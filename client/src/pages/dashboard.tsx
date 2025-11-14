@@ -441,6 +441,7 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
+      </div>
 
       {/* Player Selection Dialog */}
       <Dialog open={showPlayerSelection} onOpenChange={setShowPlayerSelection}>
@@ -688,15 +689,12 @@ function PlayerCard({
 function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: () => void }) {
   if (!game) return null;
   
-  const awayLabel = game.awayTeam?.abbreviation || game.awayTeam?.name || "Away";
-  const homeLabel = game.homeTeam?.abbreviation || game.homeTeam?.name || "Home";
-  
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">
-            {awayLabel} @ {homeLabel}
+            {game.awayTeam} @ {game.homeTeam}
           </DialogTitle>
           <DialogDescription>
             {new Date(game.startTime).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at {new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
@@ -705,29 +703,22 @@ function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: (
         <div className="space-y-6">
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
-              <h3 className="text-lg font-semibold mb-2">{awayLabel}</h3>
-              <div className="text-4xl font-bold font-mono">{game.awayScore || 0}</div>
-              {game.status === "Completed" && game.awayScore > game.homeScore && (
-                <Badge variant="default" className="mt-2">Winner</Badge>
-              )}
+              <h3 className="text-lg font-semibold mb-2">{game.awayTeam}</h3>
             </div>
             <div className="flex items-center justify-center">
               <div className="text-sm text-muted-foreground">
-                {game.status === "Live" && <Badge variant="destructive">Live</Badge>}
-                {game.status === "Scheduled" && <Badge variant="secondary">Scheduled</Badge>}
-                {game.status === "Completed" && <Badge variant="outline">Final</Badge>}
+                {game.status === "inprogress" && <Badge variant="destructive">Live</Badge>}
+                {game.status === "scheduled" && <Badge variant="secondary">Scheduled</Badge>}
+                {game.status === "completed" && <Badge variant="outline">Final</Badge>}
               </div>
             </div>
             <div>
-              <h3 className="text-lg font-semibold mb-2">{homeLabel}</h3>
-              <div className="text-4xl font-bold font-mono">{game.homeScore || 0}</div>
-              {game.status === "Completed" && game.homeScore > game.awayScore && (
-                <Badge variant="default" className="mt-2">Winner</Badge>
-              )}
+              <h3 className="text-lg font-semibold mb-2">{game.homeTeam}</h3>
             </div>
           </div>
           <div className="text-center text-sm text-muted-foreground">
-            Detailed player stats coming soon...
+            {game.venue && <div className="mb-2">{game.venue}</div>}
+            Detailed game stats and scores coming soon...
           </div>
         </div>
       </DialogContent>
