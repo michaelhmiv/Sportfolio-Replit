@@ -600,6 +600,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Start/select mining for a player
+  app.post("/api/mining/start", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const { playerId } = req.body;
+
+      if (!playerId) {
+        return res.status(400).json({ error: "playerId required" });
+      }
+
+      const player = await storage.getPlayer(playerId);
+      if (!player) {
+        return res.status(404).json({ error: "Player not found" });
+      }
+
+      if (!player.isEligibleForMining) {
+        return res.status(400).json({ error: "This player is not eligible for mining" });
+      }
+
+      // Start mining this player
+      await storage.updateMining(user.id, {
+        playerId,
+      });
+
+      broadcast({ type: "mining", userId: user.id, playerId });
+
+      res.json({ success: true, player });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Mining claim
   app.post("/api/mining/claim", async (req, res) => {
     try {
@@ -612,6 +644,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!miningData.playerId) {
         return res.status(400).json({ error: "No player selected for mining" });
+      }
+
+      const player = await storage.getPlayer(miningData.playerId);
+      if (!player) {
+        return res.status(400).json({ error: "Player not found" });
       }
 
       // Add shares to holdings (cost basis $0)
@@ -637,7 +674,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       broadcast({ type: "portfolio", userId: user.id, balance: updatedUser?.balance });
       broadcast({ type: "mining", userId: user.id, claimed: miningData.sharesAccumulated });
 
-      res.json({ success: true, claimed: miningData.sharesAccumulated });
+      res.json({ 
+        success: true, 
+        sharesClaimed: miningData.sharesAccumulated,
+        player,
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

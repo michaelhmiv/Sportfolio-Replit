@@ -1,11 +1,15 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe } from "lucide-react";
 import { Link } from "wouter";
 import type { Player, Mining, Contest, Trade } from "@shared/schema";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 interface DashboardData {
   user: {
@@ -21,8 +25,58 @@ interface DashboardData {
 }
 
 export default function Dashboard() {
+  const { toast } = useToast();
+  const [showPlayerSelection, setShowPlayerSelection] = useState(false);
+  
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
+  });
+
+  const { data: playersData } = useQuery<Player[]>({
+    queryKey: ["/api/players"],
+    enabled: showPlayerSelection,
+  });
+
+  const startMiningMutation = useMutation({
+    mutationFn: async (playerId: string) => {
+      return await apiRequest("POST", "/api/mining/start", { playerId });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      setShowPlayerSelection(false);
+      toast({
+        title: "Mining Started!",
+        description: `Now mining shares of ${data.player.firstName} ${data.player.lastName}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to Start Mining",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const claimMiningMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest("POST", "/api/mining/claim");
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+      toast({
+        title: "Shares Claimed!",
+        description: `Successfully claimed ${data.sharesClaimed} shares of ${data.player.firstName} ${data.player.lastName}`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Claim Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
   });
 
   if (isLoading) {
@@ -97,26 +151,42 @@ export default function Dashboard() {
                 />
               </div>
               
-              {data?.mining?.player && (
-                <div className="flex items-center gap-2 p-2 rounded-md bg-muted">
-                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                    <span className="text-xs font-bold">{data.mining.player.firstName[0]}{data.mining.player.lastName[0]}</span>
+              {data?.mining?.player ? (
+                <>
+                  <div className="flex items-center gap-2 p-2 rounded-md bg-muted">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-xs font-bold">{data.mining.player.firstName[0]}{data.mining.player.lastName[0]}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium truncate">{data.mining.player.firstName} {data.mining.player.lastName}</div>
+                      <div className="text-xs text-muted-foreground">{data.mining.player.team} · {data.mining.player.position}</div>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium truncate">{data.mining.player.firstName} {data.mining.player.lastName}</div>
-                    <div className="text-xs text-muted-foreground">{data.mining.player.team} · {data.mining.player.position}</div>
-                  </div>
+                  
+                  <Button 
+                    className="w-full" 
+                    size="lg"
+                    disabled={!data?.mining?.sharesAccumulated || claimMiningMutation.isPending}
+                    onClick={() => claimMiningMutation.mutate()}
+                    data-testid="button-claim-mining"
+                  >
+                    {claimMiningMutation.isPending ? "Claiming..." : `Claim ${data?.mining?.sharesAccumulated || 0} Shares`}
+                  </Button>
+                </>
+              ) : (
+                <div className="text-center py-4">
+                  <Pickaxe className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground mb-4">No player selected for mining</p>
+                  <Button 
+                    className="w-full" 
+                    size="lg"
+                    onClick={() => setShowPlayerSelection(true)}
+                    data-testid="button-select-mining-player"
+                  >
+                    Select Player to Mine
+                  </Button>
                 </div>
               )}
-              
-              <Button 
-                className="w-full" 
-                size="lg"
-                disabled={!data?.mining?.sharesAccumulated}
-                data-testid="button-claim-mining"
-              >
-                Claim {data?.mining?.sharesAccumulated || 0} Shares
-              </Button>
             </CardContent>
           </Card>
 
@@ -210,6 +280,48 @@ export default function Dashboard() {
           </Card>
         </div>
       </div>
+
+      {/* Player Selection Dialog */}
+      <Dialog open={showPlayerSelection} onOpenChange={setShowPlayerSelection}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Select Player to Mine</DialogTitle>
+            <DialogDescription>
+              Choose a player to start mining shares. You'll accumulate {data?.user?.balance && parseFloat(data.user.balance) > 1000 ? "200" : "100"} shares per hour up to a {data?.user?.balance && parseFloat(data.user.balance) > 1000 ? "33,600" : "2,400"} share cap.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="overflow-y-auto flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-1">
+              {playersData?.filter(p => p.isEligibleForMining).map((player) => (
+                <Card 
+                  key={player.id} 
+                  className="hover-elevate cursor-pointer"
+                  onClick={() => startMiningMutation.mutate(player.id)}
+                  data-testid={`card-select-player-${player.id}`}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <span className="text-lg font-bold">{player.firstName[0]}{player.lastName[0]}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">{player.firstName} {player.lastName}</div>
+                        <div className="text-sm text-muted-foreground">{player.team} · {player.position}</div>
+                        <div className="text-xs font-mono font-bold mt-1">${player.currentPrice}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            {playersData?.filter(p => p.isEligibleForMining).length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                No players available for mining at this time.
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
