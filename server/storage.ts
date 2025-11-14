@@ -1,38 +1,387 @@
-import { type User, type InsertUser } from "@shared/schema";
+import {
+  users,
+  players,
+  holdings,
+  orders,
+  trades,
+  mining,
+  contests,
+  contestEntries,
+  contestLineups,
+  playerGameStats,
+  priceHistory,
+  type User,
+  type InsertUser,
+  type Player,
+  type InsertPlayer,
+  type Holding,
+  type Order,
+  type Trade,
+  type Mining,
+  type Contest,
+  type ContestEntry,
+  type InsertContestEntry,
+  type InsertContestLineup,
+} from "@shared/schema";
+import { db } from "./db";
+import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
-// modify the interface with any CRUD methods
-// you might need
-
 export interface IStorage {
+  // User methods
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUserBalance(userId: string, amount: string): Promise<void>;
+  
+  // Player methods
+  getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]>;
+  getPlayer(id: string): Promise<Player | undefined>;
+  upsertPlayer(player: InsertPlayer): Promise<Player>;
+  
+  // Holdings methods
+  getHolding(userId: string, assetType: string, assetId: string): Promise<Holding | undefined>;
+  getUserHoldings(userId: string): Promise<Holding[]>;
+  updateHolding(userId: string, assetType: string, assetId: string, quantity: number, avgCost: string): Promise<void>;
+  
+  // Order methods
+  createOrder(order: any): Promise<Order>;
+  getOrder(id: string): Promise<Order | undefined>;
+  getUserOrders(userId: string, status?: string): Promise<Order[]>;
+  getOrderBook(playerId: string): Promise<{ bids: Order[]; asks: Order[] }>;
+  updateOrder(orderId: string, updates: Partial<Order>): Promise<void>;
+  cancelOrder(orderId: string): Promise<void>;
+  
+  // Trade methods
+  createTrade(trade: any): Promise<Trade>;
+  getRecentTrades(playerId?: string, limit?: number): Promise<Trade[]>;
+  
+  // Mining methods
+  getMining(userId: string): Promise<Mining | undefined>;
+  updateMining(userId: string, updates: Partial<Mining>): Promise<void>;
+  
+  // Contest methods
+  getContests(status?: string): Promise<Contest[]>;
+  getContest(id: string): Promise<Contest | undefined>;
+  createContestEntry(entry: InsertContestEntry): Promise<ContestEntry>;
+  getContestEntries(contestId: string): Promise<ContestEntry[]>;
+  getUserContestEntries(userId: string): Promise<ContestEntry[]>;
+  createContestLineup(lineup: InsertContestLineup): Promise<void>;
+  updateContestEntry(entryId: string, updates: Partial<ContestEntry>): Promise<void>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
+  // User methods
   async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
   }
 
   async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
+    const [user] = await db
+      .insert(users)
+      .values({
+        ...insertUser,
+        balance: "10000.00", // Starting balance
+      })
+      .returning();
+    
+    // Initialize mining for new user
+    await db.insert(mining).values({
+      userId: user.id,
+      sharesAccumulated: 0,
+    });
+    
     return user;
+  }
+
+  async updateUserBalance(userId: string, amount: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ balance: amount })
+      .where(eq(users.id, userId));
+  }
+
+  // Player methods
+  async getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]> {
+    let query = db.select().from(players);
+    
+    // Apply filters
+    if (filters?.team && filters.team !== "all") {
+      query = query.where(eq(players.team, filters.team));
+    }
+    if (filters?.position && filters.position !== "all") {
+      query = query.where(eq(players.position, filters.position));
+    }
+    
+    const results = await query;
+    
+    // Apply search filter in memory (simpler for now)
+    if (filters?.search) {
+      const searchLower = filters.search.toLowerCase();
+      return results.filter(p => 
+        p.firstName.toLowerCase().includes(searchLower) ||
+        p.lastName.toLowerCase().includes(searchLower)
+      );
+    }
+    
+    return results;
+  }
+
+  async getPlayer(id: string): Promise<Player | undefined> {
+    const [player] = await db.select().from(players).where(eq(players.id, id));
+    return player || undefined;
+  }
+
+  async upsertPlayer(player: InsertPlayer): Promise<Player> {
+    const existing = await this.getPlayer(player.id);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(players)
+        .set({ ...player, lastUpdated: new Date() })
+        .where(eq(players.id, player.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(players)
+        .values(player)
+        .returning();
+      return created;
+    }
+  }
+
+  // Holdings methods
+  async getHolding(userId: string, assetType: string, assetId: string): Promise<Holding | undefined> {
+    const [holding] = await db
+      .select()
+      .from(holdings)
+      .where(
+        and(
+          eq(holdings.userId, userId),
+          eq(holdings.assetType, assetType),
+          eq(holdings.assetId, assetId)
+        )
+      );
+    return holding || undefined;
+  }
+
+  async getUserHoldings(userId: string): Promise<Holding[]> {
+    return await db
+      .select()
+      .from(holdings)
+      .where(eq(holdings.userId, userId));
+  }
+
+  async updateHolding(userId: string, assetType: string, assetId: string, quantity: number, avgCost: string): Promise<void> {
+    const existing = await this.getHolding(userId, assetType, assetId);
+    
+    if (existing) {
+      if (quantity <= 0) {
+        // Remove holding
+        await db
+          .delete(holdings)
+          .where(
+            and(
+              eq(holdings.userId, userId),
+              eq(holdings.assetType, assetType),
+              eq(holdings.assetId, assetId)
+            )
+          );
+      } else {
+        // Update holding
+        const totalCost = (parseFloat(avgCost) * quantity).toFixed(2);
+        await db
+          .update(holdings)
+          .set({
+            quantity,
+            avgCostBasis: avgCost,
+            totalCostBasis: totalCost,
+            lastUpdated: new Date(),
+          })
+          .where(
+            and(
+              eq(holdings.userId, userId),
+              eq(holdings.assetType, assetType),
+              eq(holdings.assetId, assetId)
+            )
+          );
+      }
+    } else if (quantity > 0) {
+      // Create new holding
+      const totalCost = (parseFloat(avgCost) * quantity).toFixed(2);
+      await db.insert(holdings).values({
+        userId,
+        assetType,
+        assetId,
+        quantity,
+        avgCostBasis: avgCost,
+        totalCostBasis: totalCost,
+      });
+    }
+  }
+
+  // Order methods
+  async createOrder(order: any): Promise<Order> {
+    const [created] = await db
+      .insert(orders)
+      .values(order)
+      .returning();
+    return created;
+  }
+
+  async getOrder(id: string): Promise<Order | undefined> {
+    const [order] = await db.select().from(orders).where(eq(orders.id, id));
+    return order || undefined;
+  }
+
+  async getUserOrders(userId: string, status?: string): Promise<Order[]> {
+    if (status) {
+      return await db
+        .select()
+        .from(orders)
+        .where(and(eq(orders.userId, userId), eq(orders.status, status)))
+        .orderBy(desc(orders.createdAt));
+    }
+    return await db
+      .select()
+      .from(orders)
+      .where(eq(orders.userId, userId))
+      .orderBy(desc(orders.createdAt));
+  }
+
+  async getOrderBook(playerId: string): Promise<{ bids: Order[]; asks: Order[] }> {
+    const allOrders = await db
+      .select()
+      .from(orders)
+      .where(and(eq(orders.playerId, playerId), eq(orders.status, "open")));
+    
+    const bids = allOrders
+      .filter(o => o.side === "buy" && o.orderType === "limit")
+      .sort((a, b) => parseFloat(b.limitPrice || "0") - parseFloat(a.limitPrice || "0"));
+    
+    const asks = allOrders
+      .filter(o => o.side === "sell" && o.orderType === "limit")
+      .sort((a, b) => parseFloat(a.limitPrice || "0") - parseFloat(b.limitPrice || "0"));
+    
+    return { bids, asks };
+  }
+
+  async updateOrder(orderId: string, updates: Partial<Order>): Promise<void> {
+    await db
+      .update(orders)
+      .set(updates)
+      .where(eq(orders.id, orderId));
+  }
+
+  async cancelOrder(orderId: string): Promise<void> {
+    await db
+      .update(orders)
+      .set({ status: "cancelled" })
+      .where(eq(orders.id, orderId));
+  }
+
+  // Trade methods
+  async createTrade(trade: any): Promise<Trade> {
+    const [created] = await db
+      .insert(trades)
+      .values(trade)
+      .returning();
+    return created;
+  }
+
+  async getRecentTrades(playerId?: string, limit: number = 10): Promise<Trade[]> {
+    if (playerId) {
+      return await db
+        .select()
+        .from(trades)
+        .where(eq(trades.playerId, playerId))
+        .orderBy(desc(trades.executedAt))
+        .limit(limit);
+    }
+    return await db
+      .select()
+      .from(trades)
+      .orderBy(desc(trades.executedAt))
+      .limit(limit);
+  }
+
+  // Mining methods
+  async getMining(userId: string): Promise<Mining | undefined> {
+    const [miningData] = await db
+      .select()
+      .from(mining)
+      .where(eq(mining.userId, userId));
+    return miningData || undefined;
+  }
+
+  async updateMining(userId: string, updates: Partial<Mining>): Promise<void> {
+    await db
+      .update(mining)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(mining.userId, userId));
+  }
+
+  // Contest methods
+  async getContests(status?: string): Promise<Contest[]> {
+    if (status) {
+      return await db
+        .select()
+        .from(contests)
+        .where(eq(contests.status, status))
+        .orderBy(desc(contests.startsAt));
+    }
+    return await db
+      .select()
+      .from(contests)
+      .orderBy(desc(contests.startsAt));
+  }
+
+  async getContest(id: string): Promise<Contest | undefined> {
+    const [contest] = await db.select().from(contests).where(eq(contests.id, id));
+    return contest || undefined;
+  }
+
+  async createContestEntry(entry: InsertContestEntry): Promise<ContestEntry> {
+    const [created] = await db
+      .insert(contestEntries)
+      .values(entry)
+      .returning();
+    return created;
+  }
+
+  async getContestEntries(contestId: string): Promise<ContestEntry[]> {
+    return await db
+      .select()
+      .from(contestEntries)
+      .where(eq(contestEntries.contestId, contestId))
+      .orderBy(asc(contestEntries.rank));
+  }
+
+  async getUserContestEntries(userId: string): Promise<ContestEntry[]> {
+    return await db
+      .select()
+      .from(contestEntries)
+      .where(eq(contestEntries.userId, userId))
+      .orderBy(desc(contestEntries.createdAt));
+  }
+
+  async createContestLineup(lineup: InsertContestLineup): Promise<void> {
+    await db.insert(contestLineups).values(lineup);
+  }
+
+  async updateContestEntry(entryId: string, updates: Partial<ContestEntry>): Promise<void> {
+    await db
+      .update(contestEntries)
+      .set(updates)
+      .where(eq(contestEntries.id, entryId));
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();

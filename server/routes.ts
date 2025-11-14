@@ -1,15 +1,790 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
+import { fetchActivePlayers, getMockPlayers, calculateFantasyPoints } from "./mysportsfeeds";
+import type { InsertPlayer } from "@shared/schema";
+
+// WebSocket clients for real-time updates
+const wsClients = new Set<WebSocket>();
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // put application routes here
-  // prefix all routes with /api
-
-  // use storage to perform CRUD operations on the storage interface
-  // e.g. storage.insertUser(user) or storage.getUserByUsername(username)
-
   const httpServer = createServer(app);
+
+  // Initialize WebSocket server
+  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
+
+  wss.on('connection', (ws) => {
+    wsClients.add(ws);
+    console.log('WebSocket client connected');
+
+    ws.on('close', () => {
+      wsClients.delete(ws);
+      console.log('WebSocket client disconnected');
+    });
+  });
+
+  // Broadcast function for real-time updates
+  function broadcast(message: any) {
+    wsClients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(message));
+      }
+    });
+  }
+
+  // Helper: Get user from session (simplified - would use auth middleware in production)
+  const getUserId = (req: any): string => {
+    // For MVP, we'll create/use a default user
+    return "default-user-id";
+  };
+
+  // Helper: Ensure default user exists
+  async function ensureDefaultUser() {
+    let user = await storage.getUserByUsername("demo");
+    if (!user) {
+      user = await storage.createUser({ username: "demo" });
+    }
+    return user;
+  }
+
+  // Helper: Calculate P&L for holdings
+  function calculatePnL(quantity: number, avgCost: string, currentPrice: string) {
+    const cost = parseFloat(avgCost);
+    const price = parseFloat(currentPrice);
+    const totalValue = quantity * price;
+    const totalCost = quantity * cost;
+    const pnl = totalValue - totalCost;
+    const pnlPercent = totalCost > 0 ? (pnl / totalCost) * 100 : 0;
+    
+    return {
+      currentValue: totalValue.toFixed(2),
+      pnl: pnl.toFixed(2),
+      pnlPercent: pnlPercent.toFixed(2),
+    };
+  }
+
+  // Helper: Match orders (FIFO) - Only for limit orders
+  async function matchOrders(playerId: string) {
+    const orderBook = await storage.getOrderBook(playerId);
+    const player = await storage.getPlayer(playerId);
+    
+    if (!player) return;
+
+    // Match buy and sell limit orders
+    for (const buyOrder of orderBook.bids) {
+      if (buyOrder.status !== "open" || buyOrder.filledQuantity >= buyOrder.quantity) continue;
+      if (!buyOrder.limitPrice) continue; // Skip if no limit price (shouldn't happen for limit orders)
+
+      for (const sellOrder of orderBook.asks) {
+        if (sellOrder.status !== "open" || sellOrder.filledQuantity >= sellOrder.quantity) continue;
+        if (!sellOrder.limitPrice) continue; // Skip if no limit price (shouldn't happen for limit orders)
+
+        // Check if prices match
+        const buyPrice = parseFloat(buyOrder.limitPrice);
+        const sellPrice = parseFloat(sellOrder.limitPrice);
+        
+        if (buyPrice >= sellPrice) {
+          // Execute trade
+          const remainingBuy = buyOrder.quantity - buyOrder.filledQuantity;
+          const remainingSell = sellOrder.quantity - sellOrder.filledQuantity;
+          const tradeQuantity = Math.min(remainingBuy, remainingSell);
+          const tradePrice = sellPrice; // Price-time priority
+
+          // Create trade record
+          await storage.createTrade({
+            playerId,
+            buyerId: buyOrder.userId,
+            sellerId: sellOrder.userId,
+            buyOrderId: buyOrder.id,
+            sellOrderId: sellOrder.id,
+            quantity: tradeQuantity,
+            price: tradePrice.toFixed(2),
+          });
+
+          // Update orders
+          const newBuyFilled = buyOrder.filledQuantity + tradeQuantity;
+          const newSellFilled = sellOrder.filledQuantity + tradeQuantity;
+
+          await storage.updateOrder(buyOrder.id, {
+            filledQuantity: newBuyFilled,
+            status: newBuyFilled >= buyOrder.quantity ? "filled" : "partial",
+          });
+
+          await storage.updateOrder(sellOrder.id, {
+            filledQuantity: newSellFilled,
+            status: newSellFilled >= sellOrder.quantity ? "filled" : "partial",
+          });
+
+          // Update holdings for buyer (Average Cost Method)
+          const buyerHolding = await storage.getHolding(buyOrder.userId, "player", playerId);
+          if (buyerHolding) {
+            const newQuantity = buyerHolding.quantity + tradeQuantity;
+            const newTotalCost = parseFloat(buyerHolding.totalCostBasis) + (tradeQuantity * tradePrice);
+            const newAvgCost = newTotalCost / newQuantity;
+            await storage.updateHolding(buyOrder.userId, "player", playerId, newQuantity, newAvgCost.toFixed(4));
+          } else {
+            await storage.updateHolding(buyOrder.userId, "player", playerId, tradeQuantity, tradePrice.toFixed(4));
+          }
+
+          // Update holdings for seller
+          const sellerHolding = await storage.getHolding(sellOrder.userId, "player", playerId);
+          if (sellerHolding) {
+            const newQuantity = sellerHolding.quantity - tradeQuantity;
+            await storage.updateHolding(sellOrder.userId, "player", playerId, newQuantity, sellerHolding.avgCostBasis);
+          }
+
+          // Update balances
+          const buyer = await storage.getUser(buyOrder.userId);
+          const seller = await storage.getUser(sellOrder.userId);
+          
+          if (buyer && seller) {
+            const tradeCost = tradeQuantity * tradePrice;
+            await storage.updateUserBalance(buyOrder.userId, (parseFloat(buyer.balance) - tradeCost).toFixed(2));
+            await storage.updateUserBalance(sellOrder.userId, (parseFloat(seller.balance) + tradeCost).toFixed(2));
+          }
+
+          // Update player price
+          await storage.upsertPlayer({
+            ...player,
+            currentPrice: tradePrice.toFixed(2),
+            volume24h: player.volume24h + tradeQuantity,
+          });
+
+          // Broadcast trade update
+          broadcast({
+            type: "trade",
+            playerId,
+            price: tradePrice.toFixed(2),
+            quantity: tradeQuantity,
+          });
+        }
+      }
+    }
+  }
+
+  // API ROUTES
+
+  // Dashboard
+  app.get("/api/dashboard", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const allPlayers = await storage.getPlayers();
+      const userHoldings = await storage.getUserHoldings(user.id);
+      const allContests = await storage.getContests("open");
+      const recentTrades = await storage.getRecentTrades(undefined, 10);
+      const miningData = await storage.getMining(user.id);
+
+      // Calculate portfolio value
+      let portfolioValue = 0;
+      for (const holding of userHoldings) {
+        if (holding.assetType === "player") {
+          const player = await storage.getPlayer(holding.assetId);
+          if (player) {
+            portfolioValue += holding.quantity * parseFloat(player.currentPrice);
+          }
+        }
+      }
+
+      // Get hot players (top 5 by 24h volume)
+      const hotPlayers = allPlayers
+        .sort((a, b) => b.volume24h - a.volume24h)
+        .slice(0, 5);
+
+      // Get top 3 holdings by value
+      const topHoldings = [];
+      for (const holding of userHoldings) {
+        if (holding.assetType === "player") {
+          const player = await storage.getPlayer(holding.assetId);
+          if (player) {
+            const { currentValue, pnl, pnlPercent } = calculatePnL(
+              holding.quantity,
+              holding.avgCostBasis,
+              player.currentPrice
+            );
+            topHoldings.push({
+              player,
+              quantity: holding.quantity,
+              value: currentValue,
+              pnl,
+              pnlPercent,
+            });
+          }
+        }
+      }
+      topHoldings.sort((a, b) => parseFloat(b.value) - parseFloat(a.value));
+
+      // Get mining data
+      let miningPlayer = undefined;
+      if (miningData?.playerId) {
+        miningPlayer = await storage.getPlayer(miningData.playerId);
+      }
+
+      res.json({
+        user: {
+          balance: user.balance,
+          portfolioValue: portfolioValue.toFixed(2),
+        },
+        hotPlayers,
+        mining: miningData ? {
+          ...miningData,
+          player: miningPlayer,
+          capLimit: user.isPremium ? 33600 : 2400,
+          sharesPerHour: user.isPremium ? 200 : 100,
+        } : null,
+        contests: allContests.slice(0, 5),
+        recentTrades: await Promise.all(
+          recentTrades.map(async (trade) => ({
+            ...trade,
+            player: await storage.getPlayer(trade.playerId),
+          }))
+        ),
+        topHoldings: topHoldings.slice(0, 3),
+        portfolioHistory: [], // Placeholder
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Players / Marketplace
+  app.get("/api/players", async (req, res) => {
+    try {
+      const { search, team, position } = req.query;
+      const players = await storage.getPlayers({
+        search: search as string,
+        team: team as string,
+        position: position as string,
+      });
+      res.json(players);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Player detail page
+  app.get("/api/player/:id", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const player = await storage.getPlayer(req.params.id);
+      
+      if (!player) {
+        return res.status(404).json({ error: "Player not found" });
+      }
+
+      const orderBook = await storage.getOrderBook(player.id);
+      const recentTrades = await storage.getRecentTrades(player.id, 20);
+      const userHolding = await storage.getHolding(user.id, "player", player.id);
+
+      // Mock price history
+      const priceHistory = Array.from({ length: 24 }, (_, i) => ({
+        timestamp: new Date(Date.now() - (23 - i) * 3600000).toISOString(),
+        price: (parseFloat(player.currentPrice) + (Math.random() - 0.5) * 2).toFixed(2),
+      }));
+
+      res.json({
+        player,
+        priceHistory,
+        orderBook: {
+          bids: orderBook.bids.slice(0, 10).map(o => ({
+            price: o.limitPrice,
+            quantity: o.quantity - o.filledQuantity,
+          })),
+          asks: orderBook.asks.slice(0, 10).map(o => ({
+            price: o.limitPrice,
+            quantity: o.quantity - o.filledQuantity,
+          })),
+        },
+        recentTrades: await Promise.all(
+          recentTrades.map(async (trade) => ({
+            ...trade,
+            buyer: await storage.getUser(trade.buyerId),
+            seller: await storage.getUser(trade.sellerId),
+          }))
+        ),
+        userBalance: user.balance,
+        userHolding,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Place order
+  app.post("/api/orders/:playerId", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const player = await storage.getPlayer(req.params.playerId);
+      
+      if (!player) {
+        return res.status(404).json({ error: "Player not found" });
+      }
+
+      const { orderType, side, quantity, limitPrice } = req.body;
+
+      // Validation
+      if (!quantity || quantity <= 0) {
+        return res.status(400).json({ error: "Invalid quantity" });
+      }
+
+      if (orderType === "limit" && (!limitPrice || parseFloat(limitPrice) <= 0)) {
+        return res.status(400).json({ error: "Invalid limit price" });
+      }
+
+      // Check balance for buy orders
+      if (side === "buy") {
+        const price = orderType === "limit" ? parseFloat(limitPrice) : parseFloat(player.currentPrice);
+        const cost = quantity * price;
+        
+        if (parseFloat(user.balance) < cost) {
+          return res.status(400).json({ error: "Insufficient balance" });
+        }
+      }
+
+      // Check holdings for sell orders
+      if (side === "sell") {
+        const holding = await storage.getHolding(user.id, "player", req.params.playerId);
+        if (!holding || holding.quantity < quantity) {
+          return res.status(400).json({ error: "Insufficient shares" });
+        }
+      }
+
+      // Create order
+      const order = await storage.createOrder({
+        userId: user.id,
+        playerId: req.params.playerId,
+        orderType,
+        side,
+        quantity,
+        limitPrice: orderType === "limit" ? limitPrice : null,
+      });
+
+      // For market orders, match immediately
+      if (orderType === "market") {
+        const orderBook = await storage.getOrderBook(req.params.playerId);
+        const availableOrders = side === "buy" ? orderBook.asks : orderBook.bids;
+        
+        if (availableOrders.length === 0) {
+          return res.status(400).json({ error: "No liquidity available for market order" });
+        }
+        
+        let remainingQty = quantity;
+        let totalCost = 0;
+
+        for (const availableOrder of availableOrders) {
+          if (remainingQty <= 0) break;
+          
+          // Ensure the counterparty order has a valid limit price
+          if (!availableOrder.limitPrice || parseFloat(availableOrder.limitPrice) <= 0) {
+            continue; // Skip invalid orders
+          }
+          
+          const availableQty = availableOrder.quantity - availableOrder.filledQuantity;
+          const fillQty = Math.min(remainingQty, availableQty);
+          const fillPrice = parseFloat(availableOrder.limitPrice);
+
+          // Execute trade
+          await storage.createTrade({
+            playerId: req.params.playerId,
+            buyerId: side === "buy" ? user.id : availableOrder.userId,
+            sellerId: side === "sell" ? user.id : availableOrder.userId,
+            buyOrderId: side === "buy" ? order.id : availableOrder.id,
+            sellOrderId: side === "sell" ? order.id : availableOrder.id,
+            quantity: fillQty,
+            price: fillPrice.toFixed(2),
+          });
+
+          remainingQty -= fillQty;
+          totalCost += fillQty * fillPrice;
+
+          // Update matched order
+          const newFilled = availableOrder.filledQuantity + fillQty;
+          await storage.updateOrder(availableOrder.id, {
+            filledQuantity: newFilled,
+            status: newFilled >= availableOrder.quantity ? "filled" : "partial",
+          });
+
+          // Update holdings
+          if (side === "buy") {
+            const buyerHolding = await storage.getHolding(user.id, "player", req.params.playerId);
+            if (buyerHolding) {
+              const newQuantity = buyerHolding.quantity + fillQty;
+              const newTotalCost = parseFloat(buyerHolding.totalCostBasis) + (fillQty * fillPrice);
+              const newAvgCost = newTotalCost / newQuantity;
+              await storage.updateHolding(user.id, "player", req.params.playerId, newQuantity, newAvgCost.toFixed(4));
+            } else {
+              await storage.updateHolding(user.id, "player", req.params.playerId, fillQty, fillPrice.toFixed(4));
+            }
+
+            const sellerHolding = await storage.getHolding(availableOrder.userId, "player", req.params.playerId);
+            if (sellerHolding) {
+              await storage.updateHolding(
+                availableOrder.userId,
+                "player",
+                req.params.playerId,
+                sellerHolding.quantity - fillQty,
+                sellerHolding.avgCostBasis
+              );
+            }
+          } else {
+            // Sell order
+            const buyerHolding = await storage.getHolding(availableOrder.userId, "player", req.params.playerId);
+            if (buyerHolding) {
+              const newQuantity = buyerHolding.quantity + fillQty;
+              const newTotalCost = parseFloat(buyerHolding.totalCostBasis) + (fillQty * fillPrice);
+              const newAvgCost = newTotalCost / newQuantity;
+              await storage.updateHolding(
+                availableOrder.userId,
+                "player",
+                req.params.playerId,
+                newQuantity,
+                newAvgCost.toFixed(4)
+              );
+            } else {
+              await storage.updateHolding(availableOrder.userId, "player", req.params.playerId, fillQty, fillPrice.toFixed(4));
+            }
+
+            const sellerHolding = await storage.getHolding(user.id, "player", req.params.playerId);
+            if (sellerHolding) {
+              await storage.updateHolding(user.id, "player", req.params.playerId, sellerHolding.quantity - fillQty, sellerHolding.avgCostBasis);
+            }
+          }
+
+          // Update balances
+          const seller = await storage.getUser(side === "sell" ? user.id : availableOrder.userId);
+          const buyer = await storage.getUser(side === "buy" ? user.id : availableOrder.userId);
+          
+          if (buyer && seller) {
+            const tradeCost = fillQty * fillPrice;
+            await storage.updateUserBalance(buyer.id, (parseFloat(buyer.balance) - tradeCost).toFixed(2));
+            await storage.updateUserBalance(seller.id, (parseFloat(seller.balance) + tradeCost).toFixed(2));
+          }
+        }
+
+        // Update market order status
+        await storage.updateOrder(order.id, {
+          filledQuantity: quantity - remainingQty,
+          status: remainingQty === 0 ? "filled" : remainingQty < quantity ? "partial" : "open",
+        });
+
+        broadcast({ type: "orderBook", playerId: req.params.playerId });
+      } else {
+        // Limit order - try to match
+        await matchOrders(req.params.playerId);
+        broadcast({ type: "orderBook", playerId: req.params.playerId });
+      }
+
+      res.json({ success: true, order });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Cancel order
+  app.post("/api/orders/:orderId/cancel", async (req, res) => {
+    try {
+      await storage.cancelOrder(req.params.orderId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Portfolio
+  app.get("/api/portfolio", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const userHoldings = await storage.getUserHoldings(user.id);
+      const openOrders = await storage.getUserOrders(user.id, "open");
+
+      let totalValue = 0;
+      let totalPnL = 0;
+      let totalCost = 0;
+
+      const enrichedHoldings = await Promise.all(
+        userHoldings.map(async (holding) => {
+          if (holding.assetType === "player") {
+            const player = await storage.getPlayer(holding.assetId);
+            if (player) {
+              const { currentValue, pnl, pnlPercent } = calculatePnL(
+                holding.quantity,
+                holding.avgCostBasis,
+                player.currentPrice
+              );
+              totalValue += parseFloat(currentValue);
+              totalPnL += parseFloat(pnl);
+              totalCost += parseFloat(holding.totalCostBasis);
+
+              return { ...holding, player, currentValue, pnl, pnlPercent };
+            }
+          }
+          return holding;
+        })
+      );
+
+      const enrichedOrders = await Promise.all(
+        openOrders.map(async (order) => ({
+          ...order,
+          player: await storage.getPlayer(order.playerId),
+        }))
+      );
+
+      const premiumShares = userHoldings.find(h => h.assetType === "premium")?.quantity || 0;
+
+      res.json({
+        balance: user.balance,
+        portfolioValue: totalValue.toFixed(2),
+        totalPnL: totalPnL.toFixed(2),
+        totalPnLPercent: totalCost > 0 ? ((totalPnL / totalCost) * 100).toFixed(2) : "0.00",
+        holdings: enrichedHoldings,
+        openOrders: enrichedOrders,
+        premiumShares,
+        isPremium: user.isPremium,
+        premiumExpiresAt: user.premiumExpiresAt,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Mining claim
+  app.post("/api/mining/claim", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const miningData = await storage.getMining(user.id);
+
+      if (!miningData || miningData.sharesAccumulated === 0) {
+        return res.status(400).json({ error: "No shares to claim" });
+      }
+
+      if (!miningData.playerId) {
+        return res.status(400).json({ error: "No player selected for mining" });
+      }
+
+      // Add shares to holdings (cost basis $0)
+      const holding = await storage.getHolding(user.id, "player", miningData.playerId);
+      if (holding) {
+        const newQuantity = holding.quantity + miningData.sharesAccumulated;
+        const newTotalCost = parseFloat(holding.totalCostBasis); // Mined shares have $0 cost
+        const newAvgCost = newTotalCost / newQuantity;
+        await storage.updateHolding(user.id, "player", miningData.playerId, newQuantity, newAvgCost.toFixed(4));
+      } else {
+        await storage.updateHolding(user.id, "player", miningData.playerId, miningData.sharesAccumulated, "0.0000");
+      }
+
+      // Reset mining
+      await storage.updateMining(user.id, {
+        sharesAccumulated: 0,
+        lastClaimedAt: new Date(),
+        capReachedAt: null,
+      });
+
+      res.json({ success: true, claimed: miningData.sharesAccumulated });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Contests
+  app.get("/api/contests", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const openContests = await storage.getContests("open");
+      const myEntries = await storage.getUserContestEntries(user.id);
+
+      const enrichedEntries = await Promise.all(
+        myEntries.map(async (entry) => ({
+          ...entry,
+          contest: await storage.getContest(entry.contestId),
+        }))
+      );
+
+      res.json({
+        openContests,
+        myEntries: enrichedEntries,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Contest entry form
+  app.get("/api/contest/:id/entry", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const contest = await storage.getContest(req.params.id);
+
+      if (!contest) {
+        return res.status(404).json({ error: "Contest not found" });
+      }
+
+      const userHoldings = await storage.getUserHoldings(user.id);
+      const eligiblePlayers = await Promise.all(
+        userHoldings
+          .filter(h => h.assetType === "player")
+          .map(async (holding) => ({
+            ...holding,
+            player: await storage.getPlayer(holding.assetId),
+            isEligible: true, // Simplified - would check game schedule
+          }))
+      );
+
+      res.json({
+        contest: {
+          id: contest.id,
+          name: contest.name,
+          sport: contest.sport,
+          startsAt: contest.startsAt,
+        },
+        eligiblePlayers,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Submit contest entry
+  app.post("/api/contest/:id/enter", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const contest = await storage.getContest(req.params.id);
+
+      if (!contest) {
+        return res.status(404).json({ error: "Contest not found" });
+      }
+
+      const { lineup } = req.body;
+
+      if (!lineup || lineup.length === 0) {
+        return res.status(400).json({ error: "Lineup cannot be empty" });
+      }
+
+      // Calculate total shares
+      const totalShares = lineup.reduce((sum: number, item: any) => sum + item.sharesEntered, 0);
+
+      // Create entry
+      const entry = await storage.createContestEntry({
+        contestId: req.params.id,
+        userId: user.id,
+        totalSharesEntered: totalShares,
+      });
+
+      // Create lineup items
+      for (const item of lineup) {
+        await storage.createContestLineup({
+          entryId: entry.id,
+          playerId: item.playerId,
+          sharesEntered: item.sharesEntered,
+        });
+
+        // Burn shares from holdings
+        const holding = await storage.getHolding(user.id, "player", item.playerId);
+        if (holding) {
+          await storage.updateHolding(
+            user.id,
+            "player",
+            item.playerId,
+            holding.quantity - item.sharesEntered,
+            holding.avgCostBasis
+          );
+        }
+      }
+
+      res.json({ success: true, entry });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Contest leaderboard
+  app.get("/api/contest/:id/leaderboard", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const contest = await storage.getContest(req.params.id);
+
+      if (!contest) {
+        return res.status(404).json({ error: "Contest not found" });
+      }
+
+      const entries = await storage.getContestEntries(req.params.id);
+      
+      // Enrich entries with user and lineup data
+      const enrichedEntries = await Promise.all(
+        entries.map(async (entry) => ({
+          ...entry,
+          user: await storage.getUser(entry.userId),
+          lineups: [], // Simplified - would fetch actual lineups
+        }))
+      );
+
+      const myEntry = enrichedEntries.find(e => e.user?.id === user.id);
+
+      res.json({
+        contest,
+        entries: enrichedEntries,
+        myEntry,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Premium redeem
+  app.post("/api/premium/redeem", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const premiumHolding = await storage.getHolding(user.id, "premium", "premium");
+
+      if (!premiumHolding || premiumHolding.quantity < 1) {
+        return res.status(400).json({ error: "No premium shares to redeem" });
+      }
+
+      // Burn 1 premium share
+      await storage.updateHolding(user.id, "premium", "premium", premiumHolding.quantity - 1, "0.0000");
+
+      // Grant premium access for 30 days
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      // Update user premium status (would use storage method, but simplified here)
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Initialize players on first run
+  async function initializePlayers() {
+    const existingPlayers = await storage.getPlayers();
+    
+    if (existingPlayers.length === 0) {
+      console.log("Initializing players from MySportsFeeds...");
+      const mockPlayers = getMockPlayers();
+      
+      for (const player of mockPlayers) {
+        const insertPlayer: InsertPlayer = {
+          id: player.id,
+          firstName: player.firstName,
+          lastName: player.lastName,
+          team: player.currentTeam?.abbreviation || "UNK",
+          position: player.primaryPosition || "G",
+          jerseyNumber: player.jerseyNumber || "",
+          isActive: player.currentRosterStatus === "ROSTER",
+          isEligibleForMining: player.currentRosterStatus === "ROSTER",
+          currentPrice: "10.00",
+          volume24h: 0,
+          priceChange24h: "0.00",
+        };
+        
+        await storage.upsertPlayer(insertPlayer);
+      }
+      
+      console.log(`Initialized ${mockPlayers.length} players`);
+    }
+  }
+
+  // Initialize default user and data
+  initializePlayers();
 
   return httpServer;
 }

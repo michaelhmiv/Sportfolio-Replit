@@ -11,6 +11,10 @@ export default {
         sm: ".1875rem", /* 3px */
       },
       colors: {
+        // Trading-specific colors
+        positive: "rgb(34 197 94)", // Green for gains
+        negative: "rgb(239 68 68)", // Red for losses
+        
         // Flat / base colors (regular buttons)
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",
@@ -83,9 +87,13 @@ export default {
         },
       },
       fontFamily: {
-        sans: ["var(--font-sans)"],
+        sans: ["Inter", "var(--font-sans)"],
         serif: ["var(--font-serif)"],
-        mono: ["var(--font-mono)"],
+        mono: ["JetBrains Mono", "var(--font-mono)"],
+      },
+      fontSize: {
+        'hero': ['4rem', { lineHeight: '1', fontWeight: '700' }], // 64px for hero prices
+        'price': ['3rem', { lineHeight: '1.2', fontWeight: '700' }], // 48px for large prices
       },
       keyframes: {
         "accordion-down": {
@@ -96,10 +104,20 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        "slide-left": {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-100%)" },
+        },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "slide-left": "slide-left 30s linear infinite",
+        "fade-in": "fade-in 0.3s ease-out",
       },
     },
   },
