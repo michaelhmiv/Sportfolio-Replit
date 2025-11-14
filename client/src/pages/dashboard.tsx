@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar, Search, ChevronDown, BarChart3 } from "lucide-react";
 import { Link } from "wouter";
 import type { Player, Mining, Contest, Trade, DailyGame } from "@shared/schema";
@@ -203,12 +204,43 @@ export default function Dashboard() {
         {/* Today's Games */}
         {todayGames && todayGames.length > 0 && (
           <Card className="mb-6">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium uppercase tracking-wide">Today's Games</CardTitle>
-              <Calendar className="w-4 h-4 text-muted-foreground" />
+              <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {/* Mobile: Horizontal Scroll */}
+              <div className="sm:hidden">
+                <ScrollArea className="w-full whitespace-nowrap">
+                  <div className="flex gap-3 pb-2">
+                    {todayGames.map((game) => (
+                      <div
+                        key={game.id}
+                        className="flex-shrink-0 w-64 p-3 rounded-md bg-muted hover-elevate"
+                        data-testid={`game-${game.gameId}`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium text-sm">{game.awayTeam}</span>
+                          <span className="text-xs text-muted-foreground">@</span>
+                          <span className="font-medium text-sm">{game.homeTeam}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                          <Badge 
+                            variant={game.status === 'inprogress' ? 'default' : game.status === 'completed' ? 'secondary' : 'outline'}
+                            className="text-xs"
+                          >
+                            {game.status === 'inprogress' ? 'LIVE' : game.status === 'completed' ? 'Final' : 'Scheduled'}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+
+              {/* Desktop: Grid Layout */}
+              <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {todayGames.map((game) => (
                   <div
                     key={game.id}
