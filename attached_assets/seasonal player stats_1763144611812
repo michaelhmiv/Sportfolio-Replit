@@ -1,0 +1,188 @@
+ 
+Seasonal Player Stats (v2.1)
+Lists each player along with their seasonal stats totals on a given day.
+
+*Addon Required*: STATS
+
+URL Examples:
+CSV: 
+JSON: 
+XML: 
+XSD (for XML): 
+
+PULL URL Syntax
+Response
+Code Samples
+
+Issue a HTTPS GET request to:
+
+https://api.mysportsfeeds.com/v2.1/pull/nba/{season}/player_stats_totals.{format}
+with optional parameters:
+
+player={list-of-players} (filter players)
+position={list-of-positions} (filter player positions)
+country={list-of-countries} (filter player countries of birth)
+team={list-of-teams} (filter teams)
+date={date-range} (filter on dates)
+stats={list-of-stats} (filter stats)
+sort={sort-specifier} (sort the feed's content)
+offset={offset-specifier} (filter results starting at the given offset)
+limit={limit-specifier} (limit the maximum # of results)
+force={force-if-not-modified} (force content)
+
+where:
+
+Parameter	Description
+{season}	
+a value obtained by concatenating
+
+(season start year) + "-" +
+(season end year) + "-" +
+either "regular" or "playoff", depending on the season's type
+
+Note: if the starting and ending years are the same, you can just specify the single year.
+
+You can also use the special keywords current, latest or upcoming.
+
+Using current relates to the current in-progress season (whether regular or playoff). If a current season is not in progress (offseason), you'll receive an empty response with response code 400. Using latest will return the latest season (whether regular or playoff).
+
+Note that current and latest will in fact apply to the same season if a season is in progress.
+
+Using upcoming will only apply to a season which has been added, but has not yet actually started. This applies in cases where the upcoming season's game schedule is available, but there is no curent season underway (offseason, or between regular and playoff seasons). If no applicable season is available, an empty 400 response is returned.
+
+Valid examples are:
+
+2016-2017-regular
+2016-playoff
+current
+latest
+upcoming
+{format}	one of csv, xml, or json
+date={date-or-range-of-dates}	(optional) a single date or a range of dates.
+
+If this parameter is omitted, by default ALL dates are included.
+
+There are several acceptable formats for a date. Each is case-insensitive.
+
+Yesterday:
+yesterday
+Today:
+today
+Tomorrow:
+tomorrow
+Simple YYYYMMDD format:
+20170427
+Since a given date:
+since-yesterday
+since-20170426
+since-3-days-ago
+since-3-weeks-ago
+since-3-months-ago
+Until a given date:
+until-tomorrow
+until-20170501
+until-3-days-from-now
+until-3-weeks-from-now
+until-3-months-from-now
+Between two specified dates:
+from-yesterday-to-today
+from-20170426-to-tomorrow
+from-3-days-ago-to-3-days-from-now
+team={list-of-teams}	(optional) comma-delimited list of one or more teams.
+
+If this parameter is omitted, by default ALL teams are included.
+In addition, for either the player_gamelogs or team_gamelogs, at least one player, team, or game MUST be specified.
+
+
+There are several acceptable formats for a team. Each is case-insensitive, and strips out any punctuation.
+
+Team ID:
+24
+Team abbreviation:
+bos
+City and team name:
+boston-celtics
+player={list-of-players}	(optional) comma-delimited list of one or more players.
+
+If this parameter is omitted, by default ALL players are included.
+In addition, for either the player_gamelogs or team_gamelogs, at least one player, team, or game MUST be specified.
+
+
+There are several acceptable formats for a player. Each is case-insensitive, and strips out any punctuation.
+
+Last name only:
+smith
+First and Last names:
+joe-smith
+In case several players with teh same name exist, you can also include the player ID:
+joe-smith-1234
+position={list-of-positions}	(optional) comma-delimited list of one or more player positions.
+
+If this parameter is omitted, by default ALL positions are included.
+
+The following are the acceptable formats for a position. Each is case-insensitive, and strips out any punctuation.
+
+Position abbreviation:
+qb
+country={list-of-countries}	(optional) comma-delimited list of one or more countries.
+
+If this parameter is omitted, by default ALL countries are included.
+
+Values are case-insensitive, and stripped of any punctuation.
+
+Example:
+usa
+stats={list-of-stats}	(optional) comma-delimited list with one or more stat abbreviations.
+
+If this parameter is omitted, by default ALL stats are included.
+To include NO stats, set to none.
+
+A full list of available stats and their abbreviations can be obtained by requesting the Current Season feed.
+sort={sort-specifier}	(optional) Specifies a sorting order for the results. Format is:
+
+{prefix}.{value}.{sort-order}
+
+The {sort-order} is optional, and must be either "A" for Ascending, or "D" for descending.
+
+Valid values for this feed are:
+player.lastname
+player.age
+player.birthplace
+player.birthdate
+player.height
+player.weight
+player.position
+player.injury
+player.team
+player.number
+team.city
+team.name
+team.abbr
+offset={offset-specifier}	(optional) Specifies the starting offset for the results. Defaults to 0.
+limit={limit-specifier}	(optional) Specifies the maxmimum number of results. If not specified, all results are returned.
+force={force-if-not-modified}	(optional) Valid values are true or false.
+
+Specifies whether to "force" content to be returned and avoid an empty 304 response. (See Response Codes section for more details)
+
+Defaults to "true", which will always return the most up-to-date content based on your subscription level.
+
+Specifying "false" will also avoid any throttling restrictions on your requests. See the Throttling section for more.
+FAQ
+
+Member Rewards
+
+Terms of Service
+
+Privacy Policy
+
+About Us
+
+Affiliate Logos
+
+ 
+  
+© 2012-2025 Be A Contender Software Services Inc. | All Rights Reserved
+
+ 
+
+MySportsFeeds is an unofficial and independent source of information not affiliated with the National Hockey League (NHL), National Football League (NFL), Major League Baseball (MLB), National Basketball Association (NBA), 
