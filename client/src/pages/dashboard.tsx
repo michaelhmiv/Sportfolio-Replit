@@ -33,6 +33,7 @@ export default function Dashboard() {
   const [showPlayerSelection, setShowPlayerSelection] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTeam, setSelectedTeam] = useState("all");
+  const [selectedGame, setSelectedGame] = useState<DailyGame | null>(null);
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   
   // WebSocket connection for live updates
@@ -117,9 +118,12 @@ export default function Dashboard() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       setShowPlayerSelection(false);
+      const playerName = data?.player?.firstName && data?.player?.lastName 
+        ? `${data.player.firstName} ${data.player.lastName}`
+        : "selected player";
       toast({
         title: "Mining Started!",
-        description: `Now mining shares of ${data.player.firstName} ${data.player.lastName}`,
+        description: `Now mining shares of ${playerName}`,
       });
     },
     onError: (error: Error) => {
@@ -138,9 +142,12 @@ export default function Dashboard() {
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+      const playerName = data?.player?.firstName && data?.player?.lastName 
+        ? `${data.player.firstName} ${data.player.lastName}`
+        : "your player";
       toast({
         title: "Shares Claimed!",
-        description: `Successfully claimed ${data.sharesClaimed} shares of ${data.player.firstName} ${data.player.lastName}`,
+        description: `Successfully claimed ${data.sharesClaimed || 0} shares of ${playerName}`,
       });
     },
     onError: (error: Error) => {
@@ -161,9 +168,10 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Market Ticker */}
-      <div className="border-b bg-card">
+    <>
+      <div className="min-h-screen bg-background">
+        {/* Market Ticker */}
+        <div className="border-b bg-card">
         <div className="h-12 overflow-hidden relative">
           <div className="flex gap-6 animate-slide-left absolute whitespace-nowrap py-3 px-4">
             {data?.hotPlayers?.concat(data.hotPlayers).map((player, idx) => (
@@ -179,11 +187,11 @@ export default function Dashboard() {
               </Link>
             ))}
           </div>
+          </div>
         </div>
-      </div>
 
-      {/* Main Dashboard Grid */}
-      <div className="p-4 sm:p-6 lg:p-8">
+        {/* Main Dashboard Grid */}
+        <div className="p-4 sm:p-6 lg:p-8">
         {/* Balance Header */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
@@ -216,7 +224,8 @@ export default function Dashboard() {
                     {todayGames.map((game) => (
                       <div
                         key={game.id}
-                        className="flex-shrink-0 w-64 p-3 rounded-md bg-muted hover-elevate"
+                        className="flex-shrink-0 w-64 p-3 rounded-md bg-muted hover-elevate active-elevate-2 cursor-pointer"
+                        onClick={() => setSelectedGame(game)}
                         data-testid={`game-${game.gameId}`}
                       >
                         <div className="flex items-center justify-between mb-1">
@@ -244,7 +253,8 @@ export default function Dashboard() {
                 {todayGames.map((game) => (
                   <div
                     key={game.id}
-                    className="flex items-center justify-between p-3 rounded-md bg-muted hover-elevate"
+                    className="flex items-center justify-between p-3 rounded-md bg-muted hover-elevate active-elevate-2 cursor-pointer"
+                    onClick={() => setSelectedGame(game)}
                     data-testid={`game-${game.gameId}`}
                   >
                     <div className="flex-1">
@@ -491,7 +501,9 @@ export default function Dashboard() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+
+      <GameStatsDialog game={selectedGame} onClose={() => setSelectedGame(null)} />
+    </>
   );
 }
 
@@ -667,7 +679,58 @@ function PlayerCard({
             )}
           </CollapsibleContent>
         </div>
-      </Collapsible>
-    </Card>
+        </Collapsible>
+      </Card>
+  );
+}
+
+// Game Stats Dialog Component
+function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: () => void }) {
+  if (!game) return null;
+  
+  const awayLabel = game.awayTeam?.abbreviation || game.awayTeam?.name || "Away";
+  const homeLabel = game.homeTeam?.abbreviation || game.homeTeam?.name || "Home";
+  
+  return (
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-xl font-bold">
+            {awayLabel} @ {homeLabel}
+          </DialogTitle>
+          <DialogDescription>
+            {new Date(game.startTime).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at {new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-6">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            <div>
+              <h3 className="text-lg font-semibold mb-2">{awayLabel}</h3>
+              <div className="text-4xl font-bold font-mono">{game.awayScore || 0}</div>
+              {game.status === "Completed" && game.awayScore > game.homeScore && (
+                <Badge variant="default" className="mt-2">Winner</Badge>
+              )}
+            </div>
+            <div className="flex items-center justify-center">
+              <div className="text-sm text-muted-foreground">
+                {game.status === "Live" && <Badge variant="destructive">Live</Badge>}
+                {game.status === "Scheduled" && <Badge variant="secondary">Scheduled</Badge>}
+                {game.status === "Completed" && <Badge variant="outline">Final</Badge>}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">{homeLabel}</h3>
+              <div className="text-4xl font-bold font-mono">{game.homeScore || 0}</div>
+              {game.status === "Completed" && game.homeScore > game.awayScore && (
+                <Badge variant="default" className="mt-2">Winner</Badge>
+              )}
+            </div>
+          </div>
+          <div className="text-center text-sm text-muted-foreground">
+            Detailed player stats coming soon...
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

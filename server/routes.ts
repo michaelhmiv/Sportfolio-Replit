@@ -267,6 +267,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Game stats - get player box scores for a specific game
+  app.get("/api/games/:gameId/stats", async (req, res) => {
+    try {
+      const { gameId } = req.params;
+      const gameIdNum = parseInt(gameId);
+      
+      if (isNaN(gameIdNum)) {
+        return res.status(400).json({ error: "Invalid game ID" });
+      }
+
+      // Get all player stats for this game
+      const stats = await storage.getGameStatsByGameId(gameIdNum);
+      
+      if (!stats || stats.length === 0) {
+        return res.json({
+          gameId: gameIdNum,
+          homeTeam: {},
+          awayTeam: {},
+          topPlayers: { home: [], away: [] },
+          message: "No stats available yet"
+        });
+      }
+
+      // Group stats by team and calculate team totals
+      const homeStats = stats.filter((s: any) => s.isHomeGame);
+      const awayStats = stats.filter((s: any) => !s.isHomeGame);
+      
+      const calculateTeamTotals = (teamStats: any[]) => ({
+        points: teamStats.reduce((sum, s) => sum + s.points, 0),
+        rebounds: teamStats.reduce((sum, s) => sum + s.rebounds, 0),
+        assists: teamStats.reduce((sum, s) => sum + s.assists, 0),
+        steals: teamStats.reduce((sum, s) => sum + s.steals, 0),
+        blocks: teamStats.reduce((sum, s) => sum + s.blocks, 0),
+      });
+
+      // Get top 3 players by points for each team
+      const getTopPlayers = async (teamStats: any[]) => {
+        const sorted = teamStats.sort((a, b) => b.points - a.points).slice(0, 3);
+        return await Promise.all(sorted.map(async (stat) => ({
+          ...stat,
+          player: await storage.getPlayer(stat.playerId),
+        })));
+      };
+
+      res.json({
+        gameId: gameIdNum,
+        homeTeam: calculateTeamTotals(homeStats),
+        awayTeam: calculateTeamTotals(awayStats),
+        topPlayers: {
+          home: await getTopPlayers(homeStats),
+          away: await getTopPlayers(awayStats),
+        },
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Admin endpoint to manually trigger sync jobs
   app.post("/api/admin/sync/:jobName", async (req, res) => {
     try {
