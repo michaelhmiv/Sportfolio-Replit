@@ -49,6 +49,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
+  // Helper: Accrue mining shares based on elapsed time
+  async function accrueMiningShares(userId: string) {
+    const user = await storage.getUser(userId);
+    if (!user) return;
+
+    const miningData = await storage.getMining(userId);
+    if (!miningData || !miningData.playerId) return;
+
+    const now = new Date();
+    const capLimit = user.isPremium ? 33600 : 2400;
+    const sharesPerHour = user.isPremium ? 200 : 100;
+
+    // If already at cap, don't accrue more - clear residual time
+    if (miningData.sharesAccumulated >= capLimit) {
+      if (!miningData.capReachedAt || miningData.residualMs !== 0) {
+        await storage.updateMining(userId, { 
+          capReachedAt: now,
+          residualMs: 0,
+          updatedAt: now,
+        });
+      }
+      return;
+    }
+
+    // Determine effective start time for accrual
+    const effectiveStart = miningData.lastClaimedAt || miningData.updatedAt;
+    if (!effectiveStart) return;
+
+    // Calculate total elapsed time including residual carryover
+    const currentElapsedMs = now.getTime() - effectiveStart.getTime();
+    const totalElapsedMs = (miningData.residualMs || 0) + currentElapsedMs;
+    
+    // Convert to shares (ms per share = 3600000ms / sharesPerHour)
+    const msPerShare = (60 * 60 * 1000) / sharesPerHour;
+    const sharesEarned = Math.floor(totalElapsedMs / msPerShare);
+    
+    if (sharesEarned > 0) {
+      // Calculate new total, capped at limit
+      const actualSharesAwarded = Math.min(capLimit - miningData.sharesAccumulated, sharesEarned);
+      const newTotal = miningData.sharesAccumulated + actualSharesAwarded;
+      const capReached = newTotal >= capLimit;
+
+      // Calculate residual time based on actual shares awarded
+      const msUsed = actualSharesAwarded * msPerShare;
+      // If we hit the cap, clear residual to prevent double-counting
+      const newResidualMs = capReached ? 0 : (totalElapsedMs - msUsed);
+
+      await storage.updateMining(userId, {
+        sharesAccumulated: newTotal,
+        residualMs: newResidualMs,
+        updatedAt: now,
+        capReachedAt: capReached ? now : null,
+      });
+    } else {
+      // No full shares earned yet, but preserve fractional time in residualMs
+      await storage.updateMining(userId, {
+        residualMs: totalElapsedMs,
+        updatedAt: now,
+      });
+    }
+  }
+
   // Helper: Match orders (FIFO) - Only for limit orders
   async function matchOrders(playerId: string) {
     const orderBook = await storage.getOrderBook(playerId);
@@ -166,6 +228,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/dashboard", async (req, res) => {
     try {
       const user = await ensureDefaultUser();
+      
+      // Accrue mining shares based on elapsed time
+      await accrueMiningShares(user.id);
+      
       const allPlayers = await storage.getPlayers();
       const userHoldings = await storage.getUserHoldings(user.id);
       const allContests = await storage.getContests("open");
@@ -822,9 +888,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "This player is not eligible for mining" });
       }
 
-      // Start mining this player
+      // Get current mining state
+      const currentMining = await storage.getMining(user.id);
+      const isSwitchingPlayer = currentMining?.playerId && currentMining.playerId !== playerId;
+
+      // Start mining this player - reset timestamps and residual to start fresh accrual
       await storage.updateMining(user.id, {
         playerId,
+        updatedAt: new Date(),
+        // If switching players, reset everything; otherwise preserve state
+        sharesAccumulated: isSwitchingPlayer ? 0 : (currentMining?.sharesAccumulated || 0),
+        residualMs: isSwitchingPlayer ? 0 : (currentMining?.residualMs || 0),
+        lastClaimedAt: null,
+        capReachedAt: null,
       });
 
       broadcast({ type: "mining", userId: user.id, playerId });
@@ -839,6 +915,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/mining/claim", async (req, res) => {
     try {
       const user = await ensureDefaultUser();
+      
+      // Accrue any final shares before claiming
+      await accrueMiningShares(user.id);
+      
       const miningData = await storage.getMining(user.id);
 
       if (!miningData || miningData.sharesAccumulated === 0) {
@@ -865,10 +945,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateHolding(user.id, "player", miningData.playerId, miningData.sharesAccumulated, "0.0000");
       }
 
-      // Reset mining
+      // Reset mining - clear residualMs since we're claiming everything
+      const now = new Date();
       await storage.updateMining(user.id, {
         sharesAccumulated: 0,
-        lastClaimedAt: new Date(),
+        lastClaimedAt: now,
+        updatedAt: now,
+        residualMs: 0,
         capReachedAt: null,
       });
 

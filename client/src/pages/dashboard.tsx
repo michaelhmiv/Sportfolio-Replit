@@ -113,7 +113,8 @@ export default function Dashboard() {
 
   const startMiningMutation = useMutation({
     mutationFn: async (playerId: string) => {
-      return await apiRequest("POST", "/api/mining/start", { playerId });
+      const res = await apiRequest("POST", "/api/mining/start", { playerId });
+      return await res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -137,7 +138,8 @@ export default function Dashboard() {
 
   const claimMiningMutation = useMutation({
     mutationFn: async () => {
-      return await apiRequest("POST", "/api/mining/claim");
+      const res = await apiRequest("POST", "/api/mining/claim");
+      return await res.json();
     },
     onSuccess: (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
