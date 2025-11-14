@@ -30,11 +30,20 @@ Preferred communication style: Simple, everyday language.
 - Sidebar navigation with collapsible state management
 - Real-time market ticker with auto-scrolling player prices
 - Card-based layout for dashboard widgets and player information
-- Today's games widget showing live/scheduled NBA games
-- Mining widget with player selection and "Change" button
+- Today's games widget showing live/scheduled NBA games (responsive: horizontal scroll on mobile, grid on desktop)
+- Mining widget with enhanced player selection dialog:
+  - Search bar for filtering players by name
+  - Team dropdown filter (all teams + individual teams)
+  - Expandable PlayerCard components with season stats and recent games
+  - Stats loaded on-demand when card is expanded
 - Tabbed interfaces for contests, portfolio views, and order management
 - Modal dialogs for trade execution, contest entry, and player mining selection
 - WebSocket connection for live data updates with automatic query invalidation
+
+**Mobile-Responsive Patterns:**
+- Games widget: `<ScrollArea>` horizontal carousel on mobile (<sm), responsive grid on desktop (>=sm)
+- Player selection: Searchable command palette with collapsible stat cards
+- Breakpoint strategy: Tailwind `sm:` prefix for tablet/desktop layouts
 
 ### Backend Architecture
 
@@ -90,11 +99,16 @@ Preferred communication style: Simple, everyday language.
 ### External Dependencies
 
 **MySportsFeeds API Integration:**
-- NBA player roster data synchronization
+- NBA player roster data synchronization via `/player_gamelogs.json` and `/seasonal_player_stats.json`
 - Real-time game statistics for fantasy scoring
 - Player injury status and roster changes
 - API key authentication with gzip compression
-- Mock data fallback for development without API key
+- **Player Stats Endpoints:**
+  - `/api/player/:id/stats` - Season averages (PPG, RPG, APG, FG%, 3P%, FT%, STL, BLK, MPG, GP)
+  - `/api/player/:id/recent-games` - Last 5 games with box scores (PTS, REB, AST, FG details)
+  - Defensive null safety for missing stats (returns empty/default values)
+  - Stats fetched on-demand when player card is expanded (not on initial load)
+- NO mock data - all data comes from paid MySportsFeeds Core + Stats subscription
 
 **Third-Party Services:**
 - Neon Database for serverless PostgreSQL hosting

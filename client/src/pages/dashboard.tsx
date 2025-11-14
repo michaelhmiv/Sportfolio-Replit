@@ -459,9 +459,9 @@ export default function Dashboard() {
                 <SelectValue placeholder="All Teams" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Teams</SelectItem>
+                <SelectItem value="all" data-testid="team-option-all">All Teams</SelectItem>
                 {uniqueTeams.map((team) => (
-                  <SelectItem key={team} value={team}>{team}</SelectItem>
+                  <SelectItem key={team} value={team} data-testid={`team-option-${team}`}>{team}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
