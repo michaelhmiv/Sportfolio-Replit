@@ -20,7 +20,18 @@ export default function Marketplace() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
   const { data: players, isLoading } = useQuery<Player[]>({
-    queryKey: ["/api/players", { search, team: teamFilter, position: positionFilter, sortField, sortOrder }],
+    queryKey: ["/api/players", search, teamFilter, positionFilter, sortField, sortOrder],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (search) params.append("search", search);
+      if (teamFilter && teamFilter !== "all") params.append("team", teamFilter);
+      if (positionFilter && positionFilter !== "all") params.append("position", positionFilter);
+      
+      const url = `/api/players${params.toString() ? `?${params.toString()}` : ""}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch players");
+      return res.json();
+    },
   });
 
   const toggleSort = (field: SortField) => {
@@ -31,6 +42,25 @@ export default function Marketplace() {
       setSortOrder("desc");
     }
   };
+
+  // Client-side sorting
+  const sortedPlayers = players ? [...players].sort((a, b) => {
+    let aVal: number;
+    let bVal: number;
+    
+    if (sortField === "price") {
+      aVal = parseFloat(a.currentPrice);
+      bVal = parseFloat(b.currentPrice);
+    } else if (sortField === "volume") {
+      aVal = a.volume24h;
+      bVal = b.volume24h;
+    } else {
+      aVal = parseFloat(a.priceChange24h);
+      bVal = parseFloat(b.priceChange24h);
+    }
+    
+    return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+  }) : [];
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
@@ -131,7 +161,7 @@ export default function Marketplace() {
                     </tr>
                   </thead>
                   <tbody>
-                    {players?.map((player) => (
+                    {sortedPlayers.map((player) => (
                       <tr 
                         key={player.id} 
                         className="border-b last:border-0 hover-elevate"

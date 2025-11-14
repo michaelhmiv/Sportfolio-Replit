@@ -151,13 +151,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             volume24h: player.volume24h + tradeQuantity,
           });
 
-          // Broadcast trade update
+          // Broadcast updates after each match iteration
           broadcast({
             type: "trade",
             playerId,
             price: tradePrice.toFixed(2),
             quantity: tradeQuantity,
           });
+          
+          broadcast({ type: "orderBook", playerId }); // Update order book depth in real-time
+          
+          // Broadcast portfolio updates for both parties
+          const updatedBuyer = await storage.getUser(buyOrder.userId);
+          const updatedSeller = await storage.getUser(sellOrder.userId);
+          if (updatedBuyer) {
+            broadcast({ type: "portfolio", userId: buyOrder.userId, balance: updatedBuyer.balance });
+          }
+          if (updatedSeller) {
+            broadcast({ type: "portfolio", userId: sellOrder.userId, balance: updatedSeller.balance });
+          }
         }
       }
     }
@@ -349,6 +361,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // For market orders, validate liquidity BEFORE creating the order
+      if (orderType === "market") {
+        const orderBook = await storage.getOrderBook(req.params.playerId);
+        const availableOrders = side === "buy" ? orderBook.asks : orderBook.bids;
+        
+        // Check if there are any valid counter-side orders with valid prices
+        const validOrders = availableOrders.filter(o => 
+          o.limitPrice && 
+          parseFloat(o.limitPrice) > 0 && 
+          (o.quantity - o.filledQuantity) > 0
+        );
+        
+        if (validOrders.length === 0) {
+          return res.status(400).json({ error: "No liquidity available for market order at valid prices" });
+        }
+      }
+
       // Create order
       const order = await storage.createOrder({
         userId: user.id,
@@ -364,12 +393,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const orderBook = await storage.getOrderBook(req.params.playerId);
         const availableOrders = side === "buy" ? orderBook.asks : orderBook.bids;
         
-        if (availableOrders.length === 0) {
-          return res.status(400).json({ error: "No liquidity available for market order" });
-        }
-        
         let remainingQty = quantity;
         let totalCost = 0;
+        let lastFillPrice = 0; // Track last fill price for broadcast
 
         for (const availableOrder of availableOrders) {
           if (remainingQty <= 0) break;
@@ -382,6 +408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const availableQty = availableOrder.quantity - availableOrder.filledQuantity;
           const fillQty = Math.min(remainingQty, availableQty);
           const fillPrice = parseFloat(availableOrder.limitPrice);
+          lastFillPrice = fillPrice; // Track for broadcast
 
           // Execute trade
           await storage.createTrade({
@@ -458,16 +485,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const tradeCost = fillQty * fillPrice;
             await storage.updateUserBalance(buyer.id, (parseFloat(buyer.balance) - tradeCost).toFixed(2));
             await storage.updateUserBalance(seller.id, (parseFloat(seller.balance) + tradeCost).toFixed(2));
+            
+            // Broadcast portfolio updates for BOTH parties in each fill
+            const updatedBuyer = await storage.getUser(buyer.id);
+            const updatedSeller = await storage.getUser(seller.id);
+            if (updatedBuyer) {
+              broadcast({ type: "portfolio", userId: buyer.id, balance: updatedBuyer.balance });
+            }
+            if (updatedSeller) {
+              broadcast({ type: "portfolio", userId: seller.id, balance: updatedSeller.balance });
+            }
           }
         }
 
         // Update market order status
+        const filledQty = quantity - remainingQty;
+        
+        // Safety check: If no fills occurred despite passing pre-check, cancel the order
+        if (filledQty === 0) {
+          await storage.updateOrder(order.id, { status: "cancelled" });
+          broadcast({ type: "orderBook", playerId: req.params.playerId });
+          return res.status(400).json({ error: "Market order could not be filled - order cancelled" });
+        }
+        
         await storage.updateOrder(order.id, {
-          filledQuantity: quantity - remainingQty,
-          status: remainingQty === 0 ? "filled" : remainingQty < quantity ? "partial" : "open",
+          filledQuantity: filledQty,
+          status: remainingQty === 0 ? "filled" : "partial",
         });
 
+        // Broadcast real-time updates for order book and trades
+        // Calculate VWAP (volume-weighted average price) for the market order
+        const vwap = filledQty > 0 ? (totalCost / filledQty).toFixed(2) : lastFillPrice.toFixed(2);
+        
         broadcast({ type: "orderBook", playerId: req.params.playerId });
+        broadcast({ type: "trade", playerId: req.params.playerId, quantity: filledQty, price: vwap });
+        // Note: portfolio broadcasts already sent for each party in the fill loop above
       } else {
         // Limit order - try to match
         await matchOrders(req.params.playerId);
@@ -578,6 +630,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         lastClaimedAt: new Date(),
         capReachedAt: null,
       });
+
+      // Broadcast portfolio update
+      const updatedUser = await storage.getUser(user.id);
+      broadcast({ type: "portfolio", userId: user.id, balance: updatedUser?.balance });
+      broadcast({ type: "mining", userId: user.id, claimed: miningData.sharesAccumulated });
 
       res.json({ success: true, claimed: miningData.sharesAccumulated });
     } catch (error: any) {

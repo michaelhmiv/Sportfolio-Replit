@@ -184,7 +184,7 @@ export class DatabaseStorage implements IStorage {
     
     if (existing) {
       if (quantity <= 0) {
-        // Remove holding
+        // Remove holding - normalize to zero to avoid NaN
         await db
           .delete(holdings)
           .where(
@@ -195,13 +195,16 @@ export class DatabaseStorage implements IStorage {
             )
           );
       } else {
-        // Update holding
-        const totalCost = (parseFloat(avgCost) * quantity).toFixed(2);
+        // Update holding - ensure proper rounding and cost basis persistence
+        const avgCostParsed = parseFloat(avgCost);
+        const avgCostNormalized = isNaN(avgCostParsed) ? "0.0000" : avgCostParsed.toFixed(4);
+        const totalCost = (parseFloat(avgCostNormalized) * quantity).toFixed(2);
+        
         await db
           .update(holdings)
           .set({
             quantity,
-            avgCostBasis: avgCost,
+            avgCostBasis: avgCostNormalized,
             totalCostBasis: totalCost,
             lastUpdated: new Date(),
           })
@@ -214,14 +217,17 @@ export class DatabaseStorage implements IStorage {
           );
       }
     } else if (quantity > 0) {
-      // Create new holding
-      const totalCost = (parseFloat(avgCost) * quantity).toFixed(2);
+      // Create new holding - ensure proper rounding
+      const avgCostParsed = parseFloat(avgCost);
+      const avgCostNormalized = isNaN(avgCostParsed) ? "0.0000" : avgCostParsed.toFixed(4);
+      const totalCost = (parseFloat(avgCostNormalized) * quantity).toFixed(2);
+      
       await db.insert(holdings).values({
         userId,
         assetType,
         assetId,
         quantity,
-        avgCostBasis: avgCost,
+        avgCostBasis: avgCostNormalized,
         totalCostBasis: totalCost,
       });
     }

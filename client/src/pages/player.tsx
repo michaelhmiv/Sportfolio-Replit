@@ -85,10 +85,10 @@ export default function PlayerPage() {
       const price = parseFloat(limitPrice) || 0;
       return (qty * price).toFixed(2);
     } else {
-      // Market order uses best available price
+      // Market order uses best available price or current price as estimate
       const price = side === "buy" 
-        ? parseFloat(data?.orderBook.asks[0]?.price || "0")
-        : parseFloat(data?.orderBook.bids[0]?.price || "0");
+        ? parseFloat(data?.orderBook.asks[0]?.price || data?.player.currentPrice || "0")
+        : parseFloat(data?.orderBook.bids[0]?.price || data?.player.currentPrice || "0");
       return (qty * price).toFixed(2);
     }
   };
@@ -97,7 +97,9 @@ export default function PlayerPage() {
     if (side === "buy") {
       const price = orderType === "limit" 
         ? parseFloat(limitPrice) || parseFloat(data?.player.currentPrice || "0")
-        : parseFloat(data?.orderBook.asks[0]?.price || "0");
+        : parseFloat(data?.orderBook.asks[0]?.price || data?.player.currentPrice || "0");
+      
+      if (price <= 0) return; // Avoid division by zero
       const maxQty = Math.floor(parseFloat(data?.userBalance || "0") / price);
       setQuantity(maxQty.toString());
     } else {
