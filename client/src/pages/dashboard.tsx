@@ -161,6 +161,15 @@ export default function Dashboard() {
                       <div className="text-sm font-medium truncate">{data.mining.player.firstName} {data.mining.player.lastName}</div>
                       <div className="text-xs text-muted-foreground">{data.mining.player.team} · {data.mining.player.position}</div>
                     </div>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowPlayerSelection(true)}
+                      data-testid="button-change-mining-player"
+                      className="flex-shrink-0"
+                    >
+                      Change
+                    </Button>
                   </div>
                   
                   <Button 
