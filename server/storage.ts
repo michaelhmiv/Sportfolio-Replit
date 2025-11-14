@@ -10,6 +10,8 @@ import {
   contestLineups,
   playerGameStats,
   priceHistory,
+  dailyGames,
+  jobExecutionLogs,
   type User,
   type InsertUser,
   type Player,
@@ -22,6 +24,12 @@ import {
   type ContestEntry,
   type InsertContestEntry,
   type InsertContestLineup,
+  type DailyGame,
+  type InsertDailyGame,
+  type JobExecutionLog,
+  type InsertJobExecutionLog,
+  type PlayerGameStats,
+  type InsertPlayerGameStats,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql } from "drizzle-orm";
@@ -68,6 +76,21 @@ export interface IStorage {
   getUserContestEntries(userId: string): Promise<ContestEntry[]>;
   createContestLineup(lineup: InsertContestLineup): Promise<void>;
   updateContestEntry(entryId: string, updates: Partial<ContestEntry>): Promise<void>;
+  
+  // Daily games methods
+  upsertDailyGame(game: InsertDailyGame): Promise<DailyGame>;
+  getDailyGames(startDate: Date, endDate: Date): Promise<DailyGame[]>;
+  updateDailyGameStatus(gameId: string, status: string): Promise<void>;
+  getGamesByTeam(teamAbbreviation: string, startDate: Date, endDate: Date): Promise<DailyGame[]>;
+  
+  // Job execution log methods
+  createJobLog(log: InsertJobExecutionLog): Promise<JobExecutionLog>;
+  updateJobLog(id: string, updates: Partial<JobExecutionLog>): Promise<void>;
+  getRecentJobLogs(jobName?: string, limit?: number): Promise<JobExecutionLog[]>;
+  
+  // Player game stats methods
+  upsertPlayerGameStats(stats: InsertPlayerGameStats): Promise<PlayerGameStats>;
+  getPlayerGameStats(playerId: string, gameId: string): Promise<PlayerGameStats | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -387,6 +410,132 @@ export class DatabaseStorage implements IStorage {
       .update(contestEntries)
       .set(updates)
       .where(eq(contestEntries.id, entryId));
+  }
+
+  // Daily games methods
+  async upsertDailyGame(game: InsertDailyGame): Promise<DailyGame> {
+    const [existing] = await db
+      .select()
+      .from(dailyGames)
+      .where(eq(dailyGames.gameId, game.gameId));
+
+    if (existing) {
+      const [updated] = await db
+        .update(dailyGames)
+        .set({ ...game, lastFetchedAt: new Date() })
+        .where(eq(dailyGames.gameId, game.gameId))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(dailyGames)
+        .values(game)
+        .returning();
+      return created;
+    }
+  }
+
+  async getDailyGames(startDate: Date, endDate: Date): Promise<DailyGame[]> {
+    return await db
+      .select()
+      .from(dailyGames)
+      .where(
+        and(
+          sql`${dailyGames.date} >= ${startDate}`,
+          sql`${dailyGames.date} <= ${endDate}`
+        )
+      )
+      .orderBy(asc(dailyGames.startTime));
+  }
+
+  async updateDailyGameStatus(gameId: string, status: string): Promise<void> {
+    await db
+      .update(dailyGames)
+      .set({ status, lastFetchedAt: new Date() })
+      .where(eq(dailyGames.gameId, gameId));
+  }
+
+  async getGamesByTeam(teamAbbreviation: string, startDate: Date, endDate: Date): Promise<DailyGame[]> {
+    return await db
+      .select()
+      .from(dailyGames)
+      .where(
+        and(
+          sql`${dailyGames.date} >= ${startDate}`,
+          sql`${dailyGames.date} <= ${endDate}`,
+          sql`(${dailyGames.homeTeam} = ${teamAbbreviation} OR ${dailyGames.awayTeam} = ${teamAbbreviation})`
+        )
+      )
+      .orderBy(asc(dailyGames.startTime));
+  }
+
+  // Job execution log methods
+  async createJobLog(log: InsertJobExecutionLog): Promise<JobExecutionLog> {
+    const [created] = await db
+      .insert(jobExecutionLogs)
+      .values(log)
+      .returning();
+    return created;
+  }
+
+  async updateJobLog(id: string, updates: Partial<JobExecutionLog>): Promise<void> {
+    await db
+      .update(jobExecutionLogs)
+      .set(updates)
+      .where(eq(jobExecutionLogs.id, id));
+  }
+
+  async getRecentJobLogs(jobName?: string, limit: number = 50): Promise<JobExecutionLog[]> {
+    let query = db.select().from(jobExecutionLogs);
+    
+    if (jobName) {
+      query = query.where(eq(jobExecutionLogs.jobName, jobName));
+    }
+    
+    return await query
+      .orderBy(desc(jobExecutionLogs.scheduledFor))
+      .limit(limit);
+  }
+
+  // Player game stats methods
+  async upsertPlayerGameStats(stats: InsertPlayerGameStats): Promise<PlayerGameStats> {
+    const [existing] = await db
+      .select()
+      .from(playerGameStats)
+      .where(
+        and(
+          eq(playerGameStats.playerId, stats.playerId),
+          eq(playerGameStats.gameId, stats.gameId)
+        )
+      );
+
+    if (existing) {
+      const [updated] = await db
+        .update(playerGameStats)
+        .set({ ...stats, lastFetchedAt: new Date() })
+        .where(eq(playerGameStats.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(playerGameStats)
+        .values(stats)
+        .returning();
+      return created;
+    }
+  }
+
+  async getPlayerGameStats(playerId: string, gameId: string): Promise<PlayerGameStats | undefined> {
+    const [stats] = await db
+      .select()
+      .from(playerGameStats)
+      .where(
+        and(
+          eq(playerGameStats.playerId, playerId),
+          eq(playerGameStats.gameId, gameId)
+        )
+      );
+    return stats || undefined;
   }
 }
 

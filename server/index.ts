@@ -1,6 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { jobScheduler } from "./jobs/scheduler.js";
 
 const app = express();
 
@@ -75,7 +76,20 @@ app.use((req, res, next) => {
     port,
     host: "0.0.0.0",
     reusePort: true,
-  }, () => {
+  }, async () => {
     log(`serving on port ${port}`);
+    
+    // Initialize and start cron jobs (only if API key is available)
+    if (process.env.MYSPORTSFEEDS_API_KEY) {
+      try {
+        await jobScheduler.initialize();
+        jobScheduler.start();
+        log("Cron jobs initialized and started");
+      } catch (error: any) {
+        console.error("Failed to initialize cron jobs:", error.message);
+      }
+    } else {
+      log("Skipping cron jobs - MYSPORTSFEEDS_API_KEY not set");
+    }
   });
 })();

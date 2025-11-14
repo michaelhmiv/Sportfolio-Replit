@@ -4,6 +4,7 @@ import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { fetchActivePlayers, getMockPlayers, calculateFantasyPoints } from "./mysportsfeeds";
 import type { InsertPlayer } from "@shared/schema";
+import { jobScheduler } from "./jobs/scheduler";
 
 // WebSocket clients for real-time updates
 const wsClients = new Set<WebSocket>();
@@ -806,6 +807,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update user premium status (would use storage method, but simplified here)
       res.json({ success: true });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin middleware - validates ADMIN_API_TOKEN
+  function adminAuth(req: any, res: any, next: any) {
+    const token = req.headers.authorization?.replace('Bearer ', '');
+    const expectedToken = process.env.ADMIN_API_TOKEN;
+    
+    if (!expectedToken) {
+      console.warn('[ADMIN] ADMIN_API_TOKEN not configured - admin endpoints disabled');
+      return res.status(503).json({ error: 'Admin endpoints not configured' });
+    }
+    
+    if (token !== expectedToken) {
+      const clientIp = req.ip || req.connection.remoteAddress;
+      console.warn(`[ADMIN] Unauthorized access attempt from ${clientIp} to ${req.path}`);
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    next();
+  }
+
+  // Admin endpoint: Manually trigger cron jobs
+  app.post("/api/admin/jobs/trigger", adminAuth, async (req, res) => {
+    try {
+      const { jobName } = req.body;
+      const clientIp = req.ip || req.connection.remoteAddress;
+      
+      if (!jobName) {
+        return res.status(400).json({ error: 'jobName required' });
+      }
+      
+      const validJobs = ['roster_sync', 'schedule_sync', 'stats_sync'];
+      if (!validJobs.includes(jobName)) {
+        return res.status(400).json({ error: `Invalid jobName. Must be one of: ${validJobs.join(', ')}` });
+      }
+      
+      console.log(`[ADMIN] Job trigger requested by ${clientIp}: ${jobName}`);
+      
+      const result = await jobScheduler.triggerJob(jobName);
+      
+      console.log(`[ADMIN] Job ${jobName} completed - ${result.recordsProcessed} records, ${result.errorCount} errors, ${result.requestCount} requests`);
+      
+      res.json({
+        success: true,
+        jobName,
+        result,
+      });
+    } catch (error: any) {
+      console.error('[ADMIN] Job trigger failed:', error.message);
       res.status(500).json({ error: error.message });
     }
   });

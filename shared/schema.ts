@@ -150,6 +150,10 @@ export const playerGameStats = pgTable("player_game_stats", {
   playerId: varchar("player_id").notNull().references(() => players.id),
   gameId: text("game_id").notNull(), // MySportsFeeds game ID
   gameDate: timestamp("game_date").notNull(),
+  season: text("season").notNull().default("2024-2025-regular"), // Track season for historical data
+  opponentTeam: text("opponent_team"), // Opponent abbreviation
+  homeAway: text("home_away"), // "home" or "away"
+  minutes: integer("minutes").notNull().default(0), // Minutes played
   points: integer("points").notNull().default(0),
   threePointersMade: integer("three_pointers_made").notNull().default(0),
   rebounds: integer("rebounds").notNull().default(0),
@@ -160,6 +164,7 @@ export const playerGameStats = pgTable("player_game_stats", {
   isDoubleDouble: boolean("is_double_double").notNull().default(false),
   isTripleDouble: boolean("is_triple_double").notNull().default(false),
   fantasyPoints: decimal("fantasy_points", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  lastFetchedAt: timestamp("last_fetched_at").notNull().defaultNow(), // Track ingestion time
 }, (table) => ({
   playerGameIdx: index("player_game_idx").on(table.playerId, table.gameId),
 }));
@@ -173,6 +178,40 @@ export const priceHistory = pgTable("price_history", {
   timestamp: timestamp("timestamp").notNull().defaultNow(),
 }, (table) => ({
   playerTimeIdx: index("player_time_idx").on(table.playerId, table.timestamp),
+}));
+
+// Daily games table - cached game schedules from MySportsFeeds
+export const dailyGames = pgTable("daily_games", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gameId: text("game_id").notNull().unique(), // MySportsFeeds game ID
+  date: timestamp("date").notNull(), // Game date
+  homeTeam: text("home_team").notNull(), // Team abbreviation
+  awayTeam: text("away_team").notNull(), // Team abbreviation
+  venue: text("venue"),
+  status: text("status").notNull().default("scheduled"), // "scheduled", "inprogress", "completed"
+  startTime: timestamp("start_time").notNull(),
+  lastFetchedAt: timestamp("last_fetched_at").notNull().defaultNow(),
+}, (table) => ({
+  dateIdx: index("daily_games_date_idx").on(table.date),
+  statusIdx: index("daily_games_status_idx").on(table.status),
+  gameIdDateIdx: index("daily_games_game_date_idx").on(table.gameId, table.date),
+}));
+
+// Job execution logs - track sync job runs for monitoring
+export const jobExecutionLogs = pgTable("job_execution_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobName: text("job_name").notNull(), // e.g., "roster_sync", "schedule_sync", "stats_sync"
+  scheduledFor: timestamp("scheduled_for").notNull(), // When job was supposed to run
+  startedAt: timestamp("started_at").notNull().defaultNow(),
+  finishedAt: timestamp("finished_at"),
+  status: text("status").notNull().default("running"), // "running", "success", "failed", "degraded"
+  errorMessage: text("error_message"),
+  requestCount: integer("request_count").notNull().default(0), // API requests made during job
+  recordsProcessed: integer("records_processed").notNull().default(0),
+  errorCount: integer("error_count").notNull().default(0), // Number of failed records
+}, (table) => ({
+  jobNameIdx: index("job_name_idx").on(table.jobName),
+  scheduledIdx: index("scheduled_idx").on(table.scheduledFor),
 }));
 
 // Relations
@@ -273,6 +312,21 @@ export const insertContestLineupSchema = createInsertSchema(contestLineups).omit
   earnedScore: true,
 });
 
+export const insertDailyGameSchema = createInsertSchema(dailyGames).omit({
+  id: true,
+  lastFetchedAt: true,
+});
+
+export const insertJobExecutionLogSchema = createInsertSchema(jobExecutionLogs).omit({
+  id: true,
+  startedAt: true,
+});
+
+export const insertPlayerGameStatsSchema = createInsertSchema(playerGameStats).omit({
+  id: true,
+  lastFetchedAt: true,
+});
+
 // Select types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -290,11 +344,19 @@ export type Trade = typeof trades.$inferSelect;
 
 export type Mining = typeof mining.$inferSelect;
 
+export type DailyGame = typeof dailyGames.$inferSelect;
+export type InsertDailyGame = z.infer<typeof insertDailyGameSchema>;
+
+export type JobExecutionLog = typeof jobExecutionLogs.$inferSelect;
+export type InsertJobExecutionLog = z.infer<typeof insertJobExecutionLogSchema>;
+
+export type PlayerGameStats = typeof playerGameStats.$inferSelect;
+export type InsertPlayerGameStats = z.infer<typeof insertPlayerGameStatsSchema>;
+
 export type Contest = typeof contests.$inferSelect;
 export type ContestEntry = typeof contestEntries.$inferSelect;
 export type ContestLineup = typeof contestLineups.$inferSelect;
 
-export type PlayerGameStats = typeof playerGameStats.$inferSelect;
 export type PriceHistory = typeof priceHistory.$inferSelect;
 
 export type InsertContestEntry = z.infer<typeof insertContestEntrySchema>;

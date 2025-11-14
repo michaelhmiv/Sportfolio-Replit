@@ -74,6 +74,46 @@ export async function fetchPlayerGameStats(gameId: string): Promise<any> {
   }
 }
 
+/**
+ * Normalize MySportsFeeds game status to internal enum
+ * API returns: "UNPLAYED", "LIVE", "FINAL", "COMPLETED", "In-Progress", etc.
+ * Internal: "scheduled", "inprogress", "completed"
+ */
+export function normalizeGameStatus(apiStatus: string): string {
+  const normalized = apiStatus.toLowerCase();
+  
+  if (normalized === "final" || normalized === "completed") {
+    return "completed";
+  }
+  if (normalized === "live" || normalized === "inprogress" || normalized === "in-progress") {
+    return "inprogress";
+  }
+  return "scheduled";
+}
+
+export async function fetchGameStatus(gameId: string): Promise<string | null> {
+  try {
+    const response = await apiClient.get(`/${SEASON}/games/${gameId}.json`);
+    const apiStatus = response.data?.game?.schedule?.playedStatus;
+    return apiStatus ? normalizeGameStatus(apiStatus) : null;
+  } catch (error: any) {
+    console.error(`MySportsFeeds API error for game ${gameId}:`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Calculate fantasy points using DFS scoring rules:
+ * - Points: 1.0 per point
+ * - 3PM: 0.5 per three-pointer made
+ * - Rebounds: 1.25 per rebound
+ * - Assists: 1.5 per assist
+ * - Steals: 2.0 per steal
+ * - Blocks: 2.0 per block
+ * - Turnovers: -0.5 per turnover
+ * - Double-double: +1.5 bonus (10+ in 2 categories)
+ * - Triple-double: +3.0 bonus (10+ in 3 categories) - REPLACES double-double bonus (non-stacking)
+ */
 export function calculateFantasyPoints(stats: GameStats): number {
   let points = 0;
   
@@ -86,16 +126,14 @@ export function calculateFantasyPoints(stats: GameStats): number {
   points += stats.blocks * 2.0;
   points += stats.turnovers * -0.5;
   
-  // Double-double check (10+ in 2 categories)
+  // Double-double/Triple-double bonuses (non-stacking)
   const categories = [stats.points, stats.rebounds, stats.assists, stats.steals, stats.blocks];
   const doubleDigitCategories = categories.filter(c => c >= 10).length;
   
-  if (doubleDigitCategories >= 2) {
-    points += 1.5; // Double-double bonus
-  }
-  
   if (doubleDigitCategories >= 3) {
-    points += 3.0; // Triple-double bonus (replaces double-double)
+    points += 3.0; // Triple-double bonus (exclusive, no double-double stacking)
+  } else if (doubleDigitCategories >= 2) {
+    points += 1.5; // Double-double bonus
   }
   
   return parseFloat(points.toFixed(2));
