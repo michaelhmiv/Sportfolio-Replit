@@ -5,7 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar, Search, ChevronDown, BarChart3 } from "lucide-react";
 import { Link } from "wouter";
 import type { Player, Mining, Contest, Trade, DailyGame } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -27,6 +30,9 @@ interface DashboardData {
 export default function Dashboard() {
   const { toast } = useToast();
   const [showPlayerSelection, setShowPlayerSelection] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedTeam, setSelectedTeam] = useState("all");
+  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   
   // WebSocket connection for live updates
   useEffect(() => {
@@ -81,6 +87,23 @@ export default function Dashboard() {
     queryKey: ["/api/players"],
     enabled: showPlayerSelection,
   });
+
+  // Filter players by search and team
+  const filteredPlayers = playersData?.filter(p => {
+    if (!p.isEligibleForMining) return false;
+    
+    const matchesSearch = searchTerm === "" || 
+      `${p.firstName} ${p.lastName}`.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesTeam = selectedTeam === "all" || p.team === selectedTeam;
+    
+    return matchesSearch && matchesTeam;
+  }) || [];
+
+  // Get unique teams for filter
+  const uniqueTeams = Array.from(
+    new Set(playersData?.filter(p => p.isEligibleForMining).map(p => p.team))
+  ).sort();
 
   const { data: todayGames } = useQuery<DailyGame[]>({
     queryKey: ["/api/games/today"],
@@ -379,45 +402,240 @@ export default function Dashboard() {
 
       {/* Player Selection Dialog */}
       <Dialog open={showPlayerSelection} onOpenChange={setShowPlayerSelection}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Select Player to Mine</DialogTitle>
             <DialogDescription>
               Choose a player to start mining shares. You'll accumulate {data?.user?.balance && parseFloat(data.user.balance) > 1000 ? "200" : "100"} shares per hour up to a {data?.user?.balance && parseFloat(data.user.balance) > 1000 ? "33,600" : "2,400"} share cap.
             </DialogDescription>
           </DialogHeader>
-          <div className="overflow-y-auto flex-1">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-1">
-              {playersData?.filter(p => p.isEligibleForMining).map((player) => (
-                <Card 
-                  key={player.id} 
-                  className="hover-elevate cursor-pointer"
-                  onClick={() => startMiningMutation.mutate(player.id)}
-                  data-testid={`card-select-player-${player.id}`}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <span className="text-lg font-bold">{player.firstName[0]}{player.lastName[0]}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{player.firstName} {player.lastName}</div>
-                        <div className="text-sm text-muted-foreground">{player.team} · {player.position}</div>
-                        <div className="text-xs font-mono font-bold mt-1">${player.currentPrice}</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+          
+          {/* Search and Filter */}
+          <div className="flex flex-col sm:flex-row gap-3 px-1">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search players..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-players"
+              />
+            </div>
+            <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+              <SelectTrigger className="w-full sm:w-40" data-testid="select-team-filter">
+                <SelectValue placeholder="All Teams" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Teams</SelectItem>
+                {uniqueTeams.map((team) => (
+                  <SelectItem key={team} value={team}>{team}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="overflow-y-auto flex-1 px-1">
+            <div className="space-y-2">
+              {filteredPlayers.map((player) => (
+                <PlayerCard
+                  key={player.id}
+                  player={player}
+                  isExpanded={expandedPlayerId === player.id}
+                  onToggleExpand={() => setExpandedPlayerId(
+                    expandedPlayerId === player.id ? null : player.id
+                  )}
+                  onSelect={() => startMiningMutation.mutate(player.id)}
+                  isPending={startMiningMutation.isPending}
+                />
               ))}
             </div>
-            {playersData?.filter(p => p.isEligibleForMining).length === 0 && (
-              <div className="text-center py-8 text-muted-foreground">
-                No players available for mining at this time.
+            {filteredPlayers.length === 0 && (
+              <div className="text-center py-12 text-muted-foreground">
+                <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>No players found matching your criteria</p>
               </div>
             )}
           </div>
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+// Player Card Component with Stats and Recent Games
+function PlayerCard({ 
+  player, 
+  isExpanded, 
+  onToggleExpand, 
+  onSelect, 
+  isPending 
+}: { 
+  player: Player; 
+  isExpanded: boolean; 
+  onToggleExpand: () => void; 
+  onSelect: () => void; 
+  isPending: boolean;
+}) {
+  const { data: statsData, isLoading: statsLoading } = useQuery<any>({
+    queryKey: ["/api/player", player.id, "stats"],
+    enabled: isExpanded,
+  });
+
+  const { data: recentGamesData, isLoading: gamesLoading } = useQuery<any>({
+    queryKey: ["/api/player", player.id, "recent-games"],
+    enabled: isExpanded,
+  });
+
+  const stats = statsData?.stats;
+  const recentGames = recentGamesData?.recentGames || [];
+
+  return (
+    <Card className="hover-elevate">
+      <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
+        <div className="p-4">
+          <div className="flex items-start gap-3">
+            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+              <span className="text-lg font-bold">{player.firstName[0]}{player.lastName[0]}</span>
+            </div>
+            
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <div className="flex-1 min-w-0">
+                  <div className="font-medium truncate">{player.firstName} {player.lastName}</div>
+                  <div className="text-sm text-muted-foreground">{player.team} · {player.position}</div>
+                </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-lg font-mono font-bold">${player.currentPrice}</div>
+                </div>
+              </div>
+              
+              {/* Season Averages */}
+              {stats && !statsLoading ? (
+                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+                  <span className="font-mono"><span className="font-bold">{stats.pointsPerGame || "0.0"}</span> PPG</span>
+                  <span className="font-mono"><span className="font-bold">{stats.reboundsPerGame || "0.0"}</span> RPG</span>
+                  <span className="font-mono"><span className="font-bold">{stats.assistsPerGame || "0.0"}</span> APG</span>
+                  <span className="text-muted-foreground/60">·</span>
+                  <span>{stats.gamesPlayed || 0} GP</span>
+                </div>
+              ) : isExpanded && statsLoading ? (
+                <div className="text-xs text-muted-foreground mt-2">Loading stats...</div>
+              ) : null}
+            </div>
+
+            <div className="flex flex-col gap-2 flex-shrink-0">
+              <CollapsibleTrigger asChild>
+                <Button 
+                  size="sm" 
+                  variant="ghost"
+                  className="h-8 w-8 p-0"
+                  data-testid={`button-expand-player-${player.id}`}
+                >
+                  <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                </Button>
+              </CollapsibleTrigger>
+              <Button
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelect();
+                }}
+                disabled={isPending}
+                data-testid={`button-select-player-${player.id}`}
+                className="whitespace-nowrap"
+              >
+                {isPending ? "..." : "Mine"}
+              </Button>
+            </div>
+          </div>
+
+          <CollapsibleContent>
+            {isExpanded && (
+              <div className="mt-4 pt-4 border-t space-y-3">
+                {/* Full Season Stats */}
+                {stats && (
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                      Season Stats
+                    </div>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">FG%</div>
+                        <div className="font-mono font-bold">{stats.fieldGoalPct || "0.0"}%</div>
+                      </div>
+                      <div className="text-center p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">3P%</div>
+                        <div className="font-mono font-bold">{stats.threePointPct || "0.0"}%</div>
+                      </div>
+                      <div className="text-center p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">FT%</div>
+                        <div className="font-mono font-bold">{stats.freeThrowPct || "0.0"}%</div>
+                      </div>
+                      <div className="text-center p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">STL</div>
+                        <div className="font-mono font-bold">{stats.steals || 0}</div>
+                      </div>
+                      <div className="text-center p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">BLK</div>
+                        <div className="font-mono font-bold">{stats.blocks || 0}</div>
+                      </div>
+                      <div className="text-center p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">MPG</div>
+                        <div className="font-mono font-bold">{stats.minutesPerGame || "0.0"}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Last 5 Games */}
+                {recentGames.length > 0 && (
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                      Last 5 Games
+                    </div>
+                    <div className="space-y-2">
+                      {recentGames.map((game: any, idx: number) => (
+                        <div 
+                          key={idx} 
+                          className="flex items-center justify-between p-2 rounded-md bg-muted/30 text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium w-12">{game.game?.isHome ? 'vs' : '@'} {game.game?.opponent || "UNK"}</span>
+                            <span className="text-muted-foreground">
+                              {game.game?.date ? new Date(game.game.date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : "N/A"}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 font-mono">
+                            <span className="font-bold">{game.stats?.points || 0} PTS</span>
+                            <span className="text-muted-foreground">{game.stats?.rebounds || 0} REB</span>
+                            <span className="text-muted-foreground">{game.stats?.assists || 0} AST</span>
+                            <span className="text-muted-foreground text-[10px]">
+                              {game.stats?.fieldGoalsMade || 0}/{game.stats?.fieldGoalsAttempted || 0} FG
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {gamesLoading && (
+                  <div className="text-xs text-center text-muted-foreground py-4">
+                    Loading recent games...
+                  </div>
+                )}
+                
+                {!gamesLoading && recentGames.length === 0 && isExpanded && (
+                  <div className="text-xs text-center text-muted-foreground py-4">
+                    No recent games available
+                  </div>
+                )}
+              </div>
+            )}
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
+    </Card>
   );
 }

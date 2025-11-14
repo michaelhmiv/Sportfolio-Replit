@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
 import { storage } from "./storage";
-import { fetchActivePlayers, calculateFantasyPoints } from "./mysportsfeeds";
+import { fetchActivePlayers, calculateFantasyPoints, fetchPlayerSeasonStats, fetchPlayerGameLogs } from "./mysportsfeeds";
 import type { InsertPlayer } from "@shared/schema";
 import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
@@ -342,6 +342,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Player season stats (PPG, RPG, APG, etc.)
+  app.get("/api/player/:id/stats", async (req, res) => {
+    try {
+      const player = await storage.getPlayer(req.params.id);
+      
+      if (!player) {
+        return res.status(404).json({ error: "Player not found" });
+      }
+
+      // Fetch season stats from MySportsFeeds
+      const seasonStats = await fetchPlayerSeasonStats(player.id);
+      
+      if (!seasonStats || !seasonStats.stats) {
+        return res.json({ 
+          player: { firstName: player.firstName, lastName: player.lastName },
+          team: { abbreviation: player.team },
+          stats: null 
+        });
+      }
+
+      // Extract and format stats with defensive null checks
+      const stats = seasonStats.stats || {};
+      res.json({
+        player: seasonStats.player || { firstName: player.firstName, lastName: player.lastName },
+        team: seasonStats.team || { abbreviation: player.team },
+        stats: {
+          gamesPlayed: stats.gamesPlayed || 0,
+          // Scoring
+          points: stats.offense?.pts || 0,
+          pointsPerGame: stats.offense?.ptsPerGame?.toFixed(1) || "0.0",
+          fieldGoalPct: stats.fieldGoals?.fgPct?.toFixed(1) || "0.0",
+          threePointPct: stats.fieldGoals?.fg3PtPct?.toFixed(1) || "0.0",
+          freeThrowPct: stats.freeThrows?.ftPct?.toFixed(1) || "0.0",
+          // Rebounding
+          rebounds: stats.rebounds?.reb || 0,
+          reboundsPerGame: stats.rebounds?.rebPerGame?.toFixed(1) || "0.0",
+          offensiveRebounds: stats.rebounds?.offReb || 0,
+          defensiveRebounds: stats.rebounds?.defReb || 0,
+          // Playmaking
+          assists: stats.offense?.ast || 0,
+          assistsPerGame: stats.offense?.astPerGame?.toFixed(1) || "0.0",
+          turnovers: stats.offense?.tov || 0,
+          // Defense
+          steals: stats.defense?.stl || 0,
+          blocks: stats.defense?.blk || 0,
+          // Minutes
+          minutes: stats.miscellaneous?.minSeconds ? Math.floor(stats.miscellaneous.minSeconds / 60) : 0,
+          minutesPerGame: stats.miscellaneous?.minSecondsPerGame ? (stats.miscellaneous.minSecondsPerGame / 60).toFixed(1) : "0.0",
+        },
+      });
+    } catch (error: any) {
+      console.error("[API] Error fetching player stats:", error.message);
+      // Return graceful fallback instead of 500 error
+      res.json({ 
+        stats: null,
+        error: "Stats temporarily unavailable"
+      });
+    }
+  });
+
+  // Player recent games (last 5 games)
+  app.get("/api/player/:id/recent-games", async (req, res) => {
+    try {
+      const player = await storage.getPlayer(req.params.id);
+      
+      if (!player) {
+        return res.status(404).json({ error: "Player not found" });
+      }
+
+      // Fetch last 5 games from MySportsFeeds
+      const gameLogs = await fetchPlayerGameLogs(player.id, 5);
+      
+      if (!gameLogs || gameLogs.length === 0) {
+        return res.json({ recentGames: [] });
+      }
+
+      // Format game logs with defensive null checks
+      const recentGames = gameLogs
+        .filter((log: any) => log && log.game && log.stats) // Filter out invalid entries
+        .map((log: any) => {
+          const stats = log.stats || {};
+          return {
+            game: {
+              id: log.game?.id || 0,
+              date: log.game?.startTime || new Date().toISOString(),
+              opponent: log.game?.homeTeamAbbreviation === log.team?.abbreviation 
+                ? log.game?.awayTeamAbbreviation || "UNK"
+                : log.game?.homeTeamAbbreviation || "UNK",
+              isHome: log.game?.homeTeamAbbreviation === log.team?.abbreviation,
+            },
+            stats: {
+              points: stats.offense?.pts || 0,
+              rebounds: stats.rebounds?.reb || 0,
+              assists: stats.offense?.ast || 0,
+              steals: stats.defense?.stl || 0,
+              blocks: stats.defense?.blk || 0,
+              turnovers: stats.offense?.tov || 0,
+              fieldGoalsMade: stats.fieldGoals?.fgMade || 0,
+              fieldGoalsAttempted: stats.fieldGoals?.fgAtt || 0,
+              threePointersMade: stats.fieldGoals?.fg3PtMade || 0,
+              minutes: stats.miscellaneous?.minSeconds ? Math.floor(stats.miscellaneous.minSeconds / 60) : 0,
+            },
+          };
+        });
+
+      res.json({ recentGames });
+    } catch (error: any) {
+      console.error("[API] Error fetching player game logs:", error.message);
+      // Return graceful fallback instead of 500 error
+      res.json({ 
+        recentGames: [],
+        error: "Game logs temporarily unavailable"
+      });
     }
   });
 

@@ -108,6 +108,43 @@ export async function fetchGameStatus(gameId: string): Promise<string | null> {
 }
 
 /**
+ * Fetch player season stats (totals and averages)
+ * Returns stats like PPG, RPG, APG, FG%, etc.
+ */
+export async function fetchPlayerSeasonStats(playerId: string): Promise<any> {
+  try {
+    const response = await apiClient.get(`/${SEASON}/player_stats_totals.json`, {
+      params: {
+        player: playerId,
+      },
+    });
+    return response.data.playerStatsTotals?.[0] || null;
+  } catch (error: any) {
+    console.error(`[MySportsFeeds] Error fetching season stats for ${playerId}:`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetch player game logs (last N games)
+ * Returns detailed per-game stats
+ */
+export async function fetchPlayerGameLogs(playerId: string, limit: number = 5): Promise<any[]> {
+  try {
+    const response = await apiClient.get(`/${SEASON}/player_gamelogs.json`, {
+      params: {
+        player: playerId,
+        limit,
+      },
+    });
+    return response.data.gamelogs || [];
+  } catch (error: any) {
+    console.error(`[MySportsFeeds] Error fetching game logs for ${playerId}:`, error.message);
+    throw error;
+  }
+}
+
+/**
  * Calculate fantasy points using DFS scoring rules:
  * - Points: 1.0 per point
  * - 3PM: 0.5 per three-pointer made
