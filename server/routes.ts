@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
 import { storage } from "./storage";
-import { fetchActivePlayers, getMockPlayers, calculateFantasyPoints } from "./mysportsfeeds";
+import { fetchActivePlayers, calculateFantasyPoints } from "./mysportsfeeds";
 import type { InsertPlayer } from "@shared/schema";
 import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
@@ -925,38 +925,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Initialize players on first run
+  // Initialize players on first run by triggering roster sync
   async function initializePlayers() {
-    const existingPlayers = await storage.getPlayers();
-    
-    if (existingPlayers.length === 0) {
-      console.log("Initializing players from MySportsFeeds...");
-      const mockPlayers = getMockPlayers();
+    try {
+      const existingPlayers = await storage.getPlayers();
       
-      for (const player of mockPlayers) {
-        const insertPlayer: InsertPlayer = {
-          id: player.id,
-          firstName: player.firstName,
-          lastName: player.lastName,
-          team: player.currentTeam?.abbreviation || "UNK",
-          position: player.primaryPosition || "G",
-          jerseyNumber: player.jerseyNumber || "",
-          isActive: player.currentRosterStatus === "ROSTER",
-          isEligibleForMining: player.currentRosterStatus === "ROSTER",
-          currentPrice: "10.00",
-          volume24h: 0,
-          priceChange24h: "0.00",
-        };
-        
-        await storage.upsertPlayer(insertPlayer);
+      if (existingPlayers.length === 0) {
+        console.log("No players found. Triggering roster_sync to fetch real NBA data from MySportsFeeds...");
+        const result = await jobScheduler.triggerJob("roster_sync");
+        console.log(`Roster sync completed: ${result.recordsProcessed} players loaded, ${result.errorCount} errors`);
       }
-      
-      console.log(`Initialized ${mockPlayers.length} players`);
+    } catch (error: any) {
+      console.error("Failed to initialize players:", error.message);
     }
   }
 
   // Initialize default user and data
-  initializePlayers();
+  await ensureDefaultUser();
+  await initializePlayers();
 
   return httpServer;
 }
