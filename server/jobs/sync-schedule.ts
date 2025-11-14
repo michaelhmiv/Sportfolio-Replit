@@ -46,8 +46,8 @@ export async function syncSchedule(): Promise<JobResult> {
             await storage.upsertDailyGame({
               gameId: game.schedule.id.toString(),
               date: new Date(game.schedule.startTime),
-              homeTeam: game.game?.homeTeam?.abbreviation || "UNK",
-              awayTeam: game.game?.awayTeam?.abbreviation || "UNK",
+              homeTeam: game.schedule?.homeTeam?.abbreviation || "UNK",
+              awayTeam: game.schedule?.awayTeam?.abbreviation || "UNK",
               venue: game.schedule?.venue?.name,
               status: normalizedStatus,
               startTime: new Date(game.schedule.startTime),

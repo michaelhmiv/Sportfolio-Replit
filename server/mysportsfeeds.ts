@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API_BASE = "https://api.mysportsfeeds.com/v2.1/pull/nba";
-const SEASON = "2024-2025-regular";
+const SEASON = "latest"; // Automatically uses current season (2024-2025 or 2025-2026)
 
 if (!process.env.MYSPORTSFEEDS_API_KEY) {
   console.warn("MYSPORTSFEEDS_API_KEY not set. Using mock data.");
@@ -42,14 +42,39 @@ export interface GameStats {
 }
 
 export async function fetchActivePlayers(): Promise<MySportsFeedsPlayer[]> {
-  const response = await apiClient.get(`/${SEASON}/players.json`);
-  return response.data.players?.map((p: any) => p.player) || [];
+  try {
+    // Use player_stats_totals endpoint (requires STATS addon)
+    // Response format: { playerStatsTotals: [{ player: {...}, team: {...} }] }
+    const url = `/${SEASON}/player_stats_totals.json`;
+    console.log(`[MySportsFeeds] Fetching players from: ${API_BASE}${url}`);
+    
+    const response = await apiClient.get(url, {
+      params: {
+        stats: "PTS", // Request minimal stats to reduce payload
+        limit: 500,   // Get all players
+      },
+    });
+    
+    console.log(`[MySportsFeeds] Success! Fetched ${response.data.playerStatsTotals?.length || 0} players`);
+    
+    // Extract player objects from playerStatsTotals array
+    return response.data.playerStatsTotals?.map((entry: any) => entry.player) || [];
+  } catch (error: any) {
+    console.error(`[MySportsFeeds] Error fetching players:`, {
+      url: error.config?.url,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      message: error.message,
+    });
+    throw error;
+  }
 }
 
 export async function fetchDailyGames(date: string): Promise<any[]> {
-  const response = await apiClient.get(`/${SEASON}/games.json`, {
-    params: { date },
-  });
+  // Use daily games endpoint: /date/{YYYYMMDD}/games.json (CORE - no addon required)
+  // Format date as YYYYMMDD (e.g., 20241114)
+  const formattedDate = date.replace(/-/g, '');
+  const response = await apiClient.get(`/${SEASON}/date/${formattedDate}/games.json`);
   return response.data.games || [];
 }
 
