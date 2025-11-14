@@ -1,0 +1,165 @@
+Here's a highly detailed breakdown of **MySportsFeeds API documentation for NBA Stats integration**:[1]
+
+***
+
+**Getting Started & Authentication:**
+- **API Keys:** Sign up and manage your API keys from your account. All versions use the same key.
+- **Authentication:** Use HTTP Basic Auth in the `Authorization` header. For version 2.x, password is `"MYSPORTSFEEDS"`.
+    - The header value: `Authorization: Basic {base64(api_key_token:MYSPORTSFEEDS)}`
+    - Example cURL:
+      ```bash
+      curl -X "GET" "https://api.mysportsfeeds.com/v2.1/pull/nba/2025-2026-regular/player_stats.json" \
+      -u "api_key_token:MYSPORTSFEEDS" \
+      --compress
+      ```
+- **Security:** All requests secured over SSL (HTTPS).
+
+***
+
+**Available NBA Data Feeds:**
+- **CORE**  
+  - Seasonal Games
+  - Daily Games
+  - Current Season
+  - Latest Updates
+  - Seasonal Venues
+
+- **STATS Addon**  
+  - Daily Player Gamelogs
+  - Daily Team Gamelogs
+  - Seasonal Team Stats
+  - Seasonal Player Stats
+  - Seasonal Standings
+
+- **DETAILED Addon**  
+  - Game Boxscore
+  - Game Play-By-Play
+  - Game Lineup
+  - Player Injuries
+  - Injury History
+  - Players
+
+- **ODDS Addon**
+  - Daily Game Lines (Odds)
+  - Daily Futures (Odds)
+
+- **PROJECTIONS Addon**
+  - Daily Player Gamelogs Projections
+  - Daily DFS Projections
+  - Seasonal Player Stats Projections
+
+- **DFS and EXTRAS Addon**
+  - Daily DFS
+  - Drafts
+
+***
+
+**Available Formats:**
+- JSON, XML, CSV (for Excel/import)
+
+**Request URL Syntax:**
+- Format for NBA stats:
+  ```
+  https://api.mysportsfeeds.com/v2.1/pull/nba/{season}/{feed}.{format}
+  ```
+  Example:
+  ```
+  https://api.mysportsfeeds.com/v2.1/pull/nba/2025-2026-regular/player_stats.json
+  ```
+
+**Parameters:**
+- `season`: e.g. `2025-2026-regular`, supports historical and testing seasons.
+- `force`: If set to `false`, disables throttling and returns 304 if no updates (`force=true` returns the latest data).
+- Data can be filtered by team, player, game, and stat abbreviations.
+
+***
+
+**Error Codes:**
+- 200: Success
+- 204: Content not found
+- 304: No content change since last request (&force=false)
+- 400: Malformed request (format, league, season, feed name, game ID, etc.)
+- 401: Not authenticated
+- 403: Not authorized (requires subscription for in-progress seasons)
+- 429: Too many requests (throttling limits)
+- 500/499/502/503: System errors, commonly temporary
+
+***
+
+**Throttling & Limits:**
+- **General limit:** 200 requests per 5 minutes.
+- **Heavy feeds:** Some (player stats, gamelogs, projections) require a "backoff" delay (5, 15, or 30 seconds).
+- **Minute limit:** 100 request credits per minute (requests + accrued backoff seconds).
+- **Avoid throttling:** Use `force=false` when possible for caching.
+
+***
+
+**Field & Data Conventions:**
+- Unique, stable global IDs for players, teams, games, venues.
+- Dates: 
+  - v1.x feeds use `YYYYMMDD`.
+  - v2.x feeds use ISO-8601.
+- **Stat abbreviations:** For filtering data, use comma-delimited codes in `playerstats` or `teamstats` URL params.
+
+***
+
+**Testing, Development & Simulated Data:**
+- **Scrambled API:** Use `scrambled-api.mysportsfeeds.com` for testing -- free, with scrambled/truncated data.
+- **Simulated Seasons:** For continuous testing, use seasons like `testing-preseason`, `testing-regular`, `testing-playoff`.
+- **Live Game Replay:** For testing play-by-play or box scores, start a single replay from your account dashboard.
+
+***
+
+**Projections:**
+- Seasonal totals and game-by-game projections (player only).
+- Projections for DFS fantasy points and stat totals.
+- Note: Projections update regularly; game log projections presume player participation.
+
+***
+
+**PUSH Notifications:**
+- Currently under redesign; all data access is via PULL (HTTP GET).
+
+***
+
+**Charting & Coordinates (Advanced):**
+- Play-by-play data may include charting data (x/y coordinates) of plays.
+    - **NBA coordinate system:** Away team left, home team right; origin at top-left of court.
+
+***
+
+**Wrapper Libraries & Code Samples:**
+- Official wrappers available at [MySportsFeeds GitHub](https://github.com/MySportsFeeds).
+- Examples included for key endpoints and authentication.
+
+***
+
+**Personal vs. Commercial Usage:**
+- **Personal:** Free CORE data (latest 2 seasons, scores/schedules); must request personal account status.
+- **Commercial:** Paid; all data and feeds available, best-value pricing.
+
+***
+
+**Properties Returned in Feeds:**
+- `lastUpdatedOn`: ISO-8601 timestamp of data generation.
+- `game.schedule`: Details include startTime, IDs, teams, venue, status, played status.
+- `game.score`: Current period, total scores, period-by-period breakdown.
+- DFS/contest properties for fantasy data.
+- Seasonal, daily, game-by-game properties for teams and players.
+
+***
+
+**Summary for NBA Integration:**
+
+- **Authenticate** via Basic Auth (`api_key_token:MYSPORTSFEEDS`).
+- **Access feeds** using RESTful GET requests, data in JSON/XML/CSV.
+- **Select feeds** by season, data type (schedule, stats, boxscore, injuries, projections, DFS, odds).
+- **Observe throttling, response codes, and conventions.**
+- **Develop/test** with scrambled and simulated data.
+- **Chart data** available for advanced visualizations.
+- **Reference wrapper libraries for rapid coding in Python/Node/etc.**
+
+If you need **specific endpoint documentation, parameter options, or code samples** for any NBA stat feed, let me know which feed/endpoint you want code for!
+You can feed all the above to your AI code builder and generate tailored integrations or wrappers.
+
+[1](https://www.mysportsfeeds.com/data-feeds/api-docs/)
