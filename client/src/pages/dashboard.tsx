@@ -1,13 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe } from "lucide-react";
+import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar } from "lucide-react";
 import { Link } from "wouter";
-import type { Player, Mining, Contest, Trade } from "@shared/schema";
+import type { Player, Mining, Contest, Trade, DailyGame } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
@@ -28,6 +28,51 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [showPlayerSelection, setShowPlayerSelection] = useState(false);
   
+  // WebSocket connection for live updates
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+    ws.onopen = () => {
+      console.log('[WebSocket] Connected to live updates');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        console.log('[WebSocket] Received:', message);
+
+        // Handle different message types
+        if (message.type === 'liveStats') {
+          // Invalidate relevant queries to refresh data
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/games/today"] });
+        } else if (message.type === 'portfolio') {
+          queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+        } else if (message.type === 'mining') {
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+        } else if (message.type === 'orderBook' || message.type === 'trade') {
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+        }
+      } catch (error) {
+        console.error('[WebSocket] Failed to parse message:', error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('[WebSocket] Error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('[WebSocket] Disconnected');
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, []);
+  
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
   });
@@ -35,6 +80,10 @@ export default function Dashboard() {
   const { data: playersData } = useQuery<Player[]>({
     queryKey: ["/api/players"],
     enabled: showPlayerSelection,
+  });
+
+  const { data: todayGames } = useQuery<DailyGame[]>({
+    queryKey: ["/api/games/today"],
   });
 
   const startMiningMutation = useMutation({
@@ -127,6 +176,44 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
+
+        {/* Today's Games */}
+        {todayGames && todayGames.length > 0 && (
+          <Card className="mb-6">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium uppercase tracking-wide">Today's Games</CardTitle>
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {todayGames.map((game) => (
+                  <div
+                    key={game.id}
+                    className="flex items-center justify-between p-3 rounded-md bg-muted hover-elevate"
+                    data-testid={`game-${game.gameId}`}
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm">{game.awayTeam}</span>
+                        <span className="text-xs text-muted-foreground">@</span>
+                        <span className="font-medium text-sm">{game.homeTeam}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                        <Badge 
+                          variant={game.status === 'inprogress' ? 'default' : game.status === 'completed' ? 'secondary' : 'outline'}
+                          className="text-xs"
+                        >
+                          {game.status === 'inprogress' ? 'LIVE' : game.status === 'completed' ? 'Final' : 'Scheduled'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Widgets Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

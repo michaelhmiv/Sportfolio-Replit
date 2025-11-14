@@ -10,6 +10,7 @@ import { storage } from "../storage";
 import { syncRoster } from "./sync-roster";
 import { syncSchedule } from "./sync-schedule";
 import { syncStats } from "./sync-stats";
+import { syncStatsLive } from "./sync-stats-live";
 
 export interface JobResult {
   requestCount: number;
@@ -59,6 +60,12 @@ export class JobScheduler {
         schedule: "0 * * * *", // Every hour
         enabled: true,
         handler: syncStats,
+      },
+      {
+        name: "stats_sync_live",
+        schedule: "* * * * *", // Every minute for live games
+        enabled: true,
+        handler: syncStatsLive,
       },
     ];
 
@@ -155,6 +162,7 @@ export class JobScheduler {
       roster_sync: syncRoster,
       schedule_sync: syncSchedule,
       stats_sync: syncStats,
+      stats_sync_live: syncStatsLive,
     };
 
     const handler = jobConfigs[jobName];

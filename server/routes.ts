@@ -1,13 +1,11 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { WebSocketServer, WebSocket } from "ws";
+import { WebSocketServer } from "ws";
 import { storage } from "./storage";
 import { fetchActivePlayers, getMockPlayers, calculateFantasyPoints } from "./mysportsfeeds";
 import type { InsertPlayer } from "@shared/schema";
 import { jobScheduler } from "./jobs/scheduler";
-
-// WebSocket clients for real-time updates
-const wsClients = new Set<WebSocket>();
+import { addClient, removeClient, broadcast } from "./websocket";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -16,23 +14,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
   wss.on('connection', (ws) => {
-    wsClients.add(ws);
-    console.log('WebSocket client connected');
-
-    ws.on('close', () => {
-      wsClients.delete(ws);
-      console.log('WebSocket client disconnected');
-    });
+    addClient(ws);
+    ws.on('close', () => removeClient(ws));
   });
-
-  // Broadcast function for real-time updates
-  function broadcast(message: any) {
-    wsClients.forEach((client) => {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(JSON.stringify(message));
-      }
-    });
-  }
 
   // Helper: Get user from session (simplified - would use auth middleware in production)
   const getUserId = (req: any): string => {
@@ -255,6 +239,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         topHoldings: topHoldings.slice(0, 3),
         portfolioHistory: [], // Placeholder
       });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Today's games (in ET timezone where NBA games are scheduled)
+  app.get("/api/games/today", async (req, res) => {
+    try {
+      // Get current time in ET timezone
+      const now = new Date();
+      const etOffset = -5; // ET is UTC-5 (EST) or UTC-4 (EDT), using -5 for simplicity
+      const nowET = new Date(now.getTime() + (etOffset * 60 * 60 * 1000));
+      
+      // Get start and end of day in ET, then convert back to UTC for database query
+      const startOfDayET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 0, 0, 0);
+      const endOfDayET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 23, 59, 59);
+      
+      // Convert ET boundaries to UTC for database query
+      const startOfDayUTC = new Date(startOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
+      const endOfDayUTC = new Date(endOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
+      
+      const games = await storage.getDailyGames(startOfDayUTC, endOfDayUTC);
+      res.json(games);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

@@ -30,8 +30,11 @@ Preferred communication style: Simple, everyday language.
 - Sidebar navigation with collapsible state management
 - Real-time market ticker with auto-scrolling player prices
 - Card-based layout for dashboard widgets and player information
+- Today's games widget showing live/scheduled NBA games
+- Mining widget with player selection and "Change" button
 - Tabbed interfaces for contests, portfolio views, and order management
-- Modal dialogs for trade execution and contest entry
+- Modal dialogs for trade execution, contest entry, and player mining selection
+- WebSocket connection for live data updates with automatic query invalidation
 
 ### Backend Architecture
 
@@ -59,6 +62,7 @@ Preferred communication style: Simple, everyday language.
 
 **API Design:**
 - RESTful endpoints organized by domain (players, orders, contests, portfolio)
+- `/api/games/today` - Today's NBA games (ET timezone-aware)
 - WebSocket connections for live price updates and trade notifications
 - Aggregated dashboard endpoint for optimized data loading
 - Real-time leaderboard updates during active contests
@@ -104,8 +108,17 @@ Preferred communication style: Simple, everyday language.
 
 **Real-Time Features:**
 - WebSocket server on `/ws` path for live updates
-- Broadcast mechanism for price changes and trade executions
+- Centralized broadcast mechanism via `server/websocket.ts`
+- Live game stats polling (every 1 minute for in-progress games)
+- Broadcasts `liveStats`, `portfolio`, `mining`, `orderBook`, and `trade` events
+- Frontend auto-invalidates React Query cache on WebSocket updates
 - Client reconnection handling for market data streaming
+
+**Background Jobs (Cron):**
+- **roster_sync**: Daily at 5 AM ET - Syncs NBA player rosters from MySportsFeeds
+- **schedule_sync**: Every 6 hours - Updates game schedules
+- **stats_sync**: Hourly - Processes stats for completed games
+- **stats_sync_live**: Every minute - Real-time stats for in-progress games only (short-circuits if no live games)
 
 **Development Tools:**
 - Replit-specific plugins for runtime error overlay and development banner
