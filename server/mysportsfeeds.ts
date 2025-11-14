@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API_BASE = "https://api.mysportsfeeds.com/v2.1/pull/nba";
-const SEASON = "2025-2026-regular";
+const SEASON = "2024-2025-regular";
 
 if (!process.env.MYSPORTSFEEDS_API_KEY) {
   console.warn("MYSPORTSFEEDS_API_KEY not set. Using mock data.");
