@@ -108,6 +108,10 @@ Preferred communication style: Simple, everyday language.
   - `/api/player/:id/recent-games` - Last 5 games with box scores (PTS, REB, AST, FG details)
   - Defensive null safety for missing stats (returns empty/default values)
   - Stats fetched on-demand when player card is expanded (not on initial load)
+- **MySportsFeeds Response Structure (Confirmed):**
+  - **Season Stats:** `stats.offense.{pts, ptsPerGame, ast, astPerGame}`, `stats.rebounds.{reb, rebPerGame}`, `stats.fieldGoals.{fgPct, fg3PtPct}`, `stats.freeThrows.ftPct`, `stats.defense.{stl, blk}`
+  - **Game Logs:** `stats.offense.{pts, ast}`, `stats.rebounds.reb`, `stats.fieldGoals.{fgMade, fgAtt}`, `stats.defense.{stl, blk, tov}`
+  - All endpoints use fully normalized paths (NOT `stats.points.pts` or `stats.offense.fgm`)
 - NO mock data - all data comes from paid MySportsFeeds Core + Stats subscription
 
 **Third-Party Services:**

@@ -366,13 +366,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Extract and format stats with defensive null checks
+      // MySportsFeeds structure: offense, defense, rebounds, fieldGoals, freeThrows, etc.
       const stats = seasonStats.stats || {};
+      
       res.json({
         player: seasonStats.player || { firstName: player.firstName, lastName: player.lastName },
         team: seasonStats.team || { abbreviation: player.team },
         stats: {
           gamesPlayed: stats.gamesPlayed || 0,
-          // Scoring
+          // Scoring - MySportsFeeds provides per-game averages
           points: stats.offense?.pts || 0,
           pointsPerGame: stats.offense?.ptsPerGame?.toFixed(1) || "0.0",
           fieldGoalPct: stats.fieldGoals?.fgPct?.toFixed(1) || "0.0",
@@ -422,10 +424,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Format game logs with defensive null checks
+      // MySportsFeeds gamelogs structure: stats.{offense, rebounds, fieldGoals, defense, miscellaneous}
       const recentGames = gameLogs
         .filter((log: any) => log && log.game && log.stats) // Filter out invalid entries
         .map((log: any) => {
           const stats = log.stats || {};
+          const offense = stats.offense || {};
+          const rebounds = stats.rebounds || {};
+          const fieldGoals = stats.fieldGoals || {};
+          const defense = stats.defense || {};
           return {
             game: {
               id: log.game?.id || 0,
@@ -436,15 +443,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               isHome: log.game?.homeTeamAbbreviation === log.team?.abbreviation,
             },
             stats: {
-              points: stats.offense?.pts || 0,
-              rebounds: stats.rebounds?.reb || 0,
-              assists: stats.offense?.ast || 0,
-              steals: stats.defense?.stl || 0,
-              blocks: stats.defense?.blk || 0,
-              turnovers: stats.offense?.tov || 0,
-              fieldGoalsMade: stats.fieldGoals?.fgMade || 0,
-              fieldGoalsAttempted: stats.fieldGoals?.fgAtt || 0,
-              threePointersMade: stats.fieldGoals?.fg3PtMade || 0,
+              points: offense.pts || 0,
+              rebounds: rebounds.reb || 0,
+              assists: offense.ast || 0,
+              steals: defense.stl || 0,
+              blocks: defense.blk || 0,
+              turnovers: offense.tov || 0,
+              fieldGoalsMade: fieldGoals.fgMade || 0,
+              fieldGoalsAttempted: fieldGoals.fgAtt || 0,
+              threePointersMade: fieldGoals.fg3PtMade || 0,
               minutes: stats.miscellaneous?.minSeconds ? Math.floor(stats.miscellaneous.minSeconds / 60) : 0,
             },
           };
