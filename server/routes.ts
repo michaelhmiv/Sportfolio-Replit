@@ -267,6 +267,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin endpoint to manually trigger sync jobs
+  app.post("/api/admin/sync/:jobName", async (req, res) => {
+    try {
+      const { jobName } = req.params;
+      const result = await jobScheduler.triggerJob(jobName);
+      res.json({
+        success: true,
+        jobName,
+        ...result,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Players / Marketplace
   app.get("/api/players", async (req, res) => {
     try {

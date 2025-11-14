@@ -46,9 +46,9 @@ export async function syncSchedule(): Promise<JobResult> {
             await storage.upsertDailyGame({
               gameId: game.schedule.id.toString(),
               date: new Date(game.schedule.startTime),
-              homeTeam: game.schedule.homeTeam?.abbreviation || "UNK",
-              awayTeam: game.schedule.awayTeam?.abbreviation || "UNK",
-              venue: game.schedule.venue?.name,
+              homeTeam: game.game?.homeTeam?.abbreviation || "UNK",
+              awayTeam: game.game?.awayTeam?.abbreviation || "UNK",
+              venue: game.schedule?.venue?.name,
               status: normalizedStatus,
               startTime: new Date(game.schedule.startTime),
             });
@@ -67,40 +67,6 @@ export async function syncSchedule(): Promise<JobResult> {
 
     console.log(`[schedule_sync] Successfully processed ${recordsProcessed} games, ${errorCount} errors`);
     console.log(`[schedule_sync] API requests made: ${requestCount}`);
-    
-    // PHASE 2: Status reconciliation - Update cached games outside the fetch window
-    console.log("[schedule_sync] Starting status reconciliation for cached games...");
-    
-    // Get all non-completed games from the last 14 days
-    const reconcileStartDate = new Date();
-    reconcileStartDate.setDate(reconcileStartDate.getDate() - 14);
-    
-    const cachedGames = await storage.getDailyGames(reconcileStartDate, new Date());
-    const nonCompletedGames = cachedGames.filter(g => 
-      g.status !== "completed"
-    );
-    
-    console.log(`[schedule_sync] Found ${nonCompletedGames.length} non-completed games to reconcile`);
-    
-    for (const game of nonCompletedGames) {
-      try {
-        const updatedStatus = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
-          requestCount++;
-          return await fetchGameStatus(game.gameId);
-        });
-        
-        if (updatedStatus && updatedStatus !== game.status) {
-          await storage.updateDailyGameStatus(game.gameId, updatedStatus);
-          console.log(`[schedule_sync] Updated game ${game.gameId} status: ${game.status} -> ${updatedStatus}`);
-        }
-      } catch (error: any) {
-        console.error(`[schedule_sync] Failed to reconcile status for game ${game.gameId}:`, error.message);
-        errorCount++;
-      }
-    }
-    
-    console.log(`[schedule_sync] Status reconciliation complete`);
-    console.log(`[schedule_sync] Total API requests: ${requestCount}`);
     
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {
