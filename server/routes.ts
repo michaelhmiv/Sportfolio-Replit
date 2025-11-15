@@ -6,6 +6,7 @@ import { fetchActivePlayers, calculateFantasyPoints, fetchPlayerSeasonStats, fet
 import type { InsertPlayer } from "@shared/schema";
 import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
+import { calculateAccrualUpdate } from "@shared/mining-utils";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -74,37 +75,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return;
     }
 
-    // Use lastAccruedAt as the baseline timestamp (NOT updatedAt which changes on every poll)
-    const effectiveStart = miningData.lastAccruedAt;
-    if (!effectiveStart) return;
-
-    // Calculate total elapsed time including residual carryover
-    const currentElapsedMs = now.getTime() - effectiveStart.getTime();
-    const totalElapsedMs = (miningData.residualMs || 0) + currentElapsedMs;
+    // Initialize lastAccruedAt if missing (fallback to updatedAt or now)
+    const effectiveLastAccruedAt = miningData.lastAccruedAt || miningData.updatedAt || now;
     
-    // Convert to shares (ms per share = 3600000ms / sharesPerHour = 36000ms per share)
-    const msPerShare = (60 * 60 * 1000) / sharesPerHour;
-    const sharesEarned = Math.floor(totalElapsedMs / msPerShare);
-    
-    if (sharesEarned > 0) {
-      // Calculate new total, capped at limit
-      const actualSharesAwarded = Math.min(capLimit - miningData.sharesAccumulated, sharesEarned);
-      const newTotal = miningData.sharesAccumulated + actualSharesAwarded;
-      const capReached = newTotal >= capLimit;
-
-      // Calculate time consumed and leftover residual
-      const msConsumed = actualSharesAwarded * msPerShare;
-      const leftoverMs = Math.max(0, totalElapsedMs - msConsumed);
-      
-      // Set lastAccruedAt to now minus leftover (clamps to now, preserves residual)
-      const newLastAccruedAt = new Date(now.getTime() - leftoverMs);
-
+    // If we had to initialize, update the database immediately
+    if (!miningData.lastAccruedAt) {
       await storage.updateMining(userId, {
-        sharesAccumulated: newTotal,
-        residualMs: capReached ? 0 : leftoverMs, // Preserve residual unless capped
-        lastAccruedAt: newLastAccruedAt, // Baseline is now minus residual
+        lastAccruedAt: effectiveLastAccruedAt,
         updatedAt: now,
-        capReachedAt: capReached ? now : null,
+      });
+    }
+
+    // Use shared utility to calculate accrual update
+    const update = calculateAccrualUpdate({
+      sharesAccumulated: miningData.sharesAccumulated,
+      residualMs: miningData.residualMs || 0,
+      lastAccruedAt: effectiveLastAccruedAt,
+      sharesPerHour,
+      capLimit,
+    }, now);
+
+    // Only update if shares were actually earned
+    const sharesEarned = update.sharesAccumulated - miningData.sharesAccumulated;
+    if (sharesEarned > 0) {
+      await storage.updateMining(userId, {
+        sharesAccumulated: update.sharesAccumulated,
+        residualMs: update.residualMs,
+        lastAccruedAt: update.lastAccruedAt,
+        updatedAt: now,
+        capReachedAt: update.capReached ? now : null,
       });
     }
     // If no shares earned yet, DON'T update anything - leave baseline unchanged

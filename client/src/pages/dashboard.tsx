@@ -16,6 +16,7 @@ import { Link } from "wouter";
 import type { Player, Mining, Contest, Trade, DailyGame } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { calculateMiningShares } from "@shared/mining-utils";
 
 interface DashboardData {
   user: {
@@ -106,26 +107,22 @@ export default function Dashboard() {
         return;
       }
 
-      // Guard against division by zero or undefined
-      if (!mining.sharesPerHour || mining.sharesPerHour === 0) {
+      // Guard against missing required fields
+      if (!mining.sharesPerHour || mining.sharesPerHour === 0 || !mining.lastAccruedAt) {
         setProjectedShares(mining.sharesAccumulated || 0);
         return;
       }
 
-      // Use the same calculation logic as backend
-      const now = new Date();
-      const effectiveStart = mining.lastClaimedAt ? new Date(mining.lastClaimedAt) : new Date(mining.updatedAt);
-      const currentElapsedMs = now.getTime() - effectiveStart.getTime();
-      const totalElapsedMs = (mining.residualMs || 0) + currentElapsedMs;
-      
-      // Convert to shares (ms per share = 3600000ms / sharesPerHour)
-      const msPerShare = (60 * 60 * 1000) / mining.sharesPerHour;
-      // Clamp at zero to handle client/server clock skew
-      const sharesEarned = Math.max(0, Math.floor(totalElapsedMs / msPerShare));
-      
-      // Add to accumulated shares and cap at limit
-      const projected = Math.min(mining.sharesAccumulated + sharesEarned, mining.capLimit);
-      setProjectedShares(projected);
+      // Use shared utility to ensure frontend matches backend calculation exactly
+      const result = calculateMiningShares({
+        sharesAccumulated: mining.sharesAccumulated,
+        residualMs: mining.residualMs || 0,
+        lastAccruedAt: mining.lastAccruedAt,
+        sharesPerHour: mining.sharesPerHour,
+        capLimit: mining.capLimit,
+      });
+
+      setProjectedShares(result.projectedShares);
     };
 
     // Calculate immediately and then every second
@@ -135,8 +132,7 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [
     data?.mining?.playerId,
-    data?.mining?.updatedAt,
-    data?.mining?.lastClaimedAt,
+    data?.mining?.lastAccruedAt,
     data?.mining?.residualMs,
     data?.mining?.sharesAccumulated,
     data?.mining?.sharesPerHour,
