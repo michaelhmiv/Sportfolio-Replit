@@ -33,7 +33,7 @@ export default function Contests() {
           </TabsList>
 
           {/* Open Contests */}
-          <TabsContent value="open" className="space-y-3 sm:space-y-4">
+          <TabsContent value="open">
             {isLoading ? (
               <div className="text-center py-12 text-muted-foreground">Loading contests...</div>
             ) : data?.openContests.length === 0 ? (
@@ -43,47 +43,54 @@ export default function Contests() {
                 </CardContent>
               </Card>
             ) : (
-              data?.openContests.map((contest) => (
-                <Card key={contest.id} className="hover-elevate" data-testid={`card-contest-${contest.id}`}>
-                  <CardContent className="p-3 sm:p-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-                          <Trophy className="w-5 h-5 text-primary" />
-                          <h3 className="text-xl font-bold">{contest.name}</h3>
-                          <Badge>{contest.sport}</Badge>
-                          <Badge variant="outline" className="capitalize">{contest.status}</Badge>
+              <>
+                {/* Mobile: Card Layout */}
+                <div className="sm:hidden p-3 space-y-3">
+                  {data?.openContests.map((contest) => (
+                    <Card key={contest.id} className="hover-elevate" data-testid={`card-contest-${contest.id}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-3 mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              <Trophy className="w-4 h-4 text-primary" />
+                              <h3 className="font-bold">{contest.name}</h3>
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <Badge className="text-xs">{contest.sport}</Badge>
+                              <Badge variant="outline" className="capitalize text-xs">{contest.status}</Badge>
+                            </div>
+                          </div>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-2 gap-3 pb-3">
                           <div>
-                            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Prize Pool</div>
+                            <div className="text-xs text-muted-foreground mb-1">Prize Pool</div>
                             <div className="flex items-center gap-1">
-                              <DollarSign className="w-4 h-4 text-positive" />
-                              <span className="text-2xl font-mono font-bold text-positive" data-testid={`text-prize-${contest.id}`}>
+                              <DollarSign className="w-3 h-3 text-positive" />
+                              <span className="font-mono font-bold text-positive" data-testid={`text-prize-${contest.id}`}>
                                 ${contest.totalPrizePool}
                               </span>
                             </div>
                           </div>
                           
                           <div>
-                            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Entries</div>
+                            <div className="text-xs text-muted-foreground mb-1">Entries</div>
                             <div className="flex items-center gap-1">
-                              <Users className="w-4 h-4" />
-                              <span className="text-lg font-semibold">{contest.entryCount}</span>
+                              <Users className="w-3 h-3" />
+                              <span className="text-sm font-semibold">{contest.entryCount}</span>
                             </div>
                           </div>
                           
                           <div>
-                            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Shares Entered</div>
-                            <span className="text-lg font-semibold">{contest.totalSharesEntered}</span>
+                            <div className="text-xs text-muted-foreground mb-1">Shares</div>
+                            <span className="text-sm font-semibold">{contest.totalSharesEntered}</span>
                           </div>
                           
                           <div>
-                            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Starts</div>
+                            <div className="text-xs text-muted-foreground mb-1">Starts</div>
                             <div className="flex items-center gap-1">
-                              <Clock className="w-4 h-4" />
-                              <span className="text-sm">
+                              <Clock className="w-3 h-3" />
+                              <span className="text-xs">
                                 {new Date(contest.startsAt).toLocaleString([], { 
                                   month: 'short', 
                                   day: 'numeric', 
@@ -94,22 +101,106 @@ export default function Contests() {
                             </div>
                           </div>
                         </div>
-                      </div>
-                      
-                      <Link href={`/contest/${contest.id}/entry`}>
-                        <Button size="lg" data-testid={`button-enter-${contest.id}`}>
-                          Enter Contest
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                        
+                        <Link href={`/contest/${contest.id}/entry`}>
+                          <Button className="w-full" data-testid={`button-enter-${contest.id}`}>
+                            Enter Contest
+                          </Button>
+                        </Link>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Desktop: Table Layout */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium uppercase tracking-wide">Available Contests</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <table className="w-full">
+                        <thead className="border-b bg-muted/50">
+                          <tr>
+                            <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contest</th>
+                            <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sport</th>
+                            <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
+                            <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prize Pool</th>
+                            <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Entries</th>
+                            <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shares</th>
+                            <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Starts</th>
+                            <th className="p-4"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data?.openContests.map((contest) => (
+                            <tr 
+                              key={contest.id} 
+                              className="border-b last:border-0 hover-elevate"
+                              data-testid={`card-contest-${contest.id}`}
+                            >
+                              <td className="p-4">
+                                <div className="flex items-center gap-2">
+                                  <Trophy className="w-4 h-4 text-primary" />
+                                  <span className="font-bold">{contest.name}</span>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <Badge>{contest.sport}</Badge>
+                              </td>
+                              <td className="p-4">
+                                <Badge variant="outline" className="capitalize">{contest.status}</Badge>
+                              </td>
+                              <td className="p-4 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <DollarSign className="w-4 h-4 text-positive" />
+                                  <span className="font-mono font-bold text-positive" data-testid={`text-prize-${contest.id}`}>
+                                    ${contest.totalPrizePool}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="p-4 text-right">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Users className="w-4 h-4" />
+                                  <span className="font-semibold">{contest.entryCount}</span>
+                                </div>
+                              </td>
+                              <td className="p-4 text-right">
+                                <span className="text-sm text-muted-foreground">{contest.totalSharesEntered}</span>
+                              </td>
+                              <td className="p-4">
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-4 h-4" />
+                                  <span className="text-sm">
+                                    {new Date(contest.startsAt).toLocaleString([], { 
+                                      month: 'short', 
+                                      day: 'numeric', 
+                                      hour: 'numeric', 
+                                      minute: '2-digit' 
+                                    })}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <Link href={`/contest/${contest.id}/entry`}>
+                                  <Button data-testid={`button-enter-${contest.id}`}>
+                                    Enter Contest
+                                  </Button>
+                                </Link>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
+                </div>
+              </>
             )}
           </TabsContent>
 
           {/* My Entries */}
-          <TabsContent value="my-entries" className="space-y-3 sm:space-y-4">
+          <TabsContent value="my-entries">
             {isLoading ? (
               <div className="text-center py-12 text-muted-foreground">Loading your entries...</div>
             ) : data?.myEntries.length === 0 ? (
@@ -122,63 +213,138 @@ export default function Contests() {
                 </CardContent>
               </Card>
             ) : (
-              data?.myEntries.map((entry) => (
-                <Card key={entry.id} className="hover-elevate" data-testid={`card-entry-${entry.id}`}>
-                  <CardContent className="p-3 sm:p-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
-                          <h3 className="text-xl font-bold">{entry.contest.name}</h3>
-                          <Badge className="capitalize">{entry.contest.status}</Badge>
+              <>
+                {/* Mobile: Card Layout */}
+                <div className="sm:hidden p-3 space-y-3">
+                  {data?.myEntries.map((entry) => (
+                    <Card key={entry.id} className="hover-elevate" data-testid={`card-entry-${entry.id}`}>
+                      <CardContent className="p-4">
+                        <div className="mb-3">
+                          <h3 className="font-bold mb-2">{entry.contest.name}</h3>
+                          <Badge className="capitalize text-xs">{entry.contest.status}</Badge>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-2 gap-3 pb-3 border-b">
                           <div>
-                            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Your Shares</div>
-                            <span className="text-lg font-semibold">{entry.totalSharesEntered}</span>
+                            <div className="text-xs text-muted-foreground mb-1">Your Shares</div>
+                            <span className="text-sm font-semibold">{entry.totalSharesEntered}</span>
                           </div>
                           
                           <div>
-                            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Score</div>
-                            <span className="text-lg font-mono font-semibold">{entry.totalScore}</span>
+                            <div className="text-xs text-muted-foreground mb-1">Score</div>
+                            <span className="text-sm font-mono font-semibold">{entry.totalScore}</span>
                           </div>
                           
                           {entry.rank && (
                             <div>
-                              <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Rank</div>
-                              <span className="text-lg font-semibold">#{entry.rank}</span>
+                              <div className="text-xs text-muted-foreground mb-1">Rank</div>
+                              <span className="text-sm font-semibold">#{entry.rank}</span>
                             </div>
                           )}
                           
                           <div>
-                            <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Payout</div>
-                            <span className={`text-lg font-mono font-semibold ${parseFloat(entry.payout) > 0 ? 'text-positive' : ''}`}>
+                            <div className="text-xs text-muted-foreground mb-1">Payout</div>
+                            <span className={`text-sm font-mono font-semibold ${parseFloat(entry.payout) > 0 ? 'text-positive' : ''}`}>
                               ${entry.payout}
                             </span>
                           </div>
                         </div>
-                      </div>
-                      
-                      <div className="flex flex-col gap-2">
-                        {entry.contest.status === "open" && new Date() < new Date(entry.contest.startsAt) && (
-                          <Link href={`/contest/${entry.contestId}/entry/${entry.id}`}>
-                            <Button variant="outline" data-testid={`button-edit-entry-${entry.id}`}>
-                              Edit Entry
-                            </Button>
-                          </Link>
-                        )}
-                        {entry.contest.status === "live" && (
-                          <Link href={`/contest/${entry.contestId}/leaderboard`}>
-                            <Button variant="outline" data-testid={`button-leaderboard-${entry.id}`}>
-                              View Leaderboard
-                            </Button>
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+                        
+                        <div className="flex flex-col gap-2 mt-3">
+                          {entry.contest.status === "open" && new Date() < new Date(entry.contest.startsAt) && (
+                            <Link href={`/contest/${entry.contestId}/entry/${entry.id}`}>
+                              <Button variant="outline" className="w-full" data-testid={`button-edit-entry-${entry.id}`}>
+                                Edit Entry
+                              </Button>
+                            </Link>
+                          )}
+                          {entry.contest.status === "live" && (
+                            <Link href={`/contest/${entry.contestId}/leaderboard`}>
+                              <Button variant="outline" className="w-full" data-testid={`button-leaderboard-${entry.id}`}>
+                                View Leaderboard
+                              </Button>
+                            </Link>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Desktop: Table Layout */}
+                <div className="hidden sm:block overflow-x-auto">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium uppercase tracking-wide">My Contest Entries</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      <table className="w-full">
+                        <thead className="border-b bg-muted/50">
+                          <tr>
+                            <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contest</th>
+                            <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
+                            <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Your Shares</th>
+                            <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Score</th>
+                            <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rank</th>
+                            <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payout</th>
+                            <th className="p-4"></th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data?.myEntries.map((entry) => (
+                            <tr 
+                              key={entry.id} 
+                              className="border-b last:border-0 hover-elevate"
+                              data-testid={`card-entry-${entry.id}`}
+                            >
+                              <td className="p-4">
+                                <span className="font-bold">{entry.contest.name}</span>
+                              </td>
+                              <td className="p-4">
+                                <Badge className="capitalize">{entry.contest.status}</Badge>
+                              </td>
+                              <td className="p-4 text-right">
+                                <span className="font-semibold">{entry.totalSharesEntered}</span>
+                              </td>
+                              <td className="p-4 text-right">
+                                <span className="font-mono font-semibold">{entry.totalScore}</span>
+                              </td>
+                              <td className="p-4 text-right">
+                                <span className="font-semibold">
+                                  {entry.rank ? `#${entry.rank}` : '-'}
+                                </span>
+                              </td>
+                              <td className="p-4 text-right">
+                                <span className={`font-mono font-semibold ${parseFloat(entry.payout) > 0 ? 'text-positive' : ''}`}>
+                                  ${entry.payout}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                <div className="flex gap-2 justify-end">
+                                  {entry.contest.status === "open" && new Date() < new Date(entry.contest.startsAt) && (
+                                    <Link href={`/contest/${entry.contestId}/entry/${entry.id}`}>
+                                      <Button variant="outline" size="sm" data-testid={`button-edit-entry-${entry.id}`}>
+                                        Edit Entry
+                                      </Button>
+                                    </Link>
+                                  )}
+                                  {entry.contest.status === "live" && (
+                                    <Link href={`/contest/${entry.contestId}/leaderboard`}>
+                                      <Button variant="outline" size="sm" data-testid={`button-leaderboard-${entry.id}`}>
+                                        View Leaderboard
+                                      </Button>
+                                    </Link>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
+                </div>
+              </>
             )}
           </TabsContent>
         </Tabs>
