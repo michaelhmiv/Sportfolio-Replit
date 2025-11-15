@@ -74,15 +74,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return;
     }
 
-    // Determine effective start time for accrual
-    const effectiveStart = miningData.lastClaimedAt || miningData.updatedAt;
+    // Use lastAccruedAt as the baseline timestamp (NOT updatedAt which changes on every poll)
+    const effectiveStart = miningData.lastAccruedAt;
     if (!effectiveStart) return;
 
     // Calculate total elapsed time including residual carryover
     const currentElapsedMs = now.getTime() - effectiveStart.getTime();
     const totalElapsedMs = (miningData.residualMs || 0) + currentElapsedMs;
     
-    // Convert to shares (ms per share = 3600000ms / sharesPerHour)
+    // Convert to shares (ms per share = 3600000ms / sharesPerHour = 36000ms per share)
     const msPerShare = (60 * 60 * 1000) / sharesPerHour;
     const sharesEarned = Math.floor(totalElapsedMs / msPerShare);
     
@@ -100,16 +100,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.updateMining(userId, {
         sharesAccumulated: newTotal,
         residualMs: newResidualMs,
+        lastAccruedAt: now, // Update baseline to now after awarding shares
         updatedAt: now,
         capReachedAt: capReached ? now : null,
       });
-    } else {
-      // No full shares earned yet, but preserve fractional time in residualMs
-      await storage.updateMining(userId, {
-        residualMs: totalElapsedMs,
-        updatedAt: now,
-      });
     }
+    // If no shares earned yet, DON'T update anything - leave baseline unchanged
   }
 
   // Helper: Match orders (FIFO) - Only for limit orders
@@ -923,9 +919,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isSwitchingPlayer = currentMining?.playerId && currentMining.playerId !== playerId;
 
       // Start mining this player - reset timestamps and residual to start fresh accrual
+      const now = new Date();
       await storage.updateMining(user.id, {
         playerId,
-        updatedAt: new Date(),
+        updatedAt: now,
+        lastAccruedAt: now, // Set baseline for accrual calculation
         // If switching players, reset everything; otherwise preserve state
         sharesAccumulated: isSwitchingPlayer ? 0 : (currentMining?.sharesAccumulated || 0),
         residualMs: isSwitchingPlayer ? 0 : (currentMining?.residualMs || 0),
@@ -975,11 +973,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.updateHolding(user.id, "player", miningData.playerId, miningData.sharesAccumulated, "0.0000");
       }
 
-      // Reset mining - clear residualMs since we're claiming everything
+      // Reset mining - clear residualMs and reset accrual baseline
       const now = new Date();
       await storage.updateMining(user.id, {
         sharesAccumulated: 0,
         lastClaimedAt: now,
+        lastAccruedAt: now, // Reset baseline for fresh accrual after claim
         updatedAt: now,
         residualMs: 0,
         capReachedAt: null,

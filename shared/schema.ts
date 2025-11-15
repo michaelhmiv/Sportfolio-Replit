@@ -86,6 +86,7 @@ export const mining = pgTable("mining", {
   playerId: varchar("player_id").references(() => players.id), // null for premium users with split mining
   sharesAccumulated: integer("shares_accumulated").notNull().default(0),
   residualMs: integer("residual_ms").notNull().default(0), // Fractional time carryover in milliseconds
+  lastAccruedAt: timestamp("last_accrued_at").notNull().defaultNow(), // Baseline timestamp for accrual calculation
   lastClaimedAt: timestamp("last_claimed_at"),
   capReachedAt: timestamp("cap_reached_at"), // When they hit their cap
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
