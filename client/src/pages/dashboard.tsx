@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar, Search, ChevronDown, BarChart3 } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar, Search, ChevronDown, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import type { Player, Mining, Contest, Trade, DailyGame } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -35,6 +37,8 @@ export default function Dashboard() {
   const [selectedTeam, setSelectedTeam] = useState("all");
   const [selectedGame, setSelectedGame] = useState<DailyGame | null>(null);
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   
   // WebSocket connection for live updates
   useEffect(() => {
@@ -54,7 +58,7 @@ export default function Dashboard() {
         if (message.type === 'liveStats') {
           // Invalidate relevant queries to refresh data
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/games/today"] });
+          queryClient.invalidateQueries({ queryKey: ['/api/games'] });
         } else if (message.type === 'portfolio') {
           queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -107,9 +111,88 @@ export default function Dashboard() {
     new Set(playersData?.filter(p => p.isEligibleForMining).map(p => p.team))
   ).sort();
 
+  // Format date as YYYY-MM-DD
+  const formatDateForAPI = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Check if selected date is today
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return date.getDate() === today.getDate() &&
+           date.getMonth() === today.getMonth() &&
+           date.getFullYear() === today.getFullYear();
+  };
+
+  // Validate date is within allowed range (7 days back to 14 days forward)
+  const isDateInRange = (date: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const checkDate = new Date(date);
+    checkDate.setHours(0, 0, 0, 0);
+    
+    const minDate = new Date(today);
+    minDate.setDate(today.getDate() - 7);
+    const maxDate = new Date(today);
+    maxDate.setDate(today.getDate() + 14);
+    
+    return checkDate >= minDate && checkDate <= maxDate;
+  };
+
+  // Get date range boundaries
+  const getDateRange = () => {
+    const today = new Date();
+    const minDate = new Date(today);
+    minDate.setDate(today.getDate() - 7);
+    const maxDate = new Date(today);
+    maxDate.setDate(today.getDate() + 14);
+    return { minDate, maxDate };
+  };
+
+  const formattedDate = formatDateForAPI(selectedDate);
+
   const { data: todayGames } = useQuery<DailyGame[]>({
-    queryKey: ["/api/games/today"],
+    queryKey: ['/api/games', formattedDate],
+    queryFn: async () => {
+      const endpoint = isToday(selectedDate) 
+        ? "/api/games/today" 
+        : `/api/games/date/${formattedDate}`;
+      const res = await fetch(endpoint);
+      if (!res.ok) throw new Error('Failed to fetch games');
+      return res.json();
+    },
   });
+
+  // Navigation helpers with validation
+  const goToPrevDay = () => {
+    const prev = new Date(selectedDate);
+    prev.setDate(prev.getDate() - 1);
+    if (isDateInRange(prev)) {
+      setSelectedDate(prev);
+    }
+  };
+
+  const goToNextDay = () => {
+    const next = new Date(selectedDate);
+    next.setDate(next.getDate() + 1);
+    if (isDateInRange(next)) {
+      setSelectedDate(next);
+    }
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date());
+  };
+
+  const handleDateSelect = (date: Date | undefined) => {
+    if (date && isDateInRange(date)) {
+      setSelectedDate(date);
+      setShowDatePicker(false);
+    }
+  };
 
   const startMiningMutation = useMutation({
     mutationFn: async (playerId: string) => {
@@ -211,12 +294,77 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Today's Games */}
+        {/* Games */}
         {todayGames && todayGames.length > 0 && (
           <Card className="mb-6">
-            <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium uppercase tracking-wide">Today's Games</CardTitle>
-              <Calendar className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium uppercase tracking-wide">
+                {isToday(selectedDate) ? "Today's Games" : "Games"}
+              </CardTitle>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToPrevDay}
+                  disabled={!isDateInRange(new Date(selectedDate.getTime() - 86400000))}
+                  className="h-8"
+                  data-testid="button-prev-day"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+                
+                <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 gap-2"
+                      data-testid="button-open-calendar"
+                    >
+                      <Calendar className="w-4 h-4" />
+                      <span className="text-sm">
+                        {selectedDate.toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric',
+                          year: selectedDate.getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+                        })}
+                      </span>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <CalendarComponent
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={handleDateSelect}
+                      disabled={(date) => !isDateInRange(date)}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={goToNextDay}
+                  disabled={!isDateInRange(new Date(selectedDate.getTime() + 86400000))}
+                  className="h-8"
+                  data-testid="button-next-day"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </Button>
+
+                {!isToday(selectedDate) && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={goToToday}
+                    className="h-8"
+                    data-testid="button-today"
+                  >
+                    Today
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               {/* Mobile: Horizontal Scroll */}
