@@ -123,6 +123,13 @@ export async function syncStatsLive(): Promise<JobResult> {
             status: game.status,
             timestamp: new Date().toISOString(),
           });
+
+          // Also broadcast contest update since player stats changed
+          broadcast({
+            type: "contestUpdate",
+            gameId: game.gameId,
+            timestamp: new Date().toISOString(),
+          });
         }
       } catch (error: any) {
         console.error(`[stats_sync_live] Failed to process game ${game.gameId}:`, error.message);

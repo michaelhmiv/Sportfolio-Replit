@@ -128,15 +128,41 @@ Preferred communication style: Simple, everyday language.
 - WebSocket server on `/ws` path for live updates
 - Centralized broadcast mechanism via `server/websocket.ts`
 - Live game stats polling (every 1 minute for in-progress games)
-- Broadcasts `liveStats`, `portfolio`, `mining`, `orderBook`, and `trade` events
+- Broadcasts `liveStats`, `portfolio`, `mining`, `orderBook`, `trade`, and `contestUpdate` events
 - Frontend auto-invalidates React Query cache on WebSocket updates
 - Client reconnection handling for market data streaming
+- Contest leaderboards refresh in real-time as player stats change during games
 
 **Background Jobs (Cron):**
 - **roster_sync**: Daily at 5 AM ET - Syncs NBA player rosters from MySportsFeeds
 - **schedule_sync**: Every 6 hours - Updates game schedules
 - **stats_sync**: Hourly - Processes stats for completed games
 - **stats_sync_live**: Every minute - Real-time stats for in-progress games only (short-circuits if no live games)
+- **settle_contests**: Every 5 minutes - Automatically settles completed contests and distributes prizes
+
+**Contest Scoring Mechanics:**
+- **Proportional Share-Dilution Model:** Fantasy points are distributed based on ownership percentage
+  - If a contest has 100 total LeBron shares across all entries, and you entered 10 shares, you get 10% of LeBron's fantasy points
+  - Example: LeBron scores 50 fantasy points → you earn 5 points (10/100 × 50)
+- **Scoring Calculation:**
+  1. Calculate total shares per player across all contest entries
+  2. For each entry, calculate earned score per player: `(user_shares / total_shares) × fantasy_points`
+  3. Sum earned scores across all players in lineup to get entry total score
+  4. Rank entries by total score (descending)
+- **Prize Distribution (50/50 Contests):**
+  - Top 50% of entries win
+  - Prize pool distributed proportionally among winners
+  - Automatic settlement via cron job when contest ends
+- **Real-Time Updates:**
+  - `stats_sync_live` job broadcasts `contestUpdate` WebSocket events every minute during live games
+  - Frontend auto-refreshes leaderboards when stats change
+  - Leaderboard recalculated on-demand via `/api/contest/:id/leaderboard` endpoint
+- **Settlement Process:**
+  - `settle_contests` job runs every 5 minutes
+  - Identifies contests past their end time
+  - Calculates final rankings and determines winners
+  - Updates user balances with prize money
+  - Marks contest as "completed"
 
 **Development Tools:**
 - Replit-specific plugins for runtime error overlay and development banner

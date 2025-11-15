@@ -11,6 +11,7 @@ import { syncRoster } from "./sync-roster";
 import { syncSchedule } from "./sync-schedule";
 import { syncStats } from "./sync-stats";
 import { syncStatsLive } from "./sync-stats-live";
+import { settleContests } from "./settle-contests";
 
 export interface JobResult {
   requestCount: number;
@@ -66,6 +67,12 @@ export class JobScheduler {
         schedule: "* * * * *", // Every minute for live games
         enabled: true,
         handler: syncStatsLive,
+      },
+      {
+        name: "settle_contests",
+        schedule: "*/5 * * * *", // Every 5 minutes - check for contests to settle
+        enabled: true,
+        handler: settleContests,
       },
     ];
 

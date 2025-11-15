@@ -71,10 +71,13 @@ export interface IStorage {
   // Contest methods
   getContests(status?: string): Promise<Contest[]>;
   getContest(id: string): Promise<Contest | undefined>;
+  updateContest(contestId: string, updates: Partial<Contest>): Promise<void>;
   createContestEntry(entry: InsertContestEntry): Promise<ContestEntry>;
   getContestEntries(contestId: string): Promise<ContestEntry[]>;
   getUserContestEntries(userId: string): Promise<ContestEntry[]>;
   createContestLineup(lineup: InsertContestLineup): Promise<void>;
+  getContestLineups(entryId: string): Promise<any[]>;
+  updateContestLineup(lineupId: string, updates: any): Promise<void>;
   updateContestEntry(entryId: string, updates: Partial<ContestEntry>): Promise<void>;
   
   // Daily games methods
@@ -411,6 +414,27 @@ export class DatabaseStorage implements IStorage {
       .update(contestEntries)
       .set(updates)
       .where(eq(contestEntries.id, entryId));
+  }
+
+  async updateContest(contestId: string, updates: Partial<Contest>): Promise<void> {
+    await db
+      .update(contests)
+      .set(updates)
+      .where(eq(contests.id, contestId));
+  }
+
+  async getContestLineups(entryId: string): Promise<any[]> {
+    return await db
+      .select()
+      .from(contestLineups)
+      .where(eq(contestLineups.entryId, entryId));
+  }
+
+  async updateContestLineup(lineupId: string, updates: any): Promise<void> {
+    await db
+      .update(contestLineups)
+      .set(updates)
+      .where(eq(contestLineups.id, lineupId));
   }
 
   // Daily games methods

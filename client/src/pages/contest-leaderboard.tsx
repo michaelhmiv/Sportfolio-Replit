@@ -1,9 +1,28 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "wouter";
+import { useEffect } from "react";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, TrendingUp } from "lucide-react";
-import type { ContestEntry, ContestLineup, Player } from "@shared/schema";
+
+interface PlayerLineupStats {
+  entryId: string;
+  playerId: string;
+  playerName: string;
+  sharesEntered: number;
+  fantasyPoints: number;
+  earnedScore: number;
+}
+
+interface LeaderboardEntry {
+  entryId: string;
+  userId: string;
+  username: string;
+  totalScore: number;
+  rank: number;
+  players: PlayerLineupStats[];
+}
 
 interface LeaderboardData {
   contest: {
@@ -12,14 +31,10 @@ interface LeaderboardData {
     sport: string;
     status: string;
     totalPrizePool: string;
+    entryFee: string;
   };
-  entries: (ContestEntry & {
-    user: { username: string };
-    lineups: (ContestLineup & { player: Player })[];
-  })[];
-  myEntry?: ContestEntry & {
-    lineups: (ContestLineup & { player: Player })[];
-  };
+  leaderboard: LeaderboardEntry[];
+  myEntry?: LeaderboardEntry;
 }
 
 export default function ContestLeaderboard() {
@@ -30,6 +45,42 @@ export default function ContestLeaderboard() {
     refetchInterval: 10000, // Refresh every 10 seconds for live updates
   });
 
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+    ws.onopen = () => {
+      console.log('[Contest WebSocket] Connected to live updates');
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data);
+        console.log('[Contest WebSocket] Received:', message);
+
+        // Invalidate contest leaderboard when stats update or contest settles
+        if (message.type === 'contestUpdate' || message.type === 'liveStats') {
+          queryClient.invalidateQueries({ queryKey: ["/api/contest", id, "leaderboard"] });
+        }
+      } catch (error) {
+        console.error('[Contest WebSocket] Failed to parse message:', error);
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('[Contest WebSocket] Error:', error);
+    };
+
+    ws.onclose = () => {
+      console.log('[Contest WebSocket] Disconnected');
+    };
+
+    return () => {
+      ws.close();
+    };
+  }, [id]);
+
   if (isLoading || !data) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -38,7 +89,8 @@ export default function ContestLeaderboard() {
     );
   }
 
-  const winningThreshold = Math.ceil(data.entries.length / 2);
+  const winningThreshold = Math.ceil(data.leaderboard.length / 2);
+  const totalSharesEntered = data.myEntry?.players.reduce((sum, p) => sum + p.sharesEntered, 0) || 0;
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
@@ -52,7 +104,7 @@ export default function ContestLeaderboard() {
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <span>Total Prize Pool: <span className="font-mono font-bold text-positive">${data.contest.totalPrizePool}</span></span>
             <span>Top {winningThreshold} win</span>
-            <span>{data.entries.length} entries</span>
+            <span>{data.leaderboard.length} entries</span>
           </div>
         </div>
 
@@ -66,20 +118,14 @@ export default function ContestLeaderboard() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
                 <div>
                   <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Total Score</div>
-                  <div className="text-2xl font-mono font-bold">{data.myEntry.totalScore}</div>
+                  <div className="text-2xl font-mono font-bold">{data.myEntry.totalScore.toFixed(2)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Shares Entered</div>
-                  <div className="text-2xl font-bold">{data.myEntry.totalSharesEntered}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Potential Payout</div>
-                  <div className={`text-2xl font-mono font-bold ${data.myEntry.rank && data.myEntry.rank <= winningThreshold ? 'text-positive' : ''}`}>
-                    ${data.myEntry.payout}
-                  </div>
+                  <div className="text-2xl font-bold">{totalSharesEntered}</div>
                 </div>
                 <div>
                   <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Status</div>
@@ -92,20 +138,20 @@ export default function ContestLeaderboard() {
               {/* Lineup Details */}
               <div className="space-y-2">
                 <div className="text-xs font-semibold uppercase tracking-wide mb-2">Your Lineup</div>
-                {data.myEntry.lineups.map((lineup) => (
-                  <div key={lineup.id} className="flex items-center justify-between p-2 bg-muted rounded-md text-sm">
+                {data.myEntry.players.map((player) => (
+                  <div key={player.playerId} className="flex items-center justify-between p-2 bg-muted rounded-md text-sm">
                     <div className="flex items-center gap-2">
                       <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
                         <span className="text-xs font-bold">
-                          {lineup.player.firstName[0]}{lineup.player.lastName[0]}
+                          {player.playerName.split(' ').map(n => n[0]).join('')}
                         </span>
                       </div>
-                      <span className="font-medium">{lineup.player.firstName} {lineup.player.lastName}</span>
-                      <Badge variant="outline" className="text-xs">{lineup.sharesEntered} shares</Badge>
+                      <span className="font-medium">{player.playerName}</span>
+                      <Badge variant="outline" className="text-xs">{player.sharesEntered} shares</Badge>
                     </div>
                     <div className="text-right">
-                      <div className="font-mono font-medium">{lineup.earnedScore} pts</div>
-                      <div className="text-xs text-muted-foreground">{lineup.fantasyPoints} FP</div>
+                      <div className="font-mono font-medium">{player.earnedScore.toFixed(2)} pts</div>
+                      <div className="text-xs text-muted-foreground">{player.fantasyPoints.toFixed(1)} FP</div>
                     </div>
                   </div>
                 ))}
@@ -128,45 +174,46 @@ export default function ContestLeaderboard() {
                     <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">User</th>
                     <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Score</th>
                     <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shares</th>
-                    <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Payout</th>
+                    <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {data.entries.map((entry, idx) => {
-                    const isWinning = (entry.rank || idx + 1) <= winningThreshold;
-                    const isMyEntry = data.myEntry?.id === entry.id;
+                  {data.leaderboard.map((entry, idx) => {
+                    const isWinning = entry.rank <= winningThreshold;
+                    const isMyEntry = data.myEntry?.entryId === entry.entryId;
+                    const entryShares = entry.players.reduce((sum, p) => sum + p.sharesEntered, 0);
                     
                     return (
                       <tr
-                        key={entry.id}
+                        key={entry.entryId}
                         className={`border-b hover-elevate ${isMyEntry ? 'bg-primary/5' : ''}`}
                         data-testid={`row-leaderboard-${idx}`}
                       >
                         <td className="p-4">
                           <div className="flex items-center gap-2">
                             <span className="font-mono font-bold text-lg">
-                              #{entry.rank || idx + 1}
+                              #{entry.rank}
                             </span>
-                            {(entry.rank || idx + 1) <= 3 && (
-                              <Trophy className={`w-4 h-4 ${(entry.rank || idx + 1) === 1 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
+                            {entry.rank <= 3 && (
+                              <Trophy className={`w-4 h-4 ${entry.rank === 1 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
                             )}
                           </div>
                         </td>
                         <td className="p-4">
-                          <div className="font-medium">{entry.user.username}</div>
+                          <div className="font-medium">{entry.username}</div>
                           {isMyEntry && <Badge variant="outline" className="text-xs mt-1">You</Badge>}
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <span className="text-xl font-mono font-bold">{entry.totalScore}</span>
+                            <span className="text-xl font-mono font-bold">{entry.totalScore.toFixed(2)}</span>
                             {isWinning && <TrendingUp className="w-4 h-4 text-positive" />}
                           </div>
                         </td>
-                        <td className="p-4 text-right font-mono">{entry.totalSharesEntered}</td>
+                        <td className="p-4 text-right font-mono">{entryShares}</td>
                         <td className="p-4 text-right">
-                          <span className={`font-mono font-bold ${isWinning ? 'text-positive' : 'text-muted-foreground'}`}>
-                            ${entry.payout}
-                          </span>
+                          <Badge variant={isWinning ? "default" : "outline"} className={isWinning ? 'bg-positive hover:bg-positive' : ''}>
+                            {isWinning ? 'WINNING' : 'Not winning'}
+                          </Badge>
                         </td>
                       </tr>
                     );

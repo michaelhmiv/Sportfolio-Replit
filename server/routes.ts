@@ -1110,7 +1110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Contest leaderboard
+  // Contest leaderboard with proportional scoring
   app.get("/api/contest/:id/leaderboard", async (req, res) => {
     try {
       const user = await ensureDefaultUser();
@@ -1120,25 +1120,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Contest not found" });
       }
 
-      const entries = await storage.getContestEntries(req.params.id);
-      
-      // Enrich entries with user and lineup data
-      const enrichedEntries = await Promise.all(
-        entries.map(async (entry) => ({
-          ...entry,
-          user: await storage.getUser(entry.userId),
-          lineups: [], // Simplified - would fetch actual lineups
-        }))
-      );
+      // Calculate real-time leaderboard with proportional scoring
+      const { calculateContestLeaderboard } = await import("./contest-scoring");
+      const leaderboard = await calculateContestLeaderboard(req.params.id);
 
-      const myEntry = enrichedEntries.find(e => e.user?.id === user.id);
+      // Find user's entry
+      const myEntry = leaderboard.find(e => e.userId === user.id);
 
       res.json({
         contest,
-        entries: enrichedEntries,
+        leaderboard,
         myEntry,
       });
     } catch (error: any) {
+      console.error("[leaderboard] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });
