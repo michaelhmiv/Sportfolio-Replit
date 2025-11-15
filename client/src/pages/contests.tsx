@@ -19,21 +19,21 @@ export default function Contests() {
   });
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-background p-3 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-4 sm:mb-8">
           <h1 className="text-3xl font-bold mb-2">Contests</h1>
           <p className="text-muted-foreground">Enter 50/50 contests and compete for prizes</p>
         </div>
 
-        <Tabs defaultValue="open" className="space-y-6">
+        <Tabs defaultValue="open" className="space-y-3 sm:space-y-6">
           <TabsList>
             <TabsTrigger value="open" data-testid="tab-open-contests">Open Contests</TabsTrigger>
             <TabsTrigger value="my-entries" data-testid="tab-my-entries">My Entries</TabsTrigger>
           </TabsList>
 
           {/* Open Contests */}
-          <TabsContent value="open" className="space-y-4">
+          <TabsContent value="open" className="space-y-3 sm:space-y-4">
             {isLoading ? (
               <div className="text-center py-12 text-muted-foreground">Loading contests...</div>
             ) : data?.openContests.length === 0 ? (
@@ -45,17 +45,17 @@ export default function Contests() {
             ) : (
               data?.openContests.map((contest) => (
                 <Card key={contest.id} className="hover-elevate" data-testid={`card-contest-${contest.id}`}>
-                  <CardContent className="p-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <CardContent className="p-3 sm:p-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
                       <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-3">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
                           <Trophy className="w-5 h-5 text-primary" />
                           <h3 className="text-xl font-bold">{contest.name}</h3>
                           <Badge>{contest.sport}</Badge>
                           <Badge variant="outline" className="capitalize">{contest.status}</Badge>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                           <div>
                             <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Prize Pool</div>
                             <div className="flex items-center gap-1">
@@ -109,7 +109,7 @@ export default function Contests() {
           </TabsContent>
 
           {/* My Entries */}
-          <TabsContent value="my-entries" className="space-y-4">
+          <TabsContent value="my-entries" className="space-y-3 sm:space-y-4">
             {isLoading ? (
               <div className="text-center py-12 text-muted-foreground">Loading your entries...</div>
             ) : data?.myEntries.length === 0 ? (
@@ -124,15 +124,15 @@ export default function Contests() {
             ) : (
               data?.myEntries.map((entry) => (
                 <Card key={entry.id} className="hover-elevate" data-testid={`card-entry-${entry.id}`}>
-                  <CardContent className="p-6">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <CardContent className="p-3 sm:p-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
                       <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-3">
+                        <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3">
                           <h3 className="text-xl font-bold">{entry.contest.name}</h3>
                           <Badge className="capitalize">{entry.contest.status}</Badge>
                         </div>
                         
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
                           <div>
                             <div className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Your Shares</div>
                             <span className="text-lg font-semibold">{entry.totalSharesEntered}</span>

@@ -62,13 +62,13 @@ export default function Portfolio() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-background p-3 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-6">Portfolio</h1>
+        <div className="mb-4 sm:mb-8">
+          <h1 className="text-3xl font-bold mb-4 sm:mb-6">Portfolio</h1>
           
           {/* Portfolio Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-8">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium uppercase tracking-wide">Cash Balance</CardTitle>
@@ -110,7 +110,7 @@ export default function Portfolio() {
           </div>
         </div>
 
-        <Tabs defaultValue="holdings" className="space-y-6">
+        <Tabs defaultValue="holdings" className="space-y-3 sm:space-y-6">
           <TabsList>
             <TabsTrigger value="holdings" data-testid="tab-holdings">Holdings</TabsTrigger>
             <TabsTrigger value="orders" data-testid="tab-open-orders">Open Orders</TabsTrigger>
@@ -127,20 +127,20 @@ export default function Portfolio() {
                   <table className="w-full">
                     <thead className="border-b bg-muted/50">
                       <tr>
-                        <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Asset</th>
-                        <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
-                        <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Avg Cost</th>
-                        <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current Price</th>
-                        <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Value</th>
-                        <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">P&L</th>
-                        <th className="p-4"></th>
+                        <th className="text-left p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Asset</th>
+                        <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
+                        <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Avg Cost</th>
+                        <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current Price</th>
+                        <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Value</th>
+                        <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">P&L</th>
+                        <th className="p-2 sm:p-4"></th>
                       </tr>
                     </thead>
                     <tbody>
                       {/* Premium Shares */}
                       {data?.premiumShares && data.premiumShares > 0 && (
                         <tr className="border-b hover-elevate" data-testid="row-premium-shares">
-                          <td className="p-4">
+                          <td className="p-2 sm:p-4">
                             <div className="flex items-center gap-3">
                               <Crown className="w-8 h-8 text-primary" />
                               <div>
@@ -149,12 +149,12 @@ export default function Portfolio() {
                               </div>
                             </div>
                           </td>
-                          <td className="p-4 text-right font-mono">{data.premiumShares}</td>
-                          <td className="p-4 text-right font-mono">-</td>
-                          <td className="p-4 text-right font-mono">-</td>
-                          <td className="p-4 text-right font-mono">-</td>
-                          <td className="p-4 text-right font-mono">-</td>
-                          <td className="p-4">
+                          <td className="p-2 sm:p-4 text-right font-mono">{data.premiumShares}</td>
+                          <td className="p-2 sm:p-4 text-right font-mono">-</td>
+                          <td className="p-2 sm:p-4 text-right font-mono">-</td>
+                          <td className="p-2 sm:p-4 text-right font-mono">-</td>
+                          <td className="p-2 sm:p-4 text-right font-mono">-</td>
+                          <td className="p-2 sm:p-4">
                             <Button
                               size="sm"
                               onClick={() => redeemPremiumMutation.mutate()}
@@ -170,7 +170,7 @@ export default function Portfolio() {
                       {/* Player Holdings */}
                       {data?.holdings.filter(h => h.assetType === "player").map((holding) => (
                         <tr key={holding.id} className="border-b hover-elevate" data-testid={`row-holding-${holding.player?.id}`}>
-                          <td className="p-4">
+                          <td className="p-2 sm:p-4">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                                 <span className="font-bold text-sm">
@@ -183,11 +183,11 @@ export default function Portfolio() {
                               </div>
                             </div>
                           </td>
-                          <td className="p-4 text-right font-mono">{holding.quantity}</td>
-                          <td className="p-4 text-right font-mono">${holding.avgCostBasis}</td>
-                          <td className="p-4 text-right font-mono">${holding.player?.currentPrice}</td>
-                          <td className="p-4 text-right font-mono font-bold">${holding.currentValue}</td>
-                          <td className="p-4 text-right">
+                          <td className="p-2 sm:p-4 text-right font-mono">{holding.quantity}</td>
+                          <td className="p-2 sm:p-4 text-right font-mono">${holding.avgCostBasis}</td>
+                          <td className="p-2 sm:p-4 text-right font-mono">${holding.player?.currentPrice}</td>
+                          <td className="p-2 sm:p-4 text-right font-mono font-bold">${holding.currentValue}</td>
+                          <td className="p-2 sm:p-4 text-right">
                             <div className={parseFloat(holding.pnl) >= 0 ? 'text-positive' : 'text-negative'}>
                               <div className="font-mono font-medium">
                                 {parseFloat(holding.pnl) >= 0 ? '+' : ''}${holding.pnl}
@@ -197,7 +197,7 @@ export default function Portfolio() {
                               </div>
                             </div>
                           </td>
-                          <td className="p-4">
+                          <td className="p-2 sm:p-4">
                             <Link href={`/player/${holding.player?.id}`}>
                               <Button size="sm" variant="outline">Trade</Button>
                             </Link>
@@ -225,36 +225,36 @@ export default function Portfolio() {
                     <table className="w-full">
                       <thead className="border-b bg-muted/50">
                         <tr>
-                          <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</th>
-                          <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
-                          <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Side</th>
-                          <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
-                          <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Price</th>
-                          <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Filled</th>
-                          <th className="p-4"></th>
+                          <th className="text-left p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Type</th>
+                          <th className="text-left p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
+                          <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Side</th>
+                          <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
+                          <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Price</th>
+                          <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Filled</th>
+                          <th className="p-2 sm:p-4"></th>
                         </tr>
                       </thead>
                       <tbody>
                         {data?.openOrders.map((order) => (
                           <tr key={order.id} className="border-b hover-elevate" data-testid={`row-order-${order.id}`}>
-                            <td className="p-4">
+                            <td className="p-2 sm:p-4">
                               <Badge variant="outline" className="capitalize">{order.orderType}</Badge>
                             </td>
-                            <td className="p-4">
+                            <td className="p-2 sm:p-4">
                               <div className="font-medium">{order.player.firstName} {order.player.lastName}</div>
                               <div className="text-xs text-muted-foreground">{order.player.team}</div>
                             </td>
-                            <td className="p-4 text-right">
+                            <td className="p-2 sm:p-4 text-right">
                               <Badge className={order.side === "buy" ? "bg-positive" : "bg-negative"}>
                                 {order.side.toUpperCase()}
                               </Badge>
                             </td>
-                            <td className="p-4 text-right font-mono">{order.quantity}</td>
-                            <td className="p-4 text-right font-mono">
+                            <td className="p-2 sm:p-4 text-right font-mono">{order.quantity}</td>
+                            <td className="p-2 sm:p-4 text-right font-mono">
                               {order.limitPrice ? `$${order.limitPrice}` : "Market"}
                             </td>
-                            <td className="p-4 text-right font-mono">{order.filledQuantity}</td>
-                            <td className="p-4">
+                            <td className="p-2 sm:p-4 text-right font-mono">{order.filledQuantity}</td>
+                            <td className="p-2 sm:p-4">
                               <Button
                                 size="sm"
                                 variant="destructive"

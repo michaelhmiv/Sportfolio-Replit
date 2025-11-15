@@ -63,17 +63,17 @@ export default function Marketplace() {
   }) : [];
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-background p-3 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-4 sm:mb-8">
           <h1 className="text-3xl font-bold mb-2">Marketplace</h1>
           <p className="text-muted-foreground">Browse and trade player shares</p>
         </div>
 
         {/* Filters */}
-        <Card className="mb-6">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card className="mb-3 sm:mb-6">
+          <CardContent className="p-3 sm:p-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
               <div className="relative md:col-span-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -127,10 +127,10 @@ export default function Marketplace() {
                 <table className="w-full">
                   <thead className="border-b bg-muted/50">
                     <tr>
-                      <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
-                      <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Team</th>
-                      <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Position</th>
-                      <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <th className="text-left p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
+                      <th className="text-left p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Team</th>
+                      <th className="text-left p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Position</th>
+                      <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         <button 
                           onClick={() => toggleSort("price")} 
                           className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded"
@@ -139,7 +139,7 @@ export default function Marketplace() {
                           Price <ArrowUpDown className="w-3 h-3" />
                         </button>
                       </th>
-                      <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         <button 
                           onClick={() => toggleSort("volume")} 
                           className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded"
@@ -148,7 +148,7 @@ export default function Marketplace() {
                           24h Volume <ArrowUpDown className="w-3 h-3" />
                         </button>
                       </th>
-                      <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         <button 
                           onClick={() => toggleSort("change")} 
                           className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded"
@@ -157,7 +157,7 @@ export default function Marketplace() {
                           24h Change <ArrowUpDown className="w-3 h-3" />
                         </button>
                       </th>
-                      <th className="p-4"></th>
+                      <th className="p-2 sm:p-4"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -167,7 +167,7 @@ export default function Marketplace() {
                         className="border-b last:border-0 hover-elevate"
                         data-testid={`row-player-${player.id}`}
                       >
-                        <td className="p-4">
+                        <td className="p-2 sm:p-4">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
                               <span className="font-bold text-sm">{player.firstName[0]}{player.lastName[0]}</span>
@@ -178,21 +178,21 @@ export default function Marketplace() {
                             </div>
                           </div>
                         </td>
-                        <td className="p-4">
+                        <td className="p-2 sm:p-4">
                           <Badge variant="outline">{player.team}</Badge>
                         </td>
-                        <td className="p-4">
+                        <td className="p-2 sm:p-4">
                           <span className="text-sm text-muted-foreground">{player.position}</span>
                         </td>
-                        <td className="p-4 text-right">
+                        <td className="p-2 sm:p-4 text-right">
                           <span className="font-mono font-bold text-lg" data-testid={`text-price-${player.id}`}>
                             ${player.currentPrice}
                           </span>
                         </td>
-                        <td className="p-4 text-right">
+                        <td className="p-2 sm:p-4 text-right">
                           <span className="text-sm text-muted-foreground">{player.volume24h.toLocaleString()}</span>
                         </td>
-                        <td className="p-4 text-right">
+                        <td className="p-2 sm:p-4 text-right">
                           <div className={`flex items-center justify-end gap-1 ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
                             {parseFloat(player.priceChange24h) >= 0 ? (
                               <TrendingUp className="w-4 h-4" />
@@ -204,7 +204,7 @@ export default function Marketplace() {
                             </span>
                           </div>
                         </td>
-                        <td className="p-4">
+                        <td className="p-2 sm:p-4">
                           <Link href={`/player/${player.id}`}>
                             <Button size="sm" data-testid={`button-trade-${player.id}`}>Trade</Button>
                           </Link>
