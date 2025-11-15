@@ -90,6 +90,59 @@ export default function Dashboard() {
     refetchInterval: 10000, // Poll every 10 seconds to keep mining data fresh
   });
 
+  // Real-time mining share projection
+  const [projectedShares, setProjectedShares] = useState(0);
+  
+  useEffect(() => {
+    if (!data?.mining) {
+      setProjectedShares(0);
+      return;
+    }
+
+    const calculateProjectedShares = () => {
+      const mining = data.mining;
+      if (!mining.playerId) {
+        setProjectedShares(0);
+        return;
+      }
+
+      // Guard against division by zero or undefined
+      if (!mining.sharesPerHour || mining.sharesPerHour === 0) {
+        setProjectedShares(mining.sharesAccumulated || 0);
+        return;
+      }
+
+      // Use the same calculation logic as backend
+      const now = new Date();
+      const effectiveStart = mining.lastClaimedAt ? new Date(mining.lastClaimedAt) : new Date(mining.updatedAt);
+      const currentElapsedMs = now.getTime() - effectiveStart.getTime();
+      const totalElapsedMs = (mining.residualMs || 0) + currentElapsedMs;
+      
+      // Convert to shares (ms per share = 3600000ms / sharesPerHour)
+      const msPerShare = (60 * 60 * 1000) / mining.sharesPerHour;
+      // Clamp at zero to handle client/server clock skew
+      const sharesEarned = Math.max(0, Math.floor(totalElapsedMs / msPerShare));
+      
+      // Add to accumulated shares and cap at limit
+      const projected = Math.min(mining.sharesAccumulated + sharesEarned, mining.capLimit);
+      setProjectedShares(projected);
+    };
+
+    // Calculate immediately and then every second
+    calculateProjectedShares();
+    const interval = setInterval(calculateProjectedShares, 1000);
+
+    return () => clearInterval(interval);
+  }, [
+    data?.mining?.playerId,
+    data?.mining?.updatedAt,
+    data?.mining?.lastClaimedAt,
+    data?.mining?.residualMs,
+    data?.mining?.sharesAccumulated,
+    data?.mining?.sharesPerHour,
+    data?.mining?.capLimit,
+  ]);
+
   const { data: playersData } = useQuery<Player[]>({
     queryKey: ["/api/players"],
     enabled: showPlayerSelection,
@@ -476,13 +529,13 @@ export default function Dashboard() {
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Rate: {data?.mining?.sharesPerHour || 100} sh/hr</span>
                   <span className="text-xs text-muted-foreground font-mono">
-                    {data?.mining?.sharesAccumulated || 0} / {data?.mining?.capLimit || 2400}
+                    {projectedShares} / {data?.mining?.capLimit || 2400}
                   </span>
                 </div>
                 <Progress 
-                  value={((data?.mining?.sharesAccumulated || 0) / (data?.mining?.capLimit || 2400)) * 100} 
+                  value={(projectedShares / (data?.mining?.capLimit || 2400)) * 100} 
                   className={`h-2 transition-all ${
-                    data?.mining?.player && (data?.mining?.sharesAccumulated || 0) < (data?.mining?.capLimit || 2400)
+                    data?.mining?.player && projectedShares < (data?.mining?.capLimit || 2400)
                       ? 'animate-pulse shadow-[0_0_8px_hsl(var(--primary)_/_0.4)]'
                       : ''
                   }`}
@@ -514,11 +567,11 @@ export default function Dashboard() {
                   <Button 
                     className="w-full" 
                     size="lg"
-                    disabled={!data?.mining?.sharesAccumulated || claimMiningMutation.isPending}
+                    disabled={!projectedShares || claimMiningMutation.isPending}
                     onClick={() => claimMiningMutation.mutate()}
                     data-testid="button-claim-mining"
                   >
-                    {claimMiningMutation.isPending ? "Claiming..." : `Claim ${data?.mining?.sharesAccumulated || 0} Shares`}
+                    {claimMiningMutation.isPending ? "Claiming..." : `Claim ${projectedShares} Shares`}
                   </Button>
                 </>
               ) : (
