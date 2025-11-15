@@ -7,6 +7,15 @@ Sportfolio is a fantasy sports trading platform that gamifies NBA player perform
 ## Recent Changes
 
 ### November 15, 2025
+- **Mining Share Discrepancy Fix**: Fixed critical bug where displayed shares didn't match claimed shares
+  - **Root Cause**: Frontend used `lastClaimedAt` as baseline while backend used `lastAccruedAt`, causing ~35% discrepancy
+  - **Solution**: Created shared utility `shared/mining-utils.ts` with `calculateMiningShares()` and `calculateAccrualUpdate()`
+  - Frontend now uses `lastAccruedAt` baseline to match backend exactly
+  - Both frontend and backend use identical calculation logic via shared utility
+  - Added timestamp initialization fallback to handle missing `lastAccruedAt` gracefully
+  - Shared utility normalizes timestamps to prevent accrual stalls
+  - **Result**: Displayed projected shares now match claimed shares exactly (verified via E2E testing)
+  - Architect-reviewed and confirmed fix resolves all discrepancy issues
 - **Mining Accrual Fix**: Fixed critical timing bug that caused incorrect share accrual rates
   - Added `lastAccruedAt` field to mining schema to track persistent baseline timestamp
   - Implemented residual time preservation using formula: `newLastAccruedAt = now - leftoverMs`
