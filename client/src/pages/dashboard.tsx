@@ -460,13 +460,13 @@ export default function Dashboard() {
                         <div className="flex flex-col gap-1">
                           <div className="flex items-center justify-between">
                             <span className="font-medium text-xs">{game.awayTeam}</span>
-                            {effectiveStatus === 'completed' && game.awayScore != null && game.homeScore != null && (
+                            {(effectiveStatus === 'completed' || effectiveStatus === 'inprogress') && game.awayScore != null && (
                               <span className="font-mono font-bold text-xs">{game.awayScore}</span>
                             )}
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="font-medium text-xs">{game.homeTeam}</span>
-                            {effectiveStatus === 'completed' && game.awayScore != null && game.homeScore != null && (
+                            {(effectiveStatus === 'completed' || effectiveStatus === 'inprogress') && game.homeScore != null && (
                               <span className="font-mono font-bold text-xs">{game.homeScore}</span>
                             )}
                           </div>
