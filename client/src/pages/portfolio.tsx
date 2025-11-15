@@ -227,7 +227,6 @@ export default function Portfolio() {
                       </tr>
                     </thead>
                     <tbody>
-                      {/* Premium Shares */}
                       {data?.premiumShares && data.premiumShares > 0 && (
                         <tr className="border-b hover-elevate" data-testid="row-premium-shares">
                           <td className="p-2 sm:p-4">
@@ -256,8 +255,6 @@ export default function Portfolio() {
                           </td>
                         </tr>
                       )}
-                      
-                      {/* Player Holdings */}
                       {data?.holdings.filter(h => h.assetType === "player").map((holding) => (
                         <tr key={holding.id} className="border-b hover-elevate" data-testid={`row-holding-${holding.player?.id}`}>
                           <td className="p-2 sm:p-4">
