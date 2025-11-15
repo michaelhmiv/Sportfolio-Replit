@@ -36,6 +36,12 @@ Preferred communication style: Simple, everyday language.
   - Team dropdown filter (all teams + individual teams)
   - Expandable PlayerCard components with season stats and recent games
   - Stats loaded on-demand when card is expanded
+  - **Real-time share projection**: Client-side calculation updates every 1 second using backend accrual formula
+    - Mirrors backend logic: `sharesEarned = Math.max(0, Math.floor((residualMs + elapsedMs) / msPerShare))`
+    - Eliminates discrepancy between displayed count and claimed amount
+    - Defensive guards: division-by-zero protection, clock skew handling, stale closure prevention
+    - Progress bar animates with pulsing blue glow when actively mining
+    - 10-second polling for reconciliation with backend state
 - Tabbed interfaces for contests, portfolio views, and order management
 - Modal dialogs for trade execution, contest entry, and player mining selection
 - WebSocket connection for live data updates with automatic query invalidation
