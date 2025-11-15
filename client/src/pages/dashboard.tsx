@@ -308,7 +308,7 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen bg-background overflow-x-hidden">
         {/* Market Ticker */}
         <div className="border-b bg-card">
         <div className="h-12 overflow-hidden relative">

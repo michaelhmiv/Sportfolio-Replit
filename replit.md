@@ -13,10 +13,11 @@ Sportfolio is a fantasy sports trading platform that gamifies NBA player perform
   - Mining now correctly accrues at exactly 100 shares/hour (36,000ms per share, 2400 cap)
   - Architect-reviewed and confirmed accurate accrual rate
 - **Mobile Responsive Layouts**: Eliminated horizontal scrolling on mobile devices
-  - Replaced all table views with card-based layouts on mobile (<640px breakpoint)
-  - Marketplace, Portfolio (Holdings & Orders), and Contests now use responsive card layouts
+  - Dashboard: Added `overflow-x-hidden` to prevent market ticker from causing page-level horizontal overflow
+  - Marketplace, Portfolio (Holdings & Orders), and Contests: Replaced table views with card-based layouts on mobile (<640px breakpoint)
   - Desktop (≥640px) maintains table views for data-dense information
   - Fixed React DOM nesting errors by removing JSX comments from tbody tags
+  - Tested and verified: No horizontal scrolling on any page at 390px viewport (iPhone 12)
 
 ## User Preferences
 
