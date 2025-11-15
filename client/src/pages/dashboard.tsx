@@ -308,9 +308,9 @@ export default function Dashboard() {
 
   return (
     <>
-      <div className="min-h-screen bg-background overflow-x-hidden">
+      <div className="min-h-screen bg-background overflow-x-hidden max-w-full">
         {/* Market Ticker */}
-        <div className="border-b bg-card">
+        <div className="border-b bg-card overflow-x-hidden">
         <div className="h-12 overflow-hidden relative">
           <div className="flex gap-6 animate-slide-left absolute whitespace-nowrap py-3 px-4">
             {data?.hotPlayers?.concat(data.hotPlayers).map((player, idx) => (
@@ -330,20 +330,18 @@ export default function Dashboard() {
         </div>
 
         {/* Main Dashboard Grid */}
-        <div className="p-3 sm:p-6 lg:p-8">
+        <div className="p-3 sm:p-6 lg:p-8 max-w-full overflow-x-hidden">
         {/* Balance Header */}
-        <div className="mb-4 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-            <div className="flex items-center gap-6">
-              <div>
-                <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Cash Balance</div>
-                <div className="text-2xl font-mono font-bold" data-testid="text-balance">${data?.user.balance || "0.00"}</div>
-              </div>
-              <div>
-                <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Portfolio Value</div>
-                <div className="text-2xl font-mono font-bold" data-testid="text-portfolio-value">${data?.user.portfolioValue || "0.00"}</div>
-              </div>
+        <div className="mb-4 sm:mb-8">
+          <h1 className="text-3xl font-bold mb-3">Dashboard</h1>
+          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+            <div>
+              <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Cash Balance</div>
+              <div className="text-2xl font-mono font-bold" data-testid="text-balance">${data?.user.balance || "0.00"}</div>
+            </div>
+            <div>
+              <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Portfolio Value</div>
+              <div className="text-2xl font-mono font-bold" data-testid="text-portfolio-value">${data?.user.portfolioValue || "0.00"}</div>
             </div>
           </div>
         </div>
