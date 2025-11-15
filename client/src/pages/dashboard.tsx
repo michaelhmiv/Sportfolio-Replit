@@ -87,6 +87,7 @@ export default function Dashboard() {
   
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
+    refetchInterval: 10000, // Poll every 10 seconds to keep mining data fresh
   });
 
   const { data: playersData } = useQuery<Player[]>({
@@ -480,7 +481,11 @@ export default function Dashboard() {
                 </div>
                 <Progress 
                   value={((data?.mining?.sharesAccumulated || 0) / (data?.mining?.capLimit || 2400)) * 100} 
-                  className="h-2"
+                  className={`h-2 transition-all ${
+                    data?.mining?.player && (data?.mining?.sharesAccumulated || 0) < (data?.mining?.capLimit || 2400)
+                      ? 'animate-pulse shadow-[0_0_8px_hsl(var(--primary)_/_0.4)]'
+                      : ''
+                  }`}
                   data-testid="progress-mining"
                 />
               </div>
