@@ -379,12 +379,21 @@ export default function Dashboard() {
                         data-testid={`game-${game.gameId}`}
                       >
                         <div className="flex items-center justify-between mb-1">
-                          <span className="font-medium text-sm">{game.awayTeam}</span>
-                          <span className="text-xs text-muted-foreground">@</span>
-                          <span className="font-medium text-sm">{game.homeTeam}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{game.awayTeam}</span>
+                            <span className="text-xs text-muted-foreground">@</span>
+                            <span className="font-medium text-sm">{game.homeTeam}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">
+                            {game.status === 'scheduled' 
+                              ? new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                              : game.status === 'completed'
+                              ? new Date(game.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })
+                              : 'In Progress'
+                            }
+                          </span>
                           <Badge 
                             variant={game.status === 'inprogress' ? 'default' : game.status === 'completed' ? 'secondary' : 'outline'}
                             className="text-xs"
@@ -409,12 +418,21 @@ export default function Dashboard() {
                   >
                     <div className="flex-1">
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-medium text-sm">{game.awayTeam}</span>
-                        <span className="text-xs text-muted-foreground">@</span>
-                        <span className="font-medium text-sm">{game.homeTeam}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm">{game.awayTeam}</span>
+                          <span className="text-xs text-muted-foreground">@</span>
+                          <span className="font-medium text-sm">{game.homeTeam}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</span>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">
+                          {game.status === 'scheduled' 
+                            ? new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                            : game.status === 'completed'
+                            ? new Date(game.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })
+                            : 'In Progress'
+                          }
+                        </span>
                         <Badge 
                           variant={game.status === 'inprogress' ? 'default' : game.status === 'completed' ? 'secondary' : 'outline'}
                           className="text-xs"
