@@ -4,6 +4,20 @@
 
 Sportfolio is a fantasy sports trading platform that gamifies NBA player performance by allowing users to trade player shares like stocks. The platform combines real-time sports data with financial trading mechanics, featuring player share mining, 50/50 contests, and a professional-grade trading interface inspired by Robinhood and Bloomberg Terminal.
 
+## Recent Changes
+
+### November 15, 2025
+- **Mining Accrual Fix**: Fixed critical timing bug that caused incorrect share accrual rates
+  - Added `lastAccruedAt` field to mining schema to track persistent baseline timestamp
+  - Implemented residual time preservation using formula: `newLastAccruedAt = now - leftoverMs`
+  - Mining now correctly accrues at exactly 100 shares/hour (36,000ms per share, 2400 cap)
+  - Architect-reviewed and confirmed accurate accrual rate
+- **Mobile Responsive Layouts**: Eliminated horizontal scrolling on mobile devices
+  - Replaced all table views with card-based layouts on mobile (<640px breakpoint)
+  - Marketplace, Portfolio (Holdings & Orders), and Contests now use responsive card layouts
+  - Desktop (≥640px) maintains table views for data-dense information
+  - Fixed React DOM nesting errors by removing JSX comments from tbody tags
+
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
@@ -47,7 +61,16 @@ Preferred communication style: Simple, everyday language.
 - WebSocket connection for live data updates with automatic query invalidation
 
 **Mobile-Responsive Patterns:**
-- Games widget: `<ScrollArea>` horizontal carousel on mobile (<sm), responsive grid on desktop (>=sm)
+- **No horizontal scrolling**: All pages optimized for mobile viewports
+- **Responsive layout strategy**: Separate mobile card layouts and desktop table layouts using `sm:` breakpoint (640px)
+  - Mobile (<640px): Card-based layouts with vertical stacking
+  - Desktop (≥640px): Table layouts for data-dense views
+- **Page-specific implementations**:
+  - Marketplace: Player cards on mobile, table on desktop
+  - Portfolio Holdings: Holding cards on mobile, table on desktop
+  - Portfolio Orders: Order cards on mobile, table on desktop
+  - Contests: Contest cards on mobile, table on desktop
+  - Games widget: Horizontal scroll carousel on mobile, grid on desktop
 - Player selection: Searchable command palette with collapsible stat cards
 - Breakpoint strategy: Tailwind `sm:` prefix for tablet/desktop layouts
 
@@ -71,7 +94,13 @@ Preferred communication style: Simple, everyday language.
 - **Holdings:** User ownership tracking with cost basis calculation
 - **Orders:** Limit and market order management with order book
 - **Trades:** Transaction history and execution records
-- **Mining:** Player share mining mechanics with cooldown timers
+- **Mining:** Player share mining mechanics with precise accrual timing
+  - Accrual rate: Exactly 100 shares/hour (36,000ms per share)
+  - Cap: 2,400 shares maximum
+  - Timing mechanism: `lastAccruedAt` field tracks baseline timestamp for accurate elapsed time calculation
+  - Residual preservation: Leftover milliseconds carried forward across claims
+  - Formula: `newLastAccruedAt = now - leftoverMs` preserves residual without drift
+  - Cap handling: Residual cleared when cap reached, preventing double-counting
 - **Contests:** 50/50 contest structure with entry and lineup management
 - **Price History:** Time-series data for charting and analytics
 
