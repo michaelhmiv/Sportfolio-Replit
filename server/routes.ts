@@ -333,6 +333,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Games for a specific date (YYYY-MM-DD format)
+  app.get("/api/games/date/:date", async (req, res) => {
+    try {
+      const { date } = req.params;
+      
+      // Parse the date string (expected format: YYYY-MM-DD)
+      const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!dateMatch) {
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+      }
+      
+      const [, year, month, day] = dateMatch;
+      const etOffset = -5; // ET is UTC-5 (EST) or UTC-4 (EDT), using -5 for simplicity
+      
+      // Create date in ET timezone
+      const startOfDayET = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 0, 0, 0);
+      const endOfDayET = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 23, 59, 59);
+      
+      // Convert ET boundaries to UTC for database query
+      const startOfDayUTC = new Date(startOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
+      const endOfDayUTC = new Date(endOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
+      
+      const games = await storage.getDailyGames(startOfDayUTC, endOfDayUTC);
+      res.json(games);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Game stats - get player box scores for a specific game
   app.get("/api/games/:gameId/stats", async (req, res) => {
     try {
