@@ -23,6 +23,7 @@ function Router() {
       <Route path="/player/:id" component={PlayerPage} />
       <Route path="/contests" component={Contests} />
       <Route path="/contest/:id/entry" component={ContestEntry} />
+      <Route path="/contest/:id/entry/:entryId" component={ContestEntry} />
       <Route path="/contest/:id/leaderboard" component={ContestLeaderboard} />
       <Route path="/portfolio" component={Portfolio} />
       <Route component={NotFound} />

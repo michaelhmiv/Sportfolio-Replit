@@ -84,7 +84,12 @@ export default function Contests() {
                             <div className="flex items-center gap-1">
                               <Clock className="w-4 h-4" />
                               <span className="text-sm">
-                                {new Date(contest.startsAt).toLocaleDateString()}
+                                {new Date(contest.startsAt).toLocaleString([], { 
+                                  month: 'short', 
+                                  day: 'numeric', 
+                                  hour: 'numeric', 
+                                  minute: '2-digit' 
+                                })}
                               </span>
                             </div>
                           </div>
@@ -154,13 +159,22 @@ export default function Contests() {
                         </div>
                       </div>
                       
-                      {entry.contest.status === "live" && (
-                        <Link href={`/contest/${entry.contestId}/leaderboard`}>
-                          <Button variant="outline" data-testid={`button-leaderboard-${entry.id}`}>
-                            View Leaderboard
-                          </Button>
-                        </Link>
-                      )}
+                      <div className="flex flex-col gap-2">
+                        {entry.contest.status === "open" && new Date() < new Date(entry.contest.startsAt) && (
+                          <Link href={`/contest/${entry.contestId}/entry/${entry.id}`}>
+                            <Button variant="outline" data-testid={`button-edit-entry-${entry.id}`}>
+                              Edit Entry
+                            </Button>
+                          </Link>
+                        )}
+                        {entry.contest.status === "live" && (
+                          <Link href={`/contest/${entry.contestId}/leaderboard`}>
+                            <Button variant="outline" data-testid={`button-leaderboard-${entry.id}`}>
+                              View Leaderboard
+                            </Button>
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

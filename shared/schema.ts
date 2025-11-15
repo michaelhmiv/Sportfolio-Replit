@@ -109,6 +109,7 @@ export const contests = pgTable("contests", {
   contestType: text("contest_type").notNull().default("50/50"),
   gameDate: timestamp("game_date").notNull(), // Date of games this contest covers
   status: text("status").notNull().default("open"), // "open", "live", "completed"
+  entryFee: decimal("entry_fee", { precision: 20, scale: 2 }).notNull().default("0.00"), // Entry fee per contest
   totalSharesEntered: integer("total_shares_entered").notNull().default(0),
   totalPrizePool: decimal("total_prize_pool", { precision: 20, scale: 2 }).notNull().default("0.00"),
   entryCount: integer("entry_count").notNull().default(0),

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,27 +30,67 @@ interface LineupEntry {
 }
 
 export default function ContestEntry() {
-  const { id } = useParams<{ id: string }>();
+  const { id, entryId } = useParams<{ id: string; entryId?: string }>();
   const [, navigate] = useLocation();
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [lineup, setLineup] = useState<Map<string, LineupEntry>>(new Map());
+  const isEditMode = !!entryId;
 
   const { data, isLoading } = useQuery<ContestEntryData>({
     queryKey: ["/api/contest", id, "entry"],
+    enabled: !isEditMode,
   });
+
+  // Fetch existing entry for edit mode
+  const { data: existingEntry, isLoading: isLoadingEntry } = useQuery<any>({
+    queryKey: ["/api/contest", id, "entry", entryId],
+    enabled: isEditMode,
+  });
+
+  // Pre-populate lineup in edit mode using API-provided eligiblePlayers
+  useEffect(() => {
+    if (isEditMode && existingEntry?.lineup && existingEntry?.eligiblePlayers) {
+      const newLineup = new Map<string, LineupEntry>();
+      for (const lineupItem of existingEntry.lineup) {
+        const player = lineupItem.player;
+        if (player) {
+          // Find the eligible player entry with correct maxShares already calculated by API
+          const eligiblePlayer = existingEntry.eligiblePlayers.find((ep: any) => ep.assetId === player.id);
+          newLineup.set(player.id, {
+            playerId: player.id,
+            playerName: `${player.firstName} ${player.lastName}`,
+            team: player.team,
+            position: player.position,
+            sharesEntered: lineupItem.sharesEntered,
+            maxShares: eligiblePlayer?.quantity || lineupItem.sharesEntered, // Use API-provided quantity
+          });
+        }
+      }
+      setLineup(newLineup);
+    }
+  }, [isEditMode, existingEntry]);
 
   const submitEntryMutation = useMutation({
     mutationFn: async (lineupData: { playerId: string; sharesEntered: number }[]) => {
+      if (isEditMode) {
+        return await apiRequest("PUT", `/api/contest/${id}/entry/${entryId}`, { lineup: lineupData });
+      }
       return await apiRequest("POST", `/api/contest/${id}/enter`, { lineup: lineupData });
     },
     onSuccess: () => {
-      toast({ title: "Contest entry submitted!" });
+      toast({ title: isEditMode ? "Contest entry updated!" : "Contest entry submitted!" });
       queryClient.invalidateQueries({ queryKey: ["/api/contests"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+      // Invalidate the specific entry query in edit mode
+      if (isEditMode) {
+        queryClient.invalidateQueries({ queryKey: ["/api/contest", id, "entry", entryId] });
+        queryClient.invalidateQueries({ queryKey: ["/api/contest", id, "entry"] });
+      }
       navigate("/contests");
     },
     onError: (error: Error) => {
-      toast({ title: "Entry failed", description: error.message, variant: "destructive" });
+      toast({ title: isEditMode ? "Update failed" : "Entry failed", description: error.message, variant: "destructive" });
     },
   });
 
@@ -97,7 +137,7 @@ export default function ContestEntry() {
     submitEntryMutation.mutate(lineupData);
   };
 
-  if (isLoading || !data) {
+  if ((isEditMode && (isLoadingEntry || !existingEntry)) || (!isEditMode && (isLoading || !data))) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-muted-foreground">Loading contest...</div>
@@ -105,7 +145,9 @@ export default function ContestEntry() {
     );
   }
 
-  const filteredPlayers = data.eligiblePlayers.filter(holding =>
+  const contestData = isEditMode ? existingEntry?.contest : data?.contest;
+  const eligiblePlayers = isEditMode ? (existingEntry?.eligiblePlayers || []) : (data?.eligiblePlayers || []);
+  const filteredPlayers = eligiblePlayers.filter((holding: any) =>
     holding.player.firstName.toLowerCase().includes(search.toLowerCase()) ||
     holding.player.lastName.toLowerCase().includes(search.toLowerCase())
   );
@@ -116,9 +158,12 @@ export default function ContestEntry() {
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
             <Trophy className="w-6 h-6 text-primary" />
-            <h1 className="text-3xl font-bold">{data.contest.name}</h1>
+            <h1 className="text-3xl font-bold">{contestData?.name}</h1>
+            {isEditMode && <Badge>Editing Entry</Badge>}
           </div>
-          <p className="text-muted-foreground">Select players from your portfolio to enter this contest</p>
+          <p className="text-muted-foreground">
+            {isEditMode ? "Edit your lineup before the contest locks" : "Select players from your portfolio to enter this contest"}
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

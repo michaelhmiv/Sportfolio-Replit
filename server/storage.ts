@@ -437,6 +437,49 @@ export class DatabaseStorage implements IStorage {
       .where(eq(contestLineups.id, lineupId));
   }
 
+  async updateContestMetrics(contestId: string, totalShares: number, entryFee: string): Promise<void> {
+    // Fetch current contest to calculate new values
+    const [current] = await db
+      .select()
+      .from(contests)
+      .where(eq(contests.id, contestId));
+    
+    if (!current) return;
+
+    // Calculate new values
+    const newEntryCount = current.entryCount + 1;
+    const newTotalShares = current.totalSharesEntered + totalShares;
+    const newPrizePool = parseFloat(current.totalPrizePool) + parseFloat(entryFee);
+
+    // Update with calculated values
+    await db
+      .update(contests)
+      .set({
+        entryCount: newEntryCount,
+        totalSharesEntered: newTotalShares,
+        totalPrizePool: newPrizePool.toFixed(2),
+      })
+      .where(eq(contests.id, contestId));
+  }
+
+  async getContestEntryWithLineup(entryId: string, userId: string): Promise<{ entry: ContestEntry; lineup: any[] } | null> {
+    const [entry] = await db
+      .select()
+      .from(contestEntries)
+      .where(and(eq(contestEntries.id, entryId), eq(contestEntries.userId, userId)));
+    
+    if (!entry) return null;
+
+    const lineup = await this.getContestLineups(entryId);
+    return { entry, lineup };
+  }
+
+  async deleteContestLineup(entryId: string): Promise<void> {
+    await db
+      .delete(contestLineups)
+      .where(eq(contestLineups.entryId, entryId));
+  }
+
   // Daily games methods
   async upsertDailyGame(game: InsertDailyGame): Promise<DailyGame> {
     const [existing] = await db

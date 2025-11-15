@@ -1067,10 +1067,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Contest not found" });
       }
 
+      // Check if contest is locked (started)
+      if (new Date() >= new Date(contest.startsAt)) {
+        return res.status(400).json({ error: "Contest has already started and is locked" });
+      }
+
       const { lineup } = req.body;
 
       if (!lineup || lineup.length === 0) {
         return res.status(400).json({ error: "Lineup cannot be empty" });
+      }
+
+      // VALIDATE: Check user owns enough shares BEFORE creating entry
+      for (const item of lineup) {
+        const holding = await storage.getHolding(user.id, "player", item.playerId);
+        if (!holding || holding.quantity < item.sharesEntered) {
+          return res.status(400).json({ 
+            error: `Insufficient shares for player ${item.playerId}. Required: ${item.sharesEntered}, Available: ${holding?.quantity || 0}` 
+          });
+        }
       }
 
       // Calculate total shares
@@ -1083,7 +1098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSharesEntered: totalShares,
       });
 
-      // Create lineup items
+      // Create lineup items and burn shares from holdings
       for (const item of lineup) {
         await storage.createContestLineup({
           entryId: entry.id,
@@ -1091,8 +1106,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sharesEntered: item.sharesEntered,
         });
 
-        // Burn shares from holdings
         const holding = await storage.getHolding(user.id, "player", item.playerId);
+        // Safe to burn now - already validated above
         if (holding) {
           await storage.updateHolding(
             user.id,
@@ -1104,7 +1119,240 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Update contest metrics atomically
+      await storage.updateContestMetrics(req.params.id, totalShares, contest.entryFee);
+
+      // Broadcast contest update
+      broadcast({ type: "contestUpdate", contestId: req.params.id });
+
       res.json({ success: true, entry });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get existing contest entry for editing
+  app.get("/api/contest/:contestId/entry/:entryId", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const { contestId, entryId } = req.params;
+
+      const contest = await storage.getContest(contestId);
+      if (!contest) {
+        return res.status(404).json({ error: "Contest not found" });
+      }
+
+      // Check if contest is locked
+      if (new Date() >= new Date(contest.startsAt)) {
+        return res.status(400).json({ error: "Contest has started and is locked for editing" });
+      }
+
+      const result = await storage.getContestEntryWithLineup(entryId, user.id);
+      if (!result) {
+        return res.status(404).json({ error: "Entry not found or unauthorized" });
+      }
+
+      // Get player details for lineup
+      const enrichedLineup = await Promise.all(
+        result.lineup.map(async (item: any) => ({
+          ...item,
+          player: await storage.getPlayer(item.playerId),
+        }))
+      );
+
+      // Get ALL eligible players: current holdings (including new acquisitions) + lineup players
+      const userHoldings = await storage.getUserHoldings(user.id);
+      const holdingsMap = new Map(
+        userHoldings
+          .filter(h => h.assetType === "player")
+          .map(h => [h.assetId, h])
+      );
+
+      // Build eligible players from all holdings and lineup players
+      const allPlayerIds = new Set([
+        ...userHoldings.filter(h => h.assetType === "player").map(h => h.assetId),
+        ...result.lineup.map((l: any) => l.playerId)
+      ]);
+
+      const eligiblePlayers = await Promise.all(
+        Array.from(allPlayerIds).map(async (playerId) => {
+          const holding = holdingsMap.get(playerId);
+          const lineupItem = result.lineup.find((l: any) => l.playerId === playerId);
+          const player = await storage.getPlayer(playerId);
+          
+          // Total available = current holding + shares in lineup
+          const currentQuantity = holding?.quantity || 0;
+          const lineupShares = lineupItem?.sharesEntered || 0;
+          const totalAvailable = currentQuantity + lineupShares;
+
+          return {
+            assetId: playerId,
+            assetType: "player" as const,
+            quantity: totalAvailable,
+            userId: user.id,
+            avgCostBasis: holding?.avgCostBasis || "0.0000",
+            player,
+            isEligible: true,
+          };
+        })
+      );
+
+      res.json({
+        contest: {
+          id: contest.id,
+          name: contest.name,
+          sport: contest.sport,
+          startsAt: contest.startsAt,
+        },
+        entry: result.entry,
+        lineup: enrichedLineup,
+        eligiblePlayers,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Update contest entry (edit lineup before lock)
+  app.put("/api/contest/:contestId/entry/:entryId", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const { contestId, entryId } = req.params;
+      const { lineup } = req.body;
+
+      const contest = await storage.getContest(contestId);
+      if (!contest) {
+        return res.status(404).json({ error: "Contest not found" });
+      }
+
+      // Check if contest is locked
+      if (new Date() >= new Date(contest.startsAt)) {
+        return res.status(400).json({ error: "Contest has started and is locked for editing" });
+      }
+
+      if (!lineup || lineup.length === 0) {
+        return res.status(400).json({ error: "Lineup cannot be empty" });
+      }
+
+      // Get existing entry
+      const existing = await storage.getContestEntryWithLineup(entryId, user.id);
+      if (!existing) {
+        return res.status(404).json({ error: "Entry not found or unauthorized" });
+      }
+
+      // Get current user holdings for validation
+      const userHoldings = await storage.getUserHoldings(user.id);
+      const holdingsMap = new Map(
+        userHoldings
+          .filter(h => h.assetType === "player")
+          .map(h => [h.assetId, h.quantity])
+      );
+
+      // Calculate share differences and validate
+      const oldLineupMap = new Map(existing.lineup.map((item: any) => [item.playerId, item.sharesEntered]));
+      const newLineupMap = new Map(lineup.map((item: any) => [item.playerId, item.sharesEntered]));
+
+      // Validate that user has sufficient shares for the new lineup
+      for (const [playerId, newShares] of newLineupMap) {
+        const oldShares = oldLineupMap.get(playerId) || 0;
+        const currentHolding = holdingsMap.get(playerId) || 0;
+        const availableShares = currentHolding + oldShares; // Current holdings + shares currently in lineup
+        
+        if (newShares > availableShares) {
+          return res.status(400).json({ 
+            error: `Insufficient shares for player ${playerId}. Available: ${availableShares}, Requested: ${newShares}` 
+          });
+        }
+      }
+
+      // Return shares that were removed or reduced
+      for (const [playerId, oldShares] of oldLineupMap) {
+        const newShares = newLineupMap.get(playerId) || 0;
+        if (newShares < oldShares) {
+          const sharesToReturn = oldShares - newShares;
+          const holding = await storage.getHolding(user.id, "player", playerId);
+          if (holding) {
+            await storage.updateHolding(
+              user.id,
+              "player",
+              playerId,
+              holding.quantity + sharesToReturn,
+              holding.avgCostBasis
+            );
+          } else {
+            // Create new holding if user didn't have any
+            await storage.updateHolding(user.id, "player", playerId, sharesToReturn, "0.0000");
+          }
+        }
+      }
+
+      // VALIDATE AND BURN: Check holdings AFTER returns, then burn additional shares
+      for (const [playerId, newShares] of newLineupMap) {
+        const oldShares = oldLineupMap.get(playerId) || 0;
+        if (newShares > oldShares) {
+          const sharesToBurn = newShares - oldShares;
+          // Re-fetch holding after share returns to get current state
+          const holding = await storage.getHolding(user.id, "player", playerId);
+          
+          // CRITICAL: Validate user has enough shares AFTER returns
+          if (!holding || holding.quantity < sharesToBurn) {
+            return res.status(400).json({ 
+              error: `Insufficient shares for player ${playerId}. Required: ${sharesToBurn}, Available: ${holding?.quantity || 0}` 
+            });
+          }
+          
+          // Safe to burn now - validated above
+          await storage.updateHolding(
+            user.id,
+            "player",
+            playerId,
+            holding.quantity - sharesToBurn,
+            holding.avgCostBasis
+          );
+        }
+      }
+
+      // Calculate new total shares
+      const totalShares = lineup.reduce((sum: number, item: any) => sum + item.sharesEntered, 0);
+      const oldTotalShares = existing.entry.totalSharesEntered;
+
+      // Delete old lineup and create new one
+      await storage.deleteContestLineup(entryId);
+      for (const item of lineup) {
+        await storage.createContestLineup({
+          entryId,
+          playerId: item.playerId,
+          sharesEntered: item.sharesEntered,
+        });
+      }
+
+      // Update entry total shares
+      await storage.updateContestEntry(entryId, { totalSharesEntered: totalShares });
+
+      // Update contest metrics with the share difference (not entry count)
+      const shareDifference = totalShares - oldTotalShares;
+      if (shareDifference !== 0) {
+        // Fetch current contest to calculate new total shares
+        const currentContest = await storage.getContest(contestId);
+        if (currentContest) {
+          const newTotalShares = currentContest.totalSharesEntered + shareDifference;
+          await storage.updateContest(contestId, {
+            totalSharesEntered: newTotalShares,
+          });
+        }
+      }
+
+      // Broadcast contest update
+      broadcast({ type: "contestUpdate", contestId });
+
+      // Fetch updated entry to return fresh data
+      const updatedEntry = await storage.getContestEntryWithLineup(entryId, user.id);
+      
+      res.json({ 
+        success: true,
+        entry: updatedEntry?.entry,
+        totalShares
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
