@@ -58,8 +58,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!miningData || !miningData.playerId) return;
 
     const now = new Date();
-    const capLimit = user.isPremium ? 33600 : 2400;
-    const sharesPerHour = user.isPremium ? 200 : 100;
+    // Force non-premium rates for demo user (100 shares/hour, 2400 cap)
+    const capLimit = 2400;
+    const sharesPerHour = 100;
 
     // If already at cap, don't accrue more - clear residual time
     if (miningData.sharesAccumulated >= capLimit) {
@@ -292,8 +293,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mining: miningData ? {
           ...miningData,
           player: miningPlayer,
-          capLimit: user.isPremium ? 33600 : 2400,
-          sharesPerHour: user.isPremium ? 200 : 100,
+          capLimit: 2400,
+          sharesPerHour: 100,
         } : null,
         contests: allContests.slice(0, 5),
         recentTrades: await Promise.all(
