@@ -330,9 +330,9 @@ export default function Dashboard() {
         </div>
 
         {/* Main Dashboard Grid */}
-        <div className="p-4 sm:p-6 lg:p-8">
+        <div className="p-3 sm:p-6 lg:p-8">
         {/* Balance Header */}
-        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="mb-4 sm:mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
           <div>
             <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
             <div className="flex items-center gap-6">
@@ -350,8 +350,8 @@ export default function Dashboard() {
 
         {/* Games */}
         {todayGames && todayGames.length > 0 && (
-          <Card className="mb-6">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 space-y-0 pb-2">
+          <Card className="mb-3 sm:mb-6">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium uppercase tracking-wide">
                 {isToday(selectedDate) ? "Today's Games" : "Games"}
               </CardTitle>
@@ -517,14 +517,14 @@ export default function Dashboard() {
         )}
 
         {/* Widgets Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
           {/* Mining Widget */}
           <Card className="lg:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium uppercase tracking-wide">Mining</CardTitle>
               <Clock className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3 sm:space-y-4">
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">Rate: {data?.mining?.sharesPerHour || 100} sh/hr</span>
@@ -597,10 +597,10 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium uppercase tracking-wide">Contests</CardTitle>
               <Trophy className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2 sm:space-y-3">
               {data?.contests?.slice(0, 3).map((contest) => (
-                <div key={contest.id} className="p-3 border rounded-md hover-elevate">
-                  <div className="flex items-start justify-between mb-2">
+                <div key={contest.id} className="p-2 sm:p-3 border rounded-md hover-elevate">
+                  <div className="flex items-start justify-between mb-1 sm:mb-2">
                     <div>
                       <div className="font-medium text-sm">{contest.name}</div>
                       <Badge variant="outline" className="text-xs mt-1">{contest.sport}</Badge>
@@ -627,7 +627,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium uppercase tracking-wide">Top Holdings</CardTitle>
               <DollarSign className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2 sm:space-y-3">
               {data?.topHoldings?.slice(0, 3).map((holding) => (
                 <Link key={holding.player.id} href={`/player/${holding.player.id}`}>
                   <div className="p-2 rounded-md hover-elevate">
@@ -658,7 +658,7 @@ export default function Dashboard() {
               <CardTitle className="text-sm font-medium uppercase tracking-wide">Recent Market Activity</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-2">
+              <div className="space-y-1 sm:space-y-2">
                 {data?.recentTrades?.map((trade) => (
                   <div key={trade.id} className="flex items-center justify-between py-2 border-b last:border-0">
                     <div className="flex items-center gap-3">
