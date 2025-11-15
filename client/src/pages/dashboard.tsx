@@ -415,92 +415,49 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* Mobile: 2-Row Grid */}
-              <div className="sm:hidden grid grid-cols-2 gap-3">
-                {todayGames.map((game) => (
-                  <div
-                    key={game.id}
-                    className="p-3 rounded-md bg-muted hover-elevate active-elevate-2 cursor-pointer"
-                    onClick={() => setSelectedGame(game)}
-                    data-testid={`game-${game.gameId}`}
-                  >
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm">{game.awayTeam}</span>
-                        {game.status === 'completed' && game.awayScore != null && game.homeScore != null && (
-                          <span className="font-mono font-bold text-sm">{game.awayScore}</span>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-sm">{game.homeTeam}</span>
-                        {game.status === 'completed' && game.awayScore != null && game.homeScore != null && (
-                          <span className="font-mono font-bold text-sm">{game.homeScore}</span>
-                        )}
-                      </div>
-                      <div className="flex items-center justify-between text-xs mt-1">
-                        <span className="text-muted-foreground">
-                          {game.status === 'scheduled' 
-                            ? new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                            : game.status === 'completed'
-                            ? 'Final'
-                            : 'Live'
-                          }
-                        </span>
-                        <Badge 
-                          variant={game.status === 'inprogress' ? 'default' : game.status === 'completed' ? 'secondary' : 'outline'}
-                          className="text-xs"
-                        >
-                          {game.status === 'inprogress' ? 'LIVE' : game.status}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Desktop: Grid Layout */}
-              <div className="hidden sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {todayGames.map((game) => (
-                  <div
-                    key={game.id}
-                    className="flex items-center justify-between p-3 rounded-md bg-muted hover-elevate active-elevate-2 cursor-pointer"
-                    onClick={() => setSelectedGame(game)}
-                    data-testid={`game-${game.gameId}`}
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">{game.awayTeam}</span>
-                          {game.status === 'completed' && game.awayScore != null && game.homeScore != null ? (
-                            <span className="font-mono font-bold text-sm">{game.awayScore}</span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">@</span>
-                          )}
-                          <span className="font-medium text-sm">{game.homeTeam}</span>
+              {/* Horizontal Scroll with 2 Rows */}
+              <div className="overflow-x-auto -mx-2 px-2">
+                <div className="grid grid-rows-2 grid-flow-col auto-cols-[minmax(140px,1fr)] gap-2">
+                  {todayGames.map((game) => (
+                    <div
+                      key={game.id}
+                      className="p-2 rounded-md bg-muted hover-elevate active-elevate-2 cursor-pointer"
+                      onClick={() => setSelectedGame(game)}
+                      data-testid={`game-${game.gameId}`}
+                    >
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-xs">{game.awayTeam}</span>
                           {game.status === 'completed' && game.awayScore != null && game.homeScore != null && (
-                            <span className="font-mono font-bold text-sm">{game.homeScore}</span>
+                            <span className="font-mono font-bold text-xs">{game.awayScore}</span>
                           )}
                         </div>
-                      </div>
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">
-                          {game.status === 'scheduled' 
-                            ? new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                            : game.status === 'completed'
-                            ? 'Final'
-                            : 'Live'
-                          }
-                        </span>
-                        <Badge 
-                          variant={game.status === 'inprogress' ? 'default' : game.status === 'completed' ? 'secondary' : 'outline'}
-                          className="text-xs"
-                        >
-                          {game.status === 'inprogress' ? 'LIVE' : game.status === 'completed' ? 'Final' : new Date(game.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                        </Badge>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-xs">{game.homeTeam}</span>
+                          {game.status === 'completed' && game.awayScore != null && game.homeScore != null && (
+                            <span className="font-mono font-bold text-xs">{game.homeScore}</span>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between text-xs mt-0.5">
+                          <span className="text-muted-foreground text-[10px]">
+                            {game.status === 'scheduled' 
+                              ? new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                              : game.status === 'completed'
+                              ? 'Final'
+                              : 'Live'
+                            }
+                          </span>
+                          <Badge 
+                            variant={game.status === 'inprogress' ? 'default' : game.status === 'completed' ? 'secondary' : 'outline'}
+                            className="text-[10px] h-4 px-1"
+                          >
+                            {game.status === 'inprogress' ? 'LIVE' : game.status === 'completed' ? 'Final' : new Date(game.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </CardContent>
           </Card>
