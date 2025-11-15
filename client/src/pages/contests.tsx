@@ -46,65 +46,76 @@ export default function Contests() {
               <>
                 {/* Mobile: Card Layout */}
                 <div className="sm:hidden p-3 space-y-3">
-                  {data?.openContests.map((contest) => (
-                    <Card key={contest.id} className="hover-elevate" data-testid={`card-contest-${contest.id}`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-2 flex-wrap">
-                              <Trophy className="w-4 h-4 text-primary" />
-                              <h3 className="font-bold">{contest.name}</h3>
-                            </div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <Badge className="text-xs">{contest.sport}</Badge>
-                              <Badge variant="outline" className="capitalize text-xs">{contest.status}</Badge>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-3 pb-3">
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-1">Prize Pool</div>
-                            <div className="flex items-center gap-1">
-                              <DollarSign className="w-3 h-3 text-positive" />
-                              <span className="font-mono font-bold text-positive" data-testid={`text-prize-${contest.id}`}>
-                                ${contest.totalPrizePool}
-                              </span>
+                  {data?.openContests.map((contest) => {
+                    const isLocked = new Date() >= new Date(contest.startsAt);
+                    return (
+                      <Card key={contest.id} className="hover-elevate" data-testid={`card-contest-${contest.id}`}>
+                        <CardContent className="p-4">
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <Trophy className="w-4 h-4 text-primary" />
+                                <h3 className="font-bold">{contest.name}</h3>
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge className="text-xs">{contest.sport}</Badge>
+                                <Badge variant={isLocked ? "destructive" : "outline"} className="capitalize text-xs">
+                                  {isLocked ? "Locked" : contest.status}
+                                </Badge>
+                              </div>
                             </div>
                           </div>
                           
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-1">Entries</div>
-                            <div className="flex items-center gap-1">
-                              <Users className="w-3 h-3" />
-                              <span className="text-sm font-semibold">{contest.entryCount}</span>
+                          <div className="grid grid-cols-2 gap-3 pb-3">
+                            <div>
+                              <div className="text-xs text-muted-foreground mb-1">Prize Pool</div>
+                              <div className="flex items-center gap-1">
+                                <DollarSign className="w-3 h-3 text-positive" />
+                                <span className="font-mono font-bold text-positive" data-testid={`text-prize-${contest.id}`}>
+                                  ${contest.totalPrizePool}
+                                </span>
+                              </div>
+                            </div>
+                            
+                            <div>
+                              <div className="text-xs text-muted-foreground mb-1">Entries</div>
+                              <div className="flex items-center gap-1">
+                                <Users className="w-3 h-3" />
+                                <span className="text-sm font-semibold">{contest.entryCount}</span>
+                              </div>
+                            </div>
+                            
+                            <div className="col-span-2">
+                              <div className="text-xs text-muted-foreground mb-1">Starts</div>
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                <span className="text-xs">
+                                  {new Date(contest.startsAt).toLocaleString([], { 
+                                    month: 'short', 
+                                    day: 'numeric', 
+                                    hour: 'numeric', 
+                                    minute: '2-digit' 
+                                  })}
+                                </span>
+                              </div>
                             </div>
                           </div>
                           
-                          <div className="col-span-2">
-                            <div className="text-xs text-muted-foreground mb-1">Starts</div>
-                            <div className="flex items-center gap-1">
-                              <Clock className="w-3 h-3" />
-                              <span className="text-xs">
-                                {new Date(contest.startsAt).toLocaleString([], { 
-                                  month: 'short', 
-                                  day: 'numeric', 
-                                  hour: 'numeric', 
-                                  minute: '2-digit' 
-                                })}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <Link href={`/contest/${contest.id}/entry`}>
-                          <Button className="w-full" data-testid={`button-enter-${contest.id}`}>
-                            Enter Contest
-                          </Button>
-                        </Link>
-                      </CardContent>
-                    </Card>
-                  ))}
+                          {isLocked ? (
+                            <Button className="w-full" disabled data-testid={`button-enter-${contest.id}`}>
+                              Contest Locked
+                            </Button>
+                          ) : (
+                            <Link href={`/contest/${contest.id}/entry`}>
+                              <Button className="w-full" data-testid={`button-enter-${contest.id}`}>
+                                Enter Contest
+                              </Button>
+                            </Link>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
 
                 {/* Desktop: Table Layout */}
@@ -127,60 +138,71 @@ export default function Contests() {
                           </tr>
                         </thead>
                         <tbody>
-                          {data?.openContests.map((contest) => (
-                            <tr 
-                              key={contest.id} 
-                              className="border-b last:border-0 hover-elevate"
-                              data-testid={`card-contest-${contest.id}`}
-                            >
-                              <td className="p-4">
-                                <div className="flex items-center gap-2">
-                                  <Trophy className="w-4 h-4 text-primary" />
-                                  <span className="font-bold">{contest.name}</span>
-                                </div>
-                              </td>
-                              <td className="p-4">
-                                <Badge>{contest.sport}</Badge>
-                              </td>
-                              <td className="p-4">
-                                <Badge variant="outline" className="capitalize">{contest.status}</Badge>
-                              </td>
-                              <td className="p-4 text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  <DollarSign className="w-4 h-4 text-positive" />
-                                  <span className="font-mono font-bold text-positive" data-testid={`text-prize-${contest.id}`}>
-                                    ${contest.totalPrizePool}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="p-4 text-right">
-                                <div className="flex items-center justify-end gap-1">
-                                  <Users className="w-4 h-4" />
-                                  <span className="font-semibold">{contest.entryCount}</span>
-                                </div>
-                              </td>
-                              <td className="p-4">
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-4 h-4" />
-                                  <span className="text-sm">
-                                    {new Date(contest.startsAt).toLocaleString([], { 
-                                      month: 'short', 
-                                      day: 'numeric', 
-                                      hour: 'numeric', 
-                                      minute: '2-digit' 
-                                    })}
-                                  </span>
-                                </div>
-                              </td>
-                              <td className="p-4">
-                                <Link href={`/contest/${contest.id}/entry`}>
-                                  <Button data-testid={`button-enter-${contest.id}`}>
-                                    Enter Contest
-                                  </Button>
-                                </Link>
-                              </td>
-                            </tr>
-                          ))}
+                          {data?.openContests.map((contest) => {
+                            const isLocked = new Date() >= new Date(contest.startsAt);
+                            return (
+                              <tr 
+                                key={contest.id} 
+                                className="border-b last:border-0 hover-elevate"
+                                data-testid={`card-contest-${contest.id}`}
+                              >
+                                <td className="p-4">
+                                  <div className="flex items-center gap-2">
+                                    <Trophy className="w-4 h-4 text-primary" />
+                                    <span className="font-bold">{contest.name}</span>
+                                  </div>
+                                </td>
+                                <td className="p-4">
+                                  <Badge>{contest.sport}</Badge>
+                                </td>
+                                <td className="p-4">
+                                  <Badge variant={isLocked ? "destructive" : "outline"} className="capitalize">
+                                    {isLocked ? "Locked" : contest.status}
+                                  </Badge>
+                                </td>
+                                <td className="p-4 text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <DollarSign className="w-4 h-4 text-positive" />
+                                    <span className="font-mono font-bold text-positive" data-testid={`text-prize-${contest.id}`}>
+                                      ${contest.totalPrizePool}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="p-4 text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <Users className="w-4 h-4" />
+                                    <span className="font-semibold">{contest.entryCount}</span>
+                                  </div>
+                                </td>
+                                <td className="p-4">
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="w-4 h-4" />
+                                    <span className="text-sm">
+                                      {new Date(contest.startsAt).toLocaleString([], { 
+                                        month: 'short', 
+                                        day: 'numeric', 
+                                        hour: 'numeric', 
+                                        minute: '2-digit' 
+                                      })}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="p-4">
+                                  {isLocked ? (
+                                    <Button disabled data-testid={`button-enter-${contest.id}`}>
+                                      Contest Locked
+                                    </Button>
+                                  ) : (
+                                    <Link href={`/contest/${contest.id}/entry`}>
+                                      <Button data-testid={`button-enter-${contest.id}`}>
+                                        Enter Contest
+                                      </Button>
+                                    </Link>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
                         </tbody>
                       </table>
                     </CardContent>

@@ -31,6 +31,36 @@ interface DashboardData {
   topHoldings: { player: Player; quantity: number; value: string; pnl: string; pnlPercent: string }[];
 }
 
+// Helper to determine effective game status based on current time
+const getEffectiveGameStatus = (game: DailyGame): string => {
+  const now = new Date();
+  const startTime = new Date(game.startTime);
+  const timeSinceStart = now.getTime() - startTime.getTime();
+  const threeHoursInMs = 3 * 60 * 60 * 1000;
+  
+  // If DB says completed, trust it
+  if (game.status === 'completed') {
+    return 'completed';
+  }
+  
+  // If DB says inprogress, trust it
+  if (game.status === 'inprogress') {
+    return 'inprogress';
+  }
+  
+  // If game is scheduled but should have started (and it's been less than 3 hours), assume it's live
+  if (game.status === 'scheduled' && timeSinceStart > 0 && timeSinceStart < threeHoursInMs) {
+    return 'inprogress';
+  }
+  
+  // If more than 3 hours have passed since start and still scheduled, likely completed but not synced
+  if (game.status === 'scheduled' && timeSinceStart >= threeHoursInMs) {
+    return 'completed';
+  }
+  
+  return game.status;
+};
+
 export default function Dashboard() {
   const { toast } = useToast();
   const [showPlayerSelection, setShowPlayerSelection] = useState(false);
@@ -418,45 +448,48 @@ export default function Dashboard() {
               {/* Horizontal Scroll with 2 Rows */}
               <div className="overflow-x-auto -mx-2 px-2">
                 <div className="grid grid-rows-2 grid-flow-col auto-cols-[minmax(140px,1fr)] gap-2">
-                  {todayGames.map((game) => (
-                    <div
-                      key={game.id}
-                      className="p-2 rounded-md bg-muted hover-elevate active-elevate-2 cursor-pointer"
-                      onClick={() => setSelectedGame(game)}
-                      data-testid={`game-${game.gameId}`}
-                    >
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-xs">{game.awayTeam}</span>
-                          {game.status === 'completed' && game.awayScore != null && game.homeScore != null && (
-                            <span className="font-mono font-bold text-xs">{game.awayScore}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-xs">{game.homeTeam}</span>
-                          {game.status === 'completed' && game.awayScore != null && game.homeScore != null && (
-                            <span className="font-mono font-bold text-xs">{game.homeScore}</span>
-                          )}
-                        </div>
-                        <div className="flex items-center justify-between text-xs mt-0.5">
-                          <span className="text-muted-foreground text-[10px]">
-                            {game.status === 'scheduled' 
-                              ? new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                              : game.status === 'completed'
-                              ? 'Final'
-                              : 'Live'
-                            }
-                          </span>
-                          <Badge 
-                            variant={game.status === 'inprogress' ? 'default' : game.status === 'completed' ? 'secondary' : 'outline'}
-                            className="text-[10px] h-4 px-1"
-                          >
-                            {game.status === 'inprogress' ? 'LIVE' : game.status === 'completed' ? 'Final' : new Date(game.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                          </Badge>
+                  {todayGames.map((game) => {
+                    const effectiveStatus = getEffectiveGameStatus(game);
+                    return (
+                      <div
+                        key={game.id}
+                        className="p-2 rounded-md bg-muted hover-elevate active-elevate-2 cursor-pointer"
+                        onClick={() => setSelectedGame(game)}
+                        data-testid={`game-${game.gameId}`}
+                      >
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-xs">{game.awayTeam}</span>
+                            {effectiveStatus === 'completed' && game.awayScore != null && game.homeScore != null && (
+                              <span className="font-mono font-bold text-xs">{game.awayScore}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-xs">{game.homeTeam}</span>
+                            {effectiveStatus === 'completed' && game.awayScore != null && game.homeScore != null && (
+                              <span className="font-mono font-bold text-xs">{game.homeScore}</span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between text-xs mt-0.5">
+                            <span className="text-muted-foreground text-[10px]">
+                              {effectiveStatus === 'scheduled' 
+                                ? new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                                : effectiveStatus === 'completed'
+                                ? 'Final'
+                                : 'Live'
+                              }
+                            </span>
+                            <Badge 
+                              variant={effectiveStatus === 'inprogress' ? 'default' : effectiveStatus === 'completed' ? 'secondary' : 'outline'}
+                              className="text-[10px] h-4 px-1"
+                            >
+                              {effectiveStatus === 'inprogress' ? 'LIVE' : effectiveStatus === 'completed' ? 'Final' : new Date(game.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                            </Badge>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </CardContent>

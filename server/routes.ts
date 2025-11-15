@@ -1004,7 +1004,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/contests", async (req, res) => {
     try {
       const user = await ensureDefaultUser();
-      const openContests = await storage.getContests("open");
+      const allOpenContests = await storage.getContests("open");
+      
+      // Filter out contests that have already started
+      const now = new Date();
+      const openContests = allOpenContests.filter(contest => 
+        new Date(contest.startsAt) > now
+      );
+      
       const myEntries = await storage.getUserContestEntries(user.id);
 
       const enrichedEntries = await Promise.all(

@@ -52,7 +52,7 @@ export class JobScheduler {
       },
       {
         name: "schedule_sync",
-        schedule: "0 */6 * * *", // Every 6 hours
+        schedule: "*/15 * * * *", // Every 15 minutes
         enabled: true,
         handler: syncSchedule,
       },
