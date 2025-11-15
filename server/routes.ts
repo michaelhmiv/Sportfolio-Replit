@@ -92,15 +92,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newTotal = miningData.sharesAccumulated + actualSharesAwarded;
       const capReached = newTotal >= capLimit;
 
-      // Calculate residual time based on actual shares awarded
-      const msUsed = actualSharesAwarded * msPerShare;
-      // If we hit the cap, clear residual to prevent double-counting
-      const newResidualMs = capReached ? 0 : (totalElapsedMs - msUsed);
+      // Calculate time consumed and leftover residual
+      const msConsumed = actualSharesAwarded * msPerShare;
+      const leftoverMs = Math.max(0, totalElapsedMs - msConsumed);
+      
+      // Set lastAccruedAt to now minus leftover (clamps to now, preserves residual)
+      const newLastAccruedAt = new Date(now.getTime() - leftoverMs);
 
       await storage.updateMining(userId, {
         sharesAccumulated: newTotal,
-        residualMs: newResidualMs,
-        lastAccruedAt: now, // Update baseline to now after awarding shares
+        residualMs: capReached ? 0 : leftoverMs, // Preserve residual unless capped
+        lastAccruedAt: newLastAccruedAt, // Baseline is now minus residual
         updatedAt: now,
         capReachedAt: capReached ? now : null,
       });
