@@ -264,17 +264,15 @@ export default function Contests() {
                         </div>
                         
                         <div className="flex flex-col gap-2 mt-3">
+                          <Link href={`/contest/${entry.contestId}/leaderboard`}>
+                            <Button className="w-full" data-testid={`button-view-lineup-${entry.id}`}>
+                              View Lineup
+                            </Button>
+                          </Link>
                           {entry.contest.status === "open" && new Date() < new Date(entry.contest.startsAt) && (
                             <Link href={`/contest/${entry.contestId}/entry/${entry.id}`}>
                               <Button variant="outline" className="w-full" data-testid={`button-edit-entry-${entry.id}`}>
                                 Edit Entry
-                              </Button>
-                            </Link>
-                          )}
-                          {entry.contest.status === "live" && (
-                            <Link href={`/contest/${entry.contestId}/leaderboard`}>
-                              <Button variant="outline" className="w-full" data-testid={`button-leaderboard-${entry.id}`}>
-                                View Leaderboard
                               </Button>
                             </Link>
                           )}
@@ -334,17 +332,15 @@ export default function Contests() {
                               </td>
                               <td className="p-4">
                                 <div className="flex gap-2 justify-end">
+                                  <Link href={`/contest/${entry.contestId}/leaderboard`}>
+                                    <Button size="sm" data-testid={`button-view-lineup-${entry.id}`}>
+                                      View Lineup
+                                    </Button>
+                                  </Link>
                                   {entry.contest.status === "open" && new Date() < new Date(entry.contest.startsAt) && (
                                     <Link href={`/contest/${entry.contestId}/entry/${entry.id}`}>
                                       <Button variant="outline" size="sm" data-testid={`button-edit-entry-${entry.id}`}>
                                         Edit Entry
-                                      </Button>
-                                    </Link>
-                                  )}
-                                  {entry.contest.status === "live" && (
-                                    <Link href={`/contest/${entry.contestId}/leaderboard`}>
-                                      <Button variant="outline" size="sm" data-testid={`button-leaderboard-${entry.id}`}>
-                                        View Leaderboard
                                       </Button>
                                     </Link>
                                   )}

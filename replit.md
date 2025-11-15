@@ -78,11 +78,47 @@ Preferred communication style: Simple, everyday language.
 
 **Background Jobs (Cron):**
 - `roster_sync`: Daily (5 AM ET).
-- `schedule_sync`: Every 6 hours.
+- `schedule_sync`: Every 15 minutes (updated for faster game status updates).
 - `stats_sync`: Hourly (completed games).
-- `stats_sync_live`: Every minute (in-progress games).
+- `stats_sync_live`: Every minute (in-progress games, requires Live subscription - currently returns 403).
 - `settle_contests`: Every 5 minutes (settles contests, distributes prizes).
 
 **Contest Scoring Mechanics:**
 - **Proportional Share-Dilution Model:** Fantasy points distributed based on ownership percentage within a contest.
 - **50/50 Contests:** Top 50% entries win, prize pool distributed proportionally.
+
+## MySportsFeeds API Documentation (NBA v2.1)
+
+**Available Endpoints (with CORE + STATS subscription):**
+
+1. **DAILY PLAYER GAMELOGS** - Player stats for a specific date
+   - URL: `https://api.mysportsfeeds.com/v2.1/pull/nba/{season}/date/{date}/player_gamelogs.json`
+   - Parameters: `team`, `player`, `position`, `game`, `stats`, `sort`, `offset`, `limit`
+   - Use: Get player game stats for a specific date
+   - Addon Required: STATS
+
+2. **DAILY GAMES** - All games on a given date with schedule, status, and scores
+   - URL: `https://api.mysportsfeeds.com/v2.1/pull/nba/{season}/date/{date}/games.json`
+   - Parameters: `team`, `status`, `sort`, `offset`, `limit`
+   - Use: Current implementation uses this for game schedule and live scores
+   - Addon Required: CORE (included)
+
+3. **SEASONAL PLAYER STATS** - Player seasonal stats totals
+   - URL: `https://api.mysportsfeeds.com/v2.1/pull/nba/{season}/player_stats_totals.json`
+   - Parameters: `player`, `position`, `country`, `team`, `date`, `stats`, `sort`
+   - Use: Season averages for players
+   - Addon Required: STATS
+
+4. **SEASONAL GAMES** - All games for a season
+   - URL: `https://api.mysportsfeeds.com/v2.1/pull/nba/{season}/games.json`
+   - Parameters: `team`, `date`, `status`, `sort`
+   - Addon Required: CORE
+
+**Season Format:** `{start_year}-{end_year}-{type}` (e.g., `2024-2025-regular`, `current`, `latest`)
+**Date Format:** `YYYYMMDD` or keywords: `today`, `yesterday`, `tomorrow`
+
+**Subscription Notes:**
+- CORE tier includes: Schedule, games, roster data
+- STATS tier includes: Player game logs, seasonal stats
+- LIVE tier (NOT included): Real-time boxscore data during games - returns 403 error
+- Current workaround: Use DAILY GAMES endpoint which provides game scores updated every 15 minutes

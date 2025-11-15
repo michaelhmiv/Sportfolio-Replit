@@ -1,0 +1,182 @@
+MYSPORTSFEEDS API DOCUMENTATION COMPILATION
+Based on Version 2.1 Documentation
+
+================================================================================
+1. [cite_start]SEASONAL PLAYER STATS (v2.1) [cite: 58]
+================================================================================
+[cite_start]Description: Lists each player along with their seasonal stats totals on a given day[cite: 59].
+[cite_start]Addon Required: STATS [cite: 63]
+
+PULL URL SYNTAX:
+[cite_start]https://api.mysportsfeeds.com/v2.1/pull/nhl/{season}/player_stats_totals.{format} [cite: 75]
+
+PARAMETERS:
+- [cite_start]player={list-of-players}        (filter players) [cite: 77]
+- [cite_start]position={list-of-positions}    (filter player positions) [cite: 78]
+- [cite_start]country={list-of-countries}     (filter player countries of birth) [cite: 79]
+- [cite_start]team={list-of-teams}            (filter teams) [cite: 80]
+- [cite_start]date={date-range}               (filter on dates) [cite: 81]
+- [cite_start]stats={list-of-stats}           (filter stats) [cite: 82]
+- [cite_start]sort={sort-specifier}           (sort the feed's content) [cite: 83]
+- [cite_start]offset={offset-specifier}       (filter results starting at the given offset) [cite: 84]
+- [cite_start]limit={limit-specifier}         (Limit the maximum # of results) [cite: 85]
+- [cite_start]force={force-if-not-modified}   (force content) [cite: 86]
+
+================================================================================
+2. [cite_start]DAILY GAMES (v2.1) [cite: 238]
+================================================================================
+[cite_start]Description: All games on a given date including schedule, status and scores[cite: 239].
+[cite_start]Addon Required: None (CORE) [cite: 243]
+
+PULL URL SYNTAX:
+[cite_start]https://api.mysportsfeeds.com/v2.1/pull/nhl/{season}/date/{date}/games.{format} [cite: 253]
+
+PARAMETERS:
+- [cite_start]team={list-of-teams}            (filter teams) [cite: 255]
+- [cite_start]status={list-of-game-statuses}  (filter game statuses) [cite: 256]
+- [cite_start]sort={sort-specifier}           (sort the feed's content) [cite: 257]
+- [cite_start]offset={offset-specifier}       (filter results starting at the given offset) [cite: 258]
+- [cite_start]limit={limit-specifier}         (Limit the maximum # of results) [cite: 259]
+- [cite_start]force={force-if-not-modified}   (force content) [cite: 260]
+
+================================================================================
+3. [cite_start]SEASONAL GAMES (v2.1) [cite: 390]
+================================================================================
+[cite_start]Description: All games for a season including schedule, status and scores[cite: 391].
+[cite_start]Addon Required: None (CORE) [cite: 395]
+
+PULL URL SYNTAX:
+[cite_start]https://api.mysportsfeeds.com/v2.1/pull/nhl/{season}/games.{format} [cite: 410]
+
+PARAMETERS:
+- [cite_start]team={list-of-teams}            (filter teams) [cite: 412]
+- [cite_start]date={date-range}               (filter on dates) [cite: 413]
+- [cite_start]status={list-of-game-statuses}  (filter game statuses) [cite: 414]
+- [cite_start]sort={sort-specifier}           (sort the feed's content) [cite: 415]
+- [cite_start]offset={offset-specifier}       (filter results starting at the given offset) [cite: 416]
+- [cite_start]limit={limit-specifier}         (Limit the maximum # of results) [cite: 417]
+- [cite_start]force={force-if-not-modified}   (force content) [cite: 418]
+
+================================================================================
+4. [cite_start]CURRENT SEASON (v2.1) [cite: 581]
+================================================================================
+[cite_start]Description: Returns the current season and supported stats, for a given date[cite: 582].
+[cite_start]Addon Required: None (CORE) [cite: 586]
+
+PULL URL SYNTAX:
+[cite_start]https://api.mysportsfeeds.com/v2.1/pull/nhl/current_season.{format} [cite: 599]
+
+PARAMETERS:
+- [cite_start]date={date}                     (specify a date - YYYYMMDD) [cite: 601, 604]
+- [cite_start]force={force-if-not-modified}   (force content) [cite: 602]
+
+================================================================================
+5. [cite_start]DAILY TEAM GAMELOGS (v2.1) [cite: 686]
+================================================================================
+[cite_start]Description: All team game logs for a date including game and stats[cite: 687].
+[cite_start]Addon Required: STATS [cite: 691]
+
+PULL URL SYNTAX:
+[cite_start]https://api.mysportsfeeds.com/v2.1/pull/nhl/{season}/date/{date}/team_gamelogs.{format} [cite: 710]
+
+PARAMETERS:
+- [cite_start]team={list-of-teams}            (filter teams) [cite: 713]
+- [cite_start]game={list-of-games}            (filter on games) [cite: 714]
+- [cite_start]stats={list-of-stats}           (filter stats) [cite: 715]
+- [cite_start]sort={sort-specifier}           (sort the feed's content) [cite: 716]
+- [cite_start]offset={offset-specifier}       (filter results starting at the given offset) [cite: 717]
+- [cite_start]limit={limit-specifier}         (Limit the maximum # of results) [cite: 718]
+- [cite_start]force={force-if-not-modified}   (force content) [cite: 719]
+
+================================================================================
+6. [cite_start]LATEST UPDATES (v2.1) [cite: 842]
+================================================================================
+[cite_start]Description: Lists all the latest update timestamps for each feed[cite: 843].
+[cite_start]Addon Required: None (CORE) [cite: 848]
+
+PULL URL SYNTAX:
+[cite_start]https://api.mysportsfeeds.com/v2.1/pull/nhl/{season}/latest_updates.{format} [cite: 860]
+
+PARAMETERS:
+- [cite_start]force={force-if-not-modified}   (force content) [cite: 862]
+
+================================================================================
+7. [cite_start]SEASONAL TEAM STATS (v2.1) [cite: 944]
+================================================================================
+[cite_start]Description: Lists each team along with their seasonal stats totals on a given day[cite: 945].
+[cite_start]Addon Required: STATS [cite: 949]
+
+PULL URL SYNTAX:
+[cite_start]https://api.mysportsfeeds.com/v2.1/pull/nhl/{season}/team_stats_totals.{format} [cite: 961]
+
+PARAMETERS:
+- [cite_start]team={list-of-teams}            (filter teams) [cite: 963]
+- [cite_start]date={date-range}               (filter on dates) [cite: 964]
+- [cite_start]stats={list-of-stats}           (filter stats) [cite: 965]
+- [cite_start]sort={sort-specifier}           (sort the feed's content) [cite: 966]
+- [cite_start]offset={offset-specifier}       (filter results starting at the given offset) [cite: 967]
+- [cite_start]limit={limit-specifier}         (Limit the maximum # of results) [cite: 968]
+- [cite_start]force={force-if-not-modified}   (force content) [cite: 969]
+
+================================================================================
+8. [cite_start]DAILY PLAYER GAMELOGS (v2.1) [cite: 1124]
+================================================================================
+[cite_start]Description: All player game logs for a date including game and stats[cite: 1125].
+[cite_start]Addon Required: STATS [cite: 1129]
+
+PULL URL SYNTAX:
+[cite_start]https://api.mysportsfeeds.com/v2.1/pull/nhl/{season}/date/{date}/player_gamelogs.{format} [cite: 1148]
+
+PARAMETERS:
+- [cite_start]team={list-of-teams}            (filter teams) [cite: 1151]
+- [cite_start]player={list-of-players}        (filter players) [cite: 1152]
+- [cite_start]position={list-of-positions}    (filter player positions) [cite: 1153]
+- [cite_start]game={list-of-games}            (filter on games) [cite: 1154]
+- [cite_start]stats={list-of-stats}           (filter stats) [cite: 1155]
+- [cite_start]sort={sort-specifier}           (sort the feed's content) [cite: 1156]
+- [cite_start]offset={offset-specifier}       (filter results starting at the given offset) [cite: 1157]
+- [cite_start]limit={limit-specifier}         (Limit the maximum # of results) [cite: 1158]
+- [cite_start]force={force-if-not-modified}   (force content) [cite: 1159]
+
+================================================================================
+9. [cite_start]SEASONAL VENUES (v2.1) [cite: 1287]
+================================================================================
+[cite_start]Description: Lists all venues used in a league's specific season[cite: 1288].
+[cite_start]Addon Required: None (CORE) [cite: 1293]
+
+PULL URL SYNTAX:
+[cite_start]https://api.mysportsfeeds.com/v2.1/pull/nhl/{season}/venues.{format} [cite: 1307]
+
+PARAMETERS:
+- [cite_start]team={list-of-teams}            (filter teams) [cite: 1309]
+- [cite_start]force={force-if-not-modified}   (force content) [cite: 1309]
+
+================================================================================
+10. [cite_start]SEASONAL STANDINGS (v2.1) [cite: 1437]
+================================================================================
+[cite_start]Description: Lists all teams along with their stats and overall/conf/div/playoff rankings, on a given day[cite: 1438].
+[cite_start]Addon Required: STATS [cite: 1442]
+
+PULL URL SYNTAX:
+[cite_start]https://api.mysportsfeeds.com/v2.1/pull/nhl/{season}/standings.{format} [cite: 1452]
+
+PARAMETERS:
+- [cite_start]date={date}                     (specify a date) [cite: 1454]
+- [cite_start]team={list-of-teams}            (filter teams) [cite: 1455]
+- [cite_start]stats={list-of-stats}           (filter stats) [cite: 1456]
+- [cite_start]force={force-if-not-modified}   (force content) [cite: 1457]
+
+================================================================================
+COMMON PARAMETER DEFINITIONS
+================================================================================
+{season}:
+A value obtained by concatenating (season start year) + "-" + (season end year) + "-" + either "regular" or "playoff".
+[cite_start]Examples: 2016-2017-regular, 2016-playoff, current, latest, upcoming [cite: 94-113].
+
+{format}:
+[cite_start]One of csv, xml, or json[cite: 115].
+
+date formats:
+- Simple YYYYMMDD format: 20170427
+- Keywords: yesterday, today, tomorrow
+- [cite_start]Range: since-yesterday, until-tomorrow, from-yesterday-to-today [cite: 125-148].
