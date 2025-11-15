@@ -191,6 +191,8 @@ export const dailyGames = pgTable("daily_games", {
   venue: text("venue"),
   status: text("status").notNull().default("scheduled"), // "scheduled", "inprogress", "completed"
   startTime: timestamp("start_time").notNull(),
+  homeScore: integer("home_score"), // null for scheduled games
+  awayScore: integer("away_score"), // null for scheduled games
   lastFetchedAt: timestamp("last_fetched_at").notNull().defaultNow(),
 }, (table) => ({
   dateIdx: index("daily_games_date_idx").on(table.date),

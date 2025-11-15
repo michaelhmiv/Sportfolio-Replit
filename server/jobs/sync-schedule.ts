@@ -43,6 +43,10 @@ export async function syncSchedule(): Promise<JobResult> {
             const rawStatus = game.schedule.playedStatus || "scheduled";
             const normalizedStatus = normalizeGameStatus(rawStatus);
             
+            // Extract scores for completed/in-progress games
+            const homeScore = game.score?.homeScoreTotal != null ? parseInt(game.score.homeScoreTotal) : null;
+            const awayScore = game.score?.awayScoreTotal != null ? parseInt(game.score.awayScoreTotal) : null;
+            
             await storage.upsertDailyGame({
               gameId: game.schedule.id.toString(),
               date: new Date(game.schedule.startTime),
@@ -51,6 +55,8 @@ export async function syncSchedule(): Promise<JobResult> {
               venue: game.schedule?.venue?.name,
               status: normalizedStatus,
               startTime: new Date(game.schedule.startTime),
+              homeScore,
+              awayScore,
             });
 
             recordsProcessed++;

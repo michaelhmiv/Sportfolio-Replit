@@ -381,8 +381,15 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">{game.awayTeam}</span>
-                            <span className="text-xs text-muted-foreground">@</span>
+                            {game.status === 'completed' && game.awayScore != null && game.homeScore != null ? (
+                              <span className="font-mono font-bold text-sm">{game.awayScore}</span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">@</span>
+                            )}
                             <span className="font-medium text-sm">{game.homeTeam}</span>
+                            {game.status === 'completed' && game.awayScore != null && game.homeScore != null && (
+                              <span className="font-mono font-bold text-sm">{game.homeScore}</span>
+                            )}
                           </div>
                         </div>
                         <div className="flex items-center justify-between text-xs">
@@ -390,15 +397,15 @@ export default function Dashboard() {
                             {game.status === 'scheduled' 
                               ? new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
                               : game.status === 'completed'
-                              ? new Date(game.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })
-                              : 'In Progress'
+                              ? 'Final'
+                              : 'Live'
                             }
                           </span>
                           <Badge 
                             variant={game.status === 'inprogress' ? 'default' : game.status === 'completed' ? 'secondary' : 'outline'}
                             className="text-xs"
                           >
-                            {game.status === 'inprogress' ? 'LIVE' : game.status === 'completed' ? 'Final' : 'Scheduled'}
+                            {game.status === 'inprogress' ? 'LIVE' : game.status === 'completed' ? 'Final' : new Date(game.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                           </Badge>
                         </div>
                       </div>
@@ -420,8 +427,15 @@ export default function Dashboard() {
                       <div className="flex items-center justify-between mb-1">
                         <div className="flex items-center gap-2">
                           <span className="font-medium text-sm">{game.awayTeam}</span>
-                          <span className="text-xs text-muted-foreground">@</span>
+                          {game.status === 'completed' && game.awayScore != null && game.homeScore != null ? (
+                            <span className="font-mono font-bold text-sm">{game.awayScore}</span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">@</span>
+                          )}
                           <span className="font-medium text-sm">{game.homeTeam}</span>
+                          {game.status === 'completed' && game.awayScore != null && game.homeScore != null && (
+                            <span className="font-mono font-bold text-sm">{game.homeScore}</span>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center justify-between text-xs">
@@ -429,15 +443,15 @@ export default function Dashboard() {
                           {game.status === 'scheduled' 
                             ? new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
                             : game.status === 'completed'
-                            ? new Date(game.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })
-                            : 'In Progress'
+                            ? 'Final'
+                            : 'Live'
                           }
                         </span>
                         <Badge 
                           variant={game.status === 'inprogress' ? 'default' : game.status === 'completed' ? 'secondary' : 'outline'}
                           className="text-xs"
                         >
-                          {game.status === 'inprogress' ? 'LIVE' : game.status === 'completed' ? 'Final' : 'Scheduled'}
+                          {game.status === 'inprogress' ? 'LIVE' : game.status === 'completed' ? 'Final' : new Date(game.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                         </Badge>
                       </div>
                     </div>
