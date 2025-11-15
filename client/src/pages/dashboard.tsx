@@ -330,7 +330,7 @@ export default function Dashboard() {
         {/* Balance Header */}
         <div className="mb-4 sm:mb-8">
           <h1 className="text-3xl font-bold mb-3">Dashboard</h1>
-          <div className="flex flex-col sm:flex-row gap-4 sm:gap-6">
+          <div className="flex flex-row gap-4 sm:gap-6">
             <div>
               <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Cash Balance</div>
               <div className="text-2xl font-mono font-bold" data-testid="text-balance">${data?.user.balance || "0.00"}</div>
@@ -415,51 +415,47 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* Mobile: Horizontal Scroll */}
-              <div className="sm:hidden">
-                <ScrollArea className="w-full whitespace-nowrap">
-                  <div className="flex gap-3 pb-2">
-                    {todayGames.map((game) => (
-                      <div
-                        key={game.id}
-                        className="flex-shrink-0 w-64 p-3 rounded-md bg-muted hover-elevate active-elevate-2 cursor-pointer"
-                        onClick={() => setSelectedGame(game)}
-                        data-testid={`game-${game.gameId}`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{game.awayTeam}</span>
-                            {game.status === 'completed' && game.awayScore != null && game.homeScore != null ? (
-                              <span className="font-mono font-bold text-sm">{game.awayScore}</span>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">@</span>
-                            )}
-                            <span className="font-medium text-sm">{game.homeTeam}</span>
-                            {game.status === 'completed' && game.awayScore != null && game.homeScore != null && (
-                              <span className="font-mono font-bold text-sm">{game.homeScore}</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground">
-                            {game.status === 'scheduled' 
-                              ? new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                              : game.status === 'completed'
-                              ? 'Final'
-                              : 'Live'
-                            }
-                          </span>
-                          <Badge 
-                            variant={game.status === 'inprogress' ? 'default' : game.status === 'completed' ? 'secondary' : 'outline'}
-                            className="text-xs"
-                          >
-                            {game.status === 'inprogress' ? 'LIVE' : game.status === 'completed' ? 'Final' : new Date(game.startTime).toLocaleDateString([], { month: 'short', day: 'numeric' })}
-                          </Badge>
-                        </div>
+              {/* Mobile: 2-Row Grid */}
+              <div className="sm:hidden grid grid-cols-2 gap-3">
+                {todayGames.map((game) => (
+                  <div
+                    key={game.id}
+                    className="p-3 rounded-md bg-muted hover-elevate active-elevate-2 cursor-pointer"
+                    onClick={() => setSelectedGame(game)}
+                    data-testid={`game-${game.gameId}`}
+                  >
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm">{game.awayTeam}</span>
+                        {game.status === 'completed' && game.awayScore != null && game.homeScore != null && (
+                          <span className="font-mono font-bold text-sm">{game.awayScore}</span>
+                        )}
                       </div>
-                    ))}
+                      <div className="flex items-center justify-between">
+                        <span className="font-medium text-sm">{game.homeTeam}</span>
+                        {game.status === 'completed' && game.awayScore != null && game.homeScore != null && (
+                          <span className="font-mono font-bold text-sm">{game.homeScore}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-xs mt-1">
+                        <span className="text-muted-foreground">
+                          {game.status === 'scheduled' 
+                            ? new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                            : game.status === 'completed'
+                            ? 'Final'
+                            : 'Live'
+                          }
+                        </span>
+                        <Badge 
+                          variant={game.status === 'inprogress' ? 'default' : game.status === 'completed' ? 'secondary' : 'outline'}
+                          className="text-xs"
+                        >
+                          {game.status === 'inprogress' ? 'LIVE' : game.status}
+                        </Badge>
+                      </div>
+                    </div>
                   </div>
-                </ScrollArea>
+                ))}
               </div>
 
               {/* Desktop: Grid Layout */}

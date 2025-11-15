@@ -449,7 +449,8 @@ export class DatabaseStorage implements IStorage {
     // Calculate new values
     const newEntryCount = current.entryCount + 1;
     const newTotalShares = current.totalSharesEntered + totalShares;
-    const newPrizePool = parseFloat(current.totalPrizePool) + parseFloat(entryFee);
+    // Prize pool equals total shares (1 share = $1)
+    const newPrizePool = newTotalShares;
 
     // Update with calculated values
     await db

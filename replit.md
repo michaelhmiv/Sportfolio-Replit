@@ -2,32 +2,7 @@
 
 ## Overview
 
-Sportfolio is a fantasy sports trading platform that gamifies NBA player performance by allowing users to trade player shares like stocks. The platform combines real-time sports data with financial trading mechanics, featuring player share mining, 50/50 contests, and a professional-grade trading interface inspired by Robinhood and Bloomberg Terminal.
-
-## Recent Changes
-
-### November 15, 2025
-- **Mining Share Discrepancy Fix**: Fixed critical bug where displayed shares didn't match claimed shares
-  - **Root Cause**: Frontend used `lastClaimedAt` as baseline while backend used `lastAccruedAt`, causing ~35% discrepancy
-  - **Solution**: Created shared utility `shared/mining-utils.ts` with `calculateMiningShares()` and `calculateAccrualUpdate()`
-  - Frontend now uses `lastAccruedAt` baseline to match backend exactly
-  - Both frontend and backend use identical calculation logic via shared utility
-  - Added timestamp initialization fallback to handle missing `lastAccruedAt` gracefully
-  - Shared utility normalizes timestamps to prevent accrual stalls
-  - **Result**: Displayed projected shares now match claimed shares exactly (verified via E2E testing)
-  - Architect-reviewed and confirmed fix resolves all discrepancy issues
-- **Mining Accrual Fix**: Fixed critical timing bug that caused incorrect share accrual rates
-  - Added `lastAccruedAt` field to mining schema to track persistent baseline timestamp
-  - Implemented residual time preservation using formula: `newLastAccruedAt = now - leftoverMs`
-  - Mining now correctly accrues at exactly 100 shares/hour (36,000ms per share, 2400 cap)
-  - Architect-reviewed and confirmed accurate accrual rate
-- **Mobile Responsive Layouts**: Eliminated horizontal scrolling on mobile devices
-  - App.tsx: Added `overflow-x-hidden` to root and main containers, changed from `overflow-auto` to `overflow-y-auto overflow-x-hidden`
-  - Dashboard: Added `max-w-full` and `overflow-x-hidden` to multiple container levels, stacked balance section vertically on mobile
-  - Marketplace, Portfolio (Holdings & Orders), and Contests: Replaced table views with card-based layouts on mobile (<640px breakpoint)
-  - Desktop (≥640px) maintains table views for data-dense information
-  - Fixed React DOM nesting errors by removing JSX comments from tbody tags
-  - Tested and verified: No horizontal scrolling on any page at 390px viewport (iPhone 12)
+Sportfolio is a fantasy sports trading platform that gamifies NBA player performance. It allows users to trade player shares like stocks, combining real-time sports data with financial trading mechanics. Key features include player share mining, 50/50 contests, and a professional-grade trading interface inspired by platforms like Robinhood and Bloomberg Terminal. The project aims to create an engaging experience for sports fans, offering a unique blend of fantasy sports and financial market dynamics.
 
 ## User Preferences
 
@@ -38,180 +13,76 @@ Preferred communication style: Simple, everyday language.
 ### Frontend Architecture
 
 **Technology Stack:**
-- React with TypeScript for type-safe component development
-- Vite as the build tool and development server
-- Wouter for lightweight client-side routing
-- TanStack Query (React Query) for server state management and caching
-- Shadcn/ui component library built on Radix UI primitives
-- Tailwind CSS for utility-first styling
+- React with TypeScript, Vite, Wouter for routing, TanStack Query for server state.
+- Shadcn/ui component library built on Radix UI, Tailwind CSS for styling.
 
 **Design System:**
-- Custom design tokens defined in `design_guidelines.md` following a Robinhood/Bloomberg hybrid approach
-- Typography system using Inter for UI and JetBrains Mono for financial data
-- Trading-specific color palette with dedicated positive/negative colors for price movements
-- Component variants optimized for information density and data visualization
+- Custom design tokens follow a Robinhood/Bloomberg hybrid.
+- Typography: Inter for UI, JetBrains Mono for financial data.
+- Trading-specific color palette with positive/negative indicators.
 
 **Key UI Patterns:**
-- Sidebar navigation with collapsible state management
-- Real-time market ticker with auto-scrolling player prices
-- Card-based layout for dashboard widgets and player information
-- Today's games widget showing live/scheduled NBA games (responsive: horizontal scroll on mobile, grid on desktop)
-- Mining widget with enhanced player selection dialog:
-  - Search bar for filtering players by name
-  - Team dropdown filter (all teams + individual teams)
-  - Expandable PlayerCard components with season stats and recent games
-  - Stats loaded on-demand when card is expanded
-  - **Real-time share projection**: Client-side calculation updates every 1 second using backend accrual formula
-    - Mirrors backend logic: `sharesEarned = Math.max(0, Math.floor((residualMs + elapsedMs) / msPerShare))`
-    - Eliminates discrepancy between displayed count and claimed amount
-    - Defensive guards: division-by-zero protection, clock skew handling, stale closure prevention
-    - Progress bar animates with pulsing blue glow when actively mining
-    - 10-second polling for reconciliation with backend state
-- Tabbed interfaces for contests, portfolio views, and order management
-- Modal dialogs for trade execution, contest entry, and player mining selection
-- WebSocket connection for live data updates with automatic query invalidation
+- Sidebar navigation, real-time market ticker, card-based layouts.
+- Responsive widgets (e.g., Today's Games adapts to mobile/desktop).
+- Mining widget with enhanced player selection (search, filters, on-demand stats).
+- Client-side real-time share projection matching backend logic, animated progress bar.
+- Tabbed interfaces, modal dialogs for interactions, WebSocket for live data.
 
 **Mobile-Responsive Patterns:**
-- **No horizontal scrolling**: All pages optimized for mobile viewports
-- **Responsive layout strategy**: Separate mobile card layouts and desktop table layouts using `sm:` breakpoint (640px)
-  - Mobile (<640px): Card-based layouts with vertical stacking
-  - Desktop (≥640px): Table layouts for data-dense views
-- **Page-specific implementations**:
-  - Marketplace: Player cards on mobile, table on desktop
-  - Portfolio Holdings: Holding cards on mobile, table on desktop
-  - Portfolio Orders: Order cards on mobile, table on desktop
-  - Contests: Contest cards on mobile, table on desktop
-  - Games widget: Horizontal scroll carousel on mobile, grid on desktop
-- Player selection: Searchable command palette with collapsible stat cards
-- Breakpoint strategy: Tailwind `sm:` prefix for tablet/desktop layouts
+- Optimized for no horizontal scrolling on mobile.
+- Uses `sm:` breakpoint (640px) to switch between card-based (mobile) and table-based (desktop) layouts for data views (Marketplace, Portfolio, Contests).
+- Bottom navigation for mobile, sidebar for desktop. Primary branding color is green.
 
 ### Backend Architecture
 
 **Server Framework:**
-- Express.js with TypeScript
-- HTTP server with WebSocket support for real-time updates
-- Session-based request logging middleware
-- Vite integration for development with HMR
+- Express.js with TypeScript, HTTP server with WebSocket support.
 
 **Data Layer:**
-- Drizzle ORM for type-safe database queries
-- PostgreSQL database via Neon serverless
-- Schema-first design with Zod validation integration
-- Connection pooling for efficient database access
+- Drizzle ORM, PostgreSQL (Neon serverless), Zod validation.
 
 **Core Domain Models:**
-- **Users:** Account management with virtual currency balance and premium status
-- **Players:** NBA player data with real-time pricing and market metrics
-- **Holdings:** User ownership tracking with cost basis calculation
-- **Orders:** Limit and market order management with order book
-- **Trades:** Transaction history and execution records
-- **Mining:** Player share mining mechanics with precise accrual timing
-  - Accrual rate: Exactly 100 shares/hour (36,000ms per share)
-  - Cap: 2,400 shares maximum
-  - Timing mechanism: `lastAccruedAt` field tracks baseline timestamp for accurate elapsed time calculation
-  - Residual preservation: Leftover milliseconds carried forward across claims
-  - Formula: `newLastAccruedAt = now - leftoverMs` preserves residual without drift
-  - Cap handling: Residual cleared when cap reached, preventing double-counting
-- **Contests:** 50/50 contest structure with entry and lineup management
-- **Price History:** Time-series data for charting and analytics
+- Users, Players, Holdings, Orders, Trades, Mining (100 shares/hour, 2,400 cap, precise accrual via `lastAccruedAt`), Contests, Price History.
 
 **API Design:**
-- RESTful endpoints organized by domain (players, orders, contests, portfolio)
-- `/api/games/today` - Today's NBA games (ET timezone-aware)
-- WebSocket connections for live price updates and trade notifications
-- Aggregated dashboard endpoint for optimized data loading
-- Real-time leaderboard updates during active contests
+- RESTful endpoints (players, orders, contests, portfolio).
+- WebSocket for live price and trade updates.
+- Aggregated dashboard endpoint.
 
 ### Database Schema
 
 **Key Tables:**
-- `users` - User accounts with balance and premium subscription tracking
-- `players` - NBA player master data with current market pricing
-- `holdings` - User asset ownership with quantity and cost basis
-- `orders` - Active and historical orders with status tracking
-- `trades` - Completed transaction records
-- `mining` - Mining session state with cooldown management
-- `contests` - Contest definitions with prize pools and scheduling
-- `contest_entries` - User contest participation with scoring
-- `contest_lineups` - Player selections for contest entries
-- `player_game_stats` - Historical game performance data
-- `price_history` - Time-series pricing data for charting
+- `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, `price_history`.
+- Indexing strategy focuses on user-asset relationships, player filtering, and order book queries.
 
-**Indexing Strategy:**
-- Composite indexes on user-asset relationships for fast holdings lookup
-- Team and active status indexes on players for marketplace filtering
-- Status and timestamp indexes on orders for order book queries
-
-### External Dependencies
+## External Dependencies
 
 **MySportsFeeds API Integration:**
-- NBA player roster data synchronization via `/player_gamelogs.json` and `/seasonal_player_stats.json`
-- Real-time game statistics for fantasy scoring
-- Player injury status and roster changes
-- API key authentication with gzip compression
-- **Player Stats Endpoints:**
-  - `/api/player/:id/stats` - Season averages (PPG, RPG, APG, FG%, 3P%, FT%, STL, BLK, MPG, GP)
-  - `/api/player/:id/recent-games` - Last 5 games with box scores (PTS, REB, AST, FG details)
-  - Defensive null safety for missing stats (returns empty/default values)
-  - Stats fetched on-demand when player card is expanded (not on initial load)
-- **MySportsFeeds Response Structure (Confirmed):**
-  - **Season Stats:** `stats.offense.{pts, ptsPerGame, ast, astPerGame}`, `stats.rebounds.{reb, rebPerGame}`, `stats.fieldGoals.{fgPct, fg3PtPct}`, `stats.freeThrows.ftPct`, `stats.defense.{stl, blk}`
-  - **Game Logs:** `stats.offense.{pts, ast}`, `stats.rebounds.reb`, `stats.fieldGoals.{fgMade, fgAtt}`, `stats.defense.{stl, blk, tov}`
-  - All endpoints use fully normalized paths (NOT `stats.points.pts` or `stats.offense.fgm`)
-- NO mock data - all data comes from paid MySportsFeeds Core + Stats subscription
+- NBA player roster and game stats synchronization (`/player_gamelogs.json`, `/seasonal_player_stats.json`).
+- Real-time game statistics for scoring.
+- Player stats endpoints: `/api/player/:id/stats` (season averages) and `/api/player/:id/recent-games` (last 5 games).
+- All data directly from MySportsFeeds Core + Stats subscription (no mock data).
 
 **Third-Party Services:**
-- Neon Database for serverless PostgreSQL hosting
-- WebSocket server for real-time client updates
-- Google Fonts CDN for Inter and JetBrains Mono typography
+- Neon Database (PostgreSQL).
+- WebSocket server for real-time updates.
+- Google Fonts CDN.
 
 **Authentication:**
-- Simplified session-based authentication (MVP implementation)
-- Default demo user creation for development
-- Placeholder for future OAuth integration
+- Simplified session-based (MVP), with demo user creation. Placeholder for future OAuth.
 
 **Real-Time Features:**
-- WebSocket server on `/ws` path for live updates
-- Centralized broadcast mechanism via `server/websocket.ts`
-- Live game stats polling (every 1 minute for in-progress games)
-- Broadcasts `liveStats`, `portfolio`, `mining`, `orderBook`, `trade`, and `contestUpdate` events
-- Frontend auto-invalidates React Query cache on WebSocket updates
-- Client reconnection handling for market data streaming
-- Contest leaderboards refresh in real-time as player stats change during games
+- WebSocket server (`/ws`) for live updates, central broadcast mechanism.
+- Live game stats polling (1 min) and `contestUpdate` events.
+- Frontend auto-invalidates React Query cache.
 
 **Background Jobs (Cron):**
-- **roster_sync**: Daily at 5 AM ET - Syncs NBA player rosters from MySportsFeeds
-- **schedule_sync**: Every 6 hours - Updates game schedules
-- **stats_sync**: Hourly - Processes stats for completed games
-- **stats_sync_live**: Every minute - Real-time stats for in-progress games only (short-circuits if no live games)
-- **settle_contests**: Every 5 minutes - Automatically settles completed contests and distributes prizes
+- `roster_sync`: Daily (5 AM ET).
+- `schedule_sync`: Every 6 hours.
+- `stats_sync`: Hourly (completed games).
+- `stats_sync_live`: Every minute (in-progress games).
+- `settle_contests`: Every 5 minutes (settles contests, distributes prizes).
 
 **Contest Scoring Mechanics:**
-- **Proportional Share-Dilution Model:** Fantasy points are distributed based on ownership percentage
-  - If a contest has 100 total LeBron shares across all entries, and you entered 10 shares, you get 10% of LeBron's fantasy points
-  - Example: LeBron scores 50 fantasy points → you earn 5 points (10/100 × 50)
-- **Scoring Calculation:**
-  1. Calculate total shares per player across all contest entries
-  2. For each entry, calculate earned score per player: `(user_shares / total_shares) × fantasy_points`
-  3. Sum earned scores across all players in lineup to get entry total score
-  4. Rank entries by total score (descending)
-- **Prize Distribution (50/50 Contests):**
-  - Top 50% of entries win
-  - Prize pool distributed proportionally among winners
-  - Automatic settlement via cron job when contest ends
-- **Real-Time Updates:**
-  - `stats_sync_live` job broadcasts `contestUpdate` WebSocket events every minute during live games
-  - Frontend auto-refreshes leaderboards when stats change
-  - Leaderboard recalculated on-demand via `/api/contest/:id/leaderboard` endpoint
-- **Settlement Process:**
-  - `settle_contests` job runs every 5 minutes
-  - Identifies contests past their end time
-  - Calculates final rankings and determines winners
-  - Updates user balances with prize money
-  - Marks contest as "completed"
-
-**Development Tools:**
-- Replit-specific plugins for runtime error overlay and development banner
-- Cartographer plugin for code navigation in Replit environment
-- TSX for TypeScript execution in development mode
-- ESBuild for production bundling
+- **Proportional Share-Dilution Model:** Fantasy points distributed based on ownership percentage within a contest.
+- **50/50 Contests:** Top 50% entries win, prize pool distributed proportionally.

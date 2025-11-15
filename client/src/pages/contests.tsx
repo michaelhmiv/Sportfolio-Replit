@@ -81,12 +81,7 @@ export default function Contests() {
                             </div>
                           </div>
                           
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-1">Shares</div>
-                            <span className="text-sm font-semibold">{contest.totalSharesEntered}</span>
-                          </div>
-                          
-                          <div>
+                          <div className="col-span-2">
                             <div className="text-xs text-muted-foreground mb-1">Starts</div>
                             <div className="flex items-center gap-1">
                               <Clock className="w-3 h-3" />
@@ -127,7 +122,6 @@ export default function Contests() {
                             <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
                             <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prize Pool</th>
                             <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Entries</th>
-                            <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shares</th>
                             <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Starts</th>
                             <th className="p-4"></th>
                           </tr>
@@ -164,9 +158,6 @@ export default function Contests() {
                                   <Users className="w-4 h-4" />
                                   <span className="font-semibold">{contest.entryCount}</span>
                                 </div>
-                              </td>
-                              <td className="p-4 text-right">
-                                <span className="text-sm text-muted-foreground">{contest.totalSharesEntered}</span>
                               </td>
                               <td className="p-4">
                                 <div className="flex items-center gap-1">
