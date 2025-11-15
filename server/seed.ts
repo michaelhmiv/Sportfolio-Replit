@@ -93,36 +93,40 @@ async function seed() {
 
   console.log("Created holdings");
 
-  // Seed mock games for tomorrow (before creating contest)
+  // Seed mock games for today (before creating contest)
+  // Use ET timezone logic (same as /api/games/today endpoint)
   const now = new Date();
-  const tomorrowDate = new Date(now);
-  tomorrowDate.setUTCDate(tomorrowDate.getUTCDate() + 1);
-  tomorrowDate.setUTCHours(0, 0, 0, 0); // Zero out time components for pure date
+  const etOffset = -5; // ET is UTC-5 (EST) or UTC-4 (EDT), using -5 for simplicity
+  const nowET = new Date(now.getTime() + (etOffset * 60 * 60 * 1000));
+  
+  // Get start and end of day in ET, then convert back to UTC for database
+  const startOfDayET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 0, 0, 0);
+  const endOfDayET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 23, 59, 59);
+  
+  // Convert ET boundaries to UTC for database query
+  const startOfDayUTC = new Date(startOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
+  const endOfDayUTC = new Date(endOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
+  
+  // Create a pure date for gameDate field (midnight ET in local timezone representation)
+  const todayDate = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 0, 0, 0);
 
-  // Create some mock games at different times tomorrow
+  // Create some mock games at different times today (in ET timezone)
+  const game1StartET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 17, 0, 0); // 5:00 PM ET
+  const game2StartET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 18, 30, 0); // 6:30 PM ET
+  
   const mockGames = [
     {
-      gameId: "game-1-tomorrow",
+      gameId: "game-1-today",
       homeTeam: "LAL",
       awayTeam: "GSW",
-      startTime: new Date(Date.UTC(
-        tomorrowDate.getUTCFullYear(),
-        tomorrowDate.getUTCMonth(),
-        tomorrowDate.getUTCDate(),
-        22, 0, 0, 0 // 10:00 PM UTC (5:00 PM ET)
-      )),
+      startTime: new Date(game1StartET.getTime() - (etOffset * 60 * 60 * 1000)), // Convert to UTC
       status: "scheduled" as const,
     },
     {
-      gameId: "game-2-tomorrow",
+      gameId: "game-2-today",
       homeTeam: "MIL",
       awayTeam: "PHX",
-      startTime: new Date(Date.UTC(
-        tomorrowDate.getUTCFullYear(),
-        tomorrowDate.getUTCMonth(),
-        tomorrowDate.getUTCDate(),
-        23, 30, 0, 0 // 11:30 PM UTC (6:30 PM ET)
-      )),
+      startTime: new Date(game2StartET.getTime() - (etOffset * 60 * 60 * 1000)), // Convert to UTC
       status: "scheduled" as const,
     },
   ];
@@ -137,51 +141,33 @@ async function seed() {
       });
   }
 
-  console.log("Created mock games for tomorrow");
+  console.log("Created mock games for today (ET timezone)");
   
-  // Create UTC boundaries for tomorrow (00:00:00 to 23:59:59 UTC)
-  const startOfTomorrowUTC = new Date(Date.UTC(
-    tomorrowDate.getUTCFullYear(),
-    tomorrowDate.getUTCMonth(),
-    tomorrowDate.getUTCDate(),
-    0, 0, 0, 0
-  ));
-  
-  const endOfTomorrowUTC = new Date(Date.UTC(
-    tomorrowDate.getUTCFullYear(),
-    tomorrowDate.getUTCMonth(),
-    tomorrowDate.getUTCDate(),
-    23, 59, 59, 999
-  ));
-  
-  // Fetch games for tomorrow to find the earliest start time
-  const tomorrowGames = await db
+  // Fetch games for today (using ET boundaries) to find the earliest start time
+  const todayGames = await db
     .select()
     .from(dailyGames)
     .where(and(
-      gte(dailyGames.startTime, startOfTomorrowUTC),
-      lte(dailyGames.startTime, endOfTomorrowUTC)
+      gte(dailyGames.startTime, startOfDayUTC),
+      lte(dailyGames.startTime, endOfDayUTC)
     ))
     .orderBy(asc(dailyGames.startTime));
   
-  // Set contest start time to earliest game time, or default to 7pm UTC tomorrow if no games
-  const defaultStartTime = new Date(Date.UTC(
-    tomorrowDate.getUTCFullYear(),
-    tomorrowDate.getUTCMonth(),
-    tomorrowDate.getUTCDate(),
-    19, 0, 0, 0
-  ));
-  const contestStartTime = tomorrowGames.length > 0 
-    ? tomorrowGames[0].startTime 
+  // Set contest start time to earliest game time, or default to 7pm ET if no games
+  const defaultStartET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 19, 0, 0);
+  const defaultStartTime = new Date(defaultStartET.getTime() - (etOffset * 60 * 60 * 1000));
+  
+  const contestStartTime = todayGames.length > 0 
+    ? todayGames[0].startTime 
     : defaultStartTime;
 
   await db
     .insert(contests)
     .values({
-      name: "NBA 50/50 - Tomorrow's Games",
+      name: "NBA 50/50 - Today's Games",
       sport: "NBA",
       contestType: "50/50",
-      gameDate: tomorrowDate,
+      gameDate: todayDate,
       status: "open",
       totalSharesEntered: 0,
       totalPrizePool: "0.00",
