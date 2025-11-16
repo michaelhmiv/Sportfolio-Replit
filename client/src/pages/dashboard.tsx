@@ -288,11 +288,20 @@ export default function Dashboard() {
 
   const startMiningMutation = useMutation({
     mutationFn: async (playerIds: string[]) => {
+      console.log('[Mining] Starting mutation with player IDs:', playerIds);
       const res = await apiRequest("POST", "/api/mining/start", { playerIds });
-      return await res.json();
+      console.log('[Mining] API response status:', res.status);
+      const data = await res.json();
+      console.log('[Mining] API response data:', data);
+      // Invalidate and wait for refetch BEFORE returning
+      console.log('[Mining] Invalidating queries...');
+      await invalidatePortfolioQueries();
+      console.log('[Mining] Queries invalidated');
+      return data;
     },
     onSuccess: (data: any) => {
-      invalidatePortfolioQueries();
+      // Cache is already fresh, safe to update UI immediately
+      console.log('[Mining] onSuccess called with data:', data);
       setShowPlayerSelection(false);
       setSelectedPlayers([]);
       
@@ -303,6 +312,7 @@ export default function Dashboard() {
       });
     },
     onError: (error: any) => {
+      console.error('[Mining] onError called with error:', error);
       toast({
         title: "Failed to Start Mining",
         description: error.error || error.message,
@@ -314,10 +324,13 @@ export default function Dashboard() {
   const claimMiningMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/mining/claim");
-      return await res.json();
+      const data = await res.json();
+      // Invalidate and wait for refetch BEFORE returning
+      await invalidatePortfolioQueries();
+      return data;
     },
     onSuccess: (data: any) => {
-      invalidatePortfolioQueries();
+      // Cache is already fresh, safe to show toast immediately
       
       // Multi-player mining response
       if (data?.players && data.players.length > 0) {
