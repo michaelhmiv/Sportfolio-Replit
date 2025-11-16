@@ -369,49 +369,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (isNaN(gameIdNum)) {
         return res.status(400).json({ error: "Invalid game ID" });
       }
-
+      
       // Get all player stats for this game
       const stats = await storage.getGameStatsByGameId(gameIdNum);
       
       if (!stats || stats.length === 0) {
         return res.json({
-          gameId: gameIdNum,
-          homeTeam: {},
-          awayTeam: {},
-          topPlayers: { home: [], away: [] },
+          gameId,
+          homeTeam: { players: [], totals: null },
+          awayTeam: { players: [], totals: null },
+          topPerformers: null,
           message: "No stats available yet"
         });
       }
 
-      // Group stats by team and calculate team totals
-      const homeStats = stats.filter((s: any) => s.isHomeGame);
-      const awayStats = stats.filter((s: any) => !s.isHomeGame);
+      // Get player details for all stats
+      const statsWithPlayers = await Promise.all(
+        stats.map(async (stat) => {
+          const player = await storage.getPlayer(stat.playerId);
+          return {
+            playerId: stat.playerId,
+            playerName: player ? `${player.firstName} ${player.lastName}` : 'Unknown',
+            team: player?.team || stat.opponentTeam,
+            minutes: stat.minutes,
+            points: stat.points,
+            threePointersMade: stat.threePointersMade,
+            rebounds: stat.rebounds,
+            assists: stat.assists,
+            steals: stat.steals,
+            blocks: stat.blocks,
+            turnovers: stat.turnovers,
+            fantasyPoints: parseFloat(stat.fantasyPoints),
+            homeAway: stat.homeAway,
+          };
+        })
+      );
+
+      // Group by home/away
+      const homeStats = statsWithPlayers.filter(s => s.homeAway === "home");
+      const awayStats = statsWithPlayers.filter(s => s.homeAway === "away");
       
-      const calculateTeamTotals = (teamStats: any[]) => ({
+      const calculateTeamTotals = (teamStats: typeof statsWithPlayers) => ({
         points: teamStats.reduce((sum, s) => sum + s.points, 0),
         rebounds: teamStats.reduce((sum, s) => sum + s.rebounds, 0),
         assists: teamStats.reduce((sum, s) => sum + s.assists, 0),
         steals: teamStats.reduce((sum, s) => sum + s.steals, 0),
         blocks: teamStats.reduce((sum, s) => sum + s.blocks, 0),
+        turnovers: teamStats.reduce((sum, s) => sum + s.turnovers, 0),
       });
 
-      // Get top 3 players by points for each team
-      const getTopPlayers = async (teamStats: any[]) => {
-        const sorted = teamStats.sort((a, b) => b.points - a.points).slice(0, 3);
-        return await Promise.all(sorted.map(async (stat) => ({
-          ...stat,
-          player: await storage.getPlayer(stat.playerId),
-        })));
-      };
+      // Find top performers across both teams
+      const allStats = [...homeStats, ...awayStats];
+      const topScorer = allStats.reduce((max, s) => s.points > max.points ? s : max, allStats[0]);
+      const topRebounder = allStats.reduce((max, s) => s.rebounds > max.rebounds ? s : max, allStats[0]);
+      const topAssister = allStats.reduce((max, s) => s.assists > max.assists ? s : max, allStats[0]);
 
       res.json({
-        gameId: gameIdNum,
-        homeTeam: calculateTeamTotals(homeStats),
-        awayTeam: calculateTeamTotals(awayStats),
-        topPlayers: {
-          home: await getTopPlayers(homeStats),
-          away: await getTopPlayers(awayStats),
+        gameId,
+        homeTeam: {
+          players: homeStats,
+          totals: homeStats.length > 0 ? calculateTeamTotals(homeStats) : null,
         },
+        awayTeam: {
+          players: awayStats,
+          totals: awayStats.length > 0 ? calculateTeamTotals(awayStats) : null,
+        },
+        topPerformers: allStats.length > 0 ? {
+          topScorer,
+          topRebounder,
+          topAssister,
+        } : null,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

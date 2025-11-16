@@ -907,39 +907,204 @@ function PlayerCard({
 
 // Game Stats Dialog Component
 function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: () => void }) {
+  const { data: boxScore, isLoading } = useQuery<any>({
+    queryKey: [`/api/games/${game?.gameId}/stats`],
+    enabled: !!game,
+  });
+
   if (!game) return null;
   
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl font-bold">
             {game.awayTeam} @ {game.homeTeam}
           </DialogTitle>
           <DialogDescription>
             {new Date(game.startTime).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at {new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+            {game.venue && <span className="ml-2">• {game.venue}</span>}
           </DialogDescription>
         </DialogHeader>
+
         <div className="space-y-6">
-          <div className="grid grid-cols-3 gap-4 text-center">
-            <div>
+          {/* Score Display */}
+          <div className="grid grid-cols-3 gap-4 items-center">
+            <div className="text-center">
               <h3 className="text-lg font-semibold mb-2">{game.awayTeam}</h3>
+              {game.awayScore !== null && (
+                <div className="text-4xl font-bold font-mono">{game.awayScore}</div>
+              )}
             </div>
             <div className="flex items-center justify-center">
-              <div className="text-sm text-muted-foreground">
+              <div className="text-sm">
                 {game.status === "inprogress" && <Badge variant="destructive">Live</Badge>}
                 {game.status === "scheduled" && <Badge variant="secondary">Scheduled</Badge>}
                 {game.status === "completed" && <Badge variant="outline">Final</Badge>}
               </div>
             </div>
-            <div>
+            <div className="text-center">
               <h3 className="text-lg font-semibold mb-2">{game.homeTeam}</h3>
+              {game.homeScore !== null && (
+                <div className="text-4xl font-bold font-mono">{game.homeScore}</div>
+              )}
             </div>
           </div>
-          <div className="text-center text-sm text-muted-foreground">
-            {game.venue && <div className="mb-2">{game.venue}</div>}
-            Detailed game stats and scores coming soon...
-          </div>
+
+          {/* Loading State */}
+          {isLoading && (
+            <div className="text-center py-8 text-muted-foreground">
+              Loading box score...
+            </div>
+          )}
+
+          {/* No Stats Available */}
+          {!isLoading && boxScore?.message && (
+            <div className="text-center py-8 text-muted-foreground">
+              {boxScore.message}
+            </div>
+          )}
+
+          {/* Top Performers */}
+          {!isLoading && boxScore?.topPerformers && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium uppercase tracking-wide">Top Performers</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="text-center p-3 bg-muted rounded-md">
+                    <div className="text-xs text-muted-foreground mb-1">Leading Scorer</div>
+                    <div className="font-semibold">{boxScore.topPerformers.topScorer.playerName}</div>
+                    <div className="text-2xl font-bold font-mono text-primary">{boxScore.topPerformers.topScorer.points} PTS</div>
+                  </div>
+                  <div className="text-center p-3 bg-muted rounded-md">
+                    <div className="text-xs text-muted-foreground mb-1">Leading Rebounder</div>
+                    <div className="font-semibold">{boxScore.topPerformers.topRebounder.playerName}</div>
+                    <div className="text-2xl font-bold font-mono text-primary">{boxScore.topPerformers.topRebounder.rebounds} REB</div>
+                  </div>
+                  <div className="text-center p-3 bg-muted rounded-md">
+                    <div className="text-xs text-muted-foreground mb-1">Leading Assist</div>
+                    <div className="font-semibold">{boxScore.topPerformers.topAssister.playerName}</div>
+                    <div className="text-2xl font-bold font-mono text-primary">{boxScore.topPerformers.topAssister.assists} AST</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Box Score Tables */}
+          {!isLoading && boxScore?.awayTeam?.players && boxScore.awayTeam.players.length > 0 && (
+            <>
+              {/* Away Team Box Score */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium uppercase tracking-wide">{game.awayTeam} Box Score</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="border-b bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-semibold">Player</th>
+                          <th className="text-center p-3 font-semibold">MIN</th>
+                          <th className="text-center p-3 font-semibold">PTS</th>
+                          <th className="text-center p-3 font-semibold">REB</th>
+                          <th className="text-center p-3 font-semibold">AST</th>
+                          <th className="text-center p-3 font-semibold">STL</th>
+                          <th className="text-center p-3 font-semibold">BLK</th>
+                          <th className="text-center p-3 font-semibold">TO</th>
+                          <th className="text-center p-3 font-semibold">FP</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {boxScore.awayTeam.players.map((player: any) => (
+                          <tr key={player.playerId} className="border-b last:border-0 hover-elevate">
+                            <td className="p-3 font-medium">{player.playerName}</td>
+                            <td className="p-3 text-center font-mono">{player.minutes}</td>
+                            <td className="p-3 text-center font-mono font-semibold">{player.points}</td>
+                            <td className="p-3 text-center font-mono">{player.rebounds}</td>
+                            <td className="p-3 text-center font-mono">{player.assists}</td>
+                            <td className="p-3 text-center font-mono">{player.steals}</td>
+                            <td className="p-3 text-center font-mono">{player.blocks}</td>
+                            <td className="p-3 text-center font-mono">{player.turnovers}</td>
+                            <td className="p-3 text-center font-mono text-primary">{player.fantasyPoints.toFixed(1)}</td>
+                          </tr>
+                        ))}
+                        {boxScore.awayTeam.totals && (
+                          <tr className="border-t-2 bg-muted/30 font-semibold">
+                            <td className="p-3">TEAM TOTALS</td>
+                            <td className="p-3 text-center">-</td>
+                            <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.points}</td>
+                            <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.rebounds}</td>
+                            <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.assists}</td>
+                            <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.steals}</td>
+                            <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.blocks}</td>
+                            <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.turnovers}</td>
+                            <td className="p-3 text-center">-</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Home Team Box Score */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-sm font-medium uppercase tracking-wide">{game.homeTeam} Box Score</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="border-b bg-muted/50">
+                        <tr>
+                          <th className="text-left p-3 font-semibold">Player</th>
+                          <th className="text-center p-3 font-semibold">MIN</th>
+                          <th className="text-center p-3 font-semibold">PTS</th>
+                          <th className="text-center p-3 font-semibold">REB</th>
+                          <th className="text-center p-3 font-semibold">AST</th>
+                          <th className="text-center p-3 font-semibold">STL</th>
+                          <th className="text-center p-3 font-semibold">BLK</th>
+                          <th className="text-center p-3 font-semibold">TO</th>
+                          <th className="text-center p-3 font-semibold">FP</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {boxScore.homeTeam.players.map((player: any) => (
+                          <tr key={player.playerId} className="border-b last:border-0 hover-elevate">
+                            <td className="p-3 font-medium">{player.playerName}</td>
+                            <td className="p-3 text-center font-mono">{player.minutes}</td>
+                            <td className="p-3 text-center font-mono font-semibold">{player.points}</td>
+                            <td className="p-3 text-center font-mono">{player.rebounds}</td>
+                            <td className="p-3 text-center font-mono">{player.assists}</td>
+                            <td className="p-3 text-center font-mono">{player.steals}</td>
+                            <td className="p-3 text-center font-mono">{player.blocks}</td>
+                            <td className="p-3 text-center font-mono">{player.turnovers}</td>
+                            <td className="p-3 text-center font-mono text-primary">{player.fantasyPoints.toFixed(1)}</td>
+                          </tr>
+                        ))}
+                        {boxScore.homeTeam.totals && (
+                          <tr className="border-t-2 bg-muted/30 font-semibold">
+                            <td className="p-3">TEAM TOTALS</td>
+                            <td className="p-3 text-center">-</td>
+                            <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.points}</td>
+                            <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.rebounds}</td>
+                            <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.assists}</td>
+                            <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.steals}</td>
+                            <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.blocks}</td>
+                            <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.turnovers}</td>
+                            <td className="p-3 text-center">-</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
       </DialogContent>
     </Dialog>
