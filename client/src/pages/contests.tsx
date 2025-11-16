@@ -31,8 +31,8 @@ export default function Contests() {
   const formattedDate = formatDateForAPI(selectedDate);
   const isToday = (date: Date) => formatDateForAPI(date) === formatDateForAPI(new Date());
 
-  // Only append date query param if not today
-  const contestsUrl = isToday(selectedDate) ? "/api/contests" : `/api/contests?date=${formattedDate}`;
+  // Always filter contests by selected date
+  const contestsUrl = `/api/contests?date=${formattedDate}`;
 
   const { data, isLoading } = useQuery<ContestsData>({
     queryKey: [contestsUrl],
