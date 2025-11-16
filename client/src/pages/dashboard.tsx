@@ -973,26 +973,26 @@ function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: (
 
           {/* Top Performers */}
           {!isLoading && boxScore?.topPerformers && (
-            <Card>
+            <Card data-testid="card-top-performers">
               <CardHeader>
                 <CardTitle className="text-sm font-medium uppercase tracking-wide">Top Performers</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center p-3 bg-muted rounded-md">
+                  <div className="text-center p-3 bg-muted rounded-md" data-testid="card-leading-scorer">
                     <div className="text-xs text-muted-foreground mb-1">Leading Scorer</div>
-                    <div className="font-semibold">{boxScore.topPerformers.topScorer.playerName}</div>
-                    <div className="text-2xl font-bold font-mono text-primary">{boxScore.topPerformers.topScorer.points} PTS</div>
+                    <div className="font-semibold" data-testid="text-scorer-name">{boxScore.topPerformers.topScorer.playerName}</div>
+                    <div className="text-2xl font-bold font-mono text-primary" data-testid="text-scorer-points">{boxScore.topPerformers.topScorer.points} PTS</div>
                   </div>
-                  <div className="text-center p-3 bg-muted rounded-md">
+                  <div className="text-center p-3 bg-muted rounded-md" data-testid="card-leading-rebounder">
                     <div className="text-xs text-muted-foreground mb-1">Leading Rebounder</div>
-                    <div className="font-semibold">{boxScore.topPerformers.topRebounder.playerName}</div>
-                    <div className="text-2xl font-bold font-mono text-primary">{boxScore.topPerformers.topRebounder.rebounds} REB</div>
+                    <div className="font-semibold" data-testid="text-rebounder-name">{boxScore.topPerformers.topRebounder.playerName}</div>
+                    <div className="text-2xl font-bold font-mono text-primary" data-testid="text-rebounder-rebounds">{boxScore.topPerformers.topRebounder.rebounds} REB</div>
                   </div>
-                  <div className="text-center p-3 bg-muted rounded-md">
+                  <div className="text-center p-3 bg-muted rounded-md" data-testid="card-leading-assister">
                     <div className="text-xs text-muted-foreground mb-1">Leading Assist</div>
-                    <div className="font-semibold">{boxScore.topPerformers.topAssister.playerName}</div>
-                    <div className="text-2xl font-bold font-mono text-primary">{boxScore.topPerformers.topAssister.assists} AST</div>
+                    <div className="font-semibold" data-testid="text-assister-name">{boxScore.topPerformers.topAssister.playerName}</div>
+                    <div className="text-2xl font-bold font-mono text-primary" data-testid="text-assister-assists">{boxScore.topPerformers.topAssister.assists} AST</div>
                   </div>
                 </div>
               </CardContent>
@@ -1003,7 +1003,7 @@ function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: (
           {!isLoading && boxScore?.awayTeam?.players && boxScore.awayTeam.players.length > 0 && (
             <>
               {/* Away Team Box Score */}
-              <Card>
+              <Card data-testid="card-away-boxscore">
                 <CardHeader>
                   <CardTitle className="text-sm font-medium uppercase tracking-wide">{game.awayTeam} Box Score</CardTitle>
                 </CardHeader>
@@ -1025,10 +1025,10 @@ function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: (
                       </thead>
                       <tbody>
                         {boxScore.awayTeam.players.map((player: any) => (
-                          <tr key={player.playerId} className="border-b last:border-0 hover-elevate">
-                            <td className="p-3 font-medium">{player.playerName}</td>
+                          <tr key={player.playerId} className="border-b last:border-0 hover-elevate" data-testid={`row-player-${player.playerId}`}>
+                            <td className="p-3 font-medium" data-testid={`text-player-name-${player.playerId}`}>{player.playerName}</td>
                             <td className="p-3 text-center font-mono">{player.minutes}</td>
-                            <td className="p-3 text-center font-mono font-semibold">{player.points}</td>
+                            <td className="p-3 text-center font-mono font-semibold" data-testid={`text-player-points-${player.playerId}`}>{player.points}</td>
                             <td className="p-3 text-center font-mono">{player.rebounds}</td>
                             <td className="p-3 text-center font-mono">{player.assists}</td>
                             <td className="p-3 text-center font-mono">{player.steals}</td>
@@ -1038,10 +1038,10 @@ function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: (
                           </tr>
                         ))}
                         {boxScore.awayTeam.totals && (
-                          <tr className="border-t-2 bg-muted/30 font-semibold">
+                          <tr className="border-t-2 bg-muted/30 font-semibold" data-testid="row-away-team-totals">
                             <td className="p-3">TEAM TOTALS</td>
                             <td className="p-3 text-center">-</td>
-                            <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.points}</td>
+                            <td className="p-3 text-center font-mono" data-testid="text-away-total-points">{boxScore.awayTeam.totals.points}</td>
                             <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.rebounds}</td>
                             <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.assists}</td>
                             <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.steals}</td>
@@ -1057,7 +1057,7 @@ function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: (
               </Card>
 
               {/* Home Team Box Score */}
-              <Card>
+              <Card data-testid="card-home-boxscore">
                 <CardHeader>
                   <CardTitle className="text-sm font-medium uppercase tracking-wide">{game.homeTeam} Box Score</CardTitle>
                 </CardHeader>
@@ -1079,10 +1079,10 @@ function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: (
                       </thead>
                       <tbody>
                         {boxScore.homeTeam.players.map((player: any) => (
-                          <tr key={player.playerId} className="border-b last:border-0 hover-elevate">
-                            <td className="p-3 font-medium">{player.playerName}</td>
+                          <tr key={player.playerId} className="border-b last:border-0 hover-elevate" data-testid={`row-player-${player.playerId}`}>
+                            <td className="p-3 font-medium" data-testid={`text-player-name-${player.playerId}`}>{player.playerName}</td>
                             <td className="p-3 text-center font-mono">{player.minutes}</td>
-                            <td className="p-3 text-center font-mono font-semibold">{player.points}</td>
+                            <td className="p-3 text-center font-mono font-semibold" data-testid={`text-player-points-${player.playerId}`}>{player.points}</td>
                             <td className="p-3 text-center font-mono">{player.rebounds}</td>
                             <td className="p-3 text-center font-mono">{player.assists}</td>
                             <td className="p-3 text-center font-mono">{player.steals}</td>
@@ -1092,10 +1092,10 @@ function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: (
                           </tr>
                         ))}
                         {boxScore.homeTeam.totals && (
-                          <tr className="border-t-2 bg-muted/30 font-semibold">
+                          <tr className="border-t-2 bg-muted/30 font-semibold" data-testid="row-home-team-totals">
                             <td className="p-3">TEAM TOTALS</td>
                             <td className="p-3 text-center">-</td>
-                            <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.points}</td>
+                            <td className="p-3 text-center font-mono" data-testid="text-home-total-points">{boxScore.homeTeam.totals.points}</td>
                             <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.rebounds}</td>
                             <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.assists}</td>
                             <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.steals}</td>

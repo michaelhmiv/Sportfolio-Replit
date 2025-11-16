@@ -1288,10 +1288,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const newLineupMap = new Map(lineup.map((item: any) => [item.playerId, item.sharesEntered]));
 
       // Validate that user has sufficient shares for the new lineup
-      for (const [playerId, newShares] of newLineupMap) {
+      for (const [playerId, newShares] of Array.from(newLineupMap)) {
         const oldShares = oldLineupMap.get(playerId) || 0;
         const currentHolding = holdingsMap.get(playerId) || 0;
-        const availableShares = currentHolding + oldShares; // Current holdings + shares currently in lineup
+        const availableShares = Number(currentHolding) + Number(oldShares); // Current holdings + shares currently in lineup
         
         if (newShares > availableShares) {
           return res.status(400).json({ 
@@ -1301,10 +1301,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Return shares that were removed or reduced
-      for (const [playerId, oldShares] of oldLineupMap) {
+      for (const [playerId, oldShares] of Array.from(oldLineupMap)) {
         const newShares = newLineupMap.get(playerId) || 0;
         if (newShares < oldShares) {
-          const sharesToReturn = oldShares - newShares;
+          const sharesToReturn = Number(oldShares) - Number(newShares);
           const holding = await storage.getHolding(user.id, "player", playerId);
           if (holding) {
             await storage.updateHolding(
@@ -1322,10 +1322,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // VALIDATE AND BURN: Check holdings AFTER returns, then burn additional shares
-      for (const [playerId, newShares] of newLineupMap) {
+      for (const [playerId, newShares] of Array.from(newLineupMap)) {
         const oldShares = oldLineupMap.get(playerId) || 0;
         if (newShares > oldShares) {
-          const sharesToBurn = newShares - oldShares;
+          const sharesToBurn = Number(newShares) - Number(oldShares);
           // Re-fetch holding after share returns to get current state
           const holding = await storage.getHolding(user.id, "player", playerId);
           
