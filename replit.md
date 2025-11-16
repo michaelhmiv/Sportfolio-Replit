@@ -8,6 +8,8 @@ Sportfolio is a fantasy sports trading platform that gamifies NBA player perform
 
 Preferred communication style: Simple, everyday language.
 
+**CRITICAL RULE: Never use mock, sample, or placeholder data under any circumstances.** All data must come from live API sources (MySportsFeeds). If API data is unavailable, show empty states or loading indicators - never fabricate data.
+
 ## System Architecture
 
 ### Frontend Architecture

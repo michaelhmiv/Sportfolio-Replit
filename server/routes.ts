@@ -1284,11 +1284,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Calculate share differences and validate
-      const oldLineupMap = new Map(existing.lineup.map((item: any) => [item.playerId, item.sharesEntered]));
-      const newLineupMap = new Map(lineup.map((item: any) => [item.playerId, item.sharesEntered]));
+      const oldLineupMap = new Map<string, number>(existing.lineup.map((item: any) => [item.playerId, item.sharesEntered]));
+      const newLineupMap = new Map<string, number>(lineup.map((item: any) => [item.playerId, item.sharesEntered]));
 
       // Validate that user has sufficient shares for the new lineup
-      for (const [playerId, newShares] of Array.from(newLineupMap)) {
+      for (const [playerId, newShares] of Array.from(newLineupMap.entries())) {
         const oldShares = oldLineupMap.get(playerId) || 0;
         const currentHolding = holdingsMap.get(playerId) || 0;
         const availableShares = Number(currentHolding) + Number(oldShares); // Current holdings + shares currently in lineup
@@ -1301,7 +1301,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Return shares that were removed or reduced
-      for (const [playerId, oldShares] of Array.from(oldLineupMap)) {
+      for (const [playerId, oldShares] of Array.from(oldLineupMap.entries())) {
         const newShares = newLineupMap.get(playerId) || 0;
         if (newShares < oldShares) {
           const sharesToReturn = Number(oldShares) - Number(newShares);
@@ -1322,7 +1322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // VALIDATE AND BURN: Check holdings AFTER returns, then burn additional shares
-      for (const [playerId, newShares] of Array.from(newLineupMap)) {
+      for (const [playerId, newShares] of Array.from(newLineupMap.entries())) {
         const oldShares = oldLineupMap.get(playerId) || 0;
         if (newShares > oldShares) {
           const sharesToBurn = Number(newShares) - Number(oldShares);

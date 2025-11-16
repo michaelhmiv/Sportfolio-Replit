@@ -18,12 +18,12 @@ export async function syncStats(): Promise<JobResult> {
   let errorCount = 0;
 
   try {
-    // Get games from last 48 hours that are completed or in progress
+    // Get only TODAY's games - no historical data
     const startDate = new Date();
-    startDate.setHours(startDate.getHours() - 48);
+    startDate.setHours(0, 0, 0, 0); // Start of today
     
     const endDate = new Date();
-    endDate.setHours(endDate.getHours() + 6);
+    endDate.setHours(23, 59, 59, 999); // End of today
 
     const games = await storage.getDailyGames(startDate, endDate);
     const relevantGames = games.filter(g => 
