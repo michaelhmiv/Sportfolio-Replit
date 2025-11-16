@@ -41,12 +41,29 @@ function Header() {
   });
 
   const handleAddCash = async () => {
+    // Optimistically update the balance immediately
+    const currentBalance = parseFloat(dashboardData?.balance || "0");
+    const newBalance = (currentBalance + 1).toFixed(2);
+    
+    // Update cache optimistically
+    queryClient.setQueryData(['/api/dashboard'], (old: any) => ({
+      ...old,
+      balance: newBalance
+    }));
+
     try {
       const response = await fetch('/api/user/add-cash', { method: 'POST' });
       if (!response.ok) throw new Error('Failed to add cash');
+      
+      // Refetch to ensure we have the correct server value
       await queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
     } catch (error) {
       console.error('Failed to add cash:', error);
+      // Rollback on error
+      queryClient.setQueryData(['/api/dashboard'], (old: any) => ({
+        ...old,
+        balance: dashboardData?.balance
+      }));
     }
   };
 

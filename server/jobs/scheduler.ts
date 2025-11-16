@@ -12,6 +12,7 @@ import { syncSchedule } from "./sync-schedule";
 import { syncStats } from "./sync-stats";
 import { syncStatsLive } from "./sync-stats-live";
 import { settleContests } from "./settle-contests";
+import { createContests } from "./create-contests";
 
 export interface JobResult {
   requestCount: number;
@@ -73,6 +74,12 @@ export class JobScheduler {
         schedule: "*/5 * * * *", // Every 5 minutes - check for contests to settle
         enabled: true,
         handler: settleContests,
+      },
+      {
+        name: "create_contests",
+        schedule: "0 0 * * *", // Daily at midnight - create contests for upcoming games
+        enabled: true,
+        handler: createContests,
       },
     ];
 
@@ -170,6 +177,7 @@ export class JobScheduler {
       schedule_sync: syncSchedule,
       stats_sync: syncStats,
       stats_sync_live: syncStatsLive,
+      create_contests: createContests,
     };
 
     const handler = jobConfigs[jobName];
