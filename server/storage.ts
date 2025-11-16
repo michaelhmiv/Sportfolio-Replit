@@ -5,6 +5,7 @@ import {
   orders,
   trades,
   mining,
+  miningSplits,
   contests,
   contestEntries,
   contestLineups,
@@ -20,6 +21,8 @@ import {
   type Order,
   type Trade,
   type Mining,
+  type MiningSplit,
+  type InsertMiningSplit,
   type Contest,
   type ContestEntry,
   type InsertContestEntry,
@@ -67,6 +70,8 @@ export interface IStorage {
   // Mining methods
   getMining(userId: string): Promise<Mining | undefined>;
   updateMining(userId: string, updates: Partial<Mining>): Promise<void>;
+  getMiningSplits(userId: string): Promise<MiningSplit[]>;
+  setMiningSplits(userId: string, splits: InsertMiningSplit[]): Promise<void>;
   
   // Contest methods
   getContests(status?: string): Promise<Contest[]>;
@@ -374,6 +379,23 @@ export class DatabaseStorage implements IStorage {
       .update(mining)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(mining.userId, userId));
+  }
+
+  async getMiningSplits(userId: string): Promise<MiningSplit[]> {
+    return await db
+      .select()
+      .from(miningSplits)
+      .where(eq(miningSplits.userId, userId));
+  }
+
+  async setMiningSplits(userId: string, splits: InsertMiningSplit[]): Promise<void> {
+    // Delete existing splits
+    await db.delete(miningSplits).where(eq(miningSplits.userId, userId));
+    
+    // Insert new splits
+    if (splits.length > 0) {
+      await db.insert(miningSplits).values(splits);
+    }
   }
 
   // Contest methods

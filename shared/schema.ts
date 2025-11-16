@@ -350,6 +350,9 @@ export type Trade = typeof trades.$inferSelect;
 
 export type Mining = typeof mining.$inferSelect;
 
+export type MiningSplit = typeof miningSplits.$inferSelect;
+export type InsertMiningSplit = typeof miningSplits.$inferInsert;
+
 export type DailyGame = typeof dailyGames.$inferSelect;
 export type InsertDailyGame = z.infer<typeof insertDailyGameSchema>;
 
