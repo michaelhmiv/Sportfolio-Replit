@@ -85,12 +85,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!user) return;
 
     const miningData = await storage.getMining(userId);
-    if (!miningData || !miningData.playerId) return;
+    if (!miningData) return;
+    
+    // Check if using multi-player mining (splits)
+    const splits = await storage.getMiningSplits(userId);
+    const usingSplits = splits.length > 0;
+    
+    // If using splits but no splits configured, or using single player but no player selected, return
+    if (!usingSplits && !miningData.playerId) return;
 
     const now = new Date();
-    // Force non-premium rates for demo user (100 shares/hour, 2400 cap)
+    // Force non-premium rates for demo user (100 shares/hour total, 2400 cap)
     const capLimit = 2400;
-    const sharesPerHour = 100;
+    const totalSharesPerHour = 100;
 
     // If already at cap, don't accrue more - clear residual time
     if (miningData.sharesAccumulated >= capLimit) {
@@ -120,7 +127,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       sharesAccumulated: miningData.sharesAccumulated,
       residualMs: miningData.residualMs || 0,
       lastAccruedAt: effectiveLastAccruedAt,
-      sharesPerHour,
+      sharesPerHour: totalSharesPerHour,
       capLimit,
     }, now);
 
@@ -313,8 +320,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       // Get mining data
+      const miningSplits = await storage.getMiningSplits(user.id);
       let miningPlayer = undefined;
-      if (miningData?.playerId) {
+      let miningPlayers = [];
+      
+      if (miningSplits.length > 0) {
+        // Multi-player mining
+        miningPlayers = await Promise.all(
+          miningSplits.map(async (split) => ({
+            player: await storage.getPlayer(split.playerId),
+            sharesPerHour: split.sharesPerHour,
+          }))
+        );
+      } else if (miningData?.playerId) {
+        // Legacy single-player mining
         miningPlayer = await storage.getPlayer(miningData.playerId);
       }
 
@@ -327,6 +346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         mining: miningData ? {
           ...miningData,
           player: miningPlayer,
+          players: miningPlayers,
           capLimit: 2400,
           sharesPerHour: 100,
         } : null,
@@ -990,45 +1010,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Start/select mining for a player
+  // Start/select mining for player(s)
   app.post("/api/mining/start", async (req, res) => {
     try {
       const user = await ensureDefaultUser();
-      const { playerId } = req.body;
+      const { playerIds } = req.body; // Array of player IDs (1-10)
 
-      if (!playerId) {
-        return res.status(400).json({ error: "playerId required" });
+      if (!playerIds || !Array.isArray(playerIds) || playerIds.length === 0) {
+        return res.status(400).json({ error: "playerIds array required (1-10 players)" });
       }
 
-      const player = await storage.getPlayer(playerId);
-      if (!player) {
-        return res.status(404).json({ error: "Player not found" });
+      if (playerIds.length > 10) {
+        return res.status(400).json({ error: "Maximum 10 players allowed" });
       }
 
-      if (!player.isEligibleForMining) {
-        return res.status(400).json({ error: "This player is not eligible for mining" });
+      // Validate all players exist and are eligible
+      const players = [];
+      for (const playerId of playerIds) {
+        const player = await storage.getPlayer(playerId);
+        if (!player) {
+          return res.status(404).json({ error: `Player ${playerId} not found` });
+        }
+        if (!player.isEligibleForMining) {
+          return res.status(400).json({ error: `${player.firstName} ${player.lastName} is not eligible for mining` });
+        }
+        players.push(player);
       }
 
-      // Get current mining state
+      // Check if user has unclaimed shares
       const currentMining = await storage.getMining(user.id);
-      const isSwitchingPlayer = currentMining?.playerId && currentMining.playerId !== playerId;
+      if (currentMining && currentMining.sharesAccumulated > 0) {
+        return res.status(400).json({ 
+          error: "Must claim accumulated shares before changing player selection",
+          sharesAccumulated: currentMining.sharesAccumulated,
+        });
+      }
 
-      // Start mining this player - reset timestamps and residual to start fresh accrual
-      const now = new Date();
-      await storage.updateMining(user.id, {
+      // Calculate shares per hour for each player (equal distribution)
+      const totalRate = 100;
+      const baseSharesPerHour = Math.floor(totalRate / playerIds.length);
+      const remainder = totalRate % playerIds.length;
+
+      // Create new splits
+      const newSplits = playerIds.map((playerId, index) => ({
+        userId: user.id,
         playerId,
-        updatedAt: now,
-        lastAccruedAt: now, // Set baseline for accrual calculation
-        // If switching players, reset everything; otherwise preserve state
-        sharesAccumulated: isSwitchingPlayer ? 0 : (currentMining?.sharesAccumulated || 0),
-        residualMs: isSwitchingPlayer ? 0 : (currentMining?.residualMs || 0),
+        // Distribute remainder to first N players
+        sharesPerHour: baseSharesPerHour + (index < remainder ? 1 : 0),
+      }));
+
+      // Update mining state: clear playerId (using splits now), reset timestamps
+      const now = new Date();
+      await storage.setMiningSplits(user.id, newSplits);
+      await storage.updateMining(user.id, {
+        playerId: null, // Clear single player ID since using splits
+        sharesAccumulated: 0,
+        residualMs: 0,
+        lastAccruedAt: now,
         lastClaimedAt: null,
         capReachedAt: null,
+        updatedAt: now,
       });
 
-      broadcast({ type: "mining", userId: user.id, playerId });
+      broadcast({ type: "mining", userId: user.id, playerIds });
 
-      res.json({ success: true, player });
+      res.json({ success: true, players, splits: newSplits });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -1048,46 +1094,116 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No shares to claim" });
       }
 
-      if (!miningData.playerId) {
-        return res.status(400).json({ error: "No player selected for mining" });
+      // Check if using multi-player mining (splits)
+      const splits = await storage.getMiningSplits(user.id);
+      const usingSplits = splits.length > 0;
+
+      if (!usingSplits) {
+        // Legacy single-player mining
+        if (!miningData.playerId) {
+          return res.status(400).json({ error: "No player selected for mining" });
+        }
+
+        const player = await storage.getPlayer(miningData.playerId);
+        if (!player) {
+          return res.status(400).json({ error: "Player not found" });
+        }
+
+        // Add shares to holdings (cost basis $0)
+        const holding = await storage.getHolding(user.id, "player", miningData.playerId);
+        if (holding) {
+          const newQuantity = holding.quantity + miningData.sharesAccumulated;
+          const newTotalCost = parseFloat(holding.totalCostBasis); // Mined shares have $0 cost
+          const newAvgCost = newTotalCost / newQuantity;
+          await storage.updateHolding(user.id, "player", miningData.playerId, newQuantity, newAvgCost.toFixed(4));
+        } else {
+          await storage.updateHolding(user.id, "player", miningData.playerId, miningData.sharesAccumulated, "0.0000");
+        }
+
+        // Reset mining
+        const now = new Date();
+        await storage.updateMining(user.id, {
+          sharesAccumulated: 0,
+          lastClaimedAt: now,
+          lastAccruedAt: now,
+          updatedAt: now,
+          residualMs: 0,
+          capReachedAt: null,
+        });
+
+        broadcast({ type: "portfolio", userId: user.id });
+        broadcast({ type: "mining", userId: user.id, claimed: miningData.sharesAccumulated });
+
+        return res.json({ 
+          success: true, 
+          sharesClaimed: miningData.sharesAccumulated,
+          player,
+        });
       }
 
-      const player = await storage.getPlayer(miningData.playerId);
-      if (!player) {
-        return res.status(400).json({ error: "Player not found" });
+      // Multi-player mining: distribute shares proportionally
+      const totalAccumulated = miningData.sharesAccumulated;
+      const totalRate = 100;
+      const claimedPlayers = [];
+      let totalDistributed = 0;
+
+      // Calculate shares for each player proportionally
+      const distributions = splits.map(split => {
+        const proportion = split.sharesPerHour / totalRate;
+        const shares = Math.floor(proportion * totalAccumulated);
+        return { ...split, shares };
+      });
+
+      // Distribute remainder deterministically (to players with highest sharesPerHour)
+      const remainder = totalAccumulated - distributions.reduce((sum, d) => sum + d.shares, 0);
+      const sortedByRate = [...distributions].sort((a, b) => b.sharesPerHour - a.sharesPerHour);
+      for (let i = 0; i < remainder; i++) {
+        sortedByRate[i].shares += 1;
       }
 
-      // Add shares to holdings (cost basis $0)
-      const holding = await storage.getHolding(user.id, "player", miningData.playerId);
-      if (holding) {
-        const newQuantity = holding.quantity + miningData.sharesAccumulated;
-        const newTotalCost = parseFloat(holding.totalCostBasis); // Mined shares have $0 cost
-        const newAvgCost = newTotalCost / newQuantity;
-        await storage.updateHolding(user.id, "player", miningData.playerId, newQuantity, newAvgCost.toFixed(4));
-      } else {
-        await storage.updateHolding(user.id, "player", miningData.playerId, miningData.sharesAccumulated, "0.0000");
+      // Add shares to holdings for each player
+      for (const dist of distributions) {
+        if (dist.shares === 0) continue;
+
+        const player = await storage.getPlayer(dist.playerId);
+        if (!player) continue;
+
+        const holding = await storage.getHolding(user.id, "player", dist.playerId);
+        if (holding) {
+          const newQuantity = holding.quantity + dist.shares;
+          const newTotalCost = parseFloat(holding.totalCostBasis); // Mined shares have $0 cost
+          const newAvgCost = newTotalCost / newQuantity;
+          await storage.updateHolding(user.id, "player", dist.playerId, newQuantity, newAvgCost.toFixed(4));
+        } else {
+          await storage.updateHolding(user.id, "player", dist.playerId, dist.shares, "0.0000");
+        }
+
+        claimedPlayers.push({
+          playerId: dist.playerId,
+          playerName: `${player.firstName} ${player.lastName}`,
+          sharesClaimed: dist.shares,
+        });
+        totalDistributed += dist.shares;
       }
 
-      // Reset mining - clear residualMs and reset accrual baseline
+      // Reset mining (keep splits intact)
       const now = new Date();
       await storage.updateMining(user.id, {
         sharesAccumulated: 0,
         lastClaimedAt: now,
-        lastAccruedAt: now, // Reset baseline for fresh accrual after claim
+        lastAccruedAt: now,
         updatedAt: now,
         residualMs: 0,
         capReachedAt: null,
       });
 
-      // Broadcast portfolio update
-      const updatedUser = await storage.getUser(user.id);
-      broadcast({ type: "portfolio", userId: user.id, balance: updatedUser?.balance });
-      broadcast({ type: "mining", userId: user.id, claimed: miningData.sharesAccumulated });
+      broadcast({ type: "portfolio", userId: user.id });
+      broadcast({ type: "mining", userId: user.id, claimed: totalDistributed });
 
       res.json({ 
         success: true, 
-        sharesClaimed: miningData.sharesAccumulated,
-        player,
+        totalSharesClaimed: totalDistributed,
+        players: claimedPlayers,
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
