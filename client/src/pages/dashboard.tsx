@@ -25,7 +25,12 @@ interface DashboardData {
     portfolioValue: string;
   };
   hotPlayers: Player[];
-  mining: Mining & { player?: Player; capLimit: number; sharesPerHour: number };
+  mining: Mining & { 
+    player?: Player; 
+    players?: Array<{ player: Player | undefined; sharesPerHour: number }>;
+    capLimit: number; 
+    sharesPerHour: number; 
+  };
   contests: Contest[];
   recentTrades: (Trade & { player: Player })[];
   portfolioHistory: { date: string; value: number }[];
@@ -71,6 +76,7 @@ export default function Dashboard() {
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
   
   // WebSocket connection for live updates
   useEffect(() => {
@@ -135,7 +141,10 @@ export default function Dashboard() {
 
     const calculateProjectedShares = () => {
       const mining = data.mining;
-      if (!mining.playerId) {
+      const usingSplits = mining.players && mining.players.length > 0;
+      
+      // If using splits or single player mode, check if configured
+      if (!usingSplits && !mining.playerId) {
         setProjectedShares(0);
         return;
       }
@@ -278,25 +287,25 @@ export default function Dashboard() {
   };
 
   const startMiningMutation = useMutation({
-    mutationFn: async (playerId: string) => {
-      const res = await apiRequest("POST", "/api/mining/start", { playerId });
+    mutationFn: async (playerIds: string[]) => {
+      const res = await apiRequest("POST", "/api/mining/start", { playerIds });
       return await res.json();
     },
     onSuccess: (data: any) => {
       invalidatePortfolioQueries();
       setShowPlayerSelection(false);
-      const playerName = data?.player?.firstName && data?.player?.lastName 
-        ? `${data.player.firstName} ${data.player.lastName}`
-        : "selected player";
+      setSelectedPlayers([]);
+      
+      const playerCount = data?.players?.length || 0;
       toast({
         title: "Mining Started!",
-        description: `Now mining shares of ${playerName}`,
+        description: `Now mining shares of ${playerCount} player${playerCount !== 1 ? 's' : ''}`,
       });
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       toast({
         title: "Failed to Start Mining",
-        description: error.message,
+        description: error.error || error.message,
         variant: "destructive",
       });
     },
@@ -309,13 +318,27 @@ export default function Dashboard() {
     },
     onSuccess: (data: any) => {
       invalidatePortfolioQueries();
-      const playerName = data?.player?.firstName && data?.player?.lastName 
-        ? `${data.player.firstName} ${data.player.lastName}`
-        : "your player";
-      toast({
-        title: "Shares Claimed!",
-        description: `Successfully claimed ${data.sharesClaimed || 0} shares of ${playerName}`,
-      });
+      
+      // Multi-player mining response
+      if (data?.players && data.players.length > 0) {
+        const playerBreakdown = data.players
+          .map((p: any) => `${p.playerName} (${p.sharesClaimed})`)
+          .join(", ");
+        toast({
+          title: `Claimed ${data.totalSharesClaimed} Shares!`,
+          description: `Distribution: ${playerBreakdown}`,
+        });
+      } else {
+        // Single player mining response
+        const sharesClaimed = data?.sharesClaimed || 0;
+        const playerName = data?.player?.firstName && data?.player?.lastName 
+          ? `${data.player.firstName} ${data.player.lastName}`
+          : "your player";
+        toast({
+          title: "Shares Claimed!",
+          description: `Successfully claimed ${sharesClaimed} shares of ${playerName}`,
+        });
+      }
     },
     onError: (error: Error) => {
       toast({
@@ -529,7 +552,44 @@ export default function Dashboard() {
                 />
               </div>
               
-              {data?.mining?.player ? (
+              {data?.mining?.players && data.mining.players.length > 0 ? (
+                <>
+                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                    {data.mining.players.map((entry, idx) => entry.player && (
+                      <div key={entry.player.id} className="flex items-center gap-2 p-1.5 rounded-md bg-muted text-xs">
+                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                          <span className="text-[10px] font-bold">{entry.player.firstName[0]}{entry.player.lastName[0]}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium truncate">{entry.player.firstName} {entry.player.lastName}</div>
+                          <div className="text-[10px] text-muted-foreground">{entry.sharesPerHour} sh/hr</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setShowPlayerSelection(true)}
+                      data-testid="button-change-mining-players"
+                      className="flex-1"
+                    >
+                      Change
+                    </Button>
+                    <Button 
+                      className="flex-1" 
+                      size="sm"
+                      disabled={!projectedShares || claimMiningMutation.isPending}
+                      onClick={() => claimMiningMutation.mutate()}
+                      data-testid="button-claim-mining"
+                    >
+                      {claimMiningMutation.isPending ? "Claiming..." : `Claim ${projectedShares}`}
+                    </Button>
+                  </div>
+                </>
+              ) : data?.mining?.player ? (
                 <>
                   <div className="flex items-center gap-2 p-2 rounded-md bg-muted">
                     <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -684,12 +744,18 @@ export default function Dashboard() {
       />
 
       {/* Player Selection Dialog */}
-      <Dialog open={showPlayerSelection} onOpenChange={setShowPlayerSelection}>
+      <Dialog open={showPlayerSelection} onOpenChange={(open) => {
+        setShowPlayerSelection(open);
+        if (!open) setSelectedPlayers([]);
+      }}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Select Player to Mine</DialogTitle>
+            <DialogTitle>Select Players to Mine ({selectedPlayers.length}/10)</DialogTitle>
             <DialogDescription>
-              Choose a player to start mining shares. You'll accumulate {data?.user?.balance && parseFloat(data.user.balance) > 1000 ? "200" : "100"} shares per hour up to a {data?.user?.balance && parseFloat(data.user.balance) > 1000 ? "33,600" : "2,400"} share cap.
+              Choose up to 10 players to mine shares. Total rate is 100 shares/hour distributed equally across selected players.
+              {data?.mining?.sharesAccumulated && data.mining.sharesAccumulated > 0 && (
+                <span className="block mt-2 text-destructive font-medium">⚠️ You must claim {data.mining.sharesAccumulated} accumulated shares before changing your selection.</span>
+              )}
             </DialogDescription>
           </DialogHeader>
           
@@ -718,20 +784,56 @@ export default function Dashboard() {
             </Select>
           </div>
 
+          {/* Selected Players List */}
+          {selectedPlayers.length > 0 && (
+            <div className="px-1 pb-2 border-b">
+              <div className="text-xs font-medium text-muted-foreground mb-2">Selected Players:</div>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedPlayers.map((player) => (
+                  <Badge 
+                    key={player.id} 
+                    variant="secondary"
+                    className="text-xs px-2 py-1 cursor-pointer hover-elevate"
+                    onClick={() => setSelectedPlayers(prev => prev.filter(p => p.id !== player.id))}
+                    data-testid={`badge-selected-player-${player.id}`}
+                  >
+                    {player.firstName} {player.lastName} ({Math.floor(100 / selectedPlayers.length)} sh/hr) ×
+                  </Badge>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="overflow-y-auto flex-1 px-1">
             <div className="space-y-2">
-              {filteredPlayers.map((player) => (
-                <PlayerCard
-                  key={player.id}
-                  player={player}
-                  isExpanded={expandedPlayerId === player.id}
-                  onToggleExpand={() => setExpandedPlayerId(
-                    expandedPlayerId === player.id ? null : player.id
-                  )}
-                  onSelect={() => startMiningMutation.mutate(player.id)}
-                  isPending={startMiningMutation.isPending}
-                />
-              ))}
+              {filteredPlayers.map((player) => {
+                const isSelected = selectedPlayers.some(p => p.id === player.id);
+                return (
+                  <PlayerCard
+                    key={player.id}
+                    player={player}
+                    isExpanded={expandedPlayerId === player.id}
+                    onToggleExpand={() => setExpandedPlayerId(
+                      expandedPlayerId === player.id ? null : player.id
+                    )}
+                    onSelect={() => {
+                      if (isSelected) {
+                        setSelectedPlayers(prev => prev.filter(p => p.id !== player.id));
+                      } else if (selectedPlayers.length < 10) {
+                        setSelectedPlayers(prev => [...prev, player]);
+                      } else {
+                        toast({
+                          title: "Maximum Reached",
+                          description: "You can select up to 10 players",
+                          variant: "destructive",
+                        });
+                      }
+                    }}
+                    isPending={startMiningMutation.isPending}
+                    isSelected={isSelected}
+                  />
+                );
+              })}
             </div>
             {filteredPlayers.length === 0 && (
               <div className="text-center py-12 text-muted-foreground">
@@ -739,6 +841,18 @@ export default function Dashboard() {
                 <p>No players found matching your criteria</p>
               </div>
             )}
+          </div>
+
+          {/* Confirm Button */}
+          <div className="px-1 pt-3 border-t">
+            <Button
+              className="w-full"
+              disabled={selectedPlayers.length === 0 || startMiningMutation.isPending}
+              onClick={() => startMiningMutation.mutate(selectedPlayers.map(p => p.id))}
+              data-testid="button-confirm-mining-selection"
+            >
+              {startMiningMutation.isPending ? "Starting..." : `Start Mining ${selectedPlayers.length} Player${selectedPlayers.length !== 1 ? 's' : ''}`}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -754,13 +868,15 @@ function PlayerCard({
   isExpanded, 
   onToggleExpand, 
   onSelect, 
-  isPending 
+  isPending,
+  isSelected = false,
 }: { 
   player: Player; 
   isExpanded: boolean; 
   onToggleExpand: () => void; 
   onSelect: () => void; 
   isPending: boolean;
+  isSelected?: boolean;
 }) {
   const { data: statsData, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/player", player.id, "stats"],
@@ -824,6 +940,7 @@ function PlayerCard({
               </CollapsibleTrigger>
               <Button
                 size="sm"
+                variant={isSelected ? "default" : "outline"}
                 onClick={(e) => {
                   e.stopPropagation();
                   onSelect();
@@ -832,7 +949,7 @@ function PlayerCard({
                 data-testid={`button-select-player-${player.id}`}
                 className="whitespace-nowrap"
               >
-                {isPending ? "..." : "Mine"}
+                {isPending ? "..." : isSelected ? "✓ Added" : "Add"}
               </Button>
             </div>
           </div>

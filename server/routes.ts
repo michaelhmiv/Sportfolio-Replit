@@ -322,7 +322,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get mining data
       const miningSplits = await storage.getMiningSplits(user.id);
       let miningPlayer = undefined;
-      let miningPlayers = [];
+      let miningPlayers: Array<{ player: Player | undefined; sharesPerHour: number }> = [];
       
       if (miningSplits.length > 0) {
         // Multi-player mining
