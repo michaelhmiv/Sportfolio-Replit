@@ -746,7 +746,20 @@ export default function Dashboard() {
       {/* Player Selection Dialog */}
       <Dialog open={showPlayerSelection} onOpenChange={(open) => {
         setShowPlayerSelection(open);
-        if (!open) setSelectedPlayers([]);
+        if (!open) {
+          setSelectedPlayers([]);
+        } else {
+          // Pre-populate selected players when opening dialog
+          if (data?.mining?.players && data.mining.players.length > 0) {
+            const activePlayers = data.mining.players
+              .map(p => p.player)
+              .filter((p): p is Player => p !== undefined);
+            setSelectedPlayers(activePlayers);
+          } else if (data?.mining?.player) {
+            // Legacy single-player mode - add the single player
+            setSelectedPlayers([data.mining.player]);
+          }
+        }
       }}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
@@ -754,7 +767,27 @@ export default function Dashboard() {
             <DialogDescription>
               Choose up to 10 players to mine shares. Total rate is 100 shares/hour distributed equally across selected players.
               {data?.mining?.sharesAccumulated && data.mining.sharesAccumulated > 0 && (
-                <span className="block mt-2 text-destructive font-medium">⚠️ You must claim {data.mining.sharesAccumulated} accumulated shares before changing your selection.</span>
+                <div className="flex items-center justify-between gap-3 mt-3 p-3 rounded-md bg-destructive/10 border border-destructive/20">
+                  <span className="text-destructive font-medium text-sm">
+                    ⚠️ You must claim {data.mining.sharesAccumulated} shares before changing selection
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="destructive"
+                    onClick={async () => {
+                      setShowPlayerSelection(false);
+                      // Claim the shares
+                      await claimMiningMutation.mutateAsync();
+                      // Wait for cache to invalidate and refetch
+                      await queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+                      // Reopen dialog with fresh data
+                      setTimeout(() => setShowPlayerSelection(true), 200);
+                    }}
+                    disabled={claimMiningMutation.isPending}
+                  >
+                    {claimMiningMutation.isPending ? "Claiming..." : "Claim Now"}
+                  </Button>
+                </div>
               )}
             </DialogDescription>
           </DialogHeader>
@@ -847,11 +880,19 @@ export default function Dashboard() {
           <div className="px-1 pt-3 border-t">
             <Button
               className="w-full"
-              disabled={selectedPlayers.length === 0 || startMiningMutation.isPending}
+              disabled={
+                selectedPlayers.length === 0 || 
+                startMiningMutation.isPending ||
+                !!(data?.mining?.sharesAccumulated && data.mining.sharesAccumulated > 0)
+              }
               onClick={() => startMiningMutation.mutate(selectedPlayers.map(p => p.id))}
               data-testid="button-confirm-mining-selection"
             >
-              {startMiningMutation.isPending ? "Starting..." : `Start Mining ${selectedPlayers.length} Player${selectedPlayers.length !== 1 ? 's' : ''}`}
+              {startMiningMutation.isPending 
+                ? "Starting..." 
+                : (data?.mining?.sharesAccumulated && data.mining.sharesAccumulated > 0)
+                  ? "Claim Shares First"
+                  : `Start Mining ${selectedPlayers.length} Player${selectedPlayers.length !== 1 ? 's' : ''}`}
             </Button>
           </div>
         </DialogContent>
