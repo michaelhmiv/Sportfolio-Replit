@@ -35,20 +35,23 @@ function Router() {
 }
 
 function Header() {
-  const { data: dashboardData } = useQuery<{ balance: string }>({ 
+  const { data: dashboardData } = useQuery<{ user: { balance: string; portfolioValue: string } }>({ 
     queryKey: ['/api/dashboard'],
     refetchInterval: 10000 
   });
 
   const handleAddCash = async () => {
     // Optimistically update the balance immediately
-    const currentBalance = parseFloat(dashboardData?.balance || "0");
+    const currentBalance = parseFloat(dashboardData?.user?.balance || "0");
     const newBalance = (currentBalance + 1).toFixed(2);
     
     // Update cache optimistically
     queryClient.setQueryData(['/api/dashboard'], (old: any) => ({
       ...old,
-      balance: newBalance
+      user: {
+        ...old?.user,
+        balance: newBalance
+      }
     }));
 
     try {
@@ -62,7 +65,10 @@ function Header() {
       // Rollback on error
       queryClient.setQueryData(['/api/dashboard'], (old: any) => ({
         ...old,
-        balance: dashboardData?.balance
+        user: {
+          ...old?.user,
+          balance: dashboardData?.user?.balance
+        }
       }));
     }
   };
@@ -82,7 +88,7 @@ function Header() {
         <div className="hidden sm:flex items-center gap-2 text-sm">
           <span className="font-medium">Balance:</span>
           <span className="font-mono font-bold text-primary" data-testid="text-balance">
-            ${dashboardData?.balance || "0.00"}
+            ${dashboardData?.user?.balance || "0.00"}
           </span>
         </div>
       </div>
