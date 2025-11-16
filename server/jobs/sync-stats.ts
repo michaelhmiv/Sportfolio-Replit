@@ -49,14 +49,16 @@ export async function syncStats(): Promise<JobResult> {
 
         for (const gamelog of players) {
           try {
-            const stats = gamelog.stats?.offense;
-            if (!stats) continue;
+            const offense = gamelog.stats?.offense;
+            const rebounds_stats = gamelog.stats?.rebounds;
+            const defense = gamelog.stats?.defense;
+            if (!offense) continue;
 
-            const points = stats.pts || 0;
-            const rebounds = (stats.rebOff || 0) + (stats.rebDef || 0);
-            const assists = stats.ast || 0;
-            const steals = stats.stl || 0;
-            const blocks = stats.blk || 0;
+            const points = offense.pts || 0;
+            const rebounds = rebounds_stats ? (rebounds_stats.offReb || 0) + (rebounds_stats.defReb || 0) : 0;
+            const assists = offense.ast || 0;
+            const steals = defense?.stl || 0;
+            const blocks = defense?.blk || 0;
             
             // Calculate double-double and triple-double
             const categories = [points, rebounds, assists, steals, blocks];
@@ -66,12 +68,12 @@ export async function syncStats(): Promise<JobResult> {
             
             const fantasyPoints = calculateFantasyPoints({
               points,
-              threePointersMade: stats.fg3PtMade || 0,
+              threePointersMade: offense.fg3PtMade || 0,
               rebounds,
               assists,
               steals,
               blocks,
-              turnovers: stats.tov || 0,
+              turnovers: offense.tov || 0,
             });
 
             await storage.upsertPlayerGameStats({
@@ -81,14 +83,14 @@ export async function syncStats(): Promise<JobResult> {
               season: "2024-2025-regular",
               opponentTeam: gamelog.team.abbreviation === game.homeTeam ? game.awayTeam : game.homeTeam,
               homeAway: gamelog.team.abbreviation === game.homeTeam ? "home" : "away",
-              minutes: stats.minSeconds ? Math.floor(stats.minSeconds / 60) : 0,
+              minutes: offense.minSeconds ? Math.floor(offense.minSeconds / 60) : 0,
               points,
-              threePointersMade: stats.fg3PtMade || 0,
+              threePointersMade: offense.fg3PtMade || 0,
               rebounds,
               assists,
               steals,
               blocks,
-              turnovers: stats.tov || 0,
+              turnovers: offense.tov || 0,
               isDoubleDouble,
               isTripleDouble,
               fantasyPoints: fantasyPoints.toString(),

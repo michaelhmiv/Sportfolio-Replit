@@ -123,58 +123,7 @@ export default function Marketplace() {
             {isLoading ? (
               <div className="p-8 text-center text-muted-foreground">Loading players...</div>
             ) : (
-              <>
-                {/* Mobile: Card Layout */}
-                <div className="sm:hidden p-3 space-y-3">
-                  {sortedPlayers.map((player) => (
-                    <Card key={player.id} className="hover-elevate" data-testid={`card-player-${player.id}`}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="font-bold">{player.firstName[0]}{player.lastName[0]}</span>
-                            </div>
-                            <div>
-                              <div className="font-medium">{player.firstName} {player.lastName}</div>
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Badge variant="outline" className="text-xs">{player.team}</Badge>
-                                <span>{player.position}</span>
-                                <span>#{player.jerseyNumber}</span>
-                              </div>
-                            </div>
-                          </div>
-                          <Link href={`/player/${player.id}`}>
-                            <Button size="sm" data-testid={`button-trade-${player.id}`}>Trade</Button>
-                          </Link>
-                        </div>
-                        <div className="grid grid-cols-3 gap-3 pt-3 border-t">
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-1">Price</div>
-                            <div className="font-mono font-bold" data-testid={`text-price-${player.id}`}>${player.currentPrice}</div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-1">24h Volume</div>
-                            <div className="text-sm">{player.volume24h.toLocaleString()}</div>
-                          </div>
-                          <div>
-                            <div className="text-xs text-muted-foreground mb-1">24h Change</div>
-                            <div className={`flex items-center gap-1 text-sm ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
-                              {parseFloat(player.priceChange24h) >= 0 ? (
-                                <TrendingUp className="w-3 h-3" />
-                              ) : (
-                                <TrendingDown className="w-3 h-3" />
-                              )}
-                              <span>{parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%</span>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-
-                {/* Desktop: Table Layout */}
-                <div className="hidden sm:block overflow-x-auto">
+                <div className="overflow-x-auto">
                   <table className="w-full">
                   <thead className="border-b bg-muted/50">
                     <tr>
@@ -265,7 +214,6 @@ export default function Marketplace() {
                   </tbody>
                 </table>
               </div>
-              </>
             )}
           </CardContent>
         </Card>
