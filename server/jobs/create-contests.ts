@@ -10,6 +10,7 @@
 import { storage } from "../storage";
 import { fetchDailyGames } from "../mysportsfeeds";
 import type { JobResult } from "./scheduler";
+import { fromZonedTime } from "date-fns-tz";
 
 interface GameDay {
   date: Date;
@@ -93,12 +94,22 @@ export async function createContests(): Promise<JobResult> {
         }
 
         // Create a new 50/50 contest for this game day
-        const contestDate = new Date(dateStr + 'T00:00:00Z');
-        const startsAt = new Date(gameDay.date);
-        startsAt.setHours(startsAt.getHours() - 1); // Contests start 1 hour before first game
+        // NBA games are scheduled in Eastern Time, so use ET for contest dates
+        // Parse the date and create midnight/end-of-day in America/New_York timezone
+        const [year, month, day] = dateStr.split('-').map(Number);
         
-        const endsAt = new Date(gameDay.date);
-        endsAt.setHours(23, 59, 59, 999); // End at end of day
+        // Create midnight on game day in ET timezone, then convert to UTC for storage
+        // fromZonedTime handles DST automatically (EST = UTC-5, EDT = UTC-4)
+        const midnightET = new Date(year, month - 1, day, 0, 0, 0, 0);
+        const contestDate = fromZonedTime(midnightET, 'America/New_York');
+        
+        // Contest starts 1 hour before the first game (gameDay.date is already in correct timezone from API)
+        const startsAt = new Date(gameDay.date);
+        startsAt.setHours(startsAt.getHours() - 1);
+        
+        // Create end of day (23:59:59.999) in ET timezone, then convert to UTC
+        const endOfDayET = new Date(year, month - 1, day, 23, 59, 59, 999);
+        const endsAt = fromZonedTime(endOfDayET, 'America/New_York');
 
         const contest = await storage.createContest({
           name: `NBA 50/50 - ${dateStr.replace(/-/g, '/')}`,

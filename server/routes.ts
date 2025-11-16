@@ -7,6 +7,7 @@ import type { InsertPlayer, Player } from "@shared/schema";
 import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
 import { calculateAccrualUpdate } from "@shared/mining-utils";
+import { createContests } from "./jobs/create-contests";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
@@ -1106,25 +1107,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let openContests = allOpenContests;
       
       if (date && typeof date === 'string') {
-        // Parse the selected date in UTC to avoid timezone issues
-        const selectedDate = new Date(`${date}T00:00:00Z`);
-        const startOfDay = new Date(selectedDate);
-        const endOfDay = new Date(selectedDate);
-        endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
-        endOfDay.setUTCMilliseconds(-1); // End of day
+        // Filter by gameDate (the actual day of the games, not when contest starts)
+        // Parse the selected date: YYYY-MM-DD
+        const [year, month, day] = date.split('-').map(Number);
         
-        // Show contests that start during the selected day and haven't started yet
+        // Filter contests where gameDate matches the selected date
         openContests = allOpenContests.filter(contest => {
-          const contestStart = new Date(contest.startsAt);
-          // For future dates, show all contests starting on that date
-          // For today or past dates, also exclude contests that have already started
-          if (startOfDay <= now) {
-            return contestStart > now && contestStart >= startOfDay && contestStart <= endOfDay;
-          }
-          return contestStart >= startOfDay && contestStart <= endOfDay;
+          const gameDate = new Date(contest.gameDate);
+          const gameDateStr = gameDate.toISOString().split('T')[0];
+          return gameDateStr === date;
         });
       } else {
-        // Default behavior: filter out contests that have already started (for today)
+        // Default behavior: show all upcoming contests (haven't started yet)
         openContests = allOpenContests.filter(contest => 
           new Date(contest.startsAt) > now
         );
@@ -1143,6 +1137,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         openContests,
         myEntries: enrichedEntries,
       });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint to manually trigger contest creation (for testing)
+  app.post("/api/admin/create-contests", async (req, res) => {
+    try {
+      console.log("[admin] Manually triggering contest creation...");
+      const result = await createContests();
+      res.json(result);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
