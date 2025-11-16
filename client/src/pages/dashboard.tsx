@@ -663,6 +663,12 @@ export default function Dashboard() {
       </div>
       </div>
 
+      {/* Game Stats Dialog */}
+      <GameStatsDialog 
+        game={selectedGame} 
+        onClose={() => setSelectedGame(null)} 
+      />
+
       {/* Player Selection Dialog */}
       <Dialog open={showPlayerSelection} onOpenChange={setShowPlayerSelection}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
