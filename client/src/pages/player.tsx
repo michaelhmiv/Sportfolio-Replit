@@ -10,6 +10,7 @@ import { TrendingUp, TrendingDown } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import type { Player, Order, Trade, PriceHistory } from "@shared/schema";
 
 interface PlayerPageData {
@@ -45,8 +46,7 @@ export default function PlayerPage() {
     },
     onSuccess: () => {
       toast({ title: "Order placed successfully" });
-      queryClient.invalidateQueries({ queryKey: ["/api/player", id] });
-      queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+      invalidatePortfolioQueries();
       setQuantity("");
       setLimitPrice("");
     },

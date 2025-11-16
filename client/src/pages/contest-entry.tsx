@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Plus, Minus, Trophy } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { invalidatePortfolioQueries, invalidateContestQueries } from "@/lib/cache-invalidation";
 import type { Player, Holding } from "@shared/schema";
 
 interface ContestEntryData {
@@ -80,13 +81,9 @@ export default function ContestEntry() {
     },
     onSuccess: () => {
       toast({ title: isEditMode ? "Contest entry updated!" : "Contest entry submitted!" });
-      queryClient.invalidateQueries({ queryKey: ["/api/contests"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
-      // Invalidate the specific entry query in edit mode
-      if (isEditMode) {
-        queryClient.invalidateQueries({ queryKey: ["/api/contest", id, "entry", entryId] });
-        queryClient.invalidateQueries({ queryKey: ["/api/contest", id, "entry"] });
-      }
+      // Invalidate all portfolio and contest queries to ensure synchronization across all pages
+      invalidatePortfolioQueries();
+      invalidateContestQueries();
       navigate("/contests");
     },
     onError: (error: Error) => {

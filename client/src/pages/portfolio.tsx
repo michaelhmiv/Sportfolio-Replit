@@ -7,6 +7,7 @@ import { TrendingUp, TrendingDown, DollarSign, Crown } from "lucide-react";
 import { Link } from "wouter";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import type { Holding, Order, Player } from "@shared/schema";
 
 interface PortfolioData {
@@ -33,7 +34,7 @@ export default function Portfolio() {
     },
     onSuccess: () => {
       toast({ title: "Order cancelled" });
-      queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+      invalidatePortfolioQueries();
     },
     onError: (error: Error) => {
       toast({ title: "Failed to cancel order", description: error.message, variant: "destructive" });
@@ -46,7 +47,7 @@ export default function Portfolio() {
     },
     onSuccess: () => {
       toast({ title: "Premium activated!", description: "You now have premium access for 30 days" });
-      queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+      invalidatePortfolioQueries();
     },
     onError: (error: Error) => {
       toast({ title: "Redemption failed", description: error.message, variant: "destructive" });

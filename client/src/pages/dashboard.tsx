@@ -16,6 +16,7 @@ import { Link } from "wouter";
 import type { Player, Mining, Contest, Trade, DailyGame } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { calculateMiningShares } from "@shared/mining-utils";
 
 interface DashboardData {
@@ -87,16 +88,18 @@ export default function Dashboard() {
 
         // Handle different message types
         if (message.type === 'liveStats') {
-          // Invalidate relevant queries to refresh data
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+          // Invalidate all portfolio queries to ensure sync across all pages
+          invalidatePortfolioQueries();
           queryClient.invalidateQueries({ queryKey: ['/api/games'] });
         } else if (message.type === 'portfolio') {
-          queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+          // Portfolio update - invalidate all portfolio-related queries
+          invalidatePortfolioQueries();
         } else if (message.type === 'mining') {
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+          // Mining update affects holdings - invalidate all portfolio queries
+          invalidatePortfolioQueries();
         } else if (message.type === 'orderBook' || message.type === 'trade') {
-          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+          // Trade/order update affects portfolio - invalidate all queries
+          invalidatePortfolioQueries();
         }
       } catch (error) {
         console.error('[WebSocket] Failed to parse message:', error);
@@ -280,7 +283,7 @@ export default function Dashboard() {
       return await res.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      invalidatePortfolioQueries();
       setShowPlayerSelection(false);
       const playerName = data?.player?.firstName && data?.player?.lastName 
         ? `${data.player.firstName} ${data.player.lastName}`
@@ -305,8 +308,7 @@ export default function Dashboard() {
       return await res.json();
     },
     onSuccess: (data: any) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] });
+      invalidatePortfolioQueries();
       const playerName = data?.player?.firstName && data?.player?.lastName 
         ? `${data.player.firstName} ${data.player.lastName}`
         : "your player";

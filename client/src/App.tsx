@@ -8,6 +8,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { BottomNav } from "@/components/bottom-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
+import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import Dashboard from "@/pages/dashboard";
 import Marketplace from "@/pages/marketplace";
 import PlayerPage from "@/pages/player";
@@ -58,8 +59,8 @@ function Header() {
       const response = await fetch('/api/user/add-cash', { method: 'POST' });
       if (!response.ok) throw new Error('Failed to add cash');
       
-      // Refetch to ensure we have the correct server value
-      await queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
+      // Refetch to ensure we have the correct server value across all pages
+      invalidatePortfolioQueries();
     } catch (error) {
       console.error('Failed to add cash:', error);
       // Rollback on error
