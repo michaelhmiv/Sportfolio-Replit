@@ -135,15 +135,16 @@ export class DatabaseStorage implements IStorage {
   }
 
   async addUserBalance(userId: string, delta: number): Promise<User | undefined> {
-    const user = await this.getUser(userId);
-    if (!user) return undefined;
-    
-    const currentBalance = parseFloat(user.balance);
-    const newBalance = (currentBalance + delta).toFixed(2);
+    // Atomically increment the balance in the database
+    // Pass delta as a string to maintain decimal precision
+    const deltaStr = delta.toFixed(2);
     
     await db
       .update(users)
-      .set({ balance: newBalance })
+      .set({ 
+        // PostgreSQL handles the arithmetic atomically with proper precision
+        balance: sql`CAST((${users.balance}::DECIMAL + ${deltaStr}::DECIMAL) AS TEXT)`
+      })
       .where(eq(users.id, userId));
     
     return await this.getUser(userId);
