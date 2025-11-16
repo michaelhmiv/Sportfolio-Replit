@@ -3,12 +3,14 @@
  * 
  * Fetches daily NBA game schedules from MySportsFeeds.
  * Caches game data for contest eligibility checking.
+ * Broadcasts updates when game scores change.
  */
 
 import { storage } from "../storage";
 import { fetchDailyGames, fetchGameStatus, normalizeGameStatus } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
+import { broadcast } from "../websocket";
 
 export async function syncSchedule(): Promise<JobResult> {
   console.log("[schedule_sync] Starting game schedule sync...");
@@ -16,6 +18,7 @@ export async function syncSchedule(): Promise<JobResult> {
   let requestCount = 0;
   let recordsProcessed = 0;
   let errorCount = 0;
+  const gamesWithUpdates = new Set<string>(); // Track games that had score updates
 
   try {
     // Fetch games for a wider range: 7 days back to 14 days forward (covers contests and historical data)
@@ -42,13 +45,14 @@ export async function syncSchedule(): Promise<JobResult> {
           try {
             const rawStatus = game.schedule.playedStatus || "scheduled";
             const normalizedStatus = normalizeGameStatus(rawStatus);
+            const gameId = game.schedule.id.toString();
             
             // Extract scores for completed/in-progress games
             const homeScore = game.score?.homeScoreTotal != null ? parseInt(game.score.homeScoreTotal) : null;
             const awayScore = game.score?.awayScoreTotal != null ? parseInt(game.score.awayScoreTotal) : null;
             
             await storage.upsertDailyGame({
-              gameId: game.schedule.id.toString(),
+              gameId,
               date: new Date(game.schedule.startTime),
               homeTeam: game.schedule?.homeTeam?.abbreviation || "UNK",
               awayTeam: game.schedule?.awayTeam?.abbreviation || "UNK",
@@ -60,6 +64,11 @@ export async function syncSchedule(): Promise<JobResult> {
             });
 
             recordsProcessed++;
+            
+            // Track games that have scores (live or completed) for broadcasting
+            if ((normalizedStatus === 'inprogress' || normalizedStatus === 'completed') && (homeScore !== null || awayScore !== null)) {
+              gamesWithUpdates.add(gameId);
+            }
           } catch (error: any) {
             console.error(`[schedule_sync] Failed to store game ${game.schedule.id}:`, error.message);
             errorCount++;
@@ -68,6 +77,26 @@ export async function syncSchedule(): Promise<JobResult> {
       } catch (error: any) {
         console.error(`[schedule_sync] Failed to fetch games for ${date}:`, error.message);
         errorCount++; // Count fetch failures to track upstream outages
+      }
+    }
+
+    // Broadcast updates for games with scores
+    if (gamesWithUpdates.size > 0) {
+      console.log(`[schedule_sync] Broadcasting updates for ${gamesWithUpdates.size} games with scores`);
+      const gameIds = Array.from(gamesWithUpdates);
+      for (const gameId of gameIds) {
+        broadcast({
+          type: "liveStats",
+          gameId,
+          timestamp: new Date().toISOString(),
+        });
+        
+        // Also broadcast contest update since scores affect contest rankings
+        broadcast({
+          type: "contestUpdate",
+          gameId,
+          timestamp: new Date().toISOString(),
+        });
       }
     }
 

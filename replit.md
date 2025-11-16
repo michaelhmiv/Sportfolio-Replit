@@ -78,7 +78,7 @@ Preferred communication style: Simple, everyday language.
 
 **Background Jobs (Cron):**
 - `roster_sync`: Daily (5 AM ET).
-- `schedule_sync`: Every 15 minutes (updated for faster game status updates).
+- `schedule_sync`: Every minute (fetches live game scores, broadcasts WebSocket updates).
 - `stats_sync`: Hourly (completed games).
 - `stats_sync_live`: Every minute (in-progress games, requires Live subscription - currently returns 403).
 - `settle_contests`: Every 5 minutes (settles contests, distributes prizes).

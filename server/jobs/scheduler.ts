@@ -52,7 +52,7 @@ export class JobScheduler {
       },
       {
         name: "schedule_sync",
-        schedule: "*/15 * * * *", // Every 15 minutes
+        schedule: "* * * * *", // Every minute for live score updates
         enabled: true,
         handler: syncSchedule,
       },
