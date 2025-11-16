@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
 import { storage } from "./storage";
 import { fetchActivePlayers, calculateFantasyPoints, fetchPlayerSeasonStats, fetchPlayerGameLogs } from "./mysportsfeeds";
-import type { InsertPlayer } from "@shared/schema";
+import type { InsertPlayer, Player } from "@shared/schema";
 import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
 import { calculateAccrualUpdate } from "@shared/mining-utils";
@@ -476,6 +476,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           topAssister,
         } : null,
       });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Add cash to user balance ($1)
+  app.post("/api/user/add-cash", async (req, res) => {
+    try {
+      const user = await ensureDefaultUser();
+      const updatedUser = await storage.addUserBalance(user.id, 1.00);
+      
+      if (updatedUser) {
+        broadcast({ type: "portfolio", userId: user.id, balance: updatedUser.balance });
+        res.json({ balance: updatedUser.balance });
+      } else {
+        res.status(500).json({ error: "Failed to update balance" });
+      }
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -1082,11 +1099,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = await ensureDefaultUser();
       const allOpenContests = await storage.getContests("open");
       
-      // Filter out contests that have already started
+      const { date } = req.query;
+      
+      // Filter contests based on date
       const now = new Date();
-      const openContests = allOpenContests.filter(contest => 
-        new Date(contest.startsAt) > now
-      );
+      let openContests = allOpenContests;
+      
+      if (date && typeof date === 'string') {
+        // Parse the selected date in UTC to avoid timezone issues
+        const selectedDate = new Date(`${date}T00:00:00Z`);
+        const startOfDay = new Date(selectedDate);
+        const endOfDay = new Date(selectedDate);
+        endOfDay.setUTCDate(endOfDay.getUTCDate() + 1);
+        endOfDay.setUTCMilliseconds(-1); // End of day
+        
+        // Show contests that start during the selected day and haven't started yet
+        openContests = allOpenContests.filter(contest => {
+          const contestStart = new Date(contest.startsAt);
+          // For future dates, show all contests starting on that date
+          // For today or past dates, also exclude contests that have already started
+          if (startOfDay <= now) {
+            return contestStart > now && contestStart >= startOfDay && contestStart <= endOfDay;
+          }
+          return contestStart >= startOfDay && contestStart <= endOfDay;
+        });
+      } else {
+        // Default behavior: filter out contests that have already started (for today)
+        openContests = allOpenContests.filter(contest => 
+          new Date(contest.startsAt) > now
+        );
+      }
       
       const myEntries = await storage.getUserContestEntries(user.id);
 

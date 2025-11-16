@@ -4,8 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Trophy, Users, DollarSign, Clock } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Trophy, Users, DollarSign, Clock, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
+import { format } from "date-fns";
 import type { Contest, ContestEntry } from "@shared/schema";
 
 interface ContestsData {
@@ -14,15 +17,108 @@ interface ContestsData {
 }
 
 export default function Contests() {
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+
+  // Format date as YYYY-MM-DD for API
+  const formatDateForAPI = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const formattedDate = formatDateForAPI(selectedDate);
+  const isToday = (date: Date) => formatDateForAPI(date) === formatDateForAPI(new Date());
+
+  // Only append date query param if not today
+  const contestsUrl = isToday(selectedDate) ? "/api/contests" : `/api/contests?date=${formattedDate}`;
+
   const { data, isLoading } = useQuery<ContestsData>({
-    queryKey: ["/api/contests"],
+    queryKey: [contestsUrl],
   });
+
+  const goToPrevDay = () => {
+    setSelectedDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setDate(newDate.getDate() - 1);
+      return newDate;
+    });
+  };
+
+  const goToNextDay = () => {
+    setSelectedDate(prev => {
+      const newDate = new Date(prev);
+      newDate.setDate(newDate.getDate() + 1);
+      return newDate;
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background p-3 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-4 sm:mb-8">
-          <h1 className="text-3xl font-bold mb-2">Contests</h1>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-3xl font-bold">Contests</h1>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToPrevDay}
+                data-testid="button-prev-day"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-8 gap-2"
+                    data-testid="button-date-picker"
+                  >
+                    <Calendar className="w-4 h-4" />
+                    <span className="hidden sm:inline">
+                      {isToday(selectedDate) ? "Today" : format(selectedDate, "MMM d, yyyy")}
+                    </span>
+                    <span className="sm:hidden">
+                      {isToday(selectedDate) ? "Today" : format(selectedDate, "MMM d")}
+                    </span>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <CalendarComponent
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={(date) => {
+                      if (date) {
+                        setSelectedDate(date);
+                        setShowDatePicker(false);
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={goToNextDay}
+                data-testid="button-next-day"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSelectedDate(new Date())}
+                disabled={isToday(selectedDate)}
+                data-testid="button-today"
+              >
+                Today
+              </Button>
+            </div>
+          </div>
           <p className="text-muted-foreground">Enter 50/50 contests and compete for prizes</p>
         </div>
 

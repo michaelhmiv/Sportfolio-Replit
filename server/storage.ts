@@ -134,6 +134,21 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId));
   }
 
+  async addUserBalance(userId: string, delta: number): Promise<User | undefined> {
+    const user = await this.getUser(userId);
+    if (!user) return undefined;
+    
+    const currentBalance = parseFloat(user.balance);
+    const newBalance = (currentBalance + delta).toFixed(2);
+    
+    await db
+      .update(users)
+      .set({ balance: newBalance })
+      .where(eq(users.id, userId));
+    
+    return await this.getUser(userId);
+  }
+
   // Player methods
   async getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]> {
     let query = db.select().from(players);
