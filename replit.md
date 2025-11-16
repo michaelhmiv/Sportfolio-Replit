@@ -89,7 +89,9 @@ Preferred communication style: Simple, everyday language.
 - **Proportional Share-Dilution Model:** Fantasy points distributed based on ownership percentage within a contest.
 - **50/50 Contests:** Top 50% entries win, prize pool distributed proportionally.
 
-## MySportsFeeds API Documentation (NBA v2.1)
+## MySportsFeeds API Documentation
+
+### NBA API (v2.1) - Currently Implemented
 
 **Available Endpoints (with CORE + STATS subscription):**
 
@@ -124,3 +126,15 @@ Preferred communication style: Simple, everyday language.
 - STATS tier includes: Player game logs, seasonal stats
 - LIVE tier (NOT included): Real-time boxscore data during games - returns 403 error
 - Current workaround: Use DAILY GAMES endpoint which provides game scores updated every 15 minutes
+
+### NHL API Documentation
+
+Full NHL API documentation is available in: `docs/mysportsfeeds-nhl-api.md`
+
+**Key NHL Endpoints:**
+- Daily Player Gamelogs: `/nhl/{season}/date/{date}/player_gamelogs.json`
+- Daily Games: `/nhl/{season}/date/{date}/games.json`
+- Seasonal Player Stats: `/nhl/{season}/player_stats_totals.json`
+- Standings: `/nhl/{season}/standings.json`
+
+**NHL Positions:** C (Center), LW (Left Wing), RW (Right Wing), D (Defense), G (Goalie)
