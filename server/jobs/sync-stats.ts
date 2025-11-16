@@ -34,25 +34,22 @@ export async function syncStats(): Promise<JobResult> {
 
     for (const game of relevantGames) {
       try {
-        const boxscore = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
+        const gamelogs = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
           requestCount++;
-          return await fetchPlayerGameStats(game.gameId);
+          return await fetchPlayerGameStats(game.gameId, new Date(game.date));
         });
 
-        if (!boxscore) {
-          console.log(`[stats_sync] No boxscore data for game ${game.gameId}`);
+        if (!gamelogs || !gamelogs.gamelogs) {
+          console.log(`[stats_sync] No gamelog data for game ${game.gameId}`);
           continue;
         }
 
-        // Process player stats from boxscore
-        const players = [
-          ...(boxscore.scoring?.homeTeam?.players || []),
-          ...(boxscore.scoring?.awayTeam?.players || []),
-        ];
+        // Process player stats from gamelogs
+        const players = gamelogs.gamelogs;
 
-        for (const playerData of players) {
+        for (const gamelog of players) {
           try {
-            const stats = playerData.playerStats?.offense;
+            const stats = gamelog.stats?.offense;
             if (!stats) continue;
 
             const points = stats.pts || 0;
@@ -78,12 +75,12 @@ export async function syncStats(): Promise<JobResult> {
             });
 
             await storage.upsertPlayerGameStats({
-              playerId: playerData.player.id,
+              playerId: gamelog.player.id,
               gameId: game.gameId,
               gameDate: game.date,
               season: "2024-2025-regular",
-              opponentTeam: playerData.team.abbreviation === game.homeTeam ? game.awayTeam : game.homeTeam,
-              homeAway: playerData.team.abbreviation === game.homeTeam ? "home" : "away",
+              opponentTeam: gamelog.team.abbreviation === game.homeTeam ? game.awayTeam : game.homeTeam,
+              homeAway: gamelog.team.abbreviation === game.homeTeam ? "home" : "away",
               minutes: stats.minSeconds ? Math.floor(stats.minSeconds / 60) : 0,
               points,
               threePointersMade: stats.fg3PtMade || 0,

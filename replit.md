@@ -58,10 +58,12 @@ Preferred communication style: Simple, everyday language.
 ## External Dependencies
 
 **MySportsFeeds API Integration:**
-- NBA player roster and game stats synchronization (`/player_gamelogs.json`, `/seasonal_player_stats.json`).
+- NBA player roster and game stats synchronization using STATS-tier endpoints.
+- Uses `/date/{YYYYMMDD}/player_gamelogs.json` for game stats (not `/boxscore.json` which requires higher tier).
 - Real-time game statistics for scoring.
 - Player stats endpoints: `/api/player/:id/stats` (season averages) and `/api/player/:id/recent-games` (last 5 games).
 - All data directly from MySportsFeeds Core + Stats subscription (no mock data).
+- Box score data fetched using player_gamelogs endpoint with game filter parameter.
 
 **Third-Party Services:**
 - Neon Database (PostgreSQL).

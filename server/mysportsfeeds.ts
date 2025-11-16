@@ -79,8 +79,19 @@ export async function fetchDailyGames(date: string): Promise<any[]> {
 }
 
 
-export async function fetchPlayerGameStats(gameId: string): Promise<any> {
-  const response = await apiClient.get(`/${SEASON}/games/${gameId}/boxscore.json`);
+export async function fetchPlayerGameStats(gameId: string, gameDate: Date): Promise<any> {
+  // Format date as YYYYMMDD for MySportsFeeds API
+  const year = gameDate.getFullYear();
+  const month = String(gameDate.getMonth() + 1).padStart(2, '0');
+  const day = String(gameDate.getDate()).padStart(2, '0');
+  const dateStr = `${year}${month}${day}`;
+  
+  // Use player_gamelogs endpoint which is included in STATS tier
+  const response = await apiClient.get(`/${SEASON}/date/${dateStr}/player_gamelogs.json`, {
+    params: {
+      game: gameId,
+    }
+  });
   return response.data;
 }
 
