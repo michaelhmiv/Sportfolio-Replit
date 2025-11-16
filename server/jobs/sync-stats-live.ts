@@ -42,7 +42,15 @@ export async function syncStatsLive(): Promise<JobResult> {
       console.warn(`[stats_sync_live] Warning: ${liveGames.length} concurrent live games may strain rate limits`);
     }
 
-    for (const game of liveGames) {
+    for (let i = 0; i < liveGames.length; i++) {
+      const game = liveGames[i];
+      
+      // MySportsFeeds requires 5-second backoff between Daily Player Gamelogs requests
+      if (i > 0) {
+        console.log(`[stats_sync_live] Waiting 5 seconds before next request (backoff)...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+      
       try {
         const gamelogs = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
           requestCount++;

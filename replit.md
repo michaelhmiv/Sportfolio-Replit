@@ -67,6 +67,13 @@ Preferred communication style: Simple, everyday language.
 - All data directly from MySportsFeeds Core + Stats subscription (no mock data).
 - Box score data fetched using player_gamelogs endpoint with game filter parameter.
 
+**MySportsFeeds Throttling Requirements:**
+- **Daily/Weekly Player Gamelogs**: 5-second backoff required between requests
+- **Request limit**: 100 requests per minute (each request with backoff counts as backoff_seconds + 1)
+- **Implementation**: Sync jobs now include proper 5-second delays between game fetches
+- Player gamelogs request cost: 5 (backoff) + 1 (request) = 6 points per game
+- Maximum games per minute: ~16 games (100 / 6)
+
 **Third-Party Services:**
 - Neon Database (PostgreSQL).
 - WebSocket server for real-time updates.

@@ -32,7 +32,15 @@ export async function syncStats(): Promise<JobResult> {
 
     console.log(`[stats_sync] Found ${relevantGames.length} games to process`);
 
-    for (const game of relevantGames) {
+    for (let i = 0; i < relevantGames.length; i++) {
+      const game = relevantGames[i];
+      
+      // MySportsFeeds requires 5-second backoff between Daily Player Gamelogs requests
+      if (i > 0) {
+        console.log(`[stats_sync] Waiting 5 seconds before next request (backoff)...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
+      
       try {
         const gamelogs = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
           requestCount++;
