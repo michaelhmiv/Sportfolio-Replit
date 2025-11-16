@@ -29,6 +29,8 @@ Preferred communication style: Simple, everyday language.
 - Mining widget with enhanced player selection (search, filters, on-demand stats).
 - Client-side real-time share projection matching backend logic, animated progress bar.
 - Tabbed interfaces, modal dialogs for interactions, WebSocket for live data.
+- Add Cash button in header for quick balance top-ups ($1 increments with real-time updates).
+- Calendar date selector on Contests page for viewing contests by date.
 
 **Mobile-Responsive Patterns:**
 - Optimized for no horizontal scrolling on mobile.
@@ -44,12 +46,14 @@ Preferred communication style: Simple, everyday language.
 - Drizzle ORM, PostgreSQL (Neon serverless), Zod validation.
 
 **Core Domain Models:**
-- Users, Players, Holdings, Orders, Trades, Mining (100 shares/hour, 2,400 cap, precise accrual via `lastAccruedAt`), Contests, Price History.
+- Users (balance stored as NUMERIC with atomic updates), Players, Holdings, Orders, Trades, Mining (100 shares/hour, 2,400 cap, precise accrual via `lastAccruedAt`), Contests, Price History.
 
 **API Design:**
 - RESTful endpoints (players, orders, contests, portfolio).
 - WebSocket for live price and trade updates.
 - Aggregated dashboard endpoint.
+- POST `/api/user/add-cash`: Atomically adds $1.00 to user balance using SQL increment.
+- GET `/api/contests?date=YYYY-MM-DD`: Returns contests filtered by date (optional param).
 
 ### Database Schema
 

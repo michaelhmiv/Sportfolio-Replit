@@ -136,14 +136,12 @@ export class DatabaseStorage implements IStorage {
 
   async addUserBalance(userId: string, delta: number): Promise<User | undefined> {
     // Atomically increment the balance in the database
-    // Pass delta as a string to maintain decimal precision
-    const deltaStr = delta.toFixed(2);
-    
+    // Drizzle handles numeric values correctly when passed directly
     await db
       .update(users)
       .set({ 
         // PostgreSQL handles the arithmetic atomically with proper precision
-        balance: sql`CAST((${users.balance}::DECIMAL + ${deltaStr}::DECIMAL) AS TEXT)`
+        balance: sql`${users.balance} + ${delta}`
       })
       .where(eq(users.id, userId));
     
