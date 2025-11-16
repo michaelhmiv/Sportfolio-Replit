@@ -49,8 +49,11 @@ export default function Marketplace() {
     let bVal: number;
     
     if (sortField === "price") {
-      aVal = parseFloat(a.currentPrice);
-      bVal = parseFloat(b.currentPrice);
+      // Put players without market value at the end
+      const aPrice = a.lastTradePrice ? parseFloat(a.lastTradePrice) : -1;
+      const bPrice = b.lastTradePrice ? parseFloat(b.lastTradePrice) : -1;
+      aVal = aPrice;
+      bVal = bPrice;
     } else if (sortField === "volume") {
       aVal = a.volume24h;
       bVal = b.volume24h;
@@ -186,7 +189,7 @@ export default function Marketplace() {
                         </td>
                         <td className="p-2 sm:p-4 text-right">
                           <span className="font-mono font-bold text-lg" data-testid={`text-price-${player.id}`}>
-                            ${player.currentPrice}
+                            {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-sm font-normal">No market value</span>}
                           </span>
                         </td>
                         <td className="p-2 sm:p-4 text-right">

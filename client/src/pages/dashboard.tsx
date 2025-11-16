@@ -343,11 +343,15 @@ export default function Dashboard() {
               <Link key={`${player.id}-${idx}`} href={`/player/${player.id}`}>
                 <div className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md">
                   <span className="font-medium">{player.firstName} {player.lastName}</span>
-                  <span className="font-mono font-bold">${player.currentPrice}</span>
-                  <span className={`flex items-center text-sm ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
-                    {parseFloat(player.priceChange24h) >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-                    {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
+                  <span className="font-mono font-bold">
+                    {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-sm">No value</span>}
                   </span>
+                  {player.lastTradePrice && (
+                    <span className={`flex items-center text-sm ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                      {parseFloat(player.priceChange24h) >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
+                      {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
+                    </span>
+                  )}
                 </div>
               </Link>
             ))}
@@ -613,13 +617,21 @@ export default function Dashboard() {
                   <div className="p-2 rounded-md hover-elevate">
                     <div className="flex items-center justify-between mb-1">
                       <span className="font-medium text-sm">{holding.player.firstName} {holding.player.lastName}</span>
-                      <span className="font-mono font-bold text-sm">${holding.value}</span>
+                      {holding.value !== null ? (
+                        <span className="font-mono font-bold text-sm">${holding.value}</span>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">No value</span>
+                      )}
                     </div>
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">{holding.quantity} shares</span>
-                      <span className={parseFloat(holding.pnl) >= 0 ? 'text-positive' : 'text-negative'}>
-                        {parseFloat(holding.pnl) >= 0 ? '+' : ''}${holding.pnl} ({holding.pnlPercent}%)
-                      </span>
+                      {holding.pnl !== null ? (
+                        <span className={parseFloat(holding.pnl) >= 0 ? 'text-positive' : 'text-negative'}>
+                          {parseFloat(holding.pnl) >= 0 ? '+' : ''}${holding.pnl} ({holding.pnlPercent}%)
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </div>
                   </div>
                 </Link>
@@ -777,7 +789,9 @@ function PlayerCard({
                   <div className="text-sm text-muted-foreground">{player.team} · {player.position}</div>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <div className="text-lg font-mono font-bold">${player.currentPrice}</div>
+                  <div className="text-lg font-mono font-bold">
+                    {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-sm">No value</span>}
+                  </div>
                 </div>
               </div>
               

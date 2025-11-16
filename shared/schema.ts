@@ -23,7 +23,8 @@ export const players = pgTable("players", {
   jerseyNumber: text("jersey_number"),
   isActive: boolean("is_active").notNull().default(true), // On active roster
   isEligibleForMining: boolean("is_eligible_for_mining").notNull().default(true),
-  currentPrice: decimal("current_price", { precision: 10, scale: 2 }).notNull().default("10.00"), // Market price
+  currentPrice: decimal("current_price", { precision: 10, scale: 2 }).notNull().default("10.00"), // Placeholder - use lastTradePrice for real market value
+  lastTradePrice: decimal("last_trade_price", { precision: 10, scale: 2 }), // Actual market price from last trade, null if no trades
   volume24h: integer("volume_24h").notNull().default(0),
   priceChange24h: decimal("price_change_24h", { precision: 10, scale: 2 }).notNull().default("0.00"),
   lastUpdated: timestamp("last_updated").notNull().defaultNow(),

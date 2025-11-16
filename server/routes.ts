@@ -34,10 +34,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return user;
   }
 
-  // Helper: Calculate P&L for holdings
-  function calculatePnL(quantity: number, avgCost: string, currentPrice: string) {
+  // Helper: Get last trade price for a player
+  async function getLastTradePrice(playerId: string): Promise<string | null> {
+    const recentTrades = await storage.getRecentTrades(playerId, 1);
+    return recentTrades.length > 0 ? recentTrades[0].price : null;
+  }
+
+  // Helper: Enrich player data with last trade price (market value)
+  async function enrichPlayerWithMarketValue(player: Player): Promise<Player & { lastTradePrice: string | null }> {
+    // Get last trade price if not already in the database
+    let lastTradePrice: string | null = player.lastTradePrice;
+    if (!lastTradePrice) {
+      lastTradePrice = await getLastTradePrice(player.id);
+    }
+    return {
+      ...player,
+      lastTradePrice, // null if no trades, otherwise the last traded price
+    };
+  }
+
+  // Helper: Calculate P&L for holdings - returns null values if no market price exists
+  function calculatePnL(quantity: number, avgCost: string, lastTradePrice: string | null) {
+    // If no market price exists (no trades), return null values
+    if (!lastTradePrice) {
+      return {
+        currentValue: null,
+        pnl: null,
+        pnlPercent: null,
+      };
+    }
+    
     const cost = parseFloat(avgCost);
-    const price = parseFloat(currentPrice);
+    const price = parseFloat(lastTradePrice);
     const totalValue = quantity * price;
     const totalCost = quantity * cost;
     const pnl = totalValue - totalCost;
@@ -247,10 +275,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Get hot players (top 5 by 24h volume)
-      const hotPlayers = allPlayers
+      // Get hot players (top 5 by 24h volume) with market values
+      const hotPlayersRaw = allPlayers
         .sort((a, b) => b.volume24h - a.volume24h)
         .slice(0, 5);
+      const hotPlayers = await Promise.all(hotPlayersRaw.map(enrichPlayerWithMarketValue));
 
       // Get top 3 holdings by value
       const topHoldings = [];
@@ -258,13 +287,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (holding.assetType === "player") {
           const player = await storage.getPlayer(holding.assetId);
           if (player) {
+            const enrichedPlayer = await enrichPlayerWithMarketValue(player);
             const { currentValue, pnl, pnlPercent } = calculatePnL(
               holding.quantity,
               holding.avgCostBasis,
-              player.currentPrice
+              enrichedPlayer.lastTradePrice
             );
             topHoldings.push({
-              player,
+              player: enrichedPlayer,
               quantity: holding.quantity,
               value: currentValue,
               pnl,
@@ -273,7 +303,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
         }
       }
-      topHoldings.sort((a, b) => parseFloat(b.value) - parseFloat(a.value));
+      // Sort by value, putting null values at the end
+      topHoldings.sort((a, b) => {
+        if (a.value === null && b.value === null) return 0;
+        if (a.value === null) return 1;
+        if (b.value === null) return -1;
+        return parseFloat(b.value) - parseFloat(a.value);
+      });
 
       // Get mining data
       let miningPlayer = undefined;
@@ -464,11 +500,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/players", async (req, res) => {
     try {
       const { search, team, position } = req.query;
-      const players = await storage.getPlayers({
+      const playersRaw = await storage.getPlayers({
         search: search as string,
         team: team as string,
         position: position as string,
       });
+      // Enrich with market values (last trade prices)
+      const players = await Promise.all(playersRaw.map(enrichPlayerWithMarketValue));
       res.json(players);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
@@ -479,20 +517,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/player/:id", async (req, res) => {
     try {
       const user = await ensureDefaultUser();
-      const player = await storage.getPlayer(req.params.id);
+      const playerRaw = await storage.getPlayer(req.params.id);
       
-      if (!player) {
+      if (!playerRaw) {
         return res.status(404).json({ error: "Player not found" });
       }
 
+      // Enrich with market value
+      const player = await enrichPlayerWithMarketValue(playerRaw);
+      
       const orderBook = await storage.getOrderBook(player.id);
       const recentTrades = await storage.getRecentTrades(player.id, 20);
       const userHolding = await storage.getHolding(user.id, "player", player.id);
 
-      // Mock price history
+      // Mock price history - use last trade price if available, otherwise use currentPrice as placeholder
+      const basePrice = player.lastTradePrice || player.currentPrice || "10.00";
+      const basePriceNum = parseFloat(basePrice);
+      
+      // Guard against NaN
       const priceHistory = Array.from({ length: 24 }, (_, i) => ({
         timestamp: new Date(Date.now() - (23 - i) * 3600000).toISOString(),
-        price: (parseFloat(player.currentPrice) + (Math.random() - 0.5) * 2).toFixed(2),
+        price: (!isNaN(basePriceNum) ? (basePriceNum + (Math.random() - 0.5) * 2) : 10).toFixed(2),
       }));
 
       res.json({
@@ -882,16 +927,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (holding.assetType === "player") {
             const player = await storage.getPlayer(holding.assetId);
             if (player) {
+              const enrichedPlayer = await enrichPlayerWithMarketValue(player);
               const { currentValue, pnl, pnlPercent } = calculatePnL(
                 holding.quantity,
                 holding.avgCostBasis,
-                player.currentPrice
+                enrichedPlayer.lastTradePrice
               );
-              totalValue += parseFloat(currentValue);
-              totalPnL += parseFloat(pnl);
-              totalCost += parseFloat(holding.totalCostBasis);
+              // Only add to totals if we have a valid market price
+              if (currentValue !== null) {
+                totalValue += parseFloat(currentValue);
+                totalPnL += parseFloat(pnl!);
+                totalCost += parseFloat(holding.totalCostBasis);
+              }
 
-              return { ...holding, player, currentValue, pnl, pnlPercent };
+              return { ...holding, player: enrichedPlayer, currentValue, pnl, pnlPercent };
             }
           }
           return holding;

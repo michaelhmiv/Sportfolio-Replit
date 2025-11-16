@@ -182,17 +182,25 @@ export default function Portfolio() {
                           </td>
                           <td className="p-2 sm:p-4 text-right font-mono">{holding.quantity}</td>
                           <td className="p-2 sm:p-4 text-right font-mono">${holding.avgCostBasis}</td>
-                          <td className="p-2 sm:p-4 text-right font-mono">${holding.player?.currentPrice}</td>
-                          <td className="p-2 sm:p-4 text-right font-mono font-bold">${holding.currentValue}</td>
+                          <td className="p-2 sm:p-4 text-right font-mono">
+                            {holding.player?.lastTradePrice ? `$${holding.player.lastTradePrice}` : <span className="text-muted-foreground text-sm">No value</span>}
+                          </td>
+                          <td className="p-2 sm:p-4 text-right font-mono font-bold">
+                            {holding.currentValue !== null ? `$${holding.currentValue}` : <span className="text-muted-foreground text-sm">-</span>}
+                          </td>
                           <td className="p-2 sm:p-4 text-right">
-                            <div className={parseFloat(holding.pnl) >= 0 ? 'text-positive' : 'text-negative'}>
-                              <div className="font-mono font-medium">
-                                {parseFloat(holding.pnl) >= 0 ? '+' : ''}${holding.pnl}
+                            {holding.pnl !== null ? (
+                              <div className={parseFloat(holding.pnl) >= 0 ? 'text-positive' : 'text-negative'}>
+                                <div className="font-mono font-medium">
+                                  {parseFloat(holding.pnl) >= 0 ? '+' : ''}${holding.pnl}
+                                </div>
+                                <div className="text-xs">
+                                  ({parseFloat(holding.pnlPercent) >= 0 ? '+' : ''}{holding.pnlPercent}%)
+                                </div>
                               </div>
-                              <div className="text-xs">
-                                ({parseFloat(holding.pnlPercent) >= 0 ? '+' : ''}{holding.pnlPercent}%)
-                              </div>
-                            </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
                           </td>
                           <td className="p-2 sm:p-4">
                             <Link href={`/player/${holding.player?.id}`}>

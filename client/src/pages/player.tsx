@@ -137,13 +137,17 @@ export default function PlayerPage() {
               </div>
             </div>
             <div className="text-right">
-              <div className="text-hero font-mono font-bold" data-testid="text-current-price">${player.currentPrice}</div>
-              <div className={`flex items-center justify-end gap-1 ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
-                {parseFloat(player.priceChange24h) >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                <span className="text-xl font-medium">
-                  {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
-                </span>
+              <div className="text-hero font-mono font-bold" data-testid="text-current-price">
+                {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-2xl">No market value</span>}
               </div>
+              {player.lastTradePrice && (
+                <div className={`flex items-center justify-end gap-1 ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  {parseFloat(player.priceChange24h) >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
+                  <span className="text-xl font-medium">
+                    {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
