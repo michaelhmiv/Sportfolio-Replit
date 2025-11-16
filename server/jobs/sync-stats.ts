@@ -18,16 +18,18 @@ export async function syncStats(): Promise<JobResult> {
   let errorCount = 0;
 
   try {
-    // Get only TODAY's games - no historical data
+    // Get games from last 24 hours (catches late-night games from previous day)
     const startDate = new Date();
-    startDate.setHours(0, 0, 0, 0); // Start of today
+    startDate.setHours(startDate.getHours() - 24);
     
     const endDate = new Date();
-    endDate.setHours(23, 59, 59, 999); // End of today
+    endDate.setHours(endDate.getHours() + 6); // Include upcoming games
 
     const games = await storage.getDailyGames(startDate, endDate);
+    // Process games with scores (completed OR in-progress)
     const relevantGames = games.filter(g => 
-      g.status === "inprogress" || g.status === "completed"
+      (g.status === "inprogress" || g.status === "completed" || 
+       (g.status === "scheduled" && g.homeScore !== null && g.awayScore !== null))
     );
 
     console.log(`[stats_sync] Found ${relevantGames.length} games to process`);
