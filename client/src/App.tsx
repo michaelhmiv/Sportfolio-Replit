@@ -18,6 +18,7 @@ import ContestEntry from "@/pages/contest-entry";
 import ContestLeaderboard from "@/pages/contest-leaderboard";
 import Portfolio from "@/pages/portfolio";
 import UserProfile from "@/pages/user-profile";
+import Leaderboards from "@/pages/leaderboards";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
@@ -48,6 +49,7 @@ function Router() {
       {/* Public routes - contests and leaderboards */}
       <Route path="/contests" component={Contests} />
       <Route path="/contest/:id/leaderboard" component={ContestLeaderboard} />
+      <Route path="/leaderboards" component={Leaderboards} />
       <Route path="/user/:id" component={UserProfile} />
       
       {/* Protected routes - require authentication */}

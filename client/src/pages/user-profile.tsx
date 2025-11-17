@@ -105,50 +105,56 @@ export default function UserProfile() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="hover-elevate" data-testid="card-net-worth">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-4 h-4 text-positive" />
-                <span className="text-xs sm:text-sm text-muted-foreground">Net Worth</span>
-              </div>
-              <div className="font-mono text-lg sm:text-2xl font-bold text-positive" data-testid="text-net-worth">
-                ${stats.netWorth}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Rank #{rankings.netWorth}
-              </div>
-            </CardContent>
-          </Card>
+          <Link href="/leaderboards#netWorth">
+            <Card className="hover-elevate cursor-pointer" data-testid="card-net-worth">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <DollarSign className="w-4 h-4 text-positive" />
+                  <span className="text-xs sm:text-sm text-muted-foreground">Net Worth</span>
+                </div>
+                <div className="font-mono text-lg sm:text-2xl font-bold text-positive" data-testid="text-net-worth">
+                  ${stats.netWorth}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Rank #{rankings.netWorth} → View Full Board
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card className="hover-elevate" data-testid="card-shares-mined">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Award className="w-4 h-4 text-primary" />
-                <span className="text-xs sm:text-sm text-muted-foreground">Shares Mined</span>
-              </div>
-              <div className="text-lg sm:text-2xl font-bold" data-testid="text-shares-mined">
-                {stats.totalSharesMined.toLocaleString()}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Rank #{rankings.sharesMined}
-              </div>
-            </CardContent>
-          </Card>
+          <Link href="/leaderboards#sharesMined">
+            <Card className="hover-elevate cursor-pointer" data-testid="card-shares-mined">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Award className="w-4 h-4 text-primary" />
+                  <span className="text-xs sm:text-sm text-muted-foreground">Shares Mined</span>
+                </div>
+                <div className="text-lg sm:text-2xl font-bold" data-testid="text-shares-mined">
+                  {stats.totalSharesMined.toLocaleString()}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Rank #{rankings.sharesMined} → View Full Board
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card className="hover-elevate" data-testid="card-market-orders">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
-                <span className="text-xs sm:text-sm text-muted-foreground">Market Orders</span>
-              </div>
-              <div className="text-lg sm:text-2xl font-bold" data-testid="text-market-orders">
-                {stats.totalMarketOrders.toLocaleString()}
-              </div>
-              <div className="text-xs text-muted-foreground mt-1">
-                Rank #{rankings.marketOrders}
-              </div>
-            </CardContent>
-          </Card>
+          <Link href="/leaderboards#marketOrders">
+            <Card className="hover-elevate cursor-pointer" data-testid="card-market-orders">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                  <span className="text-xs sm:text-sm text-muted-foreground">Market Orders</span>
+                </div>
+                <div className="text-lg sm:text-2xl font-bold" data-testid="text-market-orders">
+                  {stats.totalMarketOrders.toLocaleString()}
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Rank #{rankings.marketOrders} → View Full Board
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
 
           <Card className="hover-elevate" data-testid="card-trades-executed">
             <CardContent className="p-4">

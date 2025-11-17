@@ -1708,6 +1708,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Global leaderboards (public)
+  app.get("/api/leaderboards", async (req, res) => {
+    try {
+      const category = req.query.category as string || "netWorth";
+      const allUsers = await storage.getUsers();
+
+      if (category === "sharesMined") {
+        // Sort by total shares mined
+        const ranked = allUsers
+          .sort((a: User, b: User) => b.totalSharesMined - a.totalSharesMined)
+          .map((u: User, index: number) => ({
+            rank: index + 1,
+            userId: u.id,
+            username: u.username,
+            firstName: u.firstName,
+            lastName: u.lastName,
+            profileImageUrl: u.profileImageUrl,
+            value: u.totalSharesMined,
+          }));
+        
+        return res.json({ category: "sharesMined", leaderboard: ranked });
+      }
+
+      if (category === "marketOrders") {
+        // Sort by total market orders
+        const ranked = allUsers
+          .sort((a: User, b: User) => b.totalMarketOrders - a.totalMarketOrders)
+          .map((u: User, index: number) => ({
+            rank: index + 1,
+            userId: u.id,
+            username: u.username,
+            firstName: u.firstName,
+            lastName: u.lastName,
+            profileImageUrl: u.profileImageUrl,
+            value: u.totalMarketOrders,
+          }));
+        
+        return res.json({ category: "marketOrders", leaderboard: ranked });
+      }
+
+      if (category === "netWorth") {
+        // Calculate net worth for all users
+        const usersWithNetWorth = await Promise.all(
+          allUsers.map(async (u: User) => {
+            const holdings = await storage.getUserHoldings(u.id);
+            const holdingsVal = await Promise.all(
+              holdings.map(async (h: Holding) => {
+                if (h.assetType === "player") {
+                  const p = await storage.getPlayer(h.assetId);
+                  if (p) {
+                    const lastTradePrice = p.lastTradePrice || await getLastTradePrice(p.id);
+                    if (lastTradePrice) {
+                      return parseFloat(lastTradePrice) * h.quantity;
+                    }
+                  }
+                }
+                return 0;
+              })
+            );
+            const totalHoldingsVal = holdingsVal.reduce((sum: number, v: number) => sum + v, 0);
+            return {
+              userId: u.id,
+              username: u.username,
+              firstName: u.firstName,
+              lastName: u.lastName,
+              profileImageUrl: u.profileImageUrl,
+              netWorth: parseFloat(u.balance) + totalHoldingsVal,
+            };
+          })
+        );
+
+        const ranked = usersWithNetWorth
+          .sort((a, b) => b.netWorth - a.netWorth)
+          .map((u, index) => ({
+            rank: index + 1,
+            userId: u.userId,
+            username: u.username,
+            firstName: u.firstName,
+            lastName: u.lastName,
+            profileImageUrl: u.profileImageUrl,
+            value: u.netWorth.toFixed(2),
+          }));
+
+        return res.json({ category: "netWorth", leaderboard: ranked });
+      }
+
+      res.status(400).json({ error: "Invalid category" });
+    } catch (error: any) {
+      console.error("[leaderboards] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Public user profile (anyone can view)
   app.get("/api/user/:userId/profile", async (req, res) => {
     try {
