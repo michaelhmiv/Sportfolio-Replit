@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
 import { useEffect, useState } from "react";
 import { queryClient } from "@/lib/queryClient";
+import { useWebSocket } from "@/lib/websocket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, TrendingUp, User } from "lucide-react";
@@ -44,10 +45,10 @@ export default function ContestLeaderboard() {
   const { id } = useParams<{ id: string }>();
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { subscribe } = useWebSocket();
 
   const { data, isLoading } = useQuery<LeaderboardData>({
     queryKey: ["/api/contest", id, "leaderboard"],
-    refetchInterval: 10000, // Refresh every 10 seconds for live updates
   });
 
   const handleViewEntry = (entryId: string) => {
@@ -55,41 +56,27 @@ export default function ContestLeaderboard() {
     setDrawerOpen(true);
   };
 
-  // WebSocket connection for real-time updates
+  // WebSocket connection for real-time contest updates
   useEffect(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+    if (!id) return;
 
-    ws.onopen = () => {
-      console.log('[Contest WebSocket] Connected to live updates');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        console.log('[Contest WebSocket] Received:', message);
-
-        // Invalidate contest leaderboard when stats update or contest settles
-        if (message.type === 'contestUpdate' || message.type === 'liveStats') {
-          queryClient.invalidateQueries({ queryKey: ["/api/contest", id, "leaderboard"] });
-        }
-      } catch (error) {
-        console.error('[Contest WebSocket] Failed to parse message:', error);
+    // Subscribe to contest update events
+    const unsubContestUpdate = subscribe('contestUpdate', (data) => {
+      if (data.contestId === id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/contest", id, "leaderboard"] });
       }
-    };
+    });
 
-    ws.onerror = (error) => {
-      console.error('[Contest WebSocket] Error:', error);
-    };
-
-    ws.onclose = () => {
-      console.log('[Contest WebSocket] Disconnected');
-    };
+    // Subscribe to live stats events (affects contest rankings)
+    const unsubLiveStats = subscribe('liveStats', () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/contest", id, "leaderboard"] });
+    });
 
     return () => {
-      ws.close();
+      unsubContestUpdate();
+      unsubLiveStats();
     };
-  }, [id]);
+  }, [id, subscribe]);
 
   if (isLoading || !data) {
     return (

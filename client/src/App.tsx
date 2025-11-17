@@ -1,4 +1,5 @@
 import { Switch, Route } from "wouter";
+import { useEffect } from "react";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,6 +10,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
+import { WebSocketProvider, useWebSocket } from "@/lib/websocket";
 import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "@/pages/dashboard";
 import Marketplace from "@/pages/marketplace";
@@ -76,10 +78,23 @@ function Router() {
 
 function Header() {
   const { user } = useAuth();
+  const { subscribe } = useWebSocket();
   const { data: dashboardData } = useQuery<{ user: { balance: string; portfolioValue: string } }>({ 
     queryKey: ['/api/dashboard'],
-    refetchInterval: 10000 
   });
+
+  // WebSocket listener for real-time balance updates in header
+  useEffect(() => {
+    // Portfolio events will auto-invalidate dashboard queries via WebSocket provider
+    // The header balance will update automatically
+    const unsubPortfolio = subscribe('portfolio', () => {
+      // Balance updates will be handled by the global WebSocket provider
+    });
+
+    return () => {
+      unsubPortfolio();
+    };
+  }, [subscribe]);
 
   const handleAddCash = async () => {
     // Optimistically update the balance immediately
@@ -173,8 +188,9 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <SidebarProvider style={style as React.CSSProperties}>
+      <WebSocketProvider>
+        <TooltipProvider>
+          <SidebarProvider style={style as React.CSSProperties}>
           <div className="flex h-screen w-full overflow-x-hidden">
             <div className="hidden sm:flex">
               <AppSidebar />
@@ -192,6 +208,7 @@ function App() {
         </SidebarProvider>
         <Toaster />
       </TooltipProvider>
+      </WebSocketProvider>
     </QueryClientProvider>
   );
 }

@@ -16,6 +16,17 @@ The frontend is built with React, TypeScript, Vite, Wouter for routing, and TanS
 **Cache Invalidation System:**
 A centralized cache invalidation utility (`client/src/lib/cache-invalidation.ts`) ensures instant synchronization of portfolio data across all pages. The `invalidatePortfolioQueries()` function uses React Query's array prefix matching to invalidate all portfolio-related queries including balance, holdings, orders, player prices, and contest data. All mutations (trading, mining, contest entry, cash operations) and WebSocket handlers invoke this centralized function to guarantee consistent data across Dashboard, Portfolio, Marketplace, Player pages, and the persistent header. This architecture eliminates stale data and provides real-time feedback without page refreshes.
 
+**Real-Time Updates via WebSocket:**
+A centralized WebSocket provider (`client/src/lib/websocket.tsx`) manages a single WebSocket connection shared across the entire application, ensuring zero stale data anywhere. The provider automatically reconnects on disconnect (3-second delay) and broadcasts events to all subscribed components. Every page subscribes to relevant WebSocket events:
+- **Profile Page:** Listens for `portfolio`, `mining`, and `trade` events to update net worth, mining stats, and market order cards instantly
+- **Marketplace:** Listens for `trade` and `orderBook` events to update player prices, volume, and 24h change in real-time
+- **Portfolio:** Listens for `portfolio`, `trade`, and `orderBook` events to update balance, holdings, and pending orders live
+- **Player Pages:** Listens for `trade`, `orderBook`, and `portfolio` events to update prices, trade history, and user balances instantly
+- **Header Balance:** Listens for `portfolio` events to update cash balance display across all pages
+- **Contest Leaderboards:** Listens for `contestUpdate` and `liveStats` events to update rankings as games progress
+
+WebSocket event types: `portfolio` (balance/holdings changes), `mining` (mining activity), `trade` (trade executions), `orderBook` (order book changes), `liveStats` (game stat updates), `contestUpdate` (contest changes). The provider integrates with React Query's cache invalidation system to trigger automatic data refetches, ensuring every single data point updates instantly when backend data changes.
+
 ### Backend Architecture
 The backend is an Express.js server with TypeScript, supporting both HTTP and WebSockets. It uses Drizzle ORM with a PostgreSQL database (Neon serverless) and Zod for validation. Core domain models include Users, Players, Holdings, Orders, Trades, Mining, Contests, and Price History. The system features atomic balance updates and precise timezone handling for NBA Eastern Time using `date-fns-tz` for accurate game scheduling and contest generation. API design is RESTful for data endpoints and uses WebSockets for live price and trade updates.
 

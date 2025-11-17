@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams } from "wouter";
+import { useWebSocket } from "@/lib/websocket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +31,7 @@ type TimeRange = "1D" | "1W" | "1M" | "1Y";
 export default function PlayerPage() {
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
+  const { subscribe } = useWebSocket();
   const [orderType, setOrderType] = useState<"limit" | "market">("limit");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [quantity, setQuantity] = useState("");
@@ -39,6 +41,36 @@ export default function PlayerPage() {
   const { data, isLoading } = useQuery<PlayerPageData>({
     queryKey: ["/api/player", id],
   });
+
+  // WebSocket listener for real-time player page updates
+  useEffect(() => {
+    if (!id) return;
+
+    // Subscribe to trade events for this player
+    const unsubTrade = subscribe('trade', (data) => {
+      if (data.playerId === id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/player", id] });
+      }
+    });
+
+    // Subscribe to order book changes for this player
+    const unsubOrderBook = subscribe('orderBook', (data) => {
+      if (data.playerId === id) {
+        queryClient.invalidateQueries({ queryKey: ["/api/player", id] });
+      }
+    });
+
+    // Subscribe to portfolio events (affects user balance and holdings)
+    const unsubPortfolio = subscribe('portfolio', () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/player", id] });
+    });
+
+    return () => {
+      unsubTrade();
+      unsubOrderBook();
+      unsubPortfolio();
+    };
+  }, [id, subscribe]);
 
   const placeOrderMutation = useMutation({
     mutationFn: async (orderData: { orderType: string; side: string; quantity: number; limitPrice?: string }) => {

@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useWebSocket } from "@/lib/websocket";
+import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -18,10 +20,29 @@ export default function Marketplace() {
   const [positionFilter, setPositionFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("volume");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const { subscribe } = useWebSocket();
 
   const { data: teams } = useQuery<string[]>({
     queryKey: ["/api/teams"],
   });
+
+  // WebSocket listener for real-time marketplace updates
+  useEffect(() => {
+    // Subscribe to trade events (affects prices, volume, 24h change)
+    const unsubTrade = subscribe('trade', () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/players"] });
+    });
+
+    // Subscribe to order book events
+    const unsubOrderBook = subscribe('orderBook', () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/players"] });
+    });
+
+    return () => {
+      unsubTrade();
+      unsubOrderBook();
+    };
+  }, [subscribe]);
 
   const { data: players, isLoading } = useQuery<Player[]>({
     queryKey: ["/api/players", search, teamFilter, positionFilter, sortField, sortOrder],

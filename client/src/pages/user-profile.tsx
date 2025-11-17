@@ -1,6 +1,7 @@
 import { useParams } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useWebSocket } from "@/lib/websocket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -53,10 +54,41 @@ export default function UserProfile() {
   const { toast } = useToast();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [newUsername, setNewUsername] = useState("");
+  const { subscribe } = useWebSocket();
 
   const { data: profile, isLoading } = useQuery<UserProfile>({
     queryKey: [`/api/user/${userId}/profile`],
   });
+
+  // WebSocket listener for real-time profile updates
+  useEffect(() => {
+    if (!userId) return;
+
+    // Subscribe to portfolio events (trades, balance changes)
+    const unsubPortfolio = subscribe('portfolio', (data) => {
+      if (data.userId === userId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/user/${userId}/profile`] });
+      }
+    });
+
+    // Subscribe to mining events
+    const unsubMining = subscribe('mining', (data) => {
+      if (data.userId === userId) {
+        queryClient.invalidateQueries({ queryKey: [`/api/user/${userId}/profile`] });
+      }
+    });
+
+    // Subscribe to trade events (affects market orders count and net worth)
+    const unsubTrade = subscribe('trade', () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/user/${userId}/profile`] });
+    });
+
+    return () => {
+      unsubPortfolio();
+      unsubMining();
+      unsubTrade();
+    };
+  }, [userId, subscribe]);
 
   const updateUsernameMutation = useMutation({
     mutationFn: async (username: string) => {

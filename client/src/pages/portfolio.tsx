@@ -1,4 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useWebSocket } from "@/lib/websocket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,9 +26,34 @@ interface PortfolioData {
 
 export default function Portfolio() {
   const { toast } = useToast();
+  const { subscribe } = useWebSocket();
+
   const { data, isLoading } = useQuery<PortfolioData>({
     queryKey: ["/api/portfolio"],
   });
+
+  // WebSocket listener for real-time portfolio updates
+  useEffect(() => {
+    // Portfolio events will auto-invalidate via WebSocket provider
+    // But we can also subscribe for custom logic if needed
+    const unsubPortfolio = subscribe('portfolio', () => {
+      // Additional portfolio-specific logic could go here
+    });
+
+    const unsubTrade = subscribe('trade', () => {
+      // Trades affect holdings and orders
+    });
+
+    const unsubOrderBook = subscribe('orderBook', () => {
+      // Order book changes might affect pending orders
+    });
+
+    return () => {
+      unsubPortfolio();
+      unsubTrade();
+      unsubOrderBook();
+    };
+  }, [subscribe]);
 
   const cancelOrderMutation = useMutation({
     mutationFn: async (orderId: string) => {
