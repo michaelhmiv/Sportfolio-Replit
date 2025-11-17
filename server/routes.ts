@@ -1247,14 +1247,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Contests
-  app.get("/api/contests", isAuthenticated, async (req, res) => {
+  // Contests (public - anyone can view)
+  app.get("/api/contests", async (req, res) => {
     try {
-      const userId = getUserId(req);
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
       const allOpenContests = await storage.getContests("open");
       
       const { date } = req.query;
@@ -1281,14 +1276,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
       }
       
-      const myEntries = await storage.getUserContestEntries(user.id);
-
-      const enrichedEntries = await Promise.all(
-        myEntries.map(async (entry) => ({
-          ...entry,
-          contest: await storage.getContest(entry.contestId),
-        }))
-      );
+      // If user is authenticated, include their entries
+      let enrichedEntries: any[] = [];
+      if (req.isAuthenticated() && req.user) {
+        try {
+          const userId = (req.user as any).claims.sub;
+          const user = await storage.getUser(userId);
+          if (user) {
+            const myEntries = await storage.getUserContestEntries(user.id);
+            enrichedEntries = await Promise.all(
+              myEntries.map(async (entry) => ({
+                ...entry,
+                contest: await storage.getContest(entry.contestId),
+              }))
+            );
+          }
+        } catch (error) {
+          // Ignore auth errors, just don't include entries
+          console.log("[contests] Could not fetch user entries:", error);
+        }
+      }
 
       res.json({
         openContests,
@@ -1662,14 +1669,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Contest leaderboard with proportional scoring
-  app.get("/api/contest/:id/leaderboard", isAuthenticated, async (req, res) => {
+  // Contest leaderboard with proportional scoring (public - anyone can view)
+  app.get("/api/contest/:id/leaderboard", async (req, res) => {
     try {
-      const userId = getUserId(req);
-      const user = await storage.getUser(userId);
-      if (!user) {
-        return res.status(404).json({ error: "User not found" });
-      }
       const contest = await storage.getContest(req.params.id);
 
       if (!contest) {
@@ -1680,8 +1682,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { calculateContestLeaderboard } = await import("./contest-scoring");
       const leaderboard = await calculateContestLeaderboard(req.params.id);
 
-      // Find user's entry
-      const myEntry = leaderboard.find(e => e.userId === user.id);
+      // If user is authenticated, find their entry
+      let myEntry = undefined;
+      if (req.isAuthenticated() && req.user) {
+        try {
+          const userId = (req.user as any).claims.sub;
+          const user = await storage.getUser(userId);
+          if (user) {
+            myEntry = leaderboard.find(e => e.userId === user.id);
+          }
+        } catch (error) {
+          // Ignore auth errors
+          console.log("[leaderboard] Could not fetch user entry:", error);
+        }
+      }
 
       res.json({
         contest,

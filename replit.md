@@ -44,8 +44,13 @@ Player shares are **permanent across all seasons** and never expire. Each player
 - Supports login with Google, GitHub, email/password, and other OAuth providers
 - Secure session management with PostgreSQL-backed session storage
 - Automatic user creation/sync on first login via the `upsertUser` pattern
-- All API routes protected with `isAuthenticated` middleware
 - New users receive $10,000 starting balance automatically
+
+**Public Access:**
+- **Contests & Leaderboards** are publicly viewable without authentication
+- Anyone can browse contests, view entries, points, and potential earnings
+- Authentication is only required to enter contests, trade shares, or mine players
+- Public routes: `/api/contests`, `/api/contest/:id/leaderboard`
 
 **Background Jobs (Cron):**
 - Automated daily `roster_sync`, minute-by-minute `schedule_sync` (for live game scores), hourly `stats_sync` (for completed games), and `settle_contests` every 5 minutes.
