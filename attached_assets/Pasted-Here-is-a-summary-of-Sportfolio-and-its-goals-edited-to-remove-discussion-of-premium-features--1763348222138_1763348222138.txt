@@ -1,0 +1,41 @@
+Here is a summary of Sportfolio and its goals, edited to remove discussion of premium features.
+
+### 🏟️ Welcome to Sportfolio: The Persistent Fantasy Sports Market
+
+Sportfolio is a fantasy sports game where your progress and investments last for a player's entire career, not just one season.
+
+The main goal is to create an engaging community built around a **free market economy**. Instead of developers setting player values, the market does. Your sports knowledge and ability to predict player performance are rewarded in a system where you—and all other users—determine the true value of every athlete.
+
+---
+
+### Understanding the Core Loop: What You Do
+
+The entire game revolves around "Player Shares," the core asset representing ownership of a specific player. Here is the basic lifecycle of the game:
+
+**1. ⛏️ Mine Player Shares**
+* **What it is:** Mining is the *only* way to create new shares of active players.
+* **How it works:** You simply select an active player to mine, and your account will generate shares of that player over time at a set rate of 100 shares per hour.
+* **The Strategy:** You must decide which players to invest your mining time in. Do you mine a superstar, or an underrated rookie you think will break out?
+
+**2. 📈 Use Your Shares (Trade or Compete)**
+Once shares are in your portfolio, you have two main options:
+
+* **Option A: Trade on the Player Exchange**
+    You can immediately sell your mined shares on the "Player Exchange," which functions just like a real-world stock market. You can set your price, and other users can buy your shares, allowing you to speculate and build your in-game wealth.
+* **Option B: Enter Contests**
+    You can enter your shares into various contests to compete for real prizes (virtual currency). Your player's real-life performance determines how many fantasy points you earn in the contest.
+
+**3. 🔥 The "Burn" Mechanic**
+This is the most important part of the economy:
+* When you submit shares into a contest, they are **permanently removed (or "burned")** from the game after the contest ends.
+* This ensures that shares remain scarce. Contests are the only way to create new "money" in the game, and this creation is directly tied to the destruction (burning) of shares, which keeps the economy balanced.
+
+---
+
+### Key Things to Know as a New User
+
+* **It's a Virtual Economy:** Sportfolio is a game based on virtual currency. There are **no cash-out options**.
+* **Persistence is Key:** Unlike seasonal fantasy, you don't have to redraft your players every year. If you mine a player and they become a star, you can benefit from that investment for their *entire career*.
+* **You Control the Market:** A player's mining rate is the same for everyone (100 shares/hour). Their value is only determined by what other users are willing to pay for them on the Exchange, based on their contest performance or hype.
+
+In short, your goal is to **Mine** shares of players you believe in, and then decide whether to **Trade** them for profit or **Compete** with them in contests to win prizes.
