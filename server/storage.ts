@@ -652,23 +652,19 @@ export class DatabaseStorage implements IStorage {
       })
     );
 
-    // Calculate net winnings
+    // Net winnings equals payout (no entry fees in this system)
     const payout = parseFloat(entry.payout);
-    const entryFee = parseFloat(contest.entryFee);
-    const netWinnings = payout - entryFee;
 
     return {
       entry: {
         ...entry,
-        entryFee: contest.entryFee,
-        netWinnings: netWinnings.toFixed(2),
+        netWinnings: payout.toFixed(2),
       },
       lineup: lineupWithPercentages,
       contest: {
         id: contest.id,
         name: contest.name,
         status: contest.status,
-        entryFee: contest.entryFee,
         totalPrizePool: contest.totalPrizePool,
       },
     };

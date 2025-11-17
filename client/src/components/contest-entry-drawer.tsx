@@ -29,7 +29,6 @@ interface EntryDetail {
     totalScore: string;
     rank: number | null;
     payout: string;
-    entryFee: string;
     netWinnings: string;
   };
   lineup: Array<{
@@ -49,7 +48,6 @@ interface EntryDetail {
     id: string;
     name: string;
     status: string;
-    entryFee: string;
     totalPrizePool: string;
   };
 }
@@ -208,10 +206,6 @@ export function ContestEntryDrawer({
             {/* Contest Info Footer */}
             <Separator />
             <div className="text-xs text-muted-foreground space-y-1">
-              <div className="flex justify-between">
-                <span>Entry Fee:</span>
-                <span className="font-mono">${parseFloat(entryDetails.contest.entryFee).toFixed(2)}</span>
-              </div>
               <div className="flex justify-between">
                 <span>Total Prize Pool:</span>
                 <span className="font-mono">${parseFloat(entryDetails.contest.totalPrizePool).toFixed(2)}</span>
