@@ -79,7 +79,7 @@ function Router() {
 }
 
 function Header() {
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const { subscribe } = useWebSocket();
   const { data: dashboardData } = useQuery<{ user: { balance: string; portfolioValue: string } }>({ 
     queryKey: ['/api/dashboard'],
@@ -153,29 +153,33 @@ function Header() {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
-          <span data-testid="text-username">{userName}</span>
-        </div>
-        <Button 
-          size="sm" 
-          onClick={handleAddCash}
-          data-testid="button-add-cash"
-        >
-          +$1
-        </Button>
-        <Button 
-          size="sm"
-          variant="ghost"
-          onClick={() => {
-            // Invalidate auth cache before logout
-            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-            window.location.href = "/api/logout";
-          }}
-          data-testid="button-logout"
-          title="Logout"
-        >
-          <LogOut className="h-4 w-4" />
-        </Button>
+        {isAuthenticated && (
+          <>
+            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+              <span data-testid="text-username">{userName}</span>
+            </div>
+            <Button 
+              size="sm" 
+              onClick={handleAddCash}
+              data-testid="button-add-cash"
+            >
+              +$1
+            </Button>
+            <Button 
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                // Invalidate auth cache before logout
+                queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+                window.location.href = "/api/logout";
+              }}
+              data-testid="button-logout"
+              title="Logout"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          </>
+        )}
         <Button
           variant="ghost"
           size="icon"

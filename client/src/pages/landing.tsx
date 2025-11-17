@@ -5,21 +5,6 @@ import { TrendingUp, Users, Trophy, Pickaxe } from "lucide-react";
 export default function Landing() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted">
-      {/* Header */}
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container flex h-16 items-center justify-between px-4">
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-              <TrendingUp className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <span className="text-xl font-bold">Sportfolio</span>
-          </div>
-          <Button asChild>
-            <a href="/api/login" data-testid="button-login">Get Started</a>
-          </Button>
-        </div>
-      </header>
-
       {/* Hero Section */}
       <div className="container px-4 pt-20 pb-12">
         <div className="mx-auto max-w-4xl text-center">
