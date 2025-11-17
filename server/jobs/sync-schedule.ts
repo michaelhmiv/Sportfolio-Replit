@@ -60,10 +60,11 @@ export async function syncSchedule(): Promise<JobResult> {
             // Smart status detection with fallback logic
             let normalizedStatus = normalizeGameStatus(rawStatus);
             
-            // FALLBACK: If game has final scores AND started >3 hours ago, mark as completed
+            // FALLBACK: If game has final scores AND started >2 hours ago, mark as completed
             // This handles cases where MySportsFeeds is slow to update status from "LIVE" to "FINAL"
+            // NBA games typically last 2-2.5 hours, so 2h threshold catches most finished games
             const hoursAgo = (Date.now() - startTime.getTime()) / (1000 * 60 * 60);
-            if (normalizedStatus === "inprogress" && homeScore !== null && awayScore !== null && hoursAgo > 3) {
+            if (normalizedStatus === "inprogress" && homeScore !== null && awayScore !== null && hoursAgo > 2) {
               console.log(`[schedule_sync] OVERRIDE: Game ${gameId} marked completed (scores present, started ${hoursAgo.toFixed(1)}h ago)`);
               normalizedStatus = "completed";
             }
