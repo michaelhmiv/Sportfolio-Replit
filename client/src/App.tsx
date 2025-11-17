@@ -8,6 +8,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BottomNav } from "@/components/bottom-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { HelpDialog } from "@/components/help-dialog";
 import { Button } from "@/components/ui/button";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { WebSocketProvider, useWebSocket } from "@/lib/websocket";
@@ -25,6 +26,7 @@ import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
 import { LogOut } from "lucide-react";
+import { SiDiscord } from "react-icons/si";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -174,6 +176,17 @@ function Header() {
         >
           <LogOut className="h-4 w-4" />
         </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => window.open('https://discord.gg/r8MsduNvXG', '_blank')}
+          data-testid="button-discord"
+          title="Join our Discord"
+          className="hover-elevate active-elevate-2"
+        >
+          <SiDiscord className="w-5 h-5" />
+        </Button>
+        <HelpDialog />
         <ThemeToggle />
       </div>
     </header>
