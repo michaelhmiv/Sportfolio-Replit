@@ -23,6 +23,7 @@ interface LeaderboardEntry {
   username: string;
   totalScore: number;
   rank: number;
+  payout: string;
   players: PlayerLineupStats[];
 }
 
@@ -179,11 +180,11 @@ export default function ContestLeaderboard() {
               <table className="w-full">
                 <thead className="border-b bg-muted/50">
                   <tr>
-                    <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rank</th>
-                    <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">User</th>
-                    <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Score</th>
-                    <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Shares</th>
-                    <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
+                    <th className="text-left px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Rank</th>
+                    <th className="text-left px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">User</th>
+                    <th className="text-right px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Score</th>
+                    <th className="text-right px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Shares</th>
+                    <th className="text-right px-2 py-2 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Winnings</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -191,6 +192,8 @@ export default function ContestLeaderboard() {
                     const isWinning = entry.rank <= winningThreshold;
                     const isMyEntry = data.myEntry?.entryId === entry.entryId;
                     const entryShares = entry.players.reduce((sum, p) => sum + p.sharesEntered, 0);
+                    const payout = parseFloat(entry.payout);
+                    const winnings = payout > 0 ? `$${payout.toFixed(2)}` : (data.contest.status === "completed" ? "$0.00" : "TBD");
                     
                     return (
                       <tr
@@ -198,44 +201,44 @@ export default function ContestLeaderboard() {
                         className={`border-b hover-elevate ${isMyEntry ? 'bg-primary/5' : ''}`}
                         data-testid={`row-leaderboard-${idx}`}
                       >
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-lg">
+                        <td className="px-2 py-2">
+                          <div className="flex items-center gap-1">
+                            <span className="font-mono font-bold text-sm">
                               #{entry.rank}
                             </span>
                             {entry.rank <= 3 && (
-                              <Trophy className={`w-4 h-4 ${entry.rank === 1 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
+                              <Trophy className={`w-3 h-3 ${entry.rank === 1 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
                             )}
                           </div>
                         </td>
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
+                        <td className="px-2 py-2">
+                          <div className="flex items-center gap-1">
                             <button
                               onClick={() => handleViewEntry(entry.entryId)}
-                              className="font-medium hover:text-primary hover:underline cursor-pointer text-left"
+                              className="text-sm font-medium hover:text-primary hover:underline cursor-pointer text-left truncate max-w-[120px]"
                               data-testid={`button-view-entry-${entry.userId}`}
                             >
                               @{entry.username}
                             </button>
                             <Link href={`/user/${entry.userId}`}>
-                              <Button variant="ghost" size="icon" className="h-6 w-6" data-testid={`link-profile-${entry.userId}`}>
+                              <Button variant="ghost" size="icon" className="h-5 w-5" data-testid={`link-profile-${entry.userId}`}>
                                 <User className="w-3 h-3" />
                               </Button>
                             </Link>
-                            {isMyEntry && <Badge variant="outline" className="text-xs">You</Badge>}
+                            {isMyEntry && <Badge variant="outline" className="text-[10px] px-1">You</Badge>}
                           </div>
                         </td>
-                        <td className="p-4 text-right">
+                        <td className="px-2 py-2 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <span className="text-xl font-mono font-bold">{entry.totalScore.toFixed(2)}</span>
-                            {isWinning && <TrendingUp className="w-4 h-4 text-positive" />}
+                            <span className="text-sm font-mono font-bold">{entry.totalScore.toFixed(2)}</span>
+                            {isWinning && <TrendingUp className="w-3 h-3 text-positive" />}
                           </div>
                         </td>
-                        <td className="p-4 text-right font-mono">{entryShares}</td>
-                        <td className="p-4 text-right">
-                          <Badge variant={isWinning ? "default" : "outline"} className={isWinning ? 'bg-positive hover:bg-positive' : ''}>
-                            {isWinning ? 'WINNING' : 'Not winning'}
-                          </Badge>
+                        <td className="px-2 py-2 text-right font-mono text-sm">{entryShares}</td>
+                        <td className="px-2 py-2 text-right">
+                          <span className={`text-sm font-mono font-semibold ${payout > 0 ? 'text-positive' : 'text-muted-foreground'}`} data-testid={`text-winnings-${entry.userId}`}>
+                            {winnings}
+                          </span>
                         </td>
                       </tr>
                     );

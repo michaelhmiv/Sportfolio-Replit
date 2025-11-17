@@ -29,6 +29,7 @@ export interface LeaderboardEntry {
   username: string;
   totalScore: number;
   rank: number;
+  payout: string;
   players: EntryLineupWithStats[];
 }
 
@@ -169,6 +170,7 @@ export async function calculateContestLeaderboard(contestId: string): Promise<Le
       username: user?.username || "Unknown",
       totalScore,
       rank: 0, // Will be assigned after sorting
+      payout: entry.payout || "0.00",
       players: playerDetails,
     });
   }
