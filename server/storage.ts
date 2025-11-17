@@ -48,6 +48,7 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserBalance(userId: string, amount: string): Promise<void>;
   updateUsername(userId: string, username: string): Promise<User | undefined>;
+  incrementTotalSharesMined(userId: string, amount: number): Promise<void>;
   
   // Player methods
   getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]>;
@@ -179,6 +180,15 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(users)
       .set({ balance: amount })
+      .where(eq(users.id, userId));
+  }
+
+  async incrementTotalSharesMined(userId: string, amount: number): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        totalSharesMined: sql`${users.totalSharesMined} + ${amount}`
+      })
       .where(eq(users.id, userId));
   }
 

@@ -1204,6 +1204,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateHolding(user.id, "player", miningData.playerId, miningData.sharesAccumulated, "0.0000");
         }
 
+        // Increment total shares mined counter
+        await storage.incrementTotalSharesMined(user.id, miningData.sharesAccumulated);
+
         // Reset mining
         const now = new Date();
         await storage.updateMining(user.id, {
@@ -1269,6 +1272,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
         totalDistributed += dist.shares;
       }
+
+      // Increment total shares mined counter
+      await storage.incrementTotalSharesMined(user.id, totalDistributed);
 
       // Reset mining (keep splits intact)
       const now = new Date();
