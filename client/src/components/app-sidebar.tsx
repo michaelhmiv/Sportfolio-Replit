@@ -10,6 +10,8 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { Link, useLocation } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { useToast } from "@/hooks/use-toast";
 
 const menuItems = [
   {
@@ -35,7 +37,21 @@ const menuItems = [
 ];
 
 export function AppSidebar() {
-  const [location] = useLocation();
+  const [location, setLocation] = useLocation();
+  const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
+
+  const handleNavigation = (item: typeof menuItems[0], e: React.MouseEvent) => {
+    // Portfolio tab requires authentication
+    if (item.url === "/portfolio" && !isAuthenticated) {
+      e.preventDefault();
+      toast({
+        title: "Authentication Required",
+        description: "Please create an account or log in to view your portfolio.",
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <Sidebar>
@@ -49,7 +65,11 @@ export function AppSidebar() {
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.url}>
-                    <Link href={item.url} data-testid={`link-${item.title.toLowerCase()}`}>
+                    <Link 
+                      href={item.url} 
+                      data-testid={`link-${item.title.toLowerCase()}`}
+                      onClick={(e) => handleNavigation(item, e)}
+                    >
                       <item.icon className="w-5 h-5" />
                       <span>{item.title}</span>
                     </Link>

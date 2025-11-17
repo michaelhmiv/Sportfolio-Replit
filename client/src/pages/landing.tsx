@@ -24,7 +24,7 @@ export default function Landing() {
       <div className="container px-4 pt-20 pb-12">
         <div className="mx-auto max-w-4xl text-center">
           <h1 className="text-4xl font-bold tracking-tight sm:text-6xl mb-6">
-            Trade NBA Players Like Stocks
+            Free Market Fantasy Sports
           </h1>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
             Fantasy sports meets the stock market. Buy shares in your favorite players, mine new shares, and compete in daily 50/50 contests.

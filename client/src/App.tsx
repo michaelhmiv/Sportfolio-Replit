@@ -141,7 +141,7 @@ function Header() {
         </div>
         <div className="flex items-center gap-2">
           <img src={logoUrl} alt="Sportfolio" className="w-8 h-8" />
-          <span className="text-2xl font-bold text-primary">
+          <span className="text-lg font-bold text-primary">
             Sportfolio
           </span>
         </div>

@@ -11,6 +11,10 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes (November 17, 2025)
 - **Help/Wiki Feature:** Added Help dialog accessible via question mark (?) button in header, containing comprehensive Sportfolio documentation covering mining, trading, contests, and burn mechanics
 - **Discord Integration:** Added Discord button in header linking to community server (https://discord.gg/r8MsduNvXG) for user support and engagement
+- **Landing Page Update:** Changed hero text to "Free Market Fantasy Sports" for clearer messaging
+- **Dark Mode Default:** Dark mode is now the default theme for new visitors (can still toggle to light mode)
+- **Portfolio Auth Guard:** Unauthenticated users clicking Portfolio tab now receive a helpful prompt to create an account
+- **Header Optimization:** Reduced "Sportfolio" logo font size to prevent overlap with header buttons
 
 ## System Architecture
 
