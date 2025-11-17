@@ -1,10 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { useParams, Link } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Trophy, TrendingUp } from "lucide-react";
+import { Trophy, TrendingUp, User } from "lucide-react";
+import { ContestEntryDrawer } from "@/components/contest-entry-drawer";
+import { Button } from "@/components/ui/button";
 
 interface PlayerLineupStats {
   entryId: string;
@@ -39,11 +41,18 @@ interface LeaderboardData {
 
 export default function ContestLeaderboard() {
   const { id } = useParams<{ id: string }>();
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const { data, isLoading } = useQuery<LeaderboardData>({
     queryKey: ["/api/contest", id, "leaderboard"],
     refetchInterval: 10000, // Refresh every 10 seconds for live updates
   });
+
+  const handleViewEntry = (entryId: string) => {
+    setSelectedEntryId(entryId);
+    setDrawerOpen(true);
+  };
 
   // WebSocket connection for real-time updates
   useEffect(() => {
@@ -200,12 +209,21 @@ export default function ContestLeaderboard() {
                           </div>
                         </td>
                         <td className="p-4">
-                          <Link href={`/user/${entry.userId}`}>
-                            <div className="font-medium hover:text-primary hover:underline cursor-pointer" data-testid={`link-username-${entry.userId}`}>
-                              {entry.username}
-                            </div>
-                          </Link>
-                          {isMyEntry && <Badge variant="outline" className="text-xs mt-1">You</Badge>}
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleViewEntry(entry.entryId)}
+                              className="font-medium hover:text-primary hover:underline cursor-pointer text-left"
+                              data-testid={`button-view-entry-${entry.userId}`}
+                            >
+                              @{entry.username}
+                            </button>
+                            <Link href={`/user/${entry.userId}`}>
+                              <Button variant="ghost" size="icon" className="h-6 w-6" data-testid={`link-profile-${entry.userId}`}>
+                                <User className="w-3 h-3" />
+                              </Button>
+                            </Link>
+                            {isMyEntry && <Badge variant="outline" className="text-xs">You</Badge>}
+                          </div>
                         </td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-1">
@@ -228,6 +246,13 @@ export default function ContestLeaderboard() {
           </CardContent>
         </Card>
       </div>
+
+      <ContestEntryDrawer
+        contestId={id || ""}
+        entryId={selectedEntryId}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+      />
     </div>
   );
 }

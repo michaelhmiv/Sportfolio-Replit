@@ -1707,6 +1707,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get detailed contest entry information (public - anyone can view)
+  app.get("/api/contest/:contestId/entries/:entryId", async (req, res) => {
+    try {
+      const { contestId, entryId } = req.params;
+      const entryDetails = await storage.getContestEntryDetail(contestId, entryId);
+
+      if (!entryDetails) {
+        return res.status(404).json({ error: "Entry not found" });
+      }
+
+      res.json(entryDetails);
+    } catch (error: any) {
+      console.error("[entry-detail] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Contest leaderboard with proportional scoring (public - anyone can view)
   app.get("/api/contest/:id/leaderboard", async (req, res) => {
     try {

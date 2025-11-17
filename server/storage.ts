@@ -89,6 +89,7 @@ export interface IStorage {
   getContestLineups(entryId: string): Promise<any[]>;
   updateContestLineup(lineupId: string, updates: any): Promise<void>;
   updateContestEntry(entryId: string, updates: Partial<ContestEntry>): Promise<void>;
+  getContestEntryDetail(contestId: string, entryId: string): Promise<any>;
   
   // Daily games methods
   upsertDailyGame(game: InsertDailyGame): Promise<DailyGame>;
@@ -573,6 +574,103 @@ export class DatabaseStorage implements IStorage {
     await db
       .delete(contestLineups)
       .where(eq(contestLineups.entryId, entryId));
+  }
+
+  async getContestEntryDetail(contestId: string, entryId: string): Promise<any> {
+    // Get the entry with user information
+    const [entry] = await db
+      .select({
+        id: contestEntries.id,
+        contestId: contestEntries.contestId,
+        userId: contestEntries.userId,
+        username: users.username,
+        totalSharesEntered: contestEntries.totalSharesEntered,
+        totalScore: contestEntries.totalScore,
+        rank: contestEntries.rank,
+        payout: contestEntries.payout,
+        createdAt: contestEntries.createdAt,
+      })
+      .from(contestEntries)
+      .leftJoin(users, eq(contestEntries.userId, users.id))
+      .where(and(
+        eq(contestEntries.id, entryId),
+        eq(contestEntries.contestId, contestId)
+      ));
+
+    if (!entry) {
+      return null;
+    }
+
+    // Get contest details for entry fee
+    const contest = await this.getContest(contestId);
+    if (!contest) {
+      return null;
+    }
+
+    // Get the lineup with player details
+    const lineup = await db
+      .select({
+        id: contestLineups.id,
+        playerId: contestLineups.playerId,
+        playerName: players.name,
+        playerTeam: players.team,
+        playerPosition: players.position,
+        sharesEntered: contestLineups.sharesEntered,
+        fantasyPoints: contestLineups.fantasyPoints,
+        earnedScore: contestLineups.earnedScore,
+      })
+      .from(contestLineups)
+      .leftJoin(players, eq(contestLineups.playerId, players.id))
+      .where(eq(contestLineups.entryId, entryId));
+
+    // For each player, calculate percentage of total shares entered for that player in this contest
+    const lineupWithPercentages = await Promise.all(
+      lineup.map(async (lineupItem) => {
+        // Sum all shares entered for this player across all entries in the contest
+        const [totalSharesResult] = await db
+          .select({
+            totalShares: sql<number>`CAST(COALESCE(SUM(${contestLineups.sharesEntered}), 0) AS INTEGER)`,
+          })
+          .from(contestLineups)
+          .leftJoin(contestEntries, eq(contestLineups.entryId, contestEntries.id))
+          .where(and(
+            eq(contestEntries.contestId, contestId),
+            eq(contestLineups.playerId, lineupItem.playerId)
+          ));
+
+        const totalPlayerShares = totalSharesResult?.totalShares || 0;
+        const percentage = totalPlayerShares > 0 
+          ? ((lineupItem.sharesEntered / totalPlayerShares) * 100).toFixed(2)
+          : "0.00";
+
+        return {
+          ...lineupItem,
+          totalPlayerSharesInContest: totalPlayerShares,
+          ownershipPercentage: percentage,
+        };
+      })
+    );
+
+    // Calculate net winnings
+    const payout = parseFloat(entry.payout);
+    const entryFee = parseFloat(contest.entryFee);
+    const netWinnings = payout - entryFee;
+
+    return {
+      entry: {
+        ...entry,
+        entryFee: contest.entryFee,
+        netWinnings: netWinnings.toFixed(2),
+      },
+      lineup: lineupWithPercentages,
+      contest: {
+        id: contest.id,
+        name: contest.name,
+        status: contest.status,
+        entryFee: contest.entryFee,
+        totalPrizePool: contest.totalPrizePool,
+      },
+    };
   }
 
   // Daily games methods
