@@ -49,8 +49,9 @@ Player shares are **permanent across all seasons** and never expire. Each player
 **Public Access:**
 - **Contests & Leaderboards** are publicly viewable without authentication
 - Anyone can browse contests, view entries, points, and potential earnings
+- Contest entry details drawer shows each user's lineup, share counts, ownership percentages, fantasy points, and net winnings
 - Authentication is only required to enter contests, trade shares, or mine players
-- Public routes: `/api/contests`, `/api/contest/:id/leaderboard`
+- Public routes: `/api/contests`, `/api/contest/:id/leaderboard`, `/api/contest/:contestId/entries/:entryId`
 
 **Background Jobs (Cron):**
 - Automated daily `roster_sync`, minute-by-minute `schedule_sync` (for live game scores), hourly `stats_sync` (for completed games), and `settle_contests` every 5 minutes.
