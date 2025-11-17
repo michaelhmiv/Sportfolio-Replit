@@ -53,6 +53,7 @@ export interface IStorage {
   getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]>;
   getPlayer(id: string): Promise<Player | undefined>;
   upsertPlayer(player: InsertPlayer): Promise<Player>;
+  getDistinctTeams(): Promise<string[]>;
   
   // Holdings methods
   getHolding(userId: string, assetType: string, assetId: string): Promise<Holding | undefined>;
@@ -206,14 +207,20 @@ export class DatabaseStorage implements IStorage {
 
   // Player methods
   async getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]> {
-    let query = db.select().from(players);
+    // Build array of conditions to combine with AND
+    const conditions = [];
     
-    // Apply filters
     if (filters?.team && filters.team !== "all") {
-      query = query.where(eq(players.team, filters.team));
+      conditions.push(eq(players.team, filters.team));
     }
     if (filters?.position && filters.position !== "all") {
-      query = query.where(eq(players.position, filters.position));
+      conditions.push(eq(players.position, filters.position));
+    }
+    
+    // Apply combined conditions
+    let query = db.select().from(players);
+    if (conditions.length > 0) {
+      query = query.where(and(...conditions));
     }
     
     const results = await query;
@@ -252,6 +259,16 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return created;
     }
+  }
+
+  async getDistinctTeams(): Promise<string[]> {
+    const result = await db
+      .selectDistinct({ team: players.team })
+      .from(players)
+      .where(eq(players.isActive, true))
+      .orderBy(asc(players.team));
+    
+    return result.map(r => r.team);
   }
 
   // Holdings methods

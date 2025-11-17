@@ -19,6 +19,10 @@ export default function Marketplace() {
   const [sortField, setSortField] = useState<SortField>("volume");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
 
+  const { data: teams } = useQuery<string[]>({
+    queryKey: ["/api/teams"],
+  });
+
   const { data: players, isLoading } = useQuery<Player[]>({
     queryKey: ["/api/players", search, teamFilter, positionFilter, sortField, sortOrder],
     queryFn: async () => {
@@ -94,9 +98,9 @@ export default function Marketplace() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Teams</SelectItem>
-                  <SelectItem value="LAL">Lakers</SelectItem>
-                  <SelectItem value="GSW">Warriors</SelectItem>
-                  <SelectItem value="BOS">Celtics</SelectItem>
+                  {teams?.map((team) => (
+                    <SelectItem key={team} value={team}>{team}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
 
@@ -119,48 +123,79 @@ export default function Marketplace() {
 
         {/* Player Table */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium uppercase tracking-wide">All Players</CardTitle>
+          <CardHeader className="p-3">
+            <div className="flex items-center justify-between gap-3">
+              <CardTitle className="text-sm font-medium uppercase tracking-wide">All Players</CardTitle>
+              {/* Mobile sort controls */}
+              <div className="flex items-center gap-1 sm:hidden">
+                <Button
+                  size="sm"
+                  variant={sortField === 'price' ? 'default' : 'outline'}
+                  onClick={() => toggleSort("price")}
+                  className="text-xs"
+                  data-testid="button-sort-price-mobile"
+                >
+                  Price {sortField === 'price' && <ArrowUpDown className="w-3 h-3 ml-1" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={sortField === 'volume' ? 'default' : 'outline'}
+                  onClick={() => toggleSort("volume")}
+                  className="text-xs"
+                  data-testid="button-sort-volume-mobile"
+                >
+                  Vol {sortField === 'volume' && <ArrowUpDown className="w-3 h-3 ml-1" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={sortField === 'change' ? 'default' : 'outline'}
+                  onClick={() => toggleSort("change")}
+                  className="text-xs"
+                  data-testid="button-sort-change-mobile"
+                >
+                  24h {sortField === 'change' && <ArrowUpDown className="w-3 h-3 ml-1" />}
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
               <div className="p-8 text-center text-muted-foreground">Loading players...</div>
             ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                  <thead className="border-b bg-muted/50">
+              <div>
+                <table className="w-full">
+                  <thead className="border-b bg-muted/50 hidden sm:table-header-group">
                     <tr>
-                      <th className="text-left p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
-                      <th className="text-left p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Team</th>
-                      <th className="text-left p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Position</th>
-                      <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
+                      <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Team</th>
+                      <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         <button 
                           onClick={() => toggleSort("price")} 
-                          className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded"
+                          className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded text-xs"
                           data-testid="button-sort-price"
                         >
                           Price <ArrowUpDown className="w-3 h-3" />
                         </button>
                       </th>
-                      <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">
                         <button 
                           onClick={() => toggleSort("volume")} 
-                          className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded"
+                          className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded text-xs"
                           data-testid="button-sort-volume"
                         >
-                          24h Volume <ArrowUpDown className="w-3 h-3" />
+                          24h Vol <ArrowUpDown className="w-3 h-3" />
                         </button>
                       </th>
-                      <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                      <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">
                         <button 
                           onClick={() => toggleSort("change")} 
-                          className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded"
+                          className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded text-xs"
                           data-testid="button-sort-change"
                         >
                           24h Change <ArrowUpDown className="w-3 h-3" />
                         </button>
                       </th>
-                      <th className="p-2 sm:p-4"></th>
+                      <th className="px-2 py-1.5"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -170,44 +205,75 @@ export default function Marketplace() {
                         className="border-b last:border-0 hover-elevate"
                         data-testid={`row-player-${player.id}`}
                       >
-                        <td className="p-2 sm:p-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                              <span className="font-bold text-sm">{player.firstName[0]}{player.lastName[0]}</span>
+                        {/* Mobile layout: stacked info */}
+                        <td className="px-2 py-2 sm:hidden" colSpan={6}>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                <span className="font-bold text-xs">{player.firstName[0]}{player.lastName[0]}</span>
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <div className="font-medium text-sm">{player.firstName} {player.lastName}</div>
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
+                                  <span>{player.team}</span>
+                                  <span>•</span>
+                                  <span>{player.position}</span>
+                                  <span>•</span>
+                                  <span className="font-mono font-bold text-foreground">
+                                    {player.lastTradePrice ? `$${player.lastTradePrice}` : '-'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                                  <span>Vol: {player.volume24h > 0 ? player.volume24h.toLocaleString() : '-'}</span>
+                                  <span>•</span>
+                                  <span className={parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}>
+                                    {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <Link href={`/player/${player.id}`}>
+                              <Button size="sm" data-testid={`button-trade-${player.id}`}>Trade</Button>
+                            </Link>
+                          </div>
+                        </td>
+
+                        {/* Desktop layout: table cells */}
+                        <td className="px-2 py-1.5 hidden sm:table-cell">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <span className="font-bold text-xs">{player.firstName[0]}{player.lastName[0]}</span>
                             </div>
                             <div>
-                              <div className="font-medium">{player.firstName} {player.lastName}</div>
-                              <div className="text-xs text-muted-foreground">#{player.jerseyNumber}</div>
+                              <div className="font-medium text-sm">{player.firstName} {player.lastName}</div>
+                              <div className="text-xs text-muted-foreground md:hidden">{player.team} • {player.position}</div>
                             </div>
                           </div>
                         </td>
-                        <td className="p-2 sm:p-4">
-                          <Badge variant="outline">{player.team}</Badge>
+                        <td className="px-2 py-1.5 hidden md:table-cell">
+                          <Badge variant="outline" className="text-xs">{player.team}</Badge>
                         </td>
-                        <td className="p-2 sm:p-4">
-                          <span className="text-sm text-muted-foreground">{player.position}</span>
-                        </td>
-                        <td className="p-2 sm:p-4 text-right">
-                          <span className="font-mono font-bold text-lg" data-testid={`text-price-${player.id}`}>
-                            {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-sm font-normal">No market value</span>}
+                        <td className="px-2 py-1.5 text-right hidden sm:table-cell">
+                          <span className="font-mono font-bold text-sm" data-testid={`text-price-${player.id}`}>
+                            {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-xs font-normal">-</span>}
                           </span>
                         </td>
-                        <td className="p-2 sm:p-4 text-right">
-                          <span className="text-sm text-muted-foreground">{player.volume24h.toLocaleString()}</span>
+                        <td className="px-2 py-1.5 text-right hidden lg:table-cell">
+                          <span className="text-xs text-muted-foreground">{player.volume24h > 0 ? player.volume24h.toLocaleString() : '-'}</span>
                         </td>
-                        <td className="p-2 sm:p-4 text-right">
+                        <td className="px-2 py-1.5 text-right hidden md:table-cell">
                           <div className={`flex items-center justify-end gap-1 ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
                             {parseFloat(player.priceChange24h) >= 0 ? (
-                              <TrendingUp className="w-4 h-4" />
+                              <TrendingUp className="w-3 h-3" />
                             ) : (
-                              <TrendingDown className="w-4 h-4" />
+                              <TrendingDown className="w-3 h-3" />
                             )}
-                            <span className="font-medium">
+                            <span className="font-medium text-xs">
                               {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
                             </span>
                           </div>
                         </td>
-                        <td className="p-2 sm:p-4">
+                        <td className="px-2 py-1.5 hidden sm:table-cell">
                           <Link href={`/player/${player.id}`}>
                             <Button size="sm" data-testid={`button-trade-${player.id}`}>Trade</Button>
                           </Link>

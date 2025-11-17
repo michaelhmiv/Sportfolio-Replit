@@ -590,6 +590,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Players / Marketplace
+  app.get("/api/teams", async (req, res) => {
+    try {
+      const teams = await storage.getDistinctTeams();
+      res.json(teams);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/players", async (req, res) => {
     try {
       const { search, team, position } = req.query;
