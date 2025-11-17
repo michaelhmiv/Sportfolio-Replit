@@ -8,6 +8,10 @@ Preferred communication style: Simple, everyday language.
 
 **CRITICAL RULE: Never use mock, sample, or placeholder data under any circumstances.** All data must come from live API sources (MySportsFeeds). If API data is unavailable, show empty states or loading indicators - never fabricate data.
 
+## Recent Changes (November 17, 2025)
+- **Help/Wiki Feature:** Added Help dialog accessible via question mark (?) button in header, containing comprehensive Sportfolio documentation covering mining, trading, contests, and burn mechanics
+- **Discord Integration:** Added Discord button in header linking to community server (https://discord.gg/r8MsduNvXG) for user support and engagement
+
 ## System Architecture
 
 ### Frontend Architecture
