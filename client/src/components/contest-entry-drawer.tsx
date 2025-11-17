@@ -35,7 +35,8 @@ interface EntryDetail {
   lineup: Array<{
     id: string;
     playerId: string;
-    playerName: string;
+    playerFirstName: string;
+    playerLastName: string;
     playerTeam: string;
     playerPosition: string;
     sharesEntered: number;
@@ -163,7 +164,7 @@ export function ContestEntryDrawer({
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-semibold" data-testid={`text-player-name-${player.playerId}`}>
-                              {player.playerName}
+                              {player.playerFirstName} {player.playerLastName}
                             </span>
                             <Badge variant="outline" className="text-xs">
                               {player.playerTeam}

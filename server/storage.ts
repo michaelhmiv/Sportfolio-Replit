@@ -612,7 +612,8 @@ export class DatabaseStorage implements IStorage {
       .select({
         id: contestLineups.id,
         playerId: contestLineups.playerId,
-        playerName: players.name,
+        playerFirstName: players.firstName,
+        playerLastName: players.lastName,
         playerTeam: players.team,
         playerPosition: players.position,
         sharesEntered: contestLineups.sharesEntered,
