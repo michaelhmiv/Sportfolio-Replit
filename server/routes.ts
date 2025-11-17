@@ -1958,6 +1958,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           firstName: user.firstName,
           lastName: user.lastName,
           profileImageUrl: user.profileImageUrl,
+          isAdmin: user.isAdmin || false,
           isPremium: user.isPremium,
           createdAt: user.createdAt,
         },
@@ -2008,24 +2009,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Admin middleware - validates ADMIN_API_TOKEN
-  function adminAuth(req: any, res: any, next: any) {
+  // Admin middleware - validates ADMIN_API_TOKEN (for external cron) OR isAdmin flag (for logged-in users)
+  async function adminAuth(req: any, res: any, next: any) {
     const token = req.headers.authorization?.replace('Bearer ', '');
     const expectedToken = process.env.ADMIN_API_TOKEN;
     
-    if (!expectedToken) {
-      console.warn('[ADMIN] ADMIN_API_TOKEN not configured - admin endpoints disabled');
-      return res.status(503).json({ error: 'Admin endpoints not configured' });
-    }
-    
-    if (token !== expectedToken) {
+    // Check 1: Token-based auth (for external cron jobs)
+    if (token) {
+      // If token is provided but ADMIN_API_TOKEN is not configured
+      if (!expectedToken) {
+        console.warn('[ADMIN] ADMIN_API_TOKEN not configured - admin endpoints disabled for external access');
+        return res.status(503).json({ error: 'Admin endpoints not configured' });
+      }
+      // Token-based auth success
+      if (token === expectedToken) {
+        return next();
+      }
+      // Token provided but incorrect - authentication failed
       const clientIp = req.ip || req.connection.remoteAddress;
-      console.warn(`[ADMIN] Unauthorized access attempt from ${clientIp} to ${req.path}`);
-      return res.status(401).json({ error: 'Unauthorized' });
+      console.warn(`[ADMIN] Invalid token from ${clientIp} to ${req.path}`);
+      return res.status(401).json({ error: 'Unauthorized - invalid token' });
     }
     
-    next();
+    // Check 2: Session-based auth with admin role (for logged-in admin users)
+    if (req.isAuthenticated && req.isAuthenticated()) {
+      try {
+        const userId = getUserId(req);
+        const user = await storage.getUser(userId);
+        if (user?.isAdmin) {
+          return next();
+        }
+      } catch (error) {
+        console.error('[ADMIN] Error checking admin status:', error);
+      }
+    }
+    
+    const clientIp = req.ip || req.connection.remoteAddress;
+    console.warn(`[ADMIN] Unauthorized access attempt from ${clientIp} to ${req.path}`);
+    return res.status(401).json({ error: 'Unauthorized - admin access required' });
   }
+
+  // Admin endpoint: Get system statistics
+  app.get("/api/admin/stats", adminAuth, async (req, res) => {
+    try {
+      const [users, players, allContests, jobLogs] = await Promise.all([
+        storage.getUsers(),
+        storage.getPlayers(),
+        storage.getContests(),
+        storage.getRecentJobLogs(undefined, 50),
+      ]);
+
+      const openContests = allContests.filter((c: any) => c.status === 'open').length;
+      const liveContests = allContests.filter((c: any) => c.status === 'live').length;
+      const completedContests = allContests.filter((c: any) => c.status === 'completed').length;
+
+      // Get today's API request count from job logs
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayLogs = jobLogs.filter((log: any) => {
+        const logDate = new Date(log.scheduledFor);
+        logDate.setHours(0, 0, 0, 0);
+        return logDate.getTime() === today.getTime();
+      });
+      const apiRequestsToday = todayLogs.reduce((sum: number, log: any) => sum + (log.requestCount || 0), 0);
+
+      // Get last run for each job type
+      const jobTypes = ['roster_sync', 'schedule_sync', 'stats_sync', 'create_contests', 'settle_contests'];
+      const lastJobRuns = jobTypes.map(jobName => {
+        const logs = jobLogs.filter((log: any) => log.jobName === jobName);
+        const lastLog = logs.length > 0 ? logs[0] : null;
+        return {
+          jobName,
+          status: lastLog?.status || 'never_run',
+          finishedAt: lastLog?.finishedAt || null,
+          recordsProcessed: lastLog?.recordsProcessed || 0,
+          errorCount: lastLog?.errorCount || 0,
+        };
+      });
+
+      res.json({
+        totalUsers: users.length,
+        totalPlayers: players.length,
+        totalContests: allContests.length,
+        openContests,
+        liveContests,
+        completedContests,
+        apiRequestsToday,
+        lastJobRuns,
+      });
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to get stats:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
 
   // Admin endpoint: Manually trigger cron jobs
   app.post("/api/admin/jobs/trigger", adminAuth, async (req, res) => {

@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Trophy, TrendingUp, Activity, Award, DollarSign, Clock, Edit2 } from "lucide-react";
+import { Trophy, TrendingUp, Activity, Award, DollarSign, Clock, Edit2, Settings } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -22,6 +22,7 @@ interface UserProfile {
     firstName: string;
     lastName: string;
     profileImageUrl?: string;
+    isAdmin: boolean;
     isPremium: boolean;
     createdAt: string;
   };
@@ -167,43 +168,53 @@ export default function UserProfile() {
                     </Badge>
                   )}
                   {isOwnProfile && (
-                    <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" size="sm" className="gap-2" data-testid="button-edit-username">
-                          <Edit2 className="w-3 h-3" />
-                          Edit Username
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent>
-                        <DialogHeader>
-                          <DialogTitle>Change Username</DialogTitle>
-                          <DialogDescription>
-                            Choose a unique username (3-20 characters, letters, numbers, underscores, and hyphens only)
-                          </DialogDescription>
-                        </DialogHeader>
-                        <div className="py-4">
-                          <Input
-                            placeholder="Enter new username"
-                            value={newUsername}
-                            onChange={(e) => setNewUsername(e.target.value)}
-                            maxLength={20}
-                            data-testid="input-new-username"
-                          />
-                        </div>
-                        <DialogFooter>
-                          <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                            Cancel
+                    <>
+                      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                        <DialogTrigger asChild>
+                          <Button variant="outline" size="sm" className="gap-2" data-testid="button-edit-username">
+                            <Edit2 className="w-3 h-3" />
+                            Edit Username
                           </Button>
-                          <Button
-                            onClick={handleUpdateUsername}
-                            disabled={updateUsernameMutation.isPending || !newUsername.trim()}
-                            data-testid="button-save-username"
-                          >
-                            {updateUsernameMutation.isPending ? "Saving..." : "Save"}
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Change Username</DialogTitle>
+                            <DialogDescription>
+                              Choose a unique username (3-20 characters, letters, numbers, underscores, and hyphens only)
+                            </DialogDescription>
+                          </DialogHeader>
+                          <div className="py-4">
+                            <Input
+                              placeholder="Enter new username"
+                              value={newUsername}
+                              onChange={(e) => setNewUsername(e.target.value)}
+                              maxLength={20}
+                              data-testid="input-new-username"
+                            />
+                          </div>
+                          <DialogFooter>
+                            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button
+                              onClick={handleUpdateUsername}
+                              disabled={updateUsernameMutation.isPending || !newUsername.trim()}
+                              data-testid="button-save-username"
+                            >
+                              {updateUsernameMutation.isPending ? "Saving..." : "Save"}
+                            </Button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                      {profile.user.isAdmin && (
+                        <Link href="/admin">
+                          <Button variant="outline" size="sm" className="gap-2" data-testid="button-admin">
+                            <Settings className="w-3 h-3" />
+                            Admin
                           </Button>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
+                        </Link>
+                      )}
+                    </>
                   )}
                 </div>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">

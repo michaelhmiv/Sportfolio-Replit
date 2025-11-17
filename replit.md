@@ -9,12 +9,15 @@ Preferred communication style: Simple, everyday language.
 **CRITICAL RULE: Never use mock, sample, or placeholder data under any circumstances.** All data must come from live API sources (MySportsFeeds). If API data is unavailable, show empty states or loading indicators - never fabricate data.
 
 ## Recent Changes (November 17, 2025)
-- **Help/Wiki Feature:** Added Help dialog accessible via question mark (?) button in header, containing comprehensive Sportfolio documentation covering mining, trading, contests, and burn mechanics
-- **Discord Integration:** Added Discord button in header linking to community server (https://discord.gg/r8MsduNvXG) for user support and engagement
-- **Landing Page Update:** Changed hero text to "Free Market Fantasy Sports" for clearer messaging
-- **Dark Mode Default:** Dark mode is now the default theme for new visitors (can still toggle to light mode)
-- **Portfolio Auth Guard:** Unauthenticated users clicking Portfolio tab now receive a helpful prompt to create an account
-- **Header Optimization:** Reduced "Sportfolio" logo font size to prevent overlap with header buttons
+- **Admin Panel with Role-Based Access:** Implemented comprehensive admin page (`/admin`) with system stats dashboard and manual job trigger controls, secured with dual authentication (token-based for external cron, session-based with `isAdmin` flag for logged-in admins)
+- **Admin Security Model:** Added `isAdmin` boolean field to users table; admin button on profile page only visible to admin users; middleware properly validates both authentication paths with clear 401/503 error responses
+- **External Cron Setup:** Configured production to use external cron service (cron-job.org) for automated background jobs
+- **Production Documentation:** Created `PRODUCTION_SETUP.md` with complete cron-job.org configuration instructions and admin security model
+- **Help/Wiki Feature:** Added Help dialog accessible via question mark (?) button in header
+- **Discord Integration:** Added Discord button in header linking to community server
+- **Landing Page Redesign:** Mobile-optimized layout with smaller fonts, live badge, stats bar, and gradient CTA
+- **Dark Mode Default:** Dark mode is now the default theme for new visitors
+- **Portfolio Auth Guard:** Unauthenticated users receive helpful prompt to create account
 
 ## System Architecture
 
@@ -73,5 +76,21 @@ Player shares are **permanent across all seasons** and never expire. Each player
 - Authentication is only required to enter contests, trade shares, or mine players
 - Public routes: `/api/contests`, `/api/contest/:id/leaderboard`, `/api/contest/:contestId/entries/:entryId`
 
-**Background Jobs (Cron):**
-- Automated daily `roster_sync`, minute-by-minute `schedule_sync` (for live game scores), hourly `stats_sync` (for completed games), and `settle_contests` every 5 minutes.
+**Background Jobs & Production Architecture:**
+
+**Development Environment:**
+- Background jobs run automatically via Node.js `node-cron` scheduler
+- Jobs: `roster_sync` (daily 5am), `schedule_sync` (every minute), `stats_sync` (hourly), `stats_sync_live` (every minute), `settle_contests` (every 5 min), `create_contests` (daily midnight)
+
+**Production Environment:**
+- **External Cron Service:** Replit deployments don't run background jobs automatically, so production uses cron-job.org (free service) to trigger jobs via admin API endpoints
+- **Admin API:** Secure endpoints at `/api/admin/jobs/trigger` and `/api/admin/stats` protected by `ADMIN_API_TOKEN`
+- **Admin Panel:** Web UI at `/admin` (accessible from profile page) for manual job control and system monitoring
+- **Setup Guide:** Complete configuration instructions in `PRODUCTION_SETUP.md`
+
+**Critical Jobs for Production:**
+1. `create_contests` - Daily at midnight (creates contests for next 7 days)
+2. `settle_contests` - Every 5 minutes (distributes winnings to contest winners)
+3. `schedule_sync` - Every minute (updates live game scores)
+4. `stats_sync` - Every hour (syncs completed game stats for contest scoring)
+5. `roster_sync` - Daily at 5am (refreshes NBA player data)

@@ -22,6 +22,7 @@ import ContestLeaderboard from "@/pages/contest-leaderboard";
 import Portfolio from "@/pages/portfolio";
 import UserProfile from "@/pages/user-profile";
 import Leaderboards from "@/pages/leaderboards";
+import Admin from "@/pages/admin";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
@@ -71,6 +72,9 @@ function Router() {
       </Route>
       <Route path="/portfolio">
         {isAuthenticated ? <Portfolio /> : <Landing />}
+      </Route>
+      <Route path="/admin">
+        {isAuthenticated ? <Admin /> : <Landing />}
       </Route>
       
       <Route component={NotFound} />

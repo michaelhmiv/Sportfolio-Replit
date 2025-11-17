@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   // App-specific fields
   username: text("username").unique(), // Optional username, defaults to email
   balance: decimal("balance", { precision: 20, scale: 2 }).notNull().default("10000.00"), // Starting balance: $10,000
+  isAdmin: boolean("is_admin").notNull().default(false), // Admin access to system management
   isPremium: boolean("is_premium").notNull().default(false),
   premiumExpiresAt: timestamp("premium_expires_at"),
   // Profile stats
