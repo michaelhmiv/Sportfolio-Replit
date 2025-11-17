@@ -27,6 +27,10 @@ export const users = pgTable("users", {
   balance: decimal("balance", { precision: 20, scale: 2 }).notNull().default("10000.00"), // Starting balance: $10,000
   isPremium: boolean("is_premium").notNull().default(false),
   premiumExpiresAt: timestamp("premium_expires_at"),
+  // Profile stats
+  totalSharesMined: integer("total_shares_mined").notNull().default(0),
+  totalMarketOrders: integer("total_market_orders").notNull().default(0),
+  totalTradesExecuted: integer("total_trades_executed").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

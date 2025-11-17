@@ -1,6 +1,7 @@
-import { Home, TrendingUp, Trophy, User } from "lucide-react";
+import { Home, TrendingUp, Trophy, Briefcase, User } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
   {
@@ -21,18 +22,28 @@ const navItems = [
   {
     title: "Portfolio",
     url: "/portfolio",
-    icon: User,
+    icon: Briefcase,
   },
 ];
 
 export function BottomNav() {
   const [location] = useLocation();
+  const { user } = useAuth();
+
+  // Add Profile item dynamically based on authenticated user
+  const profileItem = {
+    title: "Profile",
+    url: user?.id ? `/user/${user.id}` : "/profile",
+    icon: User,
+  };
+
+  const allItems = [...navItems, profileItem];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t sm:hidden">
       <div className="flex items-center justify-around h-16">
-        {navItems.map((item) => {
-          const isActive = location === item.url;
+        {allItems.map((item) => {
+          const isActive = location === item.url || (item.title === "Profile" && location.startsWith("/user/"));
           return (
             <Link
               key={item.title}
@@ -40,7 +51,7 @@ export function BottomNav() {
             >
               <div
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 px-4 py-2 min-w-[64px] rounded-lg transition-colors",
+                  "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors",
                   isActive
                     ? "text-primary"
                     : "text-muted-foreground hover-elevate"

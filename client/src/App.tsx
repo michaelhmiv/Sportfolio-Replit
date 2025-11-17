@@ -17,6 +17,7 @@ import Contests from "@/pages/contests";
 import ContestEntry from "@/pages/contest-entry";
 import ContestLeaderboard from "@/pages/contest-leaderboard";
 import Portfolio from "@/pages/portfolio";
+import UserProfile from "@/pages/user-profile";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/contest/:id/entry/:entryId" component={ContestEntry} />
       <Route path="/contest/:id/leaderboard" component={ContestLeaderboard} />
       <Route path="/portfolio" component={Portfolio} />
+      <Route path="/user/:id" component={UserProfile} />
       <Route component={NotFound} />
     </Switch>
   );

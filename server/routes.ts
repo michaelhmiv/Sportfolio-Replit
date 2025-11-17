@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
 import { storage } from "./storage";
 import { fetchActivePlayers, calculateFantasyPoints, fetchPlayerSeasonStats, fetchPlayerGameLogs } from "./mysportsfeeds";
-import type { InsertPlayer, Player } from "@shared/schema";
+import type { InsertPlayer, Player, User, Holding } from "@shared/schema";
 import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
 import { calculateAccrualUpdate } from "@shared/mining-utils";
@@ -1704,6 +1704,115 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("[leaderboard] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Public user profile (anyone can view)
+  app.get("/api/user/:userId/profile", async (req, res) => {
+    try {
+      const user = await storage.getUser(req.params.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Get user holdings with market values
+      const userHoldings = await storage.getUserHoldings(user.id);
+      const enrichedHoldings = await Promise.all(
+        userHoldings.map(async (holding) => {
+          if (holding.assetType === "player") {
+            const player = await storage.getPlayer(holding.assetId);
+            if (player) {
+              const lastTradePrice = player.lastTradePrice || await getLastTradePrice(player.id);
+              const marketValue = lastTradePrice 
+                ? (parseFloat(lastTradePrice) * holding.quantity).toFixed(2)
+                : null;
+              return {
+                ...holding,
+                player,
+                lastTradePrice,
+                marketValue,
+              };
+            }
+          }
+          return holding;
+        })
+      );
+
+      // Calculate net worth (balance + total market value of holdings)
+      const holdingsValue = enrichedHoldings.reduce((sum: number, h: any) => {
+        return sum + (h.marketValue ? parseFloat(h.marketValue as string) : 0);
+      }, 0);
+      const netWorth = (parseFloat(user.balance) + holdingsValue).toFixed(2);
+
+      // Get leaderboard rankings
+      const allUsers = await storage.getUsers();
+      
+      // Calculate rankings
+      const sharesMinedRank = allUsers
+        .sort((a: User, b: User) => b.totalSharesMined - a.totalSharesMined)
+        .findIndex((u: User) => u.id === user.id) + 1;
+      
+      const marketOrdersRank = allUsers
+        .sort((a: User, b: User) => b.totalMarketOrders - a.totalMarketOrders)
+        .findIndex((u: User) => u.id === user.id) + 1;
+
+      // Calculate net worth for all users (with proper price fetching)
+      const usersWithNetWorth = await Promise.all(
+        allUsers.map(async (u: User) => {
+          const holdings = await storage.getUserHoldings(u.id);
+          const holdingsVal = await Promise.all(
+            holdings.map(async (h: Holding) => {
+              if (h.assetType === "player") {
+                const p = await storage.getPlayer(h.assetId);
+                if (p) {
+                  // Use lastTradePrice from player, or fetch from trades if not cached
+                  const lastTradePrice = p.lastTradePrice || await getLastTradePrice(p.id);
+                  if (lastTradePrice) {
+                    return parseFloat(lastTradePrice) * h.quantity;
+                  }
+                }
+              }
+              return 0;
+            })
+          );
+          const totalHoldingsVal = holdingsVal.reduce((sum: number, v: number) => sum + v, 0);
+          return {
+            userId: u.id,
+            netWorth: parseFloat(u.balance) + totalHoldingsVal,
+          };
+        })
+      );
+
+      const netWorthRank = usersWithNetWorth
+        .sort((a: { userId: string; netWorth: number }, b: { userId: string; netWorth: number }) => b.netWorth - a.netWorth)
+        .findIndex((u: { userId: string; netWorth: number }) => u.userId === user.id) + 1;
+
+      res.json({
+        user: {
+          id: user.id,
+          username: user.username,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          profileImageUrl: user.profileImageUrl,
+          isPremium: user.isPremium,
+          createdAt: user.createdAt,
+        },
+        stats: {
+          netWorth,
+          totalSharesMined: user.totalSharesMined,
+          totalMarketOrders: user.totalMarketOrders,
+          totalTradesExecuted: user.totalTradesExecuted,
+          holdingsCount: enrichedHoldings.length,
+        },
+        rankings: {
+          sharesMined: sharesMinedRank,
+          marketOrders: marketOrdersRank,
+          netWorth: netWorthRank,
+        },
+        holdings: enrichedHoldings.filter(h => h.assetType === "player" && h.quantity > 0),
+      });
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useParams } from "wouter";
+import { useParams, Link } from "wouter";
 import { useEffect } from "react";
 import { queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -200,7 +200,11 @@ export default function ContestLeaderboard() {
                           </div>
                         </td>
                         <td className="p-4">
-                          <div className="font-medium">{entry.username}</div>
+                          <Link href={`/user/${entry.userId}`}>
+                            <div className="font-medium hover:text-primary hover:underline cursor-pointer" data-testid={`link-username-${entry.userId}`}>
+                              {entry.username}
+                            </div>
+                          </Link>
                           {isMyEntry && <Badge variant="outline" className="text-xs mt-1">You</Badge>}
                         </td>
                         <td className="p-4 text-right">
