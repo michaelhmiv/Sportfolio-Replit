@@ -60,11 +60,8 @@ export default function UserProfile() {
 
   const updateUsernameMutation = useMutation({
     mutationFn: async (username: string) => {
-      return await apiRequest(`/api/user/update-username`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username }),
-      });
+      const res = await apiRequest("POST", `/api/user/update-username`, { username });
+      return await res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/user/${userId}/profile`] });
