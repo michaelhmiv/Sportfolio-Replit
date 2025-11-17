@@ -591,7 +591,7 @@ export class DatabaseStorage implements IStorage {
         createdAt: contestEntries.createdAt,
       })
       .from(contestEntries)
-      .leftJoin(users, eq(contestEntries.userId, users.id))
+      .innerJoin(users, eq(contestEntries.userId, users.id))
       .where(and(
         eq(contestEntries.id, entryId),
         eq(contestEntries.contestId, contestId)
@@ -620,7 +620,7 @@ export class DatabaseStorage implements IStorage {
         earnedScore: contestLineups.earnedScore,
       })
       .from(contestLineups)
-      .leftJoin(players, eq(contestLineups.playerId, players.id))
+      .innerJoin(players, eq(contestLineups.playerId, players.id))
       .where(eq(contestLineups.entryId, entryId));
 
     // For each player, calculate percentage of total shares entered for that player in this contest
