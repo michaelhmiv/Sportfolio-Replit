@@ -101,30 +101,29 @@ export default function Leaderboards() {
               >
                 <CardContent className="p-4">
                   <Link href={`/user/${entry.userId}`}>
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-bold text-2xl w-12 text-right">
+                    <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <span className="font-mono font-bold text-xl w-10 text-right">
                           #{entry.rank}
                         </span>
                         {entry.rank <= 3 && (
-                          <Trophy className={`w-5 h-5 ${entry.rank === 1 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
+                          <Trophy className={`w-4 h-4 ${entry.rank === 1 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
                         )}
                       </div>
                       
-                      <Avatar className="w-10 h-10">
+                      <Avatar className="w-9 h-9 flex-shrink-0">
                         <AvatarImage src={entry.profileImageUrl || undefined} />
                         <AvatarFallback>{entry.username[0].toUpperCase()}</AvatarFallback>
                       </Avatar>
                       
                       <div className="flex-1 min-w-0">
-                        <div className={`font-semibold truncate ${isCurrentUser ? 'text-primary' : ''}`}>
-                          {displayName}
+                        <div className={`font-semibold text-sm truncate ${isCurrentUser ? 'text-primary' : ''}`}>
+                          @{entry.username}
                         </div>
-                        <div className="text-sm text-muted-foreground">@{entry.username}</div>
                       </div>
                       
-                      <div className="text-right">
-                        <div className="font-mono font-bold text-lg">
+                      <div className="text-right flex-shrink-0">
+                        <div className="font-mono font-bold text-base">
                           {valueFormatter(entry.value)}
                         </div>
                       </div>

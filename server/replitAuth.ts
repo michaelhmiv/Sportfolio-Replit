@@ -50,9 +50,22 @@ function updateUserSession(
   user.expires_at = user.claims?.exp;
 }
 
+// Generate a random username
+function generateUsername(): string {
+  const adjectives = ['swift', 'brave', 'wise', 'bold', 'quick', 'clever', 'mighty', 'pro', 'super', 'elite'];
+  const nouns = ['trader', 'player', 'investor', 'champion', 'star', 'hawk', 'wolf', 'eagle', 'tiger', 'bear'];
+  const adj = adjectives[Math.floor(Math.random() * adjectives.length)];
+  const noun = nouns[Math.floor(Math.random() * nouns.length)];
+  const num = Math.floor(Math.random() * 10000);
+  return `${adj}_${noun}_${num}`;
+}
+
 async function upsertUser(claims: any) {
-  // Create username from email or use first/last name
-  const username = claims["email"] || `${claims["first_name"] || ''} ${claims["last_name"] || ''}`.trim() || `user_${claims["sub"]}`;
+  // Check if user already exists
+  const existingUser = await storage.getUser(claims["sub"]);
+  
+  // Only generate a new random username for new users (not on updates)
+  const username = existingUser?.username || generateUsername();
   
   await storage.upsertUser({
     id: claims["sub"],

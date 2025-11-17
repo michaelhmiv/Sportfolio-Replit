@@ -41,17 +41,18 @@ export function BottomNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t sm:hidden">
-      <div className="flex items-center justify-around h-16">
+      <div className="grid grid-cols-5 h-16 max-w-md mx-auto">
         {allItems.map((item) => {
           const isActive = location === item.url || (item.title === "Profile" && location.startsWith("/user/"));
           return (
             <Link
               key={item.title}
               href={item.url}
+              className="flex items-center justify-center"
             >
               <div
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors",
+                  "flex flex-col items-center justify-center gap-1 py-2 rounded-lg transition-colors w-full",
                   isActive
                     ? "text-primary"
                     : "text-muted-foreground hover-elevate"

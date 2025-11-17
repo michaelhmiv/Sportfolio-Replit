@@ -536,6 +536,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update username
+  app.post("/api/user/update-username", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { username } = req.body;
+
+      // Validate username
+      if (!username || typeof username !== 'string') {
+        return res.status(400).json({ error: "Username is required" });
+      }
+
+      // Check length (3-20 characters)
+      if (username.length < 3 || username.length > 20) {
+        return res.status(400).json({ error: "Username must be between 3 and 20 characters" });
+      }
+
+      // Check format (alphanumeric, underscores, hyphens only)
+      if (!/^[a-zA-Z0-9_-]+$/.test(username)) {
+        return res.status(400).json({ error: "Username can only contain letters, numbers, underscores, and hyphens" });
+      }
+
+      // Check if username is already taken by another user
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser && existingUser.id !== userId) {
+        return res.status(409).json({ error: "Username is already taken" });
+      }
+
+      const updatedUser = await storage.updateUsername(userId, username);
+      if (updatedUser) {
+        res.json({ username: updatedUser.username });
+      } else {
+        res.status(500).json({ error: "Failed to update username" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Admin endpoint to manually trigger sync jobs
   app.post("/api/admin/sync/:jobName", isAuthenticated, async (req, res) => {
     try {

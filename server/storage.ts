@@ -47,6 +47,7 @@ export interface IStorage {
   createUser(user: InsertUser): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserBalance(userId: string, amount: string): Promise<void>;
+  updateUsername(userId: string, username: string): Promise<User | undefined>;
   
   // Player methods
   getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]>;
@@ -188,6 +189,15 @@ export class DatabaseStorage implements IStorage {
         // PostgreSQL handles the arithmetic atomically with proper precision
         balance: sql`${users.balance} + ${delta}`
       })
+      .where(eq(users.id, userId));
+    
+    return await this.getUser(userId);
+  }
+
+  async updateUsername(userId: string, username: string): Promise<User | undefined> {
+    await db
+      .update(users)
+      .set({ username, updatedAt: new Date() })
       .where(eq(users.id, userId));
     
     return await this.getUser(userId);

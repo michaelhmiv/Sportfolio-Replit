@@ -1,10 +1,17 @@
 import { useParams } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Trophy, TrendingUp, Activity, Award, DollarSign, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Trophy, TrendingUp, Activity, Award, DollarSign, Clock, Edit2 } from "lucide-react";
 import { Link } from "wouter";
+import { useAuth } from "@/hooks/useAuth";
+import { queryClient, apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import type { Player } from "@shared/schema";
 
 interface UserProfile {
@@ -42,10 +49,46 @@ interface UserProfile {
 export default function UserProfile() {
   const params = useParams();
   const userId = params.id;
+  const { user: currentUser } = useAuth();
+  const { toast } = useToast();
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [newUsername, setNewUsername] = useState("");
 
   const { data: profile, isLoading } = useQuery<UserProfile>({
     queryKey: [`/api/user/${userId}/profile`],
   });
+
+  const updateUsernameMutation = useMutation({
+    mutationFn: async (username: string) => {
+      return await apiRequest(`/api/user/update-username`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/user/${userId}/profile`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setIsEditDialogOpen(false);
+      toast({
+        title: "Username updated",
+        description: "Your username has been successfully changed.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update username",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleUpdateUsername = () => {
+    if (newUsername.trim()) {
+      updateUsernameMutation.mutate(newUsername.trim());
+    }
+  };
 
   if (isLoading) {
     return (
@@ -68,9 +111,10 @@ export default function UserProfile() {
   }
 
   const { user, stats, rankings, holdings } = profile;
-  const displayName = user.username || `${user.firstName} ${user.lastName}` || "Unknown User";
+  const displayName = user.username;
   const initials = (user.firstName?.[0] || "") + (user.lastName?.[0] || "");
   const memberSince = new Date(user.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const isOwnProfile = currentUser?.id === user.id;
 
   return (
     <div className="min-h-screen bg-background p-3 sm:p-6 lg:p-8">
@@ -86,12 +130,51 @@ export default function UserProfile() {
               
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
-                  <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-username">{displayName}</h1>
+                  <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-username">@{displayName}</h1>
                   {user.isPremium && (
                     <Badge variant="default" className="gap-1">
                       <Trophy className="w-3 h-3" />
                       Premium
                     </Badge>
+                  )}
+                  {isOwnProfile && (
+                    <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="outline" size="sm" className="gap-2" data-testid="button-edit-username">
+                          <Edit2 className="w-3 h-3" />
+                          Edit Username
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Change Username</DialogTitle>
+                          <DialogDescription>
+                            Choose a unique username (3-20 characters, letters, numbers, underscores, and hyphens only)
+                          </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4">
+                          <Input
+                            placeholder="Enter new username"
+                            value={newUsername}
+                            onChange={(e) => setNewUsername(e.target.value)}
+                            maxLength={20}
+                            data-testid="input-new-username"
+                          />
+                        </div>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={handleUpdateUsername}
+                            disabled={updateUsernameMutation.isPending || !newUsername.trim()}
+                            data-testid="button-save-username"
+                          >
+                            {updateUsernameMutation.isPending ? "Saving..." : "Save"}
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   )}
                 </div>
                 <div className="flex items-center gap-1 text-sm text-muted-foreground">
