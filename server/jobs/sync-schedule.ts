@@ -51,23 +51,8 @@ export async function syncSchedule(): Promise<JobResult> {
             const homeScore = game.score?.homeScoreTotal != null ? parseInt(game.score.homeScoreTotal) : null;
             const awayScore = game.score?.awayScoreTotal != null ? parseInt(game.score.awayScoreTotal) : null;
             
-            // DEBUG: Log raw status for games with scores to see what MySportsFeeds returns
-            if (homeScore !== null && awayScore !== null) {
-              const hoursAgo = (Date.now() - startTime.getTime()) / (1000 * 60 * 60);
-              console.log(`[schedule_sync] Game ${gameId} (${game.schedule?.homeTeam?.abbreviation} vs ${game.schedule?.awayTeam?.abbreviation}): rawStatus="${rawStatus}", scores=${homeScore}-${awayScore}, started ${hoursAgo.toFixed(1)}h ago`);
-            }
-            
-            // Smart status detection with fallback logic
-            let normalizedStatus = normalizeGameStatus(rawStatus);
-            
-            // FALLBACK: If game has final scores AND started >2 hours ago, mark as completed
-            // This handles cases where MySportsFeeds is slow to update status from "LIVE" to "FINAL"
-            // NBA games typically last 2-2.5 hours, so 2h threshold catches most finished games
-            const hoursAgo = (Date.now() - startTime.getTime()) / (1000 * 60 * 60);
-            if (normalizedStatus === "inprogress" && homeScore !== null && awayScore !== null && hoursAgo > 2) {
-              console.log(`[schedule_sync] OVERRIDE: Game ${gameId} marked completed (scores present, started ${hoursAgo.toFixed(1)}h ago)`);
-              normalizedStatus = "completed";
-            }
+            // Normalize status based on what MySportsFeeds API returns
+            const normalizedStatus = normalizeGameStatus(rawStatus);
             
             await storage.upsertDailyGame({
               gameId,
