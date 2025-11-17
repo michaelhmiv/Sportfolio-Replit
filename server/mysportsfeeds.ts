@@ -97,18 +97,26 @@ export async function fetchPlayerGameStats(gameId: string, gameDate: Date): Prom
 
 /**
  * Normalize MySportsFeeds game status to internal enum
- * API returns: "UNPLAYED", "LIVE", "FINAL", "COMPLETED", "In-Progress", etc.
+ * API returns various status strings including:
+ * - Final states: "FINAL", "COMPLETED", "FINAL_OVERTIME", "FINAL-OVERTIME"
+ * - In-progress: "LIVE", "INPROGRESS", "In-Progress", "LIVE_IN_PROGRESS"
+ * - Scheduled: "UNPLAYED", "SCHEDULED", "POSTPONED", "SUSPENDED"
  * Internal: "scheduled", "inprogress", "completed"
  */
 export function normalizeGameStatus(apiStatus: string): string {
-  const normalized = apiStatus.toLowerCase();
+  const normalized = apiStatus.toLowerCase().replace(/[-_]/g, ''); // Remove dashes and underscores
   
-  if (normalized === "final" || normalized === "completed") {
+  // Check for any variation of "final" or "completed"
+  if (normalized.includes("final") || normalized.includes("completed")) {
     return "completed";
   }
-  if (normalized === "live" || normalized === "inprogress" || normalized === "in-progress") {
+  
+  // Check for any variation of "live" or "inprogress"
+  if (normalized.includes("live") || normalized.includes("inprogress") || normalized.includes("progress")) {
     return "inprogress";
   }
+  
+  // Everything else (unplayed, scheduled, postponed, suspended, etc.) is scheduled
   return "scheduled";
 }
 
