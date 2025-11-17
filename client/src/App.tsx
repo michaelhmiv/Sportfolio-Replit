@@ -9,6 +9,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
+import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "@/pages/dashboard";
 import Marketplace from "@/pages/marketplace";
 import PlayerPage from "@/pages/player";
@@ -16,10 +17,29 @@ import Contests from "@/pages/contests";
 import ContestEntry from "@/pages/contest-entry";
 import ContestLeaderboard from "@/pages/contest-leaderboard";
 import Portfolio from "@/pages/portfolio";
+import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
+import { LogOut } from "lucide-react";
 
 function Router() {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <Landing />;
+  }
+
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
@@ -36,6 +56,7 @@ function Router() {
 }
 
 function Header() {
+  const { user } = useAuth();
   const { data: dashboardData } = useQuery<{ user: { balance: string; portfolioValue: string } }>({ 
     queryKey: ['/api/dashboard'],
     refetchInterval: 10000 
@@ -74,6 +95,8 @@ function Header() {
     }
   };
 
+  const userName = user?.username || user?.email || user?.firstName || "User";
+
   return (
     <header className="flex items-center justify-between h-16 px-4 border-b bg-card sticky top-0 z-10">
       <div className="flex items-center gap-4">
@@ -94,12 +117,28 @@ function Header() {
         </div>
       </div>
       <div className="flex items-center gap-2">
+        <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
+          <span data-testid="text-username">{userName}</span>
+        </div>
         <Button 
           size="sm" 
           onClick={handleAddCash}
           data-testid="button-add-cash"
         >
           +$1
+        </Button>
+        <Button 
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            // Invalidate auth cache before logout
+            queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+            window.location.href = "/api/logout";
+          }}
+          data-testid="button-logout"
+          title="Logout"
+        >
+          <LogOut className="h-4 w-4" />
         </Button>
         <ThemeToggle />
       </div>

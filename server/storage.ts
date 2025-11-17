@@ -15,6 +15,7 @@ import {
   jobExecutionLogs,
   type User,
   type InsertUser,
+  type UpsertUser,
   type Player,
   type InsertPlayer,
   type Holding,
@@ -43,6 +44,7 @@ export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  upsertUser(user: UpsertUser): Promise<User>;
   updateUserBalance(userId: string, amount: string): Promise<void>;
   
   // Player methods
@@ -129,6 +131,38 @@ export class DatabaseStorage implements IStorage {
       userId: user.id,
       sharesAccumulated: 0,
     });
+    
+    return user;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values({
+        ...userData,
+        balance: userData.balance || "10000.00", // Starting balance if new user
+      })
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+          profileImageUrl: userData.profileImageUrl,
+          username: userData.username,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    
+    // Initialize mining for new user if it doesn't exist
+    const existingMining = await db.select().from(mining).where(eq(mining.userId, user.id));
+    if (existingMining.length === 0) {
+      await db.insert(mining).values({
+        userId: user.id,
+        sharesAccumulated: 0,
+      });
+    }
     
     return user;
   }

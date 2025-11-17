@@ -8,8 +8,12 @@ import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
 import { calculateAccrualUpdate } from "@shared/mining-utils";
 import { createContests } from "./jobs/create-contests";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Setup authentication middleware
+  await setupAuth(app);
+
   const httpServer = createServer(app);
 
   // Initialize WebSocket server
@@ -20,20 +24,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     ws.on('close', () => removeClient(ws));
   });
 
-  // Helper: Get user from session (simplified - would use auth middleware in production)
+  // Helper: Get authenticated user ID from session
   const getUserId = (req: any): string => {
-    // For MVP, we'll create/use a default user
-    return "default-user-id";
-  };
-
-  // Helper: Ensure default user exists
-  async function ensureDefaultUser() {
-    let user = await storage.getUserByUsername("demo");
-    if (!user) {
-      user = await storage.createUser({ username: "demo" });
+    if (!req.user?.claims?.sub) {
+      throw new Error("User not authenticated");
     }
-    return user;
-  }
+    return req.user.claims.sub;
+  };
 
   // Helper: Get last trade price for a player
   async function getLastTradePrice(playerId: string): Promise<string | null> {
@@ -258,10 +255,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // API ROUTES
 
-  // Dashboard
-  app.get("/api/dashboard", async (req, res) => {
+  // Auth endpoints
+  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+
+  // Dashboard
+  app.get("/api/dashboard", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       
       // Accrue mining shares based on elapsed time
       await accrueMiningShares(user.id);
@@ -503,9 +516,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Add cash to user balance ($1)
-  app.post("/api/user/add-cash", async (req, res) => {
+  app.post("/api/user/add-cash", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       const updatedUser = await storage.addUserBalance(user.id, 1.00);
       
       if (updatedUser) {
@@ -520,7 +537,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin endpoint to manually trigger sync jobs
-  app.post("/api/admin/sync/:jobName", async (req, res) => {
+  app.post("/api/admin/sync/:jobName", isAuthenticated, async (req, res) => {
     try {
       const { jobName } = req.params;
       const result = await jobScheduler.triggerJob(jobName);
@@ -552,9 +569,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Player detail page
-  app.get("/api/player/:id", async (req, res) => {
+  app.get("/api/player/:id", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       const playerRaw = await storage.getPlayer(req.params.id);
       
       if (!playerRaw) {
@@ -730,9 +751,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Place order
-  app.post("/api/orders/:playerId", async (req, res) => {
+  app.post("/api/orders/:playerId", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       const player = await storage.getPlayer(req.params.playerId);
       
       if (!player) {
@@ -940,7 +965,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Cancel order
-  app.post("/api/orders/:orderId/cancel", async (req, res) => {
+  app.post("/api/orders/:orderId/cancel", isAuthenticated, async (req, res) => {
     try {
       await storage.cancelOrder(req.params.orderId);
       res.json({ success: true });
@@ -950,9 +975,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Portfolio
-  app.get("/api/portfolio", async (req, res) => {
+  app.get("/api/portfolio", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       const userHoldings = await storage.getUserHoldings(user.id);
       const openOrders = await storage.getUserOrders(user.id, "open");
 
@@ -1011,9 +1040,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Start/select mining for player(s)
-  app.post("/api/mining/start", async (req, res) => {
+  app.post("/api/mining/start", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       const { playerIds } = req.body; // Array of player IDs (1-10)
 
       if (!playerIds || !Array.isArray(playerIds) || playerIds.length === 0) {
@@ -1081,9 +1114,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Mining claim
-  app.post("/api/mining/claim", async (req, res) => {
+  app.post("/api/mining/claim", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       
       // Accrue any final shares before claiming
       await accrueMiningShares(user.id);
@@ -1211,9 +1248,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contests
-  app.get("/api/contests", async (req, res) => {
+  app.get("/api/contests", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       const allOpenContests = await storage.getContests("open");
       
       const { date } = req.query;
@@ -1259,7 +1300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin endpoint to manually trigger contest creation (for testing)
-  app.post("/api/admin/create-contests", async (req, res) => {
+  app.post("/api/admin/create-contests", isAuthenticated, async (req, res) => {
     try {
       console.log("[admin] Manually triggering contest creation...");
       const result = await createContests();
@@ -1270,9 +1311,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contest entry form
-  app.get("/api/contest/:id/entry", async (req, res) => {
+  app.get("/api/contest/:id/entry", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       const contest = await storage.getContest(req.params.id);
 
       if (!contest) {
@@ -1305,9 +1350,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Submit contest entry
-  app.post("/api/contest/:id/enter", async (req, res) => {
+  app.post("/api/contest/:id/enter", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       const contest = await storage.getContest(req.params.id);
 
       if (!contest) {
@@ -1379,9 +1428,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get existing contest entry for editing
-  app.get("/api/contest/:contestId/entry/:entryId", async (req, res) => {
+  app.get("/api/contest/:contestId/entry/:entryId", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       const { contestId, entryId } = req.params;
 
       const contest = await storage.getContest(contestId);
@@ -1461,9 +1514,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update contest entry (edit lineup before lock)
-  app.put("/api/contest/:contestId/entry/:entryId", async (req, res) => {
+  app.put("/api/contest/:contestId/entry/:entryId", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       const { contestId, entryId } = req.params;
       const { lineup } = req.body;
 
@@ -1606,9 +1663,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contest leaderboard with proportional scoring
-  app.get("/api/contest/:id/leaderboard", async (req, res) => {
+  app.get("/api/contest/:id/leaderboard", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       const contest = await storage.getContest(req.params.id);
 
       if (!contest) {
@@ -1634,9 +1695,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Premium redeem
-  app.post("/api/premium/redeem", async (req, res) => {
+  app.post("/api/premium/redeem", isAuthenticated, async (req, res) => {
     try {
-      const user = await ensureDefaultUser();
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
       const premiumHolding = await storage.getHolding(user.id, "premium", "premium");
 
       if (!premiumHolding || premiumHolding.quantity < 1) {
@@ -1723,8 +1788,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
-  // Initialize default user and data
-  await ensureDefaultUser();
+  // Initialize data
   await initializePlayers();
 
   return httpServer;

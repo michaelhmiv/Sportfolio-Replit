@@ -22,6 +22,9 @@ The backend is an Express.js server with TypeScript, supporting both HTTP and We
 ### Database Schema
 The database schema includes key tables such as `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, and `price_history`. Indexing is optimized for user-asset relationships, player filtering, and order book queries.
 
+**CRITICAL: Player Share Persistence Across Seasons:**
+Player shares are **permanent across all seasons** and never expire. Each player has a globally unique ID (from MySportsFeeds) that remains constant across seasons. When a user owns 100 shares of Stephen Curry in 2025, those exact same 100 shares persist into the 2026 season, 2027 season, and beyond. The `players` table uses MySportsFeeds numeric player IDs (e.g., "9218" for Stephen Curry) that are season-independent. Only game statistics (`player_game_stats` table) track seasonality via a `season` field - player identity and ownership never change. This ensures users build long-term portfolios that carry forward year after year.
+
 ## External Dependencies
 
 **MySportsFeeds API Integration:**
@@ -37,7 +40,12 @@ The database schema includes key tables such as `users`, `players`, `holdings`, 
 - **Google Fonts CDN:** For delivering typography.
 
 **Authentication:**
-- Simplified session-based authentication for an MVP with a demo user, designed for future OAuth integration.
+- **Replit Auth** integration for production-ready user authentication
+- Supports login with Google, GitHub, email/password, and other OAuth providers
+- Secure session management with PostgreSQL-backed session storage
+- Automatic user creation/sync on first login via the `upsertUser` pattern
+- All API routes protected with `isAuthenticated` middleware
+- New users receive $10,000 starting balance automatically
 
 **Background Jobs (Cron):**
 - Automated daily `roster_sync`, minute-by-minute `schedule_sync` (for live game scores), hourly `stats_sync` (for completed games), and `settle_contests` every 5 minutes.
