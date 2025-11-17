@@ -37,21 +37,36 @@ function Router() {
     );
   }
 
-  if (!isAuthenticated) {
-    return <Landing />;
-  }
-
+  // Public routes (accessible without authentication)
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/marketplace" component={Marketplace} />
-      <Route path="/player/:id" component={PlayerPage} />
+      {/* Landing page for unauthenticated users at root */}
+      <Route path="/">
+        {isAuthenticated ? <Dashboard /> : <Landing />}
+      </Route>
+      
+      {/* Public routes - contests and leaderboards */}
       <Route path="/contests" component={Contests} />
-      <Route path="/contest/:id/entry" component={ContestEntry} />
-      <Route path="/contest/:id/entry/:entryId" component={ContestEntry} />
       <Route path="/contest/:id/leaderboard" component={ContestLeaderboard} />
-      <Route path="/portfolio" component={Portfolio} />
       <Route path="/user/:id" component={UserProfile} />
+      
+      {/* Protected routes - require authentication */}
+      <Route path="/marketplace">
+        {isAuthenticated ? <Marketplace /> : <Landing />}
+      </Route>
+      <Route path="/player/:id">
+        {isAuthenticated ? <PlayerPage /> : <Landing />}
+      </Route>
+      <Route path="/contest/:id/entry">
+        {isAuthenticated ? <ContestEntry /> : <Landing />}
+      </Route>
+      <Route path="/contest/:id/entry/:entryId">
+        {isAuthenticated ? <ContestEntry /> : <Landing />}
+      </Route>
+      <Route path="/portfolio">
+        {isAuthenticated ? <Portfolio /> : <Landing />}
+      </Route>
+      
       <Route component={NotFound} />
     </Switch>
   );
