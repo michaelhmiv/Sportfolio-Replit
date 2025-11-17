@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Trophy, TrendingUp, ShoppingCart, DollarSign } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useWebSocket } from "@/lib/websocket";
+import { queryClient } from "@/lib/queryClient";
 
 interface LeaderboardEntry {
   rank: number;
@@ -25,6 +27,7 @@ interface LeaderboardData {
 export default function Leaderboards() {
   const [, setLocation] = useLocation();
   const { user } = useAuth();
+  const { subscribe } = useWebSocket();
   
   // Get initial category from URL hash
   const getHashCategory = () => {
@@ -44,6 +47,30 @@ export default function Leaderboards() {
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
+
+  // Subscribe to WebSocket events for real-time leaderboard updates
+  useEffect(() => {
+    // Mining events → update shares mined leaderboard
+    const unsubMining = subscribe('mining', () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leaderboards?category=sharesMined"] });
+    });
+
+    // Portfolio events → update net worth leaderboard
+    const unsubPortfolio = subscribe('portfolio', () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leaderboards?category=netWorth"] });
+    });
+
+    // Trade events → update market orders leaderboard
+    const unsubTrade = subscribe('trade', () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/leaderboards?category=marketOrders"] });
+    });
+
+    return () => {
+      unsubMining();
+      unsubPortfolio();
+      unsubTrade();
+    };
+  }, [subscribe]);
 
   const { data: netWorthData, isLoading: netWorthLoading } = useQuery<LeaderboardData>({
     queryKey: ["/api/leaderboards?category=netWorth"],

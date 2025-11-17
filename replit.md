@@ -23,6 +23,7 @@ A centralized WebSocket provider (`client/src/lib/websocket.tsx`) manages a sing
 - **Portfolio:** Listens for `portfolio`, `trade`, and `orderBook` events to update balance, holdings, and pending orders live
 - **Player Pages:** Listens for `trade`, `orderBook`, and `portfolio` events to update prices, trade history, and user balances instantly
 - **Header Balance:** Listens for `portfolio` events to update cash balance display across all pages
+- **Global Leaderboards:** Listens for `mining` (shares mined), `portfolio` (net worth), and `trade` (market orders) events to update all leaderboard rankings in real-time
 - **Contest Leaderboards:** Listens for `contestUpdate` and `liveStats` events to update rankings as games progress
 
 WebSocket event types: `portfolio` (balance/holdings changes), `mining` (mining activity), `trade` (trade executions), `orderBook` (order book changes), `liveStats` (game stat updates), `contestUpdate` (contest changes). The provider integrates with React Query's cache invalidation system to trigger automatic data refetches, ensuring every single data point updates instantly when backend data changes.
