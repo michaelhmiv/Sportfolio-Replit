@@ -78,16 +78,6 @@ async function upsertUser(claims: any) {
   });
 }
 
-// HTML escape function to prevent XSS
-function escapeHtml(unsafe: string): string {
-  return unsafe
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
 export async function setupAuth(app: Express) {
   app.set("trust proxy", 1);
   app.use(getSession());
@@ -131,42 +121,14 @@ export async function setupAuth(app: Express) {
   passport.deserializeUser((user: Express.User, cb) => cb(null, user));
 
   app.get("/api/login", (req, res, next) => {
-    console.log("[Auth] Login initiated:", {
-      hostname: req.hostname,
-      ip: req.ip,
-      userAgent: req.get('user-agent'),
-      timestamp: new Date().toISOString()
-    });
-
-    try {
-      ensureStrategy(req.hostname);
-      passport.authenticate(`replitauth:${req.hostname}`, {
-        prompt: "login consent",
-        scope: ["openid", "email", "profile", "offline_access"],
-      })(req, res, next);
-    } catch (error: any) {
-      console.error("[Auth] Login error:", error);
-      res.status(500).send(`
-        <html>
-          <body style="font-family: system-ui; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center;">
-            <h2>Authentication Error</h2>
-            <p>We encountered an issue starting the login process.</p>
-            <p style="color: #666; font-size: 14px;">Error: ${escapeHtml(error?.message || 'Unknown error')}</p>
-            <a href="/" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #0066cc; color: white; text-decoration: none; border-radius: 5px;">Return to Home</a>
-          </body>
-        </html>
-      `);
-    }
+    ensureStrategy(req.hostname);
+    passport.authenticate(`replitauth:${req.hostname}`, {
+      prompt: "login consent",
+      scope: ["openid", "email", "profile", "offline_access"],
+    })(req, res, next);
   });
 
   app.get("/api/callback", (req, res, next) => {
-    console.log("[Auth] Callback received:", {
-      hostname: req.hostname,
-      hasCode: !!req.query.code,
-      hasError: !!req.query.error,
-      timestamp: new Date().toISOString()
-    });
-
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
       successReturnToOrRedirect: "/",
