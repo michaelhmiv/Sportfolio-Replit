@@ -611,7 +611,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/players", async (req, res) => {
     try {
-      const { search, team, position, limit, offset } = req.query;
+      const { search, team, position, limit, offset, sortBy, sortOrder, hasBuyOrders, hasSellOrders } = req.query;
       
       // Parse and validate pagination params
       const parsedLimit = limit ? parseInt(limit as string) : 50;
@@ -621,12 +621,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const safeLimit = isNaN(parsedLimit) ? 50 : Math.max(1, Math.min(parsedLimit, 200));
       const safeOffset = isNaN(parsedOffset) ? 0 : Math.max(0, parsedOffset);
       
+      // Parse sorting and filter params
+      const validSortBy = ['price', 'volume', 'change', 'bid', 'ask'];
+      const safeSortBy = sortBy && validSortBy.includes(sortBy as string) 
+        ? sortBy as 'price' | 'volume' | 'change' | 'bid' | 'ask'
+        : 'volume';
+      const safeSortOrder = sortOrder === 'asc' ? 'asc' : 'desc';
+      const safeHasBuyOrders = hasBuyOrders === 'true';
+      const safeHasSellOrders = hasSellOrders === 'true';
+      
       const { players: playersRaw, total } = await storage.getPlayersPaginated({
         search: search as string,
         team: team as string,
         position: position as string,
         limit: safeLimit,
         offset: safeOffset,
+        sortBy: safeSortBy,
+        sortOrder: safeSortOrder,
+        hasBuyOrders: safeHasBuyOrders,
+        hasSellOrders: safeHasSellOrders,
       });
       
       // Enrich with market values and order book data (only for paginated results)

@@ -274,21 +274,97 @@ export class DatabaseStorage implements IStorage {
     position?: string;
     limit?: number;
     offset?: number;
+    sortBy?: 'price' | 'volume' | 'change' | 'bid' | 'ask';
+    sortOrder?: 'asc' | 'desc';
+    hasBuyOrders?: boolean;
+    hasSellOrders?: boolean;
   }): Promise<{ players: Player[]; total: number }> {
-    const { search, team, position, limit = 50, offset = 0 } = filters || {};
+    const { 
+      search, team, position, 
+      limit = 50, offset = 0,
+      sortBy = 'volume',
+      sortOrder = 'desc',
+      hasBuyOrders,
+      hasSellOrders
+    } = filters || {};
+    
     const conditions = this.buildPlayerQueryConditions({ search, team, position });
     
+    // Add order book filters using EXISTS subqueries
+    // Include both 'open' and 'partial' statuses (partially filled orders are still active)
+    if (hasBuyOrders) {
+      conditions.push(
+        sql`EXISTS (
+          SELECT 1 FROM ${orders} 
+          WHERE ${orders.playerId} = ${players.id} 
+          AND ${orders.side} = 'buy' 
+          AND ${orders.status} IN ('open', 'partial')
+        )`
+      );
+    }
+    
+    if (hasSellOrders) {
+      conditions.push(
+        sql`EXISTS (
+          SELECT 1 FROM ${orders} 
+          WHERE ${orders.playerId} = ${players.id} 
+          AND ${orders.side} = 'sell' 
+          AND ${orders.status} IN ('open', 'partial')
+        )`
+      );
+    }
+    
+    // Determine sort column based on sortBy parameter
+    // For price/bid/ask sorts, always use NULLS LAST so real market data appears before empty values
+    let orderByClause;
+    if (sortBy === 'price') {
+      // Sort by lastTradePrice with NULL handling (real prices first, then NULLs)
+      orderByClause = sortOrder === 'asc' 
+        ? sql`${players.lastTradePrice} ASC NULLS LAST`
+        : sql`${players.lastTradePrice} DESC NULLS LAST`;
+    } else if (sortBy === 'volume') {
+      orderByClause = sortOrder === 'asc' ? asc(players.volume24h) : desc(players.volume24h);
+    } else if (sortBy === 'change') {
+      orderByClause = sortOrder === 'asc' ? asc(players.priceChange24h) : desc(players.priceChange24h);
+    } else if (sortBy === 'bid') {
+      // Sort by best bid price (real bids first, then NULLs)
+      const bestBidSubquery = sql`(
+        SELECT MAX(${orders.limitPrice}) 
+        FROM ${orders} 
+        WHERE ${orders.playerId} = ${players.id} 
+        AND ${orders.side} = 'buy' 
+        AND ${orders.status} IN ('open', 'partial')
+      )`;
+      orderByClause = sortOrder === 'asc'
+        ? sql`${bestBidSubquery} ASC NULLS LAST`
+        : sql`${bestBidSubquery} DESC NULLS LAST`;
+    } else if (sortBy === 'ask') {
+      // Sort by best ask price (real asks first, then NULLs)
+      const bestAskSubquery = sql`(
+        SELECT MIN(${orders.limitPrice}) 
+        FROM ${orders} 
+        WHERE ${orders.playerId} = ${players.id} 
+        AND ${orders.side} = 'sell' 
+        AND ${orders.status} IN ('open', 'partial')
+      )`;
+      orderByClause = sortOrder === 'asc'
+        ? sql`${bestAskSubquery} ASC NULLS LAST`
+        : sql`${bestAskSubquery} DESC NULLS LAST`;
+    } else {
+      // Default to volume desc
+      orderByClause = desc(players.volume24h);
+    }
+    
     // Run count and data fetch in parallel for performance
-    // Build each query in one shot to avoid type reassignment issues
     const [countResult, playersData] = await Promise.all([
       // Count query
       conditions.length > 0
         ? db.select({ count: sql<number>`COUNT(*)::int` }).from(players).where(and(...conditions))
         : db.select({ count: sql<number>`COUNT(*)::int` }).from(players),
-      // Data query with pagination
+      // Data query with pagination and sorting
       conditions.length > 0
-        ? db.select().from(players).where(and(...conditions)).limit(limit).offset(offset)
-        : db.select().from(players).limit(limit).offset(offset),
+        ? db.select().from(players).where(and(...conditions)).orderBy(orderByClause).limit(limit).offset(offset)
+        : db.select().from(players).orderBy(orderByClause).limit(limit).offset(offset),
     ]);
     
     const total = countResult[0].count;

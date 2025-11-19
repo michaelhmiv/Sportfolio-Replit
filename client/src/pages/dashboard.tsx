@@ -71,12 +71,22 @@ export default function Dashboard() {
   const { toast } = useToast();
   const [showPlayerSelection, setShowPlayerSelection] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [selectedTeam, setSelectedTeam] = useState("all");
   const [selectedGame, setSelectedGame] = useState<DailyGame | null>(null);
   const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
+  
+  // Debounce search input (250ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 250);
+    
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
   
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
@@ -135,28 +145,33 @@ export default function Dashboard() {
   ]);
 
   const { data: playersResponse } = useQuery<{ players: Player[], total: number }>({
-    queryKey: ["/api/players"],
+    queryKey: ["/api/players", debouncedSearchTerm, selectedTeam],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (debouncedSearchTerm) params.append("search", debouncedSearchTerm);
+      if (selectedTeam && selectedTeam !== "all") params.append("team", selectedTeam);
+      // Only show mining-eligible players
+      params.append("limit", "1000"); // Load all eligible players for mining selection
+      
+      const url = `/api/players?${params.toString()}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Failed to fetch players");
+      const data = await res.json();
+      return data;
+    },
     enabled: showPlayerSelection,
   });
 
   const playersData = playersResponse?.players;
 
-  // Filter players by search and team
-  const filteredPlayers = playersData?.filter(p => {
-    if (!p.isEligibleForMining) return false;
-    
-    const matchesSearch = searchTerm === "" || 
-      `${p.firstName} ${p.lastName}`.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesTeam = selectedTeam === "all" || p.team === selectedTeam;
-    
-    return matchesSearch && matchesTeam;
-  }) || [];
+  // Filter only for mining eligibility (server-side handles search and team filter)
+  const filteredPlayers = playersData?.filter(p => p.isEligibleForMining) || [];
 
   // Get unique teams for filter
-  const uniqueTeams = Array.from(
-    new Set(playersData?.filter(p => p.isEligibleForMining).map(p => p.team))
-  ).sort();
+  const { data: teams } = useQuery<string[]>({
+    queryKey: ["/api/teams"],
+  });
+  const uniqueTeams = teams || [];
 
   // Format date as YYYY-MM-DD
   const formatDateForAPI = (date: Date) => {

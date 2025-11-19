@@ -24,6 +24,7 @@ type SortOrder = "asc" | "desc";
 
 export default function Marketplace() {
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [positionFilter, setPositionFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("volume");
@@ -33,6 +34,15 @@ export default function Marketplace() {
   const [page, setPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
   const { subscribe} = useWebSocket();
+  
+  // Debounce search input (250ms delay)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 250);
+    
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const { data: teams } = useQuery<string[]>({
     queryKey: ["/api/teams"],
@@ -57,12 +67,26 @@ export default function Marketplace() {
   }, [subscribe]);
 
   const { data: playersData, isLoading } = useQuery<{ players: PlayerWithOrderBook[]; total: number }>({
-    queryKey: ["/api/players", search, teamFilter, positionFilter, page],
+    queryKey: [
+      "/api/players", 
+      debouncedSearch, 
+      teamFilter, 
+      positionFilter, 
+      sortField, 
+      sortOrder, 
+      filterHasBuyOrders, 
+      filterHasSellOrders, 
+      page
+    ],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (search) params.append("search", search);
+      if (debouncedSearch) params.append("search", debouncedSearch);
       if (teamFilter && teamFilter !== "all") params.append("team", teamFilter);
       if (positionFilter && positionFilter !== "all") params.append("position", positionFilter);
+      params.append("sortBy", sortField);
+      params.append("sortOrder", sortOrder);
+      if (filterHasBuyOrders) params.append("hasBuyOrders", "true");
+      if (filterHasSellOrders) params.append("hasSellOrders", "true");
       params.append("limit", String(ITEMS_PER_PAGE));
       params.append("offset", String((page - 1) * ITEMS_PER_PAGE));
       
@@ -78,10 +102,10 @@ export default function Marketplace() {
   const totalCount = playersData?.total || 0;
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
-  // Reset to page 1 when filters change
+  // Reset to page 1 when any filter or sort changes
   useEffect(() => {
     setPage(1);
-  }, [search, teamFilter, positionFilter]);
+  }, [debouncedSearch, teamFilter, positionFilter, sortField, sortOrder, filterHasBuyOrders, filterHasSellOrders]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -91,41 +115,6 @@ export default function Marketplace() {
       setSortOrder("desc");
     }
   };
-
-  // Client-side filtering and sorting
-  const filteredAndSortedPlayers = players ? [...players]
-    .filter((player) => {
-      // Apply order book filters
-      if (filterHasBuyOrders && !player.bestBid) return false;
-      if (filterHasSellOrders && !player.bestAsk) return false;
-      return true;
-    })
-    .sort((a, b) => {
-      let aVal: number;
-      let bVal: number;
-      
-      if (sortField === "price") {
-        // Put players without market value at the end
-        const aPrice = a.lastTradePrice ? parseFloat(a.lastTradePrice) : -1;
-        const bPrice = b.lastTradePrice ? parseFloat(b.lastTradePrice) : -1;
-        aVal = aPrice;
-        bVal = bPrice;
-      } else if (sortField === "volume") {
-        aVal = a.volume24h;
-        bVal = b.volume24h;
-      } else if (sortField === "bid") {
-        aVal = a.bestBid ? parseFloat(a.bestBid) : -1;
-        bVal = b.bestBid ? parseFloat(b.bestBid) : -1;
-      } else if (sortField === "ask") {
-        aVal = a.bestAsk ? parseFloat(a.bestAsk) : -1;
-        bVal = b.bestAsk ? parseFloat(b.bestAsk) : -1;
-      } else {
-        aVal = parseFloat(a.priceChange24h);
-        bVal = parseFloat(b.priceChange24h);
-      }
-      
-      return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
-    }) : [];
 
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4">
@@ -320,7 +309,7 @@ export default function Marketplace() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredAndSortedPlayers.map((player) => (
+                    {players.map((player: PlayerWithOrderBook) => (
                       <tr 
                         key={player.id} 
                         className="border-b last:border-0 hover-elevate"
@@ -420,7 +409,7 @@ export default function Marketplace() {
             )}
 
             {/* Pagination Controls */}
-            {!isLoading && filteredAndSortedPlayers.length > 0 && totalPages > 1 && (
+            {!isLoading && players.length > 0 && totalPages > 1 && (
               <div className="mt-4 flex items-center justify-between px-2">
                 <div className="text-sm text-muted-foreground">
                   Showing {((page - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(page * ITEMS_PER_PAGE, totalCount)} of {totalCount} players

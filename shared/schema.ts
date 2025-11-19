@@ -54,6 +54,11 @@ export const players = pgTable("players", {
 }, (table) => ({
   teamIdx: index("team_idx").on(table.team),
   activeIdx: index("active_idx").on(table.isActive),
+  positionIdx: index("position_idx").on(table.position),
+  nameIdx: index("name_idx").on(table.firstName, table.lastName),
+  lastTradePriceIdx: index("last_trade_price_idx").on(table.lastTradePrice),
+  volume24hIdx: index("volume_24h_idx").on(table.volume24h),
+  priceChange24hIdx: index("price_change_24h_idx").on(table.priceChange24h),
 }));
 
 // Holdings table - user ownership of player shares and premium shares
