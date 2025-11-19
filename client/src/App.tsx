@@ -135,7 +135,7 @@ function Header() {
     }
   };
 
-  const userName = user?.username || user?.email || user?.firstName || "User";
+  const userName = user?.username || user?.email || "User";
 
   return (
     <header className="flex items-center justify-between h-16 px-4 border-b bg-card sticky top-0 z-10">

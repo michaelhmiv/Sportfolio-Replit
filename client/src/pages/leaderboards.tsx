@@ -116,9 +116,7 @@ export default function Leaderboards() {
         <div className="sm:hidden space-y-3">
           {data.leaderboard.map((entry) => {
             const isCurrentUser = user?.id === entry.userId;
-            const displayName = entry.firstName && entry.lastName 
-              ? `${entry.firstName} ${entry.lastName}`
-              : entry.username;
+            const displayName = entry.username;
 
             return (
               <Card 
@@ -182,9 +180,7 @@ export default function Leaderboards() {
                 <tbody>
                   {data.leaderboard.map((entry) => {
                     const isCurrentUser = user?.id === entry.userId;
-                    const displayName = entry.firstName && entry.lastName 
-                      ? `${entry.firstName} ${entry.lastName}`
-                      : entry.username;
+                    const displayName = entry.username;
 
                     return (
                       <tr

@@ -142,7 +142,7 @@ export default function UserProfile() {
 
   const { user, stats, rankings, holdings } = profile;
   const displayName = user.username;
-  const initials = (user.firstName?.[0] || "") + (user.lastName?.[0] || "");
+  const initials = user.username.slice(0, 2).toUpperCase();
   const memberSince = new Date(user.createdAt).toLocaleDateString("en-US", { month: "long", year: "numeric" });
   const isOwnProfile = currentUser?.id === user.id;
 
