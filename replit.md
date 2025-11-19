@@ -64,6 +64,14 @@ The `holdings_locks` table implements a transactional locking mechanism to preve
 - Secure session management with PostgreSQL-backed session storage.
 - Automatic user creation/sync on first login via the `upsertUser` pattern.
 - New users receive $10,000 starting balance automatically.
+- **Enhanced Error Handling & Security:**
+  - Comprehensive logging at each auth step (login initiation, callback received, session creation, session save, success/failure)
+  - 30-second timeout protection on callback to prevent hanging
+  - Explicit session verification via `req.session.save()` before redirect
+  - All error messages HTML-escaped to prevent XSS vulnerabilities
+  - User-friendly error pages with retry options on failure
+  - Frontend retry logic (up to 3 retries with exponential backoff for non-401 errors)
+  - 30-second staleTime on auth queries for better performance
 
 **Public Access:**
 - Contests and Leaderboards are publicly viewable without authentication.
