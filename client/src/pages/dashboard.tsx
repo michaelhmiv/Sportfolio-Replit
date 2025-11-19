@@ -288,22 +288,59 @@ export default function Dashboard() {
 
   const startMiningMutation = useMutation({
     mutationFn: async (playerIds: string[]) => {
+      // Auto-claim any unclaimed shares before starting new mining session
+      const unclaimedShares = data?.mining?.sharesAccumulated || 0;
+      let claimResult = null;
+      let claimError = null;
+      
+      if (unclaimedShares > 0) {
+        try {
+          const claimRes = await apiRequest("POST", "/api/mining/claim");
+          claimResult = await claimRes.json();
+          await invalidatePortfolioQueries();
+        } catch (error: any) {
+          // Store claim error but continue with mining start
+          // apiRequest throws Error objects with format: "status: message"
+          claimError = error?.message || "Failed to claim shares";
+        }
+      }
+      
       const res = await apiRequest("POST", "/api/mining/start", { playerIds });
-      const data = await res.json();
+      const miningData = await res.json();
       // Invalidate and wait for refetch BEFORE returning
       await invalidatePortfolioQueries();
-      return data;
+      return { miningData, claimResult, unclaimedShares, claimError };
     },
-    onSuccess: (data: any) => {
+    onSuccess: (result: any) => {
       // Cache is already fresh, safe to update UI immediately
       setShowPlayerSelection(false);
       setSelectedPlayers([]);
       
-      const playerCount = data?.players?.length || 0;
-      toast({
-        title: "Mining Started!",
-        description: `Now mining shares of ${playerCount} player${playerCount !== 1 ? 's' : ''}`,
-      });
+      const playerCount = result?.miningData?.players?.length || 0;
+      const wasAutoClaimed = result?.unclaimedShares > 0;
+      
+      if (wasAutoClaimed) {
+        if (result?.claimError) {
+          // Auto-claim failed but mining started successfully
+          toast({
+            title: "Mining Started (Claim Failed)",
+            description: `Started mining ${playerCount} player${playerCount !== 1 ? 's' : ''}, but couldn't auto-claim ${result.unclaimedShares} shares. Please claim manually.`,
+            variant: "destructive",
+          });
+        } else {
+          // Show combined message about successful auto-claim and new mining
+          const claimedCount = result?.claimResult?.totalSharesClaimed || result?.unclaimedShares;
+          toast({
+            title: "Mining Started!",
+            description: `Auto-claimed ${claimedCount} shares and started mining ${playerCount} player${playerCount !== 1 ? 's' : ''}`,
+          });
+        }
+      } else {
+        toast({
+          title: "Mining Started!",
+          description: `Now mining shares of ${playerCount} player${playerCount !== 1 ? 's' : ''}`,
+        });
+      }
     },
     onError: (error: any) => {
       toast({
@@ -772,29 +809,6 @@ export default function Dashboard() {
             <DialogTitle>Select Players to Mine ({selectedPlayers.length}/10)</DialogTitle>
             <DialogDescription>
               Choose up to 10 players to mine shares. Total rate is 100 shares/hour distributed equally across selected players.
-              {data?.mining?.sharesAccumulated && data.mining.sharesAccumulated > 0 && (
-                <div className="flex items-center justify-between gap-3 mt-3 p-3 rounded-md bg-destructive/10 border border-destructive/20">
-                  <span className="text-destructive font-medium text-sm">
-                    ⚠️ You must claim {data.mining.sharesAccumulated} shares before changing selection
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={async () => {
-                      setShowPlayerSelection(false);
-                      // Claim the shares
-                      await claimMiningMutation.mutateAsync();
-                      // Wait for cache to invalidate and refetch
-                      await queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-                      // Reopen dialog with fresh data
-                      setTimeout(() => setShowPlayerSelection(true), 200);
-                    }}
-                    disabled={claimMiningMutation.isPending}
-                  >
-                    {claimMiningMutation.isPending ? "Claiming..." : "Claim Now"}
-                  </Button>
-                </div>
-              )}
             </DialogDescription>
           </DialogHeader>
           
@@ -888,17 +902,14 @@ export default function Dashboard() {
               className="w-full"
               disabled={
                 selectedPlayers.length === 0 || 
-                startMiningMutation.isPending ||
-                !!(data?.mining?.sharesAccumulated && data.mining.sharesAccumulated > 0)
+                startMiningMutation.isPending
               }
               onClick={() => startMiningMutation.mutate(selectedPlayers.map(p => p.id))}
               data-testid="button-confirm-mining-selection"
             >
               {startMiningMutation.isPending 
                 ? "Starting..." 
-                : (data?.mining?.sharesAccumulated && data.mining.sharesAccumulated > 0)
-                  ? "Claim Shares First"
-                  : `Start Mining ${selectedPlayers.length} Player${selectedPlayers.length !== 1 ? 's' : ''}`}
+                : `Start Mining ${selectedPlayers.length} Player${selectedPlayers.length !== 1 ? 's' : ''}`}
             </Button>
           </div>
         </DialogContent>
