@@ -160,134 +160,18 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
-    const startTime = Date.now();
     console.log("[Auth] Callback received:", {
       hostname: req.hostname,
       hasCode: !!req.query.code,
-      hasState: !!req.query.state,
       hasError: !!req.query.error,
-      error: req.query.error,
-      errorDescription: req.query.error_description,
       timestamp: new Date().toISOString()
     });
 
-    // Set timeout to prevent hanging - 30 seconds max
-    const timeoutId = setTimeout(() => {
-      console.error("[Auth] Callback timeout - exceeded 30 seconds");
-      if (!res.headersSent) {
-        res.status(504).send(`
-          <html>
-            <body style="font-family: system-ui; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center;">
-              <h2>Authentication Timeout</h2>
-              <p>The authentication process took too long to complete.</p>
-              <p style="color: #666; font-size: 14px;">Please try again.</p>
-              <a href="/api/login" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #0066cc; color: white; text-decoration: none; border-radius: 5px;">Try Again</a>
-            </body>
-          </html>
-        `);
-      }
-    }, 30000);
-
-    try {
-      ensureStrategy(req.hostname);
-      
-      passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
-        clearTimeout(timeoutId);
-        const duration = Date.now() - startTime;
-
-        if (err) {
-          console.error("[Auth] Callback authentication error:", {
-            error: err.message,
-            stack: err.stack,
-            duration: `${duration}ms`
-          });
-          return res.status(500).send(`
-            <html>
-              <body style="font-family: system-ui; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center;">
-                <h2>Authentication Failed</h2>
-                <p>We couldn't complete your sign-in.</p>
-                <p style="color: #666; font-size: 14px;">Error: ${escapeHtml(err?.message || 'Unknown error')}</p>
-                <a href="/api/login" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #0066cc; color: white; text-decoration: none; border-radius: 5px;">Try Again</a>
-              </body>
-            </html>
-          `);
-        }
-
-        if (!user) {
-          console.error("[Auth] Callback failed - no user returned:", {
-            info,
-            duration: `${duration}ms`
-          });
-          return res.redirect("/api/login");
-        }
-
-        // Log in the user and verify session
-        req.logIn(user, (loginErr) => {
-          if (loginErr) {
-            console.error("[Auth] Session creation error:", {
-              error: loginErr.message,
-              userId: (user as any)?.claims?.sub,
-              duration: `${duration}ms`
-            });
-            return res.status(500).send(`
-              <html>
-                <body style="font-family: system-ui; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center;">
-                  <h2>Session Error</h2>
-                  <p>We couldn't create your session. Please try again.</p>
-                  <a href="/api/login" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #0066cc; color: white; text-decoration: none; border-radius: 5px;">Try Again</a>
-                </body>
-              </html>
-            `);
-          }
-
-          // Verify session is actually saved before redirecting
-          req.session.save((saveErr) => {
-            if (saveErr) {
-              console.error("[Auth] Session save error:", {
-                error: saveErr.message,
-                userId: (user as any)?.claims?.sub,
-                duration: `${duration}ms`
-              });
-              return res.status(500).send(`
-                <html>
-                  <body style="font-family: system-ui; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center;">
-                    <h2>Session Storage Error</h2>
-                    <p>We couldn't save your session. Please try again.</p>
-                    <a href="/api/login" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #0066cc; color: white; text-decoration: none; border-radius: 5px;">Try Again</a>
-                  </body>
-                </html>
-              `);
-            }
-
-            console.log("[Auth] Callback successful:", {
-              userId: (user as any)?.claims?.sub,
-              email: (user as any)?.claims?.email,
-              duration: `${duration}ms`,
-              sessionId: req.sessionID
-            });
-
-            // Successfully authenticated - redirect to dashboard
-            res.redirect("/");
-          });
-        });
-      })(req, res, next);
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      console.error("[Auth] Callback exception:", {
-        error: error.message,
-        stack: error.stack
-      });
-      res.status(500).send(`
-        <html>
-          <body style="font-family: system-ui; max-width: 600px; margin: 100px auto; padding: 20px; text-align: center;">
-            <h2>Unexpected Error</h2>
-            <p>Something went wrong during authentication.</p>
-            <p style="color: #666; font-size: 14px;">Error: ${escapeHtml(error?.message || 'Unknown error')}</p>
-            <a href="/" style="display: inline-block; margin-top: 20px; padding: 10px 20px; background: #0066cc; color: white; text-decoration: none; border-radius: 5px;">Return to Home</a>
-          </body>
-        </html>
-      `);
-    }
+    ensureStrategy(req.hostname);
+    passport.authenticate(`replitauth:${req.hostname}`, {
+      successReturnToOrRedirect: "/",
+      failureRedirect: "/api/login",
+    })(req, res, next);
   });
 
   app.get("/api/logout", (req, res) => {
