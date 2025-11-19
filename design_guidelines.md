@@ -1,14 +1,14 @@
-# Sportfolio Design Guidelines: Data-Driven Trading Platform
+# Sportfolio Design Guidelines: Sports Trading Terminal
 
 ## Design Approach
 
-**Primary Reference:** Robinhood + Bloomberg Terminal hybrid
-- Robinhood's clean, modern trading interface and frictionless UX
+**Primary Reference:** ESPN Energy + Bloomberg Terminal Density
+- ESPN's bold, sports-focused visual language with orange/gold accents
 - Bloomberg's information density and real-time data displays
-- Linear's typography clarity for data readability
-- Stripe's restrained use of color for financial applications
+- Terminal-like sharp edges and tight spacing for professional feel
+- Aggressive use of color for data signals (orange/gold for highlights, green/red for performance)
 
-**Core Principle:** Maximum information density with absolute clarity. Every pixel serves the trader's decision-making process.
+**Core Principle:** Maximum information density with bold visual hierarchy. Sports trading deserves energy, not corporate blandness.
 
 ## Typography System
 
@@ -25,11 +25,12 @@
 
 ## Layout & Spacing
 
-**Spacing Primitives:** Tailwind units of 1, 2, 4, 6, 8
-- Tight data grids: p-1, gap-2
-- Component padding: p-4, p-6
-- Section spacing: py-8, py-12
-- Page margins: px-4 (mobile), px-8 (desktop)
+**Spacing Primitives:** Tighter spacing for terminal density - Tailwind units of 1, 2, 3, 4
+- Tight data grids: p-1, gap-1
+- Component padding: p-3, p-4 (reduced from p-6)
+- Section spacing: py-6, py-8 (reduced from py-12)
+- Page margins: px-3 (mobile), px-4 (desktop)
+- Card spacing: gap-2 (reduced from gap-4)
 
 **Grid System:**
 - Dashboard: 12-column grid with 2-3 column widget cards
@@ -131,9 +132,13 @@
 ## Visual Treatment
 
 **Color Philosophy:**
-- Neutral base with minimal color usage
-- Color only for data signals (positive/negative, status indicators)
-- Avoid decorative color - every color has semantic meaning
+- **Primary:** Basketball Orange `hsl(18 100% 60%)` - Action buttons, highlights, active states
+- **Accent:** Championship Gold `hsl(33 100% 55%)` - Secondary highlights, badges, alerts
+- **Positive:** Green `rgb(34 197 94)` - Gains, bullish indicators
+- **Negative:** Red `rgb(239 68 68)` - Losses, bearish indicators
+- **Background:** Deep blacks in dark mode (4% lightness), crisp white in light mode
+- **Cards:** Minimal separation - 6% lightness in dark mode vs 97% in light mode
+- Bold color usage for data hierarchy - orange/gold draws the eye to key actions and prices
 
 **Interaction States:**
 - Buttons: Solid fills with subtle hover darkening
@@ -142,9 +147,10 @@
 - Focus states: Clear outline for keyboard navigation
 
 **Elevation:**
-- Minimal shadows (1-2 levels max)
-- Cards use subtle borders instead of heavy shadows
-- Floating panels (modals, dropdowns) use medium shadow
+- Near-zero shadows for flat terminal aesthetic
+- Sharp borders (2px-4px radius) instead of rounded corners
+- Cards use strong borders with minimal background separation
+- Floating panels (modals, dropdowns) use sharp edges with subtle shadows
 
 ## Images
 
