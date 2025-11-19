@@ -257,6 +257,15 @@ export default function Marketplace() {
                       <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
                       <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Team</th>
                       <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        <button 
+                          onClick={() => toggleSort("price")} 
+                          className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded text-xs"
+                          data-testid="button-sort-price"
+                        >
+                          Market Value <ArrowUpDown className="w-3 h-3" />
+                        </button>
+                      </th>
+                      <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">
                         <div className="flex items-center gap-1 justify-end">
                           <button 
                             onClick={() => toggleSort("bid")} 
@@ -316,6 +325,10 @@ export default function Marketplace() {
                                   <span className="text-muted-foreground">{player.team} • {player.position}</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 text-xs mt-0.5">
+                                  <span className="font-mono font-bold text-foreground">
+                                    {player.lastTradePrice ? `$${player.lastTradePrice}` : '-'}
+                                  </span>
+                                  <span className="text-muted-foreground">•</span>
                                   <span className="text-blue-500 dark:text-blue-400 font-mono font-bold">
                                     {player.bestBid ? `$${player.bestBid}` : '-'}
                                   </span>
@@ -350,6 +363,11 @@ export default function Marketplace() {
                           <Badge variant="outline" className="text-xs">{player.team}</Badge>
                         </td>
                         <td className="px-2 py-1.5 text-right hidden sm:table-cell">
+                          <span className="font-mono font-bold text-sm" data-testid={`text-market-value-${player.id}`}>
+                            {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-xs font-normal">-</span>}
+                          </span>
+                        </td>
+                        <td className="px-2 py-1.5 text-right hidden lg:table-cell">
                           <div className="flex items-center justify-end gap-2 font-mono text-sm font-bold">
                             <span className="text-blue-500 dark:text-blue-400" data-testid={`text-bid-${player.id}`}>
                               {player.bestBid || '-'}

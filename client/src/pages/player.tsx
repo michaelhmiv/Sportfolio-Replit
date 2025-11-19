@@ -139,6 +139,32 @@ export default function PlayerPage() {
     }
   };
 
+  // Handler for clicking a bid in the order book (auto-fill SELL form)
+  const handleBidClick = (bid: { price: string; quantity: number }) => {
+    setSide("sell");
+    setOrderType("limit");
+    setLimitPrice(bid.price);
+    setQuantity(bid.quantity.toString());
+    toast({ 
+      title: "Order form updated", 
+      description: `Set to SELL ${bid.quantity} shares at $${bid.price}`,
+      duration: 3000
+    });
+  };
+
+  // Handler for clicking an ask in the order book (auto-fill BUY form)
+  const handleAskClick = (ask: { price: string; quantity: number }) => {
+    setSide("buy");
+    setOrderType("limit");
+    setLimitPrice(ask.price);
+    setQuantity(ask.quantity.toString());
+    toast({ 
+      title: "Order form updated", 
+      description: `Set to BUY ${ask.quantity} shares at $${ask.price}`,
+      duration: 3000
+    });
+  };
+
   if (isLoading || !data) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -243,7 +269,12 @@ export default function PlayerPage() {
                       <div className="p-2 bg-muted/50 text-xs font-semibold uppercase tracking-wide text-center">Bids</div>
                       <div className="space-y-1 p-2">
                         {orderBook.bids.slice(0, 5).map((bid, idx) => (
-                          <div key={idx} className="flex justify-between text-sm" data-testid={`bid-${idx}`}>
+                          <div 
+                            key={idx} 
+                            className="flex justify-between text-sm cursor-pointer hover-elevate active-elevate-2 rounded-sm px-1 py-0.5 -mx-1" 
+                            onClick={() => handleBidClick(bid)}
+                            data-testid={`bid-${idx}`}
+                          >
                             <span className="font-mono text-positive font-medium">${bid.price}</span>
                             <span className="text-muted-foreground">{bid.quantity}</span>
                           </div>
@@ -255,7 +286,12 @@ export default function PlayerPage() {
                       <div className="p-2 bg-muted/50 text-xs font-semibold uppercase tracking-wide text-center">Asks</div>
                       <div className="space-y-1 p-2">
                         {orderBook.asks.slice(0, 5).map((ask, idx) => (
-                          <div key={idx} className="flex justify-between text-sm" data-testid={`ask-${idx}`}>
+                          <div 
+                            key={idx} 
+                            className="flex justify-between text-sm cursor-pointer hover-elevate active-elevate-2 rounded-sm px-1 py-0.5 -mx-1" 
+                            onClick={() => handleAskClick(ask)}
+                            data-testid={`ask-${idx}`}
+                          >
                             <span className="font-mono text-negative font-medium">${ask.price}</span>
                             <span className="text-muted-foreground">{ask.quantity}</span>
                           </div>
