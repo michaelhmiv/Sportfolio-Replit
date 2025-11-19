@@ -39,6 +39,22 @@ The `holdings_locks` table implements a transactional locking mechanism to preve
 - Dashboard uses batch player fetches via `getPlayersByIds()` to minimize database queries
 - React Query configured with 10-second staleTime for balanced cache freshness and performance
 
+**Server-Side Search, Filter, and Sort (Marketplace & Mining):**
+The `GET /api/players` endpoint supports comprehensive server-side operations to enable searching across the entire player database (500-5000+ players) rather than limiting to client-side loaded data only:
+
+Query Parameters:
+- `search` (string): Case-insensitive search on firstName and lastName (debounced 250ms on frontend)
+- `team` (string): Filter by exact team name
+- `position` (string): Filter by position (G, F, C, etc.)
+- `sortBy` (string): Sort field - 'price', 'volume', 'change', 'bid', 'ask' (default: 'volume')
+- `sortOrder` (string): Sort direction - 'asc' or 'desc' (default: 'desc')
+- `hasBuyOrders` (boolean): Only show players with active buy orders (includes both 'open' and 'partial' statuses)
+- `hasSellOrders` (boolean): Only show players with active sell orders (includes both 'open' and 'partial' statuses)
+- `limit` (number): Results per page (default: 50, max: 200)
+- `offset` (number): Pagination offset
+
+Database indexes on firstName, lastName, team, position, lastTradePrice, volume24h, and priceChange24h ensure sub-150ms query performance. NULL handling uses `NULLS LAST` for both ASC and DESC sorts on price/bid/ask fields, ensuring players with real market data always appear before those without trades or order books.
+
 ### Background Jobs
 **Development Environment:** Background jobs run automatically via Node.js `node-cron` scheduler for tasks like `roster_sync`, `schedule_sync`, `stats_sync`, `stats_sync_live`, `settle_contests`, and `create_contests`.
 
