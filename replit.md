@@ -23,7 +23,21 @@ A centralized WebSocket provider (`client/src/lib/websocket.tsx`) manages a sing
 The backend is an Express.js server with TypeScript, supporting both HTTP and WebSockets. It uses Drizzle ORM with a PostgreSQL database (Neon serverless) and Zod for validation. Core domain models include Users, Players, Holdings, Orders, Trades, Mining, Contests, and Price History. The system features atomic balance updates and precise timezone handling for NBA Eastern Time using `date-fns-tz`. API design is RESTful for data endpoints and uses WebSockets for live price and trade updates.
 
 ### Database Schema
-The database schema includes key tables such as `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, and `price_history`. Indexing is optimized for user-asset relationships, player filtering, and order book queries. Player shares are permanent across all seasons, identified by a globally unique MySportsFeeds numeric player ID.
+The database schema includes key tables such as `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, `price_history`, and `holdings_locks`. Indexing is optimized for user-asset relationships, player filtering, and order book queries. Player shares are permanent across all seasons, identified by a globally unique MySportsFeeds numeric player ID.
+
+**Share Locking System (Double-Spend Prevention):**
+The `holdings_locks` table implements a transactional locking mechanism to prevent users from double-spending their shares across multiple orders, contests, or mining operations. Key features:
+- Lock types: "order" (sell orders), "contest" (contest entries), "mining" (mining operations)
+- Available shares formula: `holdings.quantity - SUM(holdings_locks.lockedQuantity)`
+- Atomic reservations using database transactions with SELECT...FOR UPDATE to prevent race conditions
+- Automatic lock releases on order cancellation, partial/full order fills, and contest settlement
+- All lock operations are transactional to guarantee data consistency under high concurrency
+
+**Performance Optimizations:**
+- Portfolio endpoint uses SQL JOIN query (`getUserHoldingsWithPlayers`) to fetch holdings + players + locks in a single database round-trip, eliminating N+1 query issues
+- Marketplace implements pagination (50 items per page) with limit/offset for fast page loads
+- Dashboard uses batch player fetches via `getPlayersByIds()` to minimize database queries
+- React Query configured with 10-second staleTime for balanced cache freshness and performance
 
 ### Background Jobs
 **Development Environment:** Background jobs run automatically via Node.js `node-cron` scheduler for tasks like `roster_sync`, `schedule_sync`, `stats_sync`, `stats_sync_live`, `settle_contests`, and `create_contests`.
