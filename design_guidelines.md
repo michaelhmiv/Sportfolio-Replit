@@ -3,10 +3,10 @@
 ## Design Approach
 
 **Primary Reference:** ESPN Energy + Bloomberg Terminal Density
-- ESPN's bold, sports-focused visual language with orange/gold accents
+- ESPN's bold, sports-focused visual language
 - Bloomberg's information density and real-time data displays
 - Terminal-like sharp edges and tight spacing for professional feel
-- Aggressive use of color for data signals (orange/gold for highlights, green/red for performance)
+- Aggressive use of color for data signals (green primary brand, red for losses, green for gains)
 
 **Core Principle:** Maximum information density with bold visual hierarchy. Sports trading deserves energy, not corporate blandness.
 
@@ -132,13 +132,13 @@
 ## Visual Treatment
 
 **Color Philosophy:**
-- **Primary:** Basketball Orange `hsl(18 100% 60%)` - Action buttons, highlights, active states
-- **Accent:** Championship Gold `hsl(33 100% 55%)` - Secondary highlights, badges, alerts
+- **Primary:** Emerald Green `hsl(142 76% 36%)` - Action buttons, highlights, active states, logo match
+- **Accent:** Emerald Green `hsl(142 76% 36%)` - Secondary highlights, badges, alerts
 - **Positive:** Green `rgb(34 197 94)` - Gains, bullish indicators
 - **Negative:** Red `rgb(239 68 68)` - Losses, bearish indicators
 - **Background:** Deep blacks in dark mode (4% lightness), crisp white in light mode
 - **Cards:** Minimal separation - 6% lightness in dark mode vs 97% in light mode
-- Bold color usage for data hierarchy - orange/gold draws the eye to key actions and prices
+- Green brand color matches the Sportfolio logo and creates professional, sports-focused aesthetic
 
 **Interaction States:**
 - Buttons: Solid fills with subtle hover darkening
