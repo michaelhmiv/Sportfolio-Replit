@@ -178,6 +178,7 @@ export class JobScheduler {
       stats_sync: syncStats,
       stats_sync_live: syncStatsLive,
       create_contests: createContests,
+      settle_contests: settleContests,
     };
 
     const handler = jobConfigs[jobName];
