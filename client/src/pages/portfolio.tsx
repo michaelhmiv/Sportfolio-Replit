@@ -176,20 +176,23 @@ export default function Portfolio() {
                 <CardTitle className="text-sm font-medium uppercase tracking-wide">Your Holdings</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div>
-                  <table className="w-full">
-                    <thead className="border-b bg-muted/50 hidden sm:table-header-group">
-                      <tr>
-                        <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Asset</th>
-                        <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
-                        <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Avg Cost</th>
-                        <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Current Price</th>
-                        <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Total Value</th>
-                        <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">P&L</th>
-                        <th className="px-2 py-1.5"></th>
-                      </tr>
-                    </thead>
-                    <tbody>
+                {!data?.premiumShares && data?.holdings.filter(h => h.assetType === "player").length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground" data-testid="text-no-holdings">No holdings yet. Start trading to build your portfolio!</div>
+                ) : (
+                  <div>
+                    <table className="w-full">
+                      <thead className="border-b bg-muted/50 hidden sm:table-header-group">
+                        <tr>
+                          <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Asset</th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Avg Cost</th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Current Price</th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Total Value</th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">P&L</th>
+                          <th className="px-2 py-1.5"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
                       {data?.premiumShares && data.premiumShares > 0 && (
                         <tr className="border-b hover-elevate" data-testid="row-premium-shares">
                           {/* Mobile layout */}
@@ -326,6 +329,7 @@ export default function Portfolio() {
                     </tbody>
                   </table>
                 </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
