@@ -35,6 +35,15 @@ All pages must include the following tracking and monetization scripts in the `<
 ## Recent Changes 
 
 ### November 19, 2025
+- **Clickable Order Book for Fast Trading:** Implemented interactive order book on player detail pages
+  - Clicking a bid row auto-fills SELL form with limit order at bid price and quantity
+  - Clicking an ask row auto-fills BUY form with limit order at ask price and quantity
+  - Toast notifications confirm form updates: "Set to BUY/SELL [quantity] shares at $[price]"
+  - Visual feedback: cursor-pointer + hover-elevate effects show rows are clickable
+  - Enhances trading speed while preventing accidental orders through explicit confirmation
+- **Portfolio Terminology Consistency:** Renamed "Total Value" to "Market Value" on portfolio holdings table
+  - Aligns portfolio page terminology with marketplace (which shows "Market Value" column)
+  - Provides consistent user experience across all pages showing position values
 - **Marketplace Order Book Visualization:** Enhanced marketplace with real-time bid/ask price display
   - Backend: `/api/players` endpoint now returns `bestBid`, `bestAsk`, `bidSize`, `askSize` for each player calculated from live order books
   - TradingView-Style Display: Bid prices shown in blue, ask prices in red, with "Bid × Ask" or "Bid / Ask" format
