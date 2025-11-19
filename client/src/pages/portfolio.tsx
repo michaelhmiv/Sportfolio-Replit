@@ -59,9 +59,9 @@ export default function Portfolio() {
     mutationFn: async (orderId: string) => {
       return await apiRequest("POST", `/api/orders/${orderId}/cancel`, {});
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      await invalidatePortfolioQueries();
       toast({ title: "Order cancelled" });
-      invalidatePortfolioQueries();
     },
     onError: (error: Error) => {
       toast({ title: "Failed to cancel order", description: error.message, variant: "destructive" });
@@ -72,9 +72,9 @@ export default function Portfolio() {
     mutationFn: async () => {
       return await apiRequest("POST", "/api/premium/redeem", {});
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      await invalidatePortfolioQueries();
       toast({ title: "Premium activated!", description: "You now have premium access for 30 days" });
-      invalidatePortfolioQueries();
     },
     onError: (error: Error) => {
       toast({ title: "Redemption failed", description: error.message, variant: "destructive" });

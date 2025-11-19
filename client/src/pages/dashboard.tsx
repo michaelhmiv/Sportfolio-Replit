@@ -78,53 +78,6 @@ export default function Dashboard() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
   
-  // WebSocket connection for live updates
-  useEffect(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
-
-    ws.onopen = () => {
-      console.log('[WebSocket] Connected to live updates');
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        console.log('[WebSocket] Received:', message);
-
-        // Handle different message types
-        if (message.type === 'liveStats') {
-          // Invalidate all portfolio queries to ensure sync across all pages
-          invalidatePortfolioQueries();
-          queryClient.invalidateQueries({ queryKey: ['/api/games'] });
-        } else if (message.type === 'portfolio') {
-          // Portfolio update - invalidate all portfolio-related queries
-          invalidatePortfolioQueries();
-        } else if (message.type === 'mining') {
-          // Mining update affects holdings - invalidate all portfolio queries
-          invalidatePortfolioQueries();
-        } else if (message.type === 'orderBook' || message.type === 'trade') {
-          // Trade/order update affects portfolio - invalidate all queries
-          invalidatePortfolioQueries();
-        }
-      } catch (error) {
-        console.error('[WebSocket] Failed to parse message:', error);
-      }
-    };
-
-    ws.onerror = (error) => {
-      console.error('[WebSocket] Error:', error);
-    };
-
-    ws.onclose = () => {
-      console.log('[WebSocket] Disconnected');
-    };
-
-    return () => {
-      ws.close();
-    };
-  }, []);
-  
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
     refetchInterval: 10000, // Poll every 10 seconds to keep mining data fresh
@@ -312,7 +265,7 @@ export default function Dashboard() {
       return { miningData, claimResult, unclaimedShares, claimError };
     },
     onSuccess: (result: any) => {
-      // Cache is already fresh, safe to update UI immediately
+      // Cache already invalidated in mutationFn, queries will auto-refetch
       setShowPlayerSelection(false);
       setSelectedPlayers([]);
       
@@ -360,7 +313,7 @@ export default function Dashboard() {
       return data;
     },
     onSuccess: (data: any) => {
-      // Cache is already fresh, safe to show toast immediately
+      // Cache already invalidated in mutationFn, queries will auto-refetch
       
       // Multi-player mining response
       if (data?.players && data.players.length > 0) {

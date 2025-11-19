@@ -79,11 +79,12 @@ export default function ContestEntry() {
       }
       return await apiRequest("POST", `/api/contest/${id}/enter`, { lineup: lineupData });
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      await Promise.all([
+        invalidatePortfolioQueries(),
+        invalidateContestQueries(),
+      ]);
       toast({ title: isEditMode ? "Contest entry updated!" : "Contest entry submitted!" });
-      // Invalidate all portfolio and contest queries to ensure synchronization across all pages
-      invalidatePortfolioQueries();
-      invalidateContestQueries();
       navigate("/contests");
     },
     onError: (error: Error) => {

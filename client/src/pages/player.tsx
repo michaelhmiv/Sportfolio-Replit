@@ -76,9 +76,9 @@ export default function PlayerPage() {
     mutationFn: async (orderData: { orderType: string; side: string; quantity: number; limitPrice?: string }) => {
       return await apiRequest("POST", `/api/orders/${id}`, orderData);
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      await invalidatePortfolioQueries();
       toast({ title: "Order placed successfully" });
-      invalidatePortfolioQueries();
       setQuantity("");
       setLimitPrice("");
     },

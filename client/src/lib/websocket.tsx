@@ -40,17 +40,19 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
         // Global cache invalidation based on event type
         switch (message.type) {
           case 'portfolio':
-            // Invalidate all portfolio-related queries
+            // Invalidate all portfolio-related queries (auto-refetches active queries)
             invalidatePortfolioQueries();
             break;
 
           case 'mining':
-            // Invalidate mining data
-            queryClient.invalidateQueries({ queryKey: ['/api/mining/status'] });
-            // Also invalidate profile stats as mining affects them
-            if (message.userId) {
-              queryClient.invalidateQueries({ queryKey: [`/api/user/${message.userId}/profile`] });
-            }
+            // Invalidate mining data and portfolio (mining affects holdings)
+            Promise.all([
+              queryClient.invalidateQueries({ queryKey: ['/api/mining/status'] }),
+              queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] }),
+              message.userId 
+                ? queryClient.invalidateQueries({ queryKey: [`/api/user/${message.userId}/profile`] })
+                : Promise.resolve(),
+            ]);
             break;
 
           case 'trade':
