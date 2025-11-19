@@ -193,7 +193,7 @@ export default function Portfolio() {
                         </tr>
                       </thead>
                       <tbody>
-                      {data?.premiumShares && data.premiumShares > 0 && (
+                      {(data?.premiumShares ?? 0) > 0 && (
                         <tr className="border-b hover-elevate" data-testid="row-premium-shares">
                           {/* Mobile layout */}
                           <td className="px-2 py-2 sm:hidden" colSpan={7}>
