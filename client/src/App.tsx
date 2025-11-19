@@ -24,6 +24,7 @@ import UserProfile from "@/pages/user-profile";
 import Leaderboards from "@/pages/leaderboards";
 import Admin from "@/pages/admin";
 import Landing from "@/pages/landing";
+import AuthError from "@/pages/auth-error";
 import NotFound from "@/pages/not-found";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
 import { LogOut, User } from "lucide-react";
@@ -76,6 +77,9 @@ function Router() {
       <Route path="/admin">
         {isAuthenticated ? <Admin /> : <Landing />}
       </Route>
+      
+      {/* Auth error page - public, always accessible */}
+      <Route path="/auth/error" component={AuthError} />
       
       <Route component={NotFound} />
     </Switch>

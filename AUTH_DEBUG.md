@@ -75,34 +75,72 @@ Logs when OAuth strategies are registered for different domains:
 Logs when a user initiates login:
 - Hostname, IP, user agent
 - Session ID
+- **Redirect URI debugging** - exact callback URL being generated
+- Protocol and full request URL
+- Session and cookie status
 
 **Example:**
 ```
 [AUTH:LOGIN] 2025-11-19T12:16:00.000Z - Login initiated {
   "hostname": "your-repl.replit.app",
+  "protocol": "https",
+  "host": "your-repl.replit.app",
+  "fullUrl": "https://your-repl.replit.app/api/login",
+  "callbackURL": "https://your-repl.replit.app/api/callback",
   "ip": "123.45.67.89",
   "userAgent": "Mozilla/5.0...",
-  "sessionID": "abc123..."
+  "sessionID": "abc123...",
+  "hasSession": true,
+  "cookies": ["connect.sid"]
 }
 ```
 
+**Key Field:** `callbackURL` shows the exact OAuth callback URL being registered for this login attempt.
+
 ### 6. OAuth Callback (`[AUTH:CALLBACK]`)
 Logs when OAuth provider redirects back to your app:
-- Query parameters received
-- Error information (if any)
+- **Redirect URI validation** - expected vs actual callback URL
+- Query parameters received (sanitized)
+- OAuth provider errors
+- Session and cookie status
 - Authentication success/failure
-- Session establishment
 
 **Example:**
 ```
 [AUTH:CALLBACK] 2025-11-19T12:16:05.000Z - OAuth callback received {
   "hostname": "your-repl.replit.app",
+  "protocol": "https",
+  "host": "your-repl.replit.app",
+  "fullUrl": "https://your-repl.replit.app/api/callback?code=...",
+  "expectedCallbackURL": "https://your-repl.replit.app/api/callback",
   "query": { "code": "[REDACTED]", "state": "[REDACTED]" },
   "sessionID": "abc123...",
-  "hasError": false
+  "hasSession": true,
+  "hasError": false,
+  "cookies": ["connect.sid"]
 }
-[AUTH:CALLBACK] 2025-11-19T12:16:05.500Z - Authentication successful, redirecting
+[AUTH:CALLBACK] 2025-11-19T12:16:05.500Z - Authentication successful, redirecting {
+  "sessionID": "abc123...",
+  "isAuthenticated": true,
+  "hasUser": true,
+  "userClaims": ["sub", "email", "first_name", "last_name"]
+}
 ```
+
+**OAuth Provider Errors:**
+If the OAuth provider returns an error, you'll see:
+```
+[AUTH:CALLBACK] OAuth provider returned error {
+  "error": "access_denied",
+  "errorDescription": "User denied authorization",
+  "errorUri": "https://..."
+}
+```
+
+**Key Fields:**
+- `expectedCallbackURL` - What your app expects
+- `fullUrl` - The actual URL the user was redirected to
+- Compare these to debug redirect URI mismatches
 
 ### 7. Verify Callback (`[AUTH:VERIFY]`)
 Logs during the token verification and user creation process:
@@ -220,9 +258,58 @@ Logs during logout process:
 5. **User upsert** - Look for `[AUTH:USER_UPSERT]` success or errors
 
 **Common error patterns:**
-- Missing `[AUTH:CALLBACK]` → User didn't complete OAuth flow
+- Missing `[AUTH:CALLBACK]` → User didn't complete OAuth flow or was blocked
+- OAuth provider error in callback → User denied access or provider issue
 - Error in `[AUTH:VERIFY]` → Token verification failed
 - Error in `[AUTH:USER_UPSERT]` → Database issue saving user
+- Redirect to `/auth/error` → Check error code and description in URL
+
+### Issue: "Window Closes Immediately" After Clicking Allow
+
+**What this actually means:**
+- User clicks "Allow" on Replit OAuth screen
+- Instead of returning to your app, they see an error or blank page
+- Users interpret this as "the window closing"
+
+**Debug steps:**
+
+1. **Check for OAuth provider errors:**
+```
+[AUTH:CALLBACK] OAuth provider returned error {
+  "error": "access_denied",
+  "errorDescription": "..."
+}
+```
+This means the user denied access or there's a provider-side issue.
+
+2. **Check for redirect URI mismatch:**
+Compare these log fields:
+```
+[AUTH:LOGIN] callbackURL: "https://yourapp-xyz.replit.app/api/callback"
+[AUTH:CALLBACK] expectedCallbackURL: "https://yourapp-abc.replit.app/api/callback"
+```
+If the domains differ (`.app` vs `.dev`, different subdomain), that's your problem!
+
+3. **Check for callback authentication failures:**
+```
+[AUTH:CALLBACK] Authentication FAILED in callback {
+  "error": "...",
+  "errorName": "...",
+  "errorCode": "..."
+}
+```
+
+4. **Verify session persistence:**
+```
+[AUTH:LOGIN] hasSession: true, cookies: ["connect.sid"]
+[AUTH:CALLBACK] hasSession: false, cookies: []
+```
+If session is lost between login and callback, cookies aren't working.
+
+**Solutions:**
+- Ensure user accesses app from consistent URL (always use `.replit.app`, not `.dev`)
+- Check cookie settings (secure, sameSite) in `[AUTH:SESSION]` logs
+- Look for error page redirect: user should see `/auth/error` with error details
 
 ### Issue: User Logged Out Unexpectedly
 
@@ -243,13 +330,52 @@ Logs during logout process:
 **Check these logs:**
 
 1. **Session configuration** - Look at `[AUTH:SESSION]` initialization
-2. **Serialize/Deserialize** - Check `[AUTH:SERIALIZE]` and `[AUTH:DESERIALIZE]`
-3. **Session store** - Look for database connection messages
+2. **Cookie settings** - Verify they're appropriate for your environment:
+```
+[AUTH:SESSION] Session configuration created {
+  "ttl": 604800000,
+  "secure": false,  // Should be true in production
+  "sameSite": "lax",
+  "httpOnly": true
+}
+```
+3. **Session presence during OAuth flow:**
+```
+[AUTH:LOGIN] hasSession: true, cookies: ["connect.sid"]
+[AUTH:CALLBACK] hasSession: true, cookies: ["connect.sid"]
+```
+Both should have session and cookies.
+
+4. **Serialize/Deserialize** - Check `[AUTH:SERIALIZE]` and `[AUTH:DESERIALIZE]`
+5. **Session store** - Look for database connection messages
 
 **Common patterns:**
 - Session store not connecting to database
-- Cookie settings (secure, sameSite) not compatible with environment
+- `secure: true` in development (should be false for http)
+- Cross-domain cookie issues (check `sameSite` setting)
 - Missing `SESSION_SECRET` or `DATABASE_URL`
+- Session lost between login and callback (cookies not being sent)
+
+## User-Facing Error Messages
+
+When OAuth fails, users are redirected to `/auth/error` with a friendly error page instead of seeing technical errors. The page shows:
+
+- **User-friendly error title and description**
+- **Actionable suggestions** (what the user can do)
+- **Error code** (for support/debugging)
+- **Retry and Home buttons**
+
+Common error codes shown to users:
+- `access_denied` - User clicked "Deny" on OAuth screen
+- `server_error` - Server configuration issue
+- `callback_failed` - Authentication callback failed
+- `auth_failed` - General authentication failure
+- `redirect_uri_mismatch` - OAuth configuration problem
+
+**Error URL format:**
+```
+/auth/error?error=access_denied&description=You%20denied%20the%20request
+```
 
 ## Viewing Logs
 
@@ -258,6 +384,22 @@ Logs appear in the Console/Shell output automatically.
 
 ### In Production
 If you've enabled `AUTH_DEBUG=true`, logs will appear in your application logs.
+
+### Filtering Logs
+Use grep to filter specific auth events:
+```bash
+# View all auth logs
+grep "\[AUTH:" logs.txt
+
+# View only callback logs
+grep "\[AUTH:CALLBACK\]" logs.txt
+
+# View only errors
+grep "FAILED\|ERROR" logs.txt | grep "\[AUTH:"
+
+# View redirect URI debugging
+grep "callbackURL\|expectedCallbackURL" logs.txt
+```
 
 ## Privacy Note
 

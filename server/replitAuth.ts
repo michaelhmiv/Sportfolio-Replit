@@ -270,12 +270,31 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/login", (req, res, next) => {
+    const callbackURL = `https://${req.hostname}/api/callback`;
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const fullUrl = `${protocol}://${host}${req.originalUrl}`;
+    
     authLog("LOGIN", "Login initiated", {
       hostname: req.hostname,
+      protocol,
+      host,
+      fullUrl,
+      callbackURL,
       ip: req.ip,
       userAgent: req.get("user-agent"),
       sessionID: req.sessionID,
+      hasSession: !!req.session,
+      cookies: Object.keys(req.cookies || {}),
     });
+
+    // Validate that we can create a callback URL
+    if (!req.hostname) {
+      authLog("LOGIN", "ERROR: Missing hostname for callback URL", {
+        headers: req.headers,
+      });
+      return res.status(500).send("Server configuration error: cannot determine hostname");
+    }
 
     ensureStrategy(req.hostname);
     passport.authenticate(`replitauth:${req.hostname}`, {
@@ -285,6 +304,11 @@ export async function setupAuth(app: Express) {
   });
 
   app.get("/api/callback", (req, res, next) => {
+    const callbackURL = `https://${req.hostname}/api/callback`;
+    const protocol = req.protocol;
+    const host = req.get('host');
+    const fullUrl = `${protocol}://${host}${req.originalUrl}`;
+    
     // Sanitize query params - never log sensitive OAuth codes or state
     const sanitizedQuery = {
       ...req.query,
@@ -294,31 +318,70 @@ export async function setupAuth(app: Express) {
     
     authLog("CALLBACK", "OAuth callback received", {
       hostname: req.hostname,
+      protocol,
+      host,
+      fullUrl,
+      expectedCallbackURL: callbackURL,
       query: sanitizedQuery,
       sessionID: req.sessionID,
+      hasSession: !!req.session,
       hasError: !!req.query.error,
+      error: req.query.error,
       errorDescription: req.query.error_description,
+      cookies: Object.keys(req.cookies || {}),
     });
+
+    // Check for OAuth provider errors in query params
+    if (req.query.error) {
+      authLog("CALLBACK", "OAuth provider returned error", {
+        error: req.query.error,
+        errorDescription: req.query.error_description,
+        errorUri: req.query.error_uri,
+      });
+      
+      // Redirect to error page with details
+      return res.redirect(
+        `/auth/error?error=${encodeURIComponent(req.query.error as string)}&description=${encodeURIComponent((req.query.error_description as string) || 'Authentication failed')}`
+      );
+    }
+
+    // Validate hostname
+    if (!req.hostname) {
+      authLog("CALLBACK", "ERROR: Missing hostname", {
+        headers: req.headers,
+      });
+      return res.redirect('/auth/error?error=server_error&description=Cannot%20determine%20server%20hostname');
+    }
 
     ensureStrategy(req.hostname);
     
     passport.authenticate(`replitauth:${req.hostname}`, {
       successReturnToOrRedirect: "/",
-      failureRedirect: "/api/login",
+      failureRedirect: "/auth/error?error=auth_failed&description=Authentication%20failed%2C%20please%20try%20again",
     })(req, res, (err: any) => {
       if (err) {
         authLog("CALLBACK", "Authentication FAILED in callback", {
           error: err.message,
+          errorName: err.name,
+          errorCode: (err as any).code,
           stack: err.stack,
+          sessionID: req.sessionID,
         });
-        return next(err);
+        
+        // Redirect to error page instead of throwing
+        return res.redirect(
+          `/auth/error?error=callback_failed&description=${encodeURIComponent(err.message || 'Authentication callback failed')}`
+        );
       }
       
+      // Log success but don't call next() - Passport already handled the redirect
       authLog("CALLBACK", "Authentication successful, redirecting", {
         sessionID: req.sessionID,
         isAuthenticated: req.isAuthenticated(),
+        hasUser: !!req.user,
+        userClaims: req.user ? Object.keys((req.user as any).claims || {}) : [],
       });
-      next();
+      // Passport's successReturnToOrRedirect will handle the redirect, we just return
     });
   });
 
