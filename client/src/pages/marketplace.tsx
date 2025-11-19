@@ -215,15 +215,24 @@ export default function Marketplace() {
             <div className="flex items-center justify-between gap-3">
               <CardTitle className="text-sm font-medium uppercase tracking-wide">All Players</CardTitle>
               {/* Mobile sort controls */}
-              <div className="flex items-center gap-1 sm:hidden">
+              <div className="flex items-center gap-1 sm:hidden flex-wrap">
                 <Button
                   size="sm"
-                  variant={sortField === 'price' ? 'default' : 'outline'}
-                  onClick={() => toggleSort("price")}
+                  variant={sortField === 'bid' ? 'default' : 'outline'}
+                  onClick={() => toggleSort("bid")}
                   className="text-xs"
-                  data-testid="button-sort-price-mobile"
+                  data-testid="button-sort-bid-mobile"
                 >
-                  Price {sortField === 'price' && <ArrowUpDown className="w-3 h-3 ml-1" />}
+                  Bid {sortField === 'bid' && <ArrowUpDown className="w-3 h-3 ml-1" />}
+                </Button>
+                <Button
+                  size="sm"
+                  variant={sortField === 'ask' ? 'default' : 'outline'}
+                  onClick={() => toggleSort("ask")}
+                  className="text-xs"
+                  data-testid="button-sort-ask-mobile"
+                >
+                  Ask {sortField === 'ask' && <ArrowUpDown className="w-3 h-3 ml-1" />}
                 </Button>
                 <Button
                   size="sm"
@@ -233,15 +242,6 @@ export default function Marketplace() {
                   data-testid="button-sort-volume-mobile"
                 >
                   Vol {sortField === 'volume' && <ArrowUpDown className="w-3 h-3 ml-1" />}
-                </Button>
-                <Button
-                  size="sm"
-                  variant={sortField === 'change' ? 'default' : 'outline'}
-                  onClick={() => toggleSort("change")}
-                  className="text-xs"
-                  data-testid="button-sort-change-mobile"
-                >
-                  24h {sortField === 'change' && <ArrowUpDown className="w-3 h-3 ml-1" />}
                 </Button>
               </div>
             </div>
@@ -258,9 +258,21 @@ export default function Marketplace() {
                       <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Team</th>
                       <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                         <div className="flex items-center gap-1 justify-end">
-                          <span className="text-[#3b82f6]">Bid</span>
+                          <button 
+                            onClick={() => toggleSort("bid")} 
+                            className="hover-elevate px-2 py-1 rounded text-xs text-blue-500 dark:text-blue-400 flex items-center gap-0.5"
+                            data-testid="button-sort-bid"
+                          >
+                            Bid {sortField === 'bid' && <ArrowUpDown className="w-3 h-3" />}
+                          </button>
                           <span className="text-muted-foreground">/</span>
-                          <span className="text-[#ef4444]">Ask</span>
+                          <button 
+                            onClick={() => toggleSort("ask")} 
+                            className="hover-elevate px-2 py-1 rounded text-xs text-red-500 dark:text-red-400 flex items-center gap-0.5"
+                            data-testid="button-sort-ask"
+                          >
+                            Ask {sortField === 'ask' && <ArrowUpDown className="w-3 h-3" />}
+                          </button>
                         </div>
                       </th>
                       <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">
@@ -304,11 +316,11 @@ export default function Marketplace() {
                                   <span className="text-muted-foreground">{player.team} • {player.position}</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 text-xs mt-0.5">
-                                  <span className="text-[#3b82f6] font-mono font-bold">
+                                  <span className="text-blue-500 dark:text-blue-400 font-mono font-bold">
                                     {player.bestBid ? `$${player.bestBid}` : '-'}
                                   </span>
                                   <span className="text-muted-foreground">/</span>
-                                  <span className="text-[#ef4444] font-mono font-bold">
+                                  <span className="text-red-500 dark:text-red-400 font-mono font-bold">
                                     {player.bestAsk ? `$${player.bestAsk}` : '-'}
                                   </span>
                                   <span className="text-muted-foreground">•</span>
@@ -339,11 +351,11 @@ export default function Marketplace() {
                         </td>
                         <td className="px-2 py-1.5 text-right hidden sm:table-cell">
                           <div className="flex items-center justify-end gap-2 font-mono text-sm font-bold">
-                            <span className="text-[#3b82f6]" data-testid={`text-bid-${player.id}`}>
+                            <span className="text-blue-500 dark:text-blue-400" data-testid={`text-bid-${player.id}`}>
                               {player.bestBid || '-'}
                             </span>
                             <span className="text-muted-foreground font-normal">×</span>
-                            <span className="text-[#ef4444]" data-testid={`text-ask-${player.id}`}>
+                            <span className="text-red-500 dark:text-red-400" data-testid={`text-ask-${player.id}`}>
                               {player.bestAsk || '-'}
                             </span>
                           </div>

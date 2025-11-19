@@ -35,6 +35,17 @@ All pages must include the following tracking and monetization scripts in the `<
 ## Recent Changes 
 
 ### November 19, 2025
+- **Marketplace Order Book Visualization:** Enhanced marketplace with real-time bid/ask price display
+  - Backend: `/api/players` endpoint now returns `bestBid`, `bestAsk`, `bidSize`, `askSize` for each player calculated from live order books
+  - TradingView-Style Display: Bid prices shown in blue, ask prices in red, with "Bid × Ask" or "Bid / Ask" format
+  - Order Book Filters: Added "Has Buy Orders" and "Has Sell Orders" checkboxes to filter players with active limit orders
+  - Sortable Columns: Clickable Bid and Ask headers enable sorting by price (high to low)
+  - Real-Time Updates: WebSocket `orderBook` events trigger automatic marketplace refresh for instant order book changes
+  - Mobile Optimized: Responsive sort controls and color-coded price display on all screen sizes
+- **User Privacy Enhancement:** Removed all displays of users' firstName and lastName throughout the site
+  - Header, leaderboards, and user profiles now show only usernames (never firstName/lastName)
+  - Avatar initials derived from username instead of firstName/lastName
+  - Backend `/api/leaderboards` endpoint no longer returns firstName/lastName fields
 - **Authentication UX Improvements:** Fixed critical signup conversion issues
   - Added `sameSite: "lax"` to session cookie configuration for proper OAuth redirect handling across modern browsers
   - Added prominent "Sign In" button in header for non-authenticated users, improving discoverability
@@ -63,14 +74,14 @@ A centralized cache invalidation utility (`client/src/lib/cache-invalidation.ts`
 **Real-Time Updates via WebSocket:**
 A centralized WebSocket provider (`client/src/lib/websocket.tsx`) manages a single WebSocket connection shared across the entire application, ensuring zero stale data anywhere. The provider automatically reconnects on disconnect (3-second delay) and broadcasts events to all subscribed components. Every page subscribes to relevant WebSocket events:
 - **Profile Page:** Listens for `portfolio`, `mining`, and `trade` events to update net worth, mining stats, and market order cards instantly
-- **Marketplace:** Listens for `trade` and `orderBook` events to update player prices, volume, and 24h change in real-time
+- **Marketplace:** Listens for `trade` and `orderBook` events to update player prices, bid/ask spreads, volume, and 24h change in real-time. Order book updates show immediately when limit orders are placed or filled, revealing live market depth (best bid/best ask) for all players.
 - **Portfolio:** Listens for `portfolio`, `trade`, and `orderBook` events to update balance, holdings, and pending orders live
 - **Player Pages:** Listens for `trade`, `orderBook`, and `portfolio` events to update prices, trade history, and user balances instantly
 - **Header Balance:** Listens for `portfolio` events to update cash balance display across all pages
 - **Global Leaderboards:** Listens for `mining` (shares mined), `portfolio` (net worth), and `trade` (market orders) events to update all leaderboard rankings in real-time
 - **Contest Leaderboards:** Listens for `contestUpdate` and `liveStats` events to update rankings as games progress
 
-WebSocket event types: `portfolio` (balance/holdings changes), `mining` (mining activity), `trade` (trade executions), `orderBook` (order book changes), `liveStats` (game stat updates), `contestUpdate` (contest changes). The provider integrates with React Query's cache invalidation system to trigger automatic data refetches, ensuring every single data point updates instantly when backend data changes.
+WebSocket event types: `portfolio` (balance/holdings changes), `mining` (mining activity), `trade` (trade executions), `orderBook` (order book changes showing best bid/ask and depth), `liveStats` (game stat updates), `contestUpdate` (contest changes). The provider integrates with React Query's cache invalidation system to trigger automatic data refetches, ensuring every single data point updates instantly when backend data changes.
 
 ### Backend Architecture
 The backend is an Express.js server with TypeScript, supporting both HTTP and WebSockets. It uses Drizzle ORM with a PostgreSQL database (Neon serverless) and Zod for validation. Core domain models include Users, Players, Holdings, Orders, Trades, Mining, Contests, and Price History. The system features atomic balance updates and precise timezone handling for NBA Eastern Time using `date-fns-tz` for accurate game scheduling and contest generation. API design is RESTful for data endpoints and uses WebSockets for live price and trade updates.
