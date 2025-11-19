@@ -420,6 +420,40 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
   const path = req.path;
   const sessionID = req.sessionID;
 
+  // DEV MODE BYPASS: Allow testing without OAuth in development
+  // Enabled by default in development mode for easier testing on .replit.dev domains
+  const isDev = process.env.NODE_ENV === 'development';
+  const bypassAuth = process.env.DEV_BYPASS_AUTH !== 'false'; // Enabled by default, set to 'false' to disable
+  
+  if (isDev && bypassAuth) {
+    if (!req.user) {
+      // Create a mock dev user session
+      const mockUser = {
+        claims: {
+          sub: 'dev-user-12345678',
+          email: 'dev@example.com',
+          first_name: 'Dev',
+          last_name: 'User',
+        },
+        expires_at: Math.floor(Date.now() / 1000) + 86400, // 24 hours from now
+        access_token: 'dev-mock-token',
+        refresh_token: 'dev-mock-refresh',
+      };
+      
+      req.user = mockUser;
+      
+      // Ensure the dev user exists in the database
+      try {
+        await upsertUser(mockUser.claims);
+      } catch (error) {
+        console.error('[DEV_BYPASS] Failed to create dev user:', error);
+      }
+      
+      console.log('[DEV_BYPASS] Dev mode auth bypass active - using mock user');
+    }
+    return next();
+  }
+
   authLog("AUTH_CHECK", "Checking authentication", {
     path,
     sessionID,
