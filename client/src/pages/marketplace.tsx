@@ -91,16 +91,16 @@ export default function Marketplace() {
   }) : [];
 
   return (
-    <div className="min-h-screen bg-background p-3 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-background p-3 sm:p-4">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-4 sm:mb-8">
+        <div className="mb-4 sm:mb-4">
           <h1 className="text-3xl font-bold mb-2">Marketplace</h1>
           <p className="text-muted-foreground">Browse and trade player shares</p>
         </div>
 
         {/* Filters */}
         <Card className="mb-3 sm:mb-6">
-          <CardContent className="p-3 sm:p-6">
+          <CardContent className="p-3 sm:p-4">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
               <div className="relative md:col-span-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

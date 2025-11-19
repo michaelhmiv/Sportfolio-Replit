@@ -94,7 +94,7 @@ export default function Leaderboards() {
   const renderLeaderboard = (data: LeaderboardData | undefined, isLoading: boolean, valueFormatter: (value: number | string) => string) => {
     if (isLoading) {
       return (
-        <div className="text-center py-12 text-muted-foreground">
+        <div className="text-center py-6 text-muted-foreground">
           Loading leaderboard...
         </div>
       );
@@ -103,7 +103,7 @@ export default function Leaderboards() {
     if (!data || data.leaderboard.length === 0) {
       return (
         <Card>
-          <CardContent className="py-12 text-center text-muted-foreground">
+          <CardContent className="py-6 text-center text-muted-foreground">
             No data available
           </CardContent>
         </Card>
@@ -234,14 +234,14 @@ export default function Leaderboards() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-3 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-background p-3 sm:p-4">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-4 sm:mb-8">
+        <div className="mb-4 sm:mb-4">
           <h1 className="text-3xl font-bold mb-2">Global Leaderboards</h1>
           <p className="text-muted-foreground">See how you rank against all players</p>
         </div>
 
-        <Tabs value={category} onValueChange={handleTabChange} className="space-y-3 sm:space-y-6">
+        <Tabs value={category} onValueChange={handleTabChange} className="space-y-3 sm:space-y-3">
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="netWorth" data-testid="tab-net-worth">
               <DollarSign className="w-4 h-4 mr-2" />

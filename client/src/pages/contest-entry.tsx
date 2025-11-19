@@ -163,7 +163,7 @@ export default function ContestEntry() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* Available Players */}
           <Card>
             <CardHeader>
@@ -181,7 +181,7 @@ export default function ContestEntry() {
             </CardHeader>
             <CardContent className="space-y-2 max-h-[600px] overflow-y-auto">
               {filteredPlayers.length === 0 ? (
-                <div className="py-8 text-center text-muted-foreground">
+                <div className="py-4 text-center text-muted-foreground">
                   No eligible players found
                 </div>
               ) : (
@@ -230,7 +230,7 @@ export default function ContestEntry() {
             </CardHeader>
             <CardContent className="space-y-4">
               {lineup.size === 0 ? (
-                <div className="py-12 text-center text-muted-foreground">
+                <div className="py-6 text-center text-muted-foreground">
                   Add players to your lineup
                 </div>
               ) : (

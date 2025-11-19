@@ -171,7 +171,7 @@ export function ContestEntryDrawer({
                               {player.playerPosition}
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <span data-testid={`text-shares-${player.playerId}`}>
                               {player.sharesEntered} shares
                             </span>
@@ -182,7 +182,7 @@ export function ContestEntryDrawer({
                           </div>
                         </div>
 
-                        <div className="flex gap-6 sm:gap-8">
+                        <div className="flex gap-3 sm:gap-8">
                           <div>
                             <div className="text-xs text-muted-foreground">Fantasy Pts</div>
                             <div className="font-mono font-semibold" data-testid={`text-fantasy-points-${player.playerId}`}>

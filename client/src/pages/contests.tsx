@@ -55,9 +55,9 @@ export default function Contests() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-3 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-background p-3 sm:p-4">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-4 sm:mb-8">
+        <div className="mb-4 sm:mb-4">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-3xl font-bold">Contests</h1>
             <div className="flex items-center gap-2">
@@ -122,7 +122,7 @@ export default function Contests() {
           <p className="text-muted-foreground">Enter 50/50 contests and compete for prizes</p>
         </div>
 
-        <Tabs defaultValue="open" className="space-y-3 sm:space-y-6">
+        <Tabs defaultValue="open" className="space-y-3 sm:space-y-3">
           <TabsList>
             <TabsTrigger value="open" data-testid="tab-open-contests">Open Contests</TabsTrigger>
             <TabsTrigger value="my-entries" data-testid="tab-my-entries">My Entries</TabsTrigger>
@@ -131,10 +131,10 @@ export default function Contests() {
           {/* Open Contests */}
           <TabsContent value="open">
             {isLoading ? (
-              <div className="text-center py-12 text-muted-foreground">Loading contests...</div>
+              <div className="text-center py-6 text-muted-foreground">Loading contests...</div>
             ) : data?.openContests.length === 0 ? (
               <Card>
-                <CardContent className="py-12 text-center text-muted-foreground">
+                <CardContent className="py-6 text-center text-muted-foreground">
                   No open contests available
                 </CardContent>
               </Card>
@@ -320,10 +320,10 @@ export default function Contests() {
           {/* My Entries */}
           <TabsContent value="my-entries">
             {isLoading ? (
-              <div className="text-center py-12 text-muted-foreground">Loading your entries...</div>
+              <div className="text-center py-6 text-muted-foreground">Loading your entries...</div>
             ) : data?.myEntries.length === 0 ? (
               <Card>
-                <CardContent className="py-12 text-center">
+                <CardContent className="py-6 text-center">
                   <p className="text-muted-foreground mb-4">You haven't entered any contests yet</p>
                   <Button onClick={() => document.querySelector<HTMLButtonElement>('[data-testid="tab-open-contests"]')?.click()}>
                     Browse Open Contests

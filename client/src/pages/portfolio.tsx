@@ -90,13 +90,13 @@ export default function Portfolio() {
   }
 
   return (
-    <div className="min-h-screen bg-background p-3 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-background p-3 sm:p-4">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-4 sm:mb-8">
+        <div className="mb-4 sm:mb-4">
           <h1 className="text-3xl font-bold mb-4 sm:mb-6">Portfolio</h1>
           
           {/* Portfolio Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-6 mb-4 sm:mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium uppercase tracking-wide">Cash Balance</CardTitle>
@@ -138,7 +138,7 @@ export default function Portfolio() {
           </div>
         </div>
 
-        <Tabs defaultValue="holdings" className="space-y-3 sm:space-y-6">
+        <Tabs defaultValue="holdings" className="space-y-3 sm:space-y-3">
           <TabsList>
             <TabsTrigger value="holdings" data-testid="tab-holdings">Holdings</TabsTrigger>
             <TabsTrigger value="orders" data-testid="tab-open-orders">Open Orders</TabsTrigger>

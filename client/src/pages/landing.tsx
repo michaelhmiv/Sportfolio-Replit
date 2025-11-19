@@ -15,7 +15,7 @@ export default function Landing() {
           <h1 className="text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-3 sm:mb-5">
             Free Market<br className="sm:hidden" /> Fantasy Sports
           </h1>
-          <p className="text-sm sm:text-lg md:text-xl text-muted-foreground mb-5 sm:mb-8 max-w-2xl">
+          <p className="text-sm sm:text-lg md:text-xl text-muted-foreground mb-5 sm:mb-4 max-w-2xl">
             Your portfolio lasts a player's entire career. Trade shares, mine value, compete for prizes.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
@@ -48,7 +48,7 @@ export default function Landing() {
       </div>
 
       {/* Features */}
-      <div className="container px-4 py-6 sm:py-12">
+      <div className="container px-4 py-6 sm:py-6">
         <div className="mx-auto max-w-5xl">
           <h2 className="text-lg sm:text-2xl font-bold mb-4 sm:mb-6">How It Works</h2>
           <div className="grid gap-3 sm:gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -98,7 +98,7 @@ export default function Landing() {
       </div>
 
       {/* CTA Section */}
-      <div className="container px-4 py-6 sm:py-12 pb-12 sm:pb-20">
+      <div className="container px-4 py-6 sm:py-6 pb-12 sm:pb-20">
         <div className="mx-auto max-w-3xl">
           <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0 overflow-hidden relative">
             <div className="absolute top-0 right-0 w-32 h-32 bg-primary-foreground/5 rounded-full -translate-y-16 translate-x-16"></div>

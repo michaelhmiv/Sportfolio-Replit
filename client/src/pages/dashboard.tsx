@@ -369,7 +369,7 @@ export default function Dashboard() {
         {/* Market Ticker */}
         <div className="border-b bg-card overflow-x-hidden">
         <div className="h-12 overflow-hidden relative">
-          <div className="flex gap-6 animate-slide-left absolute whitespace-nowrap py-3 px-4">
+          <div className="flex gap-3 animate-slide-left absolute whitespace-nowrap py-3 px-4">
             {data?.hotPlayers?.concat(data.hotPlayers).map((player, idx) => (
               <Link key={`${player.id}-${idx}`} href={`/player/${player.id}`}>
                 <div className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md">
@@ -391,11 +391,11 @@ export default function Dashboard() {
         </div>
 
         {/* Main Dashboard Grid */}
-        <div className="p-3 sm:p-6 lg:p-8 max-w-full overflow-x-hidden">
+        <div className="p-3 sm:p-4 max-w-full overflow-x-hidden">
         {/* Balance Header */}
-        <div className="mb-4 sm:mb-8">
+        <div className="mb-4 sm:mb-4">
           <h1 className="text-3xl font-bold mb-3">Dashboard</h1>
-          <div className="flex flex-row gap-4 sm:gap-6">
+          <div className="flex flex-row gap-2 sm:gap-3">
             <div>
               <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Cash Balance</div>
               <div className="text-2xl font-mono font-bold" data-testid="text-balance">${data?.user.balance || "0.00"}</div>
@@ -532,7 +532,7 @@ export default function Dashboard() {
         )}
 
         {/* Widgets Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-3">
           {/* Mining Widget */}
           <Card className="lg:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -875,7 +875,7 @@ export default function Dashboard() {
               })}
             </div>
             {filteredPlayers.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
+              <div className="text-center py-6 text-muted-foreground">
                 <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>No players found matching your criteria</p>
               </div>
@@ -962,7 +962,7 @@ function PlayerCard({
               
               {/* Season Averages */}
               {stats && !statsLoading ? (
-                <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
                   <span className="font-mono"><span className="font-bold">{stats.pointsPerGame || "0.0"}</span> PPG</span>
                   <span className="font-mono"><span className="font-bold">{stats.reboundsPerGame || "0.0"}</span> RPG</span>
                   <span className="font-mono"><span className="font-bold">{stats.assistsPerGame || "0.0"}</span> APG</span>
@@ -1113,9 +1113,9 @@ function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: (
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-3">
           {/* Score Display */}
-          <div className="grid grid-cols-3 gap-4 items-center">
+          <div className="grid grid-cols-3 gap-2 items-center">
             <div className="text-center">
               <h3 className="text-lg font-semibold mb-2">{game.awayTeam}</h3>
               {game.awayScore !== null && (
@@ -1139,14 +1139,14 @@ function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: (
 
           {/* Loading State */}
           {isLoading && (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-4 text-muted-foreground">
               Loading box score...
             </div>
           )}
 
           {/* No Stats Available */}
           {!isLoading && boxScore?.message && (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-center py-4 text-muted-foreground">
               {boxScore.message}
             </div>
           )}
@@ -1158,7 +1158,7 @@ function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: (
                 <CardTitle className="text-sm font-medium uppercase tracking-wide">Top Performers</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <div className="text-center p-3 bg-muted rounded-md" data-testid="card-leading-scorer">
                     <div className="text-xs text-muted-foreground mb-1">Leading Scorer</div>
                     <div className="font-semibold" data-testid="text-scorer-name">{boxScore.topPerformers.topScorer.playerName}</div>

@@ -153,9 +153,9 @@ export default function PlayerPage() {
     <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
       <div className="max-w-7xl mx-auto">
         {/* Player Header */}
-        <div className="mb-8">
+        <div className="mb-4">
           <div className="flex items-start justify-between mb-4">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
               <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
                 <span className="text-2xl font-bold">{player.firstName[0]}{player.lastName[0]}</span>
               </div>
@@ -184,9 +184,9 @@ export default function PlayerPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
           {/* Chart */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-3">
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
@@ -231,7 +231,7 @@ export default function PlayerPage() {
             </Card>
 
             {/* Order Book & Recent Trades */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-sm font-medium uppercase tracking-wide">Order Book</CardTitle>

@@ -122,7 +122,7 @@ export default function UserProfile() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background p-3 sm:p-6 lg:p-8 flex items-center justify-center">
+      <div className="min-h-screen bg-background p-3 sm:p-4 flex items-center justify-center">
         <div className="text-muted-foreground">Loading profile...</div>
       </div>
     );
@@ -130,9 +130,9 @@ export default function UserProfile() {
 
   if (!profile) {
     return (
-      <div className="min-h-screen bg-background p-3 sm:p-6 lg:p-8 flex items-center justify-center">
+      <div className="min-h-screen bg-background p-3 sm:p-4 flex items-center justify-center">
         <Card>
-          <CardContent className="py-12 text-center">
+          <CardContent className="py-6 text-center">
             <p className="text-muted-foreground">User not found</p>
           </CardContent>
         </Card>
@@ -147,12 +147,12 @@ export default function UserProfile() {
   const isOwnProfile = currentUser?.id === user.id;
 
   return (
-    <div className="min-h-screen bg-background p-3 sm:p-6 lg:p-8">
-      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-6">
+    <div className="min-h-screen bg-background p-3 sm:p-4">
+      <div className="max-w-6xl mx-auto space-y-4 sm:space-y-3">
         {/* Profile Header */}
         <Card data-testid="card-profile-header">
           <CardContent className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
               <Avatar className="h-20 w-20 sm:h-24 sm:w-24" data-testid="avatar-user">
                 <AvatarImage src={user.profileImageUrl} alt={displayName} />
                 <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
@@ -302,7 +302,7 @@ export default function UserProfile() {
           </CardHeader>
           <CardContent>
             {holdings.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-4 text-muted-foreground">
                 No public holdings to display
               </div>
             ) : (
