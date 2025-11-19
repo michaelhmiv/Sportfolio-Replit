@@ -32,22 +32,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return req.user.claims.sub;
   };
 
-  // Helper: Get last trade price for a player
-  async function getLastTradePrice(playerId: string): Promise<string | null> {
-    const recentTrades = await storage.getRecentTrades(playerId, 1);
-    return recentTrades.length > 0 ? recentTrades[0].price : null;
-  }
-
   // Helper: Enrich player data with last trade price (market value)
-  async function enrichPlayerWithMarketValue(player: Player): Promise<Player & { lastTradePrice: string | null }> {
-    // Get last trade price if not already in the database
-    let lastTradePrice: string | null = player.lastTradePrice;
-    if (!lastTradePrice) {
-      lastTradePrice = await getLastTradePrice(player.id);
-    }
+  // Now just returns the cached lastTradePrice from database - no additional queries needed
+  function enrichPlayerWithMarketValue(player: Player): Player & { lastTradePrice: string | null } {
     return {
       ...player,
-      lastTradePrice, // null if no trades, otherwise the last traded price
+      lastTradePrice: player.lastTradePrice || null, // Cached value from database
     };
   }
 
@@ -222,10 +212,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.updateUserBalance(sellOrder.userId, (parseFloat(seller.balance) + tradeCost).toFixed(2));
           }
 
-          // Update player price
+          // Update player price and cache last trade price
           await storage.upsertPlayer({
             ...player,
             currentPrice: tradePrice.toFixed(2),
+            lastTradePrice: tradePrice.toFixed(2), // Cache for performance
             volume24h: player.volume24h + tradeQuantity,
           });
 
@@ -601,15 +592,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/players", async (req, res) => {
     try {
-      const { search, team, position } = req.query;
-      const playersRaw = await storage.getPlayers({
+      const { search, team, position, limit, offset } = req.query;
+      
+      // Parse and validate pagination params
+      const parsedLimit = limit ? parseInt(limit as string) : 50;
+      const parsedOffset = offset ? parseInt(offset as string) : 0;
+      
+      // Guard against invalid numeric input (NaN)
+      const safeLimit = isNaN(parsedLimit) ? 50 : Math.max(1, Math.min(parsedLimit, 200));
+      const safeOffset = isNaN(parsedOffset) ? 0 : Math.max(0, parsedOffset);
+      
+      const { players: playersRaw, total } = await storage.getPlayersPaginated({
         search: search as string,
         team: team as string,
         position: position as string,
+        limit: safeLimit,
+        offset: safeOffset,
       });
-      // Enrich with market values and order book data
+      
+      // Enrich with market values and order book data (only for paginated results)
       const players = await Promise.all(playersRaw.map(async (player) => {
-        const enriched = await enrichPlayerWithMarketValue(player);
+        const enriched = enrichPlayerWithMarketValue(player);
         const orderBook = await storage.getOrderBook(player.id);
         
         // Get best bid (highest buy price) and best ask (lowest sell price)
@@ -640,7 +643,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           askSize,
         };
       }));
-      res.json(players);
+      
+      res.json({ players, total });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -1854,11 +1858,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
               holdings.map(async (h: Holding) => {
                 if (h.assetType === "player") {
                   const p = await storage.getPlayer(h.assetId);
-                  if (p) {
-                    const lastTradePrice = p.lastTradePrice || await getLastTradePrice(p.id);
-                    if (lastTradePrice) {
-                      return parseFloat(lastTradePrice) * h.quantity;
-                    }
+                  if (p?.lastTradePrice) {
+                    return parseFloat(p.lastTradePrice) * h.quantity;
                   }
                 }
                 return 0;
@@ -1909,14 +1910,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (holding.assetType === "player") {
             const player = await storage.getPlayer(holding.assetId);
             if (player) {
-              const lastTradePrice = player.lastTradePrice || await getLastTradePrice(player.id);
-              const marketValue = lastTradePrice 
-                ? (parseFloat(lastTradePrice) * holding.quantity).toFixed(2)
+              const marketValue = player.lastTradePrice 
+                ? (parseFloat(player.lastTradePrice) * holding.quantity).toFixed(2)
                 : null;
               return {
                 ...holding,
                 player,
-                lastTradePrice,
+                lastTradePrice: player.lastTradePrice,
                 marketValue,
               };
             }
@@ -1951,12 +1951,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             holdings.map(async (h: Holding) => {
               if (h.assetType === "player") {
                 const p = await storage.getPlayer(h.assetId);
-                if (p) {
-                  // Use lastTradePrice from player, or fetch from trades if not cached
-                  const lastTradePrice = p.lastTradePrice || await getLastTradePrice(p.id);
-                  if (lastTradePrice) {
-                    return parseFloat(lastTradePrice) * h.quantity;
-                  }
+                if (p?.lastTradePrice) {
+                  return parseFloat(p.lastTradePrice) * h.quantity;
                 }
               }
               return 0;
@@ -2081,7 +2077,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         storage.getContests(),
         storage.getRecentJobLogs(undefined, 50),
       ]);
-
       const openContests = allContests.filter((c: any) => c.status === 'open').length;
       const liveContests = allContests.filter((c: any) => c.status === 'live').length;
       const completedContests = allContests.filter((c: any) => c.status === 'completed').length;

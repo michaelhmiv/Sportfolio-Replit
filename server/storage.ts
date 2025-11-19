@@ -52,6 +52,7 @@ export interface IStorage {
   
   // Player methods
   getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]>;
+  getPlayersPaginated(filters?: { search?: string; team?: string; position?: string; limit?: number; offset?: number }): Promise<{ players: Player[]; total: number }>;
   getPlayer(id: string): Promise<Player | undefined>;
   upsertPlayer(player: InsertPlayer): Promise<Player>;
   getDistinctTeams(): Promise<string[]>;
@@ -215,9 +216,8 @@ export class DatabaseStorage implements IStorage {
     return await this.getUser(userId);
   }
 
-  // Player methods
-  async getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]> {
-    // Build array of conditions to combine with AND
+  // Helper: Build player query conditions (reused by getPlayers and getPlayersPaginated)
+  private buildPlayerQueryConditions(filters?: { search?: string; team?: string; position?: string }) {
     const conditions = [];
     
     if (filters?.team && filters.team !== "all") {
@@ -226,25 +226,59 @@ export class DatabaseStorage implements IStorage {
     if (filters?.position && filters.position !== "all") {
       conditions.push(eq(players.position, filters.position));
     }
-    
-    // Apply combined conditions
-    let query = db.select().from(players);
-    if (conditions.length > 0) {
-      query = query.where(and(...conditions));
-    }
-    
-    const results = await query;
-    
-    // Apply search filter in memory (simpler for now)
     if (filters?.search) {
-      const searchLower = filters.search.toLowerCase();
-      return results.filter(p => 
-        p.firstName.toLowerCase().includes(searchLower) ||
-        p.lastName.toLowerCase().includes(searchLower)
+      // Use SQL ILIKE for case-insensitive search on first/last name
+      const searchTerm = `%${filters.search}%`;
+      conditions.push(
+        sql`(${players.firstName} ILIKE ${searchTerm} OR ${players.lastName} ILIKE ${searchTerm})`
       );
     }
     
-    return results;
+    return conditions;
+  }
+
+  // Player methods - returns full list (legacy API for backward compatibility)
+  async getPlayers(filters?: { 
+    search?: string; 
+    team?: string; 
+    position?: string;
+  }): Promise<Player[]> {
+    const conditions = this.buildPlayerQueryConditions(filters);
+    
+    // Build query in one shot to avoid type reassignment issues
+    if (conditions.length > 0) {
+      return await db.select().from(players).where(and(...conditions));
+    }
+    return await db.select().from(players);
+  }
+
+  // Paginated players - returns subset with total count (new API for performance)
+  async getPlayersPaginated(filters?: { 
+    search?: string; 
+    team?: string; 
+    position?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ players: Player[]; total: number }> {
+    const { search, team, position, limit = 50, offset = 0 } = filters || {};
+    const conditions = this.buildPlayerQueryConditions({ search, team, position });
+    
+    // Run count and data fetch in parallel for performance
+    // Build each query in one shot to avoid type reassignment issues
+    const [countResult, playersData] = await Promise.all([
+      // Count query
+      conditions.length > 0
+        ? db.select({ count: sql<number>`COUNT(*)::int` }).from(players).where(and(...conditions))
+        : db.select({ count: sql<number>`COUNT(*)::int` }).from(players),
+      // Data query with pagination
+      conditions.length > 0
+        ? db.select().from(players).where(and(...conditions)).limit(limit).offset(offset)
+        : db.select().from(players).limit(limit).offset(offset),
+    ]);
+    
+    const total = countResult[0].count;
+    
+    return { players: playersData, total };
   }
 
   async getPlayer(id: string): Promise<Player | undefined> {
