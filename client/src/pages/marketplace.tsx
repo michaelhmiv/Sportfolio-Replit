@@ -7,11 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, TrendingUp, TrendingDown, ArrowUpDown } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Search, TrendingUp, TrendingDown, ArrowUpDown, Filter } from "lucide-react";
 import { Link } from "wouter";
 import type { Player } from "@shared/schema";
 
-type SortField = "price" | "volume" | "change";
+type PlayerWithOrderBook = Player & {
+  bestBid: string | null;
+  bestAsk: string | null;
+  bidSize: number;
+  askSize: number;
+};
+
+type SortField = "price" | "volume" | "change" | "bid" | "ask";
 type SortOrder = "asc" | "desc";
 
 export default function Marketplace() {
@@ -20,6 +28,8 @@ export default function Marketplace() {
   const [positionFilter, setPositionFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("volume");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [filterHasBuyOrders, setFilterHasBuyOrders] = useState(false);
+  const [filterHasSellOrders, setFilterHasSellOrders] = useState(false);
   const { subscribe } = useWebSocket();
 
   const { data: teams } = useQuery<string[]>({
@@ -44,7 +54,7 @@ export default function Marketplace() {
     };
   }, [subscribe]);
 
-  const { data: players, isLoading } = useQuery<Player[]>({
+  const { data: players, isLoading } = useQuery<PlayerWithOrderBook[]>({
     queryKey: ["/api/players", search, teamFilter, positionFilter, sortField, sortOrder],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -68,27 +78,40 @@ export default function Marketplace() {
     }
   };
 
-  // Client-side sorting
-  const sortedPlayers = players ? [...players].sort((a, b) => {
-    let aVal: number;
-    let bVal: number;
-    
-    if (sortField === "price") {
-      // Put players without market value at the end
-      const aPrice = a.lastTradePrice ? parseFloat(a.lastTradePrice) : -1;
-      const bPrice = b.lastTradePrice ? parseFloat(b.lastTradePrice) : -1;
-      aVal = aPrice;
-      bVal = bPrice;
-    } else if (sortField === "volume") {
-      aVal = a.volume24h;
-      bVal = b.volume24h;
-    } else {
-      aVal = parseFloat(a.priceChange24h);
-      bVal = parseFloat(b.priceChange24h);
-    }
-    
-    return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
-  }) : [];
+  // Client-side filtering and sorting
+  const filteredAndSortedPlayers = players ? [...players]
+    .filter((player) => {
+      // Apply order book filters
+      if (filterHasBuyOrders && !player.bestBid) return false;
+      if (filterHasSellOrders && !player.bestAsk) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      let aVal: number;
+      let bVal: number;
+      
+      if (sortField === "price") {
+        // Put players without market value at the end
+        const aPrice = a.lastTradePrice ? parseFloat(a.lastTradePrice) : -1;
+        const bPrice = b.lastTradePrice ? parseFloat(b.lastTradePrice) : -1;
+        aVal = aPrice;
+        bVal = bPrice;
+      } else if (sortField === "volume") {
+        aVal = a.volume24h;
+        bVal = b.volume24h;
+      } else if (sortField === "bid") {
+        aVal = a.bestBid ? parseFloat(a.bestBid) : -1;
+        bVal = b.bestBid ? parseFloat(b.bestBid) : -1;
+      } else if (sortField === "ask") {
+        aVal = a.bestAsk ? parseFloat(a.bestAsk) : -1;
+        bVal = b.bestAsk ? parseFloat(b.bestAsk) : -1;
+      } else {
+        aVal = parseFloat(a.priceChange24h);
+        bVal = parseFloat(b.priceChange24h);
+      }
+      
+      return sortOrder === "asc" ? aVal - bVal : bVal - aVal;
+    }) : [];
 
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4">
@@ -100,7 +123,7 @@ export default function Marketplace() {
 
         {/* Filters */}
         <Card className="mb-3 sm:mb-6">
-          <CardContent className="p-3 sm:p-4">
+          <CardContent className="p-3 sm:p-4 space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
               <div className="relative md:col-span-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -138,6 +161,50 @@ export default function Marketplace() {
                   <SelectItem value="C">Center</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            
+            {/* Order Book Filters */}
+            <div className="flex flex-wrap items-center gap-4 pt-1">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Show only:</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="filter-buy-orders" 
+                  checked={filterHasBuyOrders}
+                  onCheckedChange={(checked) => setFilterHasBuyOrders(checked as boolean)}
+                  data-testid="checkbox-filter-buy-orders"
+                />
+                <label htmlFor="filter-buy-orders" className="text-sm cursor-pointer">
+                  Has Buy Orders
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="filter-sell-orders" 
+                  checked={filterHasSellOrders}
+                  onCheckedChange={(checked) => setFilterHasSellOrders(checked as boolean)}
+                  data-testid="checkbox-filter-sell-orders"
+                />
+                <label htmlFor="filter-sell-orders" className="text-sm cursor-pointer">
+                  Has Sell Orders
+                </label>
+              </div>
+              {(filterHasBuyOrders || filterHasSellOrders) && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setFilterHasBuyOrders(false);
+                    setFilterHasSellOrders(false);
+                  }}
+                  className="text-xs"
+                  data-testid="button-clear-filters"
+                >
+                  Clear Filters
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -190,13 +257,11 @@ export default function Marketplace() {
                       <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
                       <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Team</th>
                       <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        <button 
-                          onClick={() => toggleSort("price")} 
-                          className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded text-xs"
-                          data-testid="button-sort-price"
-                        >
-                          Price <ArrowUpDown className="w-3 h-3" />
-                        </button>
+                        <div className="flex items-center gap-1 justify-end">
+                          <span className="text-[#3b82f6]">Bid</span>
+                          <span className="text-muted-foreground">/</span>
+                          <span className="text-[#ef4444]">Ask</span>
+                        </div>
                       </th>
                       <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">
                         <button 
@@ -220,7 +285,7 @@ export default function Marketplace() {
                     </tr>
                   </thead>
                   <tbody>
-                    {sortedPlayers.map((player) => (
+                    {filteredAndSortedPlayers.map((player) => (
                       <tr 
                         key={player.id} 
                         className="border-b last:border-0 hover-elevate"
@@ -235,21 +300,19 @@ export default function Marketplace() {
                               </div>
                               <div className="min-w-0 flex-1">
                                 <div className="font-medium text-sm">{player.firstName} {player.lastName}</div>
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
-                                  <span>{player.team}</span>
-                                  <span>•</span>
-                                  <span>{player.position}</span>
-                                  <span>•</span>
-                                  <span className="font-mono font-bold text-foreground">
-                                    {player.lastTradePrice ? `$${player.lastTradePrice}` : '-'}
-                                  </span>
+                                <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                                  <span className="text-muted-foreground">{player.team} • {player.position}</span>
                                 </div>
-                                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
-                                  <span>Vol: {player.volume24h > 0 ? player.volume24h.toLocaleString() : '-'}</span>
-                                  <span>•</span>
-                                  <span className={parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}>
-                                    {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
+                                <div className="flex items-center gap-1.5 text-xs mt-0.5">
+                                  <span className="text-[#3b82f6] font-mono font-bold">
+                                    {player.bestBid ? `$${player.bestBid}` : '-'}
                                   </span>
+                                  <span className="text-muted-foreground">/</span>
+                                  <span className="text-[#ef4444] font-mono font-bold">
+                                    {player.bestAsk ? `$${player.bestAsk}` : '-'}
+                                  </span>
+                                  <span className="text-muted-foreground">•</span>
+                                  <span className="text-muted-foreground">Vol: {player.volume24h > 0 ? player.volume24h.toLocaleString() : '-'}</span>
                                 </div>
                               </div>
                             </div>
@@ -275,9 +338,15 @@ export default function Marketplace() {
                           <Badge variant="outline" className="text-xs">{player.team}</Badge>
                         </td>
                         <td className="px-2 py-1.5 text-right hidden sm:table-cell">
-                          <span className="font-mono font-bold text-sm" data-testid={`text-price-${player.id}`}>
-                            {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-xs font-normal">-</span>}
-                          </span>
+                          <div className="flex items-center justify-end gap-2 font-mono text-sm font-bold">
+                            <span className="text-[#3b82f6]" data-testid={`text-bid-${player.id}`}>
+                              {player.bestBid || '-'}
+                            </span>
+                            <span className="text-muted-foreground font-normal">×</span>
+                            <span className="text-[#ef4444]" data-testid={`text-ask-${player.id}`}>
+                              {player.bestAsk || '-'}
+                            </span>
+                          </div>
                         </td>
                         <td className="px-2 py-1.5 text-right hidden lg:table-cell">
                           <span className="text-xs text-muted-foreground">{player.volume24h > 0 ? player.volume24h.toLocaleString() : '-'}</span>
