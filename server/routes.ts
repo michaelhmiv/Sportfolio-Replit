@@ -1792,8 +1792,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             rank: index + 1,
             userId: u.id,
             username: u.username,
-            firstName: u.firstName,
-            lastName: u.lastName,
             profileImageUrl: u.profileImageUrl,
             value: u.totalSharesMined,
           }));
@@ -1809,8 +1807,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             rank: index + 1,
             userId: u.id,
             username: u.username,
-            firstName: u.firstName,
-            lastName: u.lastName,
             profileImageUrl: u.profileImageUrl,
             value: u.totalMarketOrders,
           }));
@@ -1841,8 +1837,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             return {
               userId: u.id,
               username: u.username,
-              firstName: u.firstName,
-              lastName: u.lastName,
               profileImageUrl: u.profileImageUrl,
               netWorth: parseFloat(u.balance) + totalHoldingsVal,
             };
@@ -1855,8 +1849,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
             rank: index + 1,
             userId: u.userId,
             username: u.username,
-            firstName: u.firstName,
-            lastName: u.lastName,
             profileImageUrl: u.profileImageUrl,
             value: u.netWorth.toFixed(2),
           }));

@@ -13,8 +13,6 @@ interface LeaderboardEntry {
   rank: number;
   userId: string;
   username: string;
-  firstName: string | null;
-  lastName: string | null;
   profileImageUrl: string | null;
   value: number | string;
 }
