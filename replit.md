@@ -8,6 +8,30 @@ Preferred communication style: Simple, everyday language.
 
 **CRITICAL RULE: Never use mock, sample, or placeholder data under any circumstances.** All data must come from live API sources (MySportsFeeds). If API data is unavailable, show empty states or loading indicators - never fabricate data.
 
+**REQUIRED: Analytics & Advertising Tags**
+All pages must include the following tracking and monetization scripts in the `<head>` section of `client/index.html`:
+
+1. **Google Analytics 4 (GA4)** - Track user behavior and site performance:
+   ```html
+   <!-- Google tag (gtag.js) -->
+   <script async src="https://www.googletagmanager.com/gtag/js?id=G-Q2SC72MKTF"></script>
+   <script>
+     window.dataLayer = window.dataLayer || [];
+     function gtag(){dataLayer.push(arguments);}
+     gtag('js', new Date());
+     gtag('config', 'G-Q2SC72MKTF');
+   </script>
+   ```
+
+2. **Google AdSense** - Enable monetization through display ads:
+   ```html
+   <!-- Google AdSense -->
+   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-3663304837019777"
+        crossorigin="anonymous"></script>
+   ```
+
+**Note:** This is a single-page application (SPA) - all routes share the same HTML file (`client/index.html`), so these tags automatically apply to every page. When adding new HTML files (if ever needed), these tags must be included in each file's `<head>` section.
+
 ## Recent Changes (November 17, 2025)
 - **Admin Panel with Role-Based Access:** Implemented comprehensive admin page (`/admin`) with system stats dashboard and manual job trigger controls, secured with dual authentication (token-based for external cron, session-based with `isAdmin` flag for logged-in admins)
 - **Admin Security Model:** Added `isAdmin` boolean field to users table; admin button on profile page only visible to admin users; middleware properly validates both authentication paths with clear 401/503 error responses
@@ -61,6 +85,8 @@ Player shares are **permanent across all seasons** and never expire. Each player
 - **Neon Database:** Serverless PostgreSQL for data persistence.
 - **WebSocket Server:** Custom implementation for real-time updates and notifications.
 - **Google Fonts CDN:** For delivering typography.
+- **Google Analytics 4:** Tracking and analytics (Measurement ID: G-Q2SC72MKTF)
+- **Google AdSense:** Monetization via display ads (Publisher ID: ca-pub-3663304837019777)
 
 **Authentication:**
 - **Replit Auth** integration for production-ready user authentication
