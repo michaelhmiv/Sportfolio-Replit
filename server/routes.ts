@@ -304,12 +304,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const playerMap = new Map(players.map(p => [p.id, p]));
 
       // Calculate portfolio value using pre-fetched players
+      // Only count holdings with real market prices (skip placeholder prices)
       let portfolioValue = 0;
       for (const holding of userHoldings) {
         if (holding.assetType === "player") {
           const player = playerMap.get(holding.assetId);
-          if (player) {
-            portfolioValue += holding.quantity * parseFloat(player.currentPrice);
+          if (player && player.lastTradePrice) {
+            portfolioValue += holding.quantity * parseFloat(player.lastTradePrice);
           }
         }
       }
@@ -703,15 +704,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const recentTrades = await storage.getRecentTrades(player.id, 20);
       const userHolding = await storage.getHolding(user.id, "player", player.id);
 
-      // Mock price history - use last trade price if available, otherwise use currentPrice as placeholder
-      const basePrice = player.lastTradePrice || player.currentPrice || "10.00";
-      const basePriceNum = parseFloat(basePrice);
-      
-      // Guard against NaN
-      const priceHistory = Array.from({ length: 24 }, (_, i) => ({
-        timestamp: new Date(Date.now() - (23 - i) * 3600000).toISOString(),
-        price: (!isNaN(basePriceNum) ? (basePriceNum + (Math.random() - 0.5) * 2) : 10).toFixed(2),
-      }));
+      // Price history: empty array if no trades, flat line at last trade price if trades exist
+      const priceHistory = player.lastTradePrice
+        ? Array.from({ length: 24 }, (_, i) => ({
+            timestamp: new Date(Date.now() - (23 - i) * 3600000).toISOString(),
+            price: player.lastTradePrice,
+          }))
+        : [];
 
       res.json({
         player,
@@ -891,7 +890,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check balance for buy orders
       if (side === "buy") {
-        const price = orderType === "limit" ? parseFloat(limitPrice) : parseFloat(player.currentPrice);
+        let price: number;
+        
+        if (orderType === "limit") {
+          price = parseFloat(limitPrice);
+        } else {
+          // For market orders, get price from best ask (use worst-case for balance check)
+          const orderBook = await storage.getOrderBook(req.params.playerId);
+          const validAsks = orderBook.asks.filter(o => 
+            o.limitPrice && 
+            parseFloat(o.limitPrice) > 0 && 
+            (o.quantity - o.filledQuantity) > 0
+          );
+          
+          if (validAsks.length === 0) {
+            return res.status(400).json({ error: "No market liquidity available" });
+          }
+          
+          // Use highest ask price for balance check (worst case)
+          price = Math.max(...validAsks.map(o => parseFloat(o.limitPrice!)));
+        }
+        
         const cost = quantity * price;
         
         if (parseFloat(user.balance) < cost) {
@@ -1141,11 +1160,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const lockedQuantity = Number(item.totalLocked || 0);
 
         if (holding.assetType === "player" && player) {
-          const enrichedPlayer = { ...player, lastTradePrice: player.lastTradePrice || player.currentPrice };
+          // Use real market price only - never fall back to placeholder currentPrice
           const { currentValue, pnl, pnlPercent } = calculatePnL(
             holding.quantity,
             holding.avgCostBasis,
-            enrichedPlayer.lastTradePrice
+            player.lastTradePrice
           );
           
           if (currentValue !== null) {
@@ -1156,7 +1175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           return { 
             ...holding, 
-            player: enrichedPlayer, 
+            player, 
             currentValue, 
             pnl, 
             pnlPercent,

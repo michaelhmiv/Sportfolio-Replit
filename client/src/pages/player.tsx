@@ -233,26 +233,35 @@ export default function PlayerPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={priceHistory}>
-                    <XAxis dataKey="timestamp" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                    <Tooltip 
-                      contentStyle={{ 
-                        backgroundColor: "hsl(var(--popover))", 
-                        border: "1px solid hsl(var(--border))",
-                        borderRadius: "6px"
-                      }}
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="price" 
-                      stroke="hsl(var(--primary))" 
-                      strokeWidth={2}
-                      dot={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {priceHistory.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <LineChart data={priceHistory}>
+                      <XAxis dataKey="timestamp" stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: "hsl(var(--popover))", 
+                          border: "1px solid hsl(var(--border))",
+                          borderRadius: "6px"
+                        }}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="price" 
+                        stroke="hsl(var(--primary))" 
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground" data-testid="text-no-price-data">
+                    <div className="text-center">
+                      <p className="text-sm">No trade data available</p>
+                      <p className="text-xs mt-1">This player has not been traded yet</p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
