@@ -36,7 +36,7 @@ import {
   type InsertPlayerGameStats,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -54,6 +54,8 @@ export interface IStorage {
   getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]>;
   getPlayersPaginated(filters?: { search?: string; team?: string; position?: string; limit?: number; offset?: number }): Promise<{ players: Player[]; total: number }>;
   getPlayer(id: string): Promise<Player | undefined>;
+  getPlayersByIds(ids: string[]): Promise<Player[]>;
+  getTopPlayersByVolume(limit: number): Promise<Player[]>;
   upsertPlayer(player: InsertPlayer): Promise<Player>;
   getDistinctTeams(): Promise<string[]>;
   
@@ -284,6 +286,18 @@ export class DatabaseStorage implements IStorage {
   async getPlayer(id: string): Promise<Player | undefined> {
     const [player] = await db.select().from(players).where(eq(players.id, id));
     return player || undefined;
+  }
+
+  async getPlayersByIds(ids: string[]): Promise<Player[]> {
+    if (ids.length === 0) return [];
+    return await db.select().from(players).where(inArray(players.id, ids));
+  }
+
+  async getTopPlayersByVolume(limit: number): Promise<Player[]> {
+    return await db.select()
+      .from(players)
+      .orderBy(desc(players.volume24h))
+      .limit(limit);
   }
 
   async upsertPlayer(player: InsertPlayer): Promise<Player> {

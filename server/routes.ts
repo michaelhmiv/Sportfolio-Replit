@@ -270,36 +270,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Accrue mining shares based on elapsed time
       await accrueMiningShares(user.id);
       
-      const allPlayers = await storage.getPlayers();
-      const userHoldings = await storage.getUserHoldings(user.id);
-      const allContests = await storage.getContests("open");
-      const recentTrades = await storage.getRecentTrades(undefined, 10);
-      const miningData = await storage.getMining(user.id);
+      // Fetch data in parallel
+      const [userHoldings, allContests, recentTrades, miningData, miningSplits, hotPlayersRaw] = await Promise.all([
+        storage.getUserHoldings(user.id),
+        storage.getContests("open"),
+        storage.getRecentTrades(undefined, 10),
+        storage.getMining(user.id),
+        storage.getMiningSplits(user.id),
+        storage.getTopPlayersByVolume(5), // Get top 5 players by 24h volume directly from DB
+      ]);
 
-      // Calculate portfolio value
+      // Collect all unique player IDs we need to fetch
+      const playerIds = new Set<string>();
+      
+      // Add holdings player IDs
+      userHoldings.forEach(h => {
+        if (h.assetType === "player") playerIds.add(h.assetId);
+      });
+      
+      // Add recent trades player IDs
+      recentTrades.forEach(t => playerIds.add(t.playerId));
+      
+      // Add mining player IDs
+      if (miningData?.playerId) playerIds.add(miningData.playerId);
+      miningSplits.forEach(s => playerIds.add(s.playerId));
+      
+      // Batch fetch all needed players in one query
+      const players = await storage.getPlayersByIds(Array.from(playerIds));
+      const playerMap = new Map(players.map(p => [p.id, p]));
+
+      // Calculate portfolio value using pre-fetched players
       let portfolioValue = 0;
       for (const holding of userHoldings) {
         if (holding.assetType === "player") {
-          const player = await storage.getPlayer(holding.assetId);
+          const player = playerMap.get(holding.assetId);
           if (player) {
             portfolioValue += holding.quantity * parseFloat(player.currentPrice);
           }
         }
       }
 
-      // Get hot players (top 5 by 24h volume) with market values
-      const hotPlayersRaw = allPlayers
-        .sort((a, b) => b.volume24h - a.volume24h)
-        .slice(0, 5);
+      // Enrich hot players with market values
       const hotPlayers = await Promise.all(hotPlayersRaw.map(enrichPlayerWithMarketValue));
 
-      // Get top 3 holdings by value
+      // Get top 3 holdings by value using pre-fetched players
       const topHoldings = [];
       for (const holding of userHoldings) {
         if (holding.assetType === "player") {
-          const player = await storage.getPlayer(holding.assetId);
+          const player = playerMap.get(holding.assetId);
           if (player) {
-            const enrichedPlayer = await enrichPlayerWithMarketValue(player);
+            const enrichedPlayer = enrichPlayerWithMarketValue(player);
             const { currentValue, pnl, pnlPercent } = calculatePnL(
               holding.quantity,
               holding.avgCostBasis,
@@ -323,22 +343,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return parseFloat(b.value) - parseFloat(a.value);
       });
 
-      // Get mining data
-      const miningSplits = await storage.getMiningSplits(user.id);
+      // Get mining data using pre-fetched players
       let miningPlayer = undefined;
       let miningPlayers: Array<{ player: Player | undefined; sharesPerHour: number }> = [];
       
       if (miningSplits.length > 0) {
         // Multi-player mining
-        miningPlayers = await Promise.all(
-          miningSplits.map(async (split) => ({
-            player: await storage.getPlayer(split.playerId),
-            sharesPerHour: split.sharesPerHour,
-          }))
-        );
+        miningPlayers = miningSplits.map(split => ({
+          player: playerMap.get(split.playerId),
+          sharesPerHour: split.sharesPerHour,
+        }));
       } else if (miningData?.playerId) {
         // Legacy single-player mining
-        miningPlayer = await storage.getPlayer(miningData.playerId);
+        miningPlayer = playerMap.get(miningData.playerId);
       }
 
       res.json({
@@ -355,12 +372,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           sharesPerHour: 100,
         } : null,
         contests: allContests.slice(0, 5),
-        recentTrades: await Promise.all(
-          recentTrades.map(async (trade) => ({
-            ...trade,
-            player: await storage.getPlayer(trade.playerId),
-          }))
-        ),
+        recentTrades: recentTrades.map(trade => ({
+          ...trade,
+          player: playerMap.get(trade.playerId),
+        })),
         topHoldings: topHoldings.slice(0, 3),
         portfolioHistory: [], // Placeholder
       });
