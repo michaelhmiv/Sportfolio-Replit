@@ -65,7 +65,9 @@ export default function Marketplace() {
       const url = `/api/players${params.toString() ? `?${params.toString()}` : ""}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch players");
-      return res.json();
+      const data = await res.json();
+      // API now returns { players, total } for pagination
+      return data.players || data;
     },
   });
 

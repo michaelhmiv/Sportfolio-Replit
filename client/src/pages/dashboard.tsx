@@ -134,10 +134,12 @@ export default function Dashboard() {
     data?.mining?.capLimit,
   ]);
 
-  const { data: playersData } = useQuery<Player[]>({
+  const { data: playersResponse } = useQuery<{ players: Player[], total: number }>({
     queryKey: ["/api/players"],
     enabled: showPlayerSelection,
   });
+
+  const playersData = playersResponse?.players;
 
   // Filter players by search and team
   const filteredPlayers = playersData?.filter(p => {
