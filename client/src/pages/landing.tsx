@@ -21,7 +21,7 @@ export default function Landing() {
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <Button asChild size="lg" className="w-full sm:w-auto">
               <a href="/api/login" data-testid="button-hero-login" className="flex items-center justify-center gap-2">
-                Start Trading
+                Sign In with Replit
                 <ArrowRight className="w-4 h-4" />
               </a>
             </Button>
@@ -113,7 +113,7 @@ export default function Landing() {
               <Button variant="secondary" size="lg" asChild className="shadow-lg">
                 <a href="/api/login" data-testid="button-cta-login" className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
-                  Sign Up Free
+                  Sign In with Replit
                 </a>
               </Button>
             </CardContent>
