@@ -70,6 +70,23 @@ export const holdings = pgTable("holdings", {
   userAssetIdx: index("user_asset_idx").on(table.userId, table.assetType, table.assetId),
 }));
 
+// Holdings locks table - tracks reserved/locked shares to prevent double-spending
+// Available shares = holdings.quantity - SUM(holdings_locks.lockedQuantity)
+export const holdingsLocks = pgTable("holdings_locks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  assetType: text("asset_type").notNull(), // "player" or "premium"
+  assetId: text("asset_id").notNull(), // player ID or "premium"
+  lockType: text("lock_type").notNull(), // "order", "contest", "mining"
+  lockReferenceId: varchar("lock_reference_id").notNull(), // order ID, contest entry ID, or mining record ID
+  lockedQuantity: integer("locked_quantity").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userAssetIdx: index("locks_user_asset_idx").on(table.userId, table.assetType, table.assetId),
+  referenceIdx: index("locks_reference_idx").on(table.lockReferenceId),
+  lockTypeIdx: index("locks_type_idx").on(table.lockType),
+}));
+
 // Orders table - limit and market orders on the order book
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -317,6 +334,11 @@ export const insertHoldingSchema = createInsertSchema(holdings).omit({
   lastUpdated: true,
 });
 
+export const insertHoldingsLockSchema = createInsertSchema(holdingsLocks).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertOrderSchema = createInsertSchema(orders).omit({
   id: true,
   filledQuantity: true,
@@ -366,6 +388,9 @@ export type InsertPlayer = z.infer<typeof insertPlayerSchema>;
 
 export type Holding = typeof holdings.$inferSelect;
 export type InsertHolding = z.infer<typeof insertHoldingSchema>;
+
+export type HoldingsLock = typeof holdingsLocks.$inferSelect;
+export type InsertHoldingsLock = z.infer<typeof insertHoldingsLockSchema>;
 
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
