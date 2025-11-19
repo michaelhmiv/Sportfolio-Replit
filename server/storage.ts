@@ -450,18 +450,60 @@ export class DatabaseStorage implements IStorage {
     lockReferenceId: string,
     quantity: number
   ): Promise<HoldingsLock> {
-    const [lock] = await db
-      .insert(holdingsLocks)
-      .values({
-        userId,
-        assetType,
-        assetId,
-        lockType,
-        lockReferenceId,
-        lockedQuantity: quantity,
-      })
-      .returning();
-    return lock;
+    // CRITICAL: Use transaction with row-level lock to prevent race conditions
+    return await db.transaction(async (tx) => {
+      // Step 1: Lock the holdings row to prevent concurrent modifications
+      const [holding] = await tx
+        .select()
+        .from(holdings)
+        .where(
+          and(
+            eq(holdings.userId, userId),
+            eq(holdings.assetType, assetType),
+            eq(holdings.assetId, assetId)
+          )
+        )
+        .for('update'); // SELECT ... FOR UPDATE - prevents concurrent reservations
+
+      if (!holding) {
+        throw new Error(`No holdings found for user ${userId}, asset ${assetId}`);
+      }
+
+      // Step 2: Calculate currently locked shares within the same transaction
+      const lockedResult = await tx
+        .select({ total: sql<number>`COALESCE(SUM(${holdingsLocks.lockedQuantity}), 0)` })
+        .from(holdingsLocks)
+        .where(
+          and(
+            eq(holdingsLocks.userId, userId),
+            eq(holdingsLocks.assetType, assetType),
+            eq(holdingsLocks.assetId, assetId)
+          )
+        );
+
+      const totalLocked = Number(lockedResult[0]?.total || 0);
+      const available = holding.quantity - totalLocked;
+
+      // Step 3: Check if sufficient shares are available
+      if (available < quantity) {
+        throw new Error(`Insufficient available shares: have ${available}, need ${quantity}`);
+      }
+
+      // Step 4: Create the lock
+      const [lock] = await tx
+        .insert(holdingsLocks)
+        .values({
+          userId,
+          assetType,
+          assetId,
+          lockType,
+          lockReferenceId,
+          lockedQuantity: quantity,
+        })
+        .returning();
+
+      return lock;
+    });
   }
 
   async releaseShares(lockId: string): Promise<void> {
