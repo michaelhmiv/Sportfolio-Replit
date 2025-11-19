@@ -61,9 +61,17 @@ The `holdings_locks` table implements a transactional locking mechanism to preve
 **Authentication:**
 - **Replit Auth** integration for production-ready user authentication.
 - Supports login with Google, GitHub, email/password, and other OAuth providers.
-- Secure session management with PostgreSQL-backed session storage.
+- Secure session management with PostgreSQL-backed session storage (7-day TTL, secure cookies with sameSite: lax).
 - Automatic user creation/sync on first login via the `upsertUser` pattern.
 - New users receive $10,000 starting balance automatically.
+
+**OAuth Debugging & Error Handling:**
+- Comprehensive production-safe debug logging (`AUTH_DEBUG=true` or auto-enabled in dev) with categorized prefixes: `[AUTH:LOGIN]`, `[AUTH:CALLBACK]`, `[AUTH:VERIFY]`, `[AUTH:USER_UPSERT]`, etc.
+- Redirect URI debugging: logs exact callback URLs, protocols, hostnames at both login and callback stages to diagnose domain mismatch issues (.replit.app vs .replit.dev).
+- Session and cookie tracking throughout OAuth flow to diagnose session persistence issues.
+- User-friendly error page (`/auth/error`) with actionable messages for common OAuth failures (access_denied, server_error, callback_failed).
+- All sensitive data (OAuth codes, state params, tokens) automatically redacted; user IDs truncated to first 8 chars.
+- Complete troubleshooting guide available in `AUTH_DEBUG.md`.
 
 **Public Access:**
 - Contests and Leaderboards are publicly viewable without authentication.
