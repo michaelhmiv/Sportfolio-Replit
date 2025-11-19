@@ -1,4 +1,4 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, Link } from "wouter";
 import { useEffect } from "react";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -26,7 +26,7 @@ import Admin from "@/pages/admin";
 import Landing from "@/pages/landing";
 import NotFound from "@/pages/not-found";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
-import { LogOut } from "lucide-react";
+import { LogOut, User } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
 
 function Router() {
@@ -159,9 +159,11 @@ function Header() {
       <div className="flex items-center gap-2">
         {isAuthenticated && (
           <>
-            <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
-              <span data-testid="text-username">{userName}</span>
-            </div>
+            <Link href={user?.id ? `/user/${user.id}` : "/profile"} className="hidden sm:block" data-testid="link-username">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground hover-elevate active-elevate-2 px-3 py-1.5 rounded-md transition-colors">
+                <span data-testid="text-username">{userName}</span>
+              </div>
+            </Link>
             <Button 
               size="sm" 
               onClick={handleAddCash}
@@ -170,7 +172,19 @@ function Header() {
               +$1
             </Button>
             <Button 
-              size="sm"
+              size="icon"
+              variant="ghost"
+              asChild
+              data-testid="button-profile"
+              title="Profile"
+              className="hidden sm:flex"
+            >
+              <Link href={user?.id ? `/user/${user.id}` : "/profile"}>
+                <User className="h-4 w-4" />
+              </Link>
+            </Button>
+            <Button 
+              size="icon"
               variant="ghost"
               onClick={() => {
                 // Invalidate auth cache before logout
