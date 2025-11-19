@@ -95,46 +95,71 @@ export default function Portfolio() {
         <div className="mb-4 sm:mb-4">
           <h1 className="text-3xl font-bold mb-4 sm:mb-6">Portfolio</h1>
           
-          {/* Portfolio Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium uppercase tracking-wide">Cash Balance</CardTitle>
-                <DollarSign className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-mono font-bold" data-testid="text-cash-balance">${data?.balance}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium uppercase tracking-wide">Portfolio Value</CardTitle>
-                <TrendingUp className="w-4 h-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-mono font-bold" data-testid="text-portfolio-value">${data?.portfolioValue}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium uppercase tracking-wide">Total P&L</CardTitle>
-                {parseFloat(data?.totalPnL || "0") >= 0 ? (
-                  <TrendingUp className="w-4 h-4 text-positive" />
-                ) : (
-                  <TrendingDown className="w-4 h-4 text-negative" />
-                )}
-              </CardHeader>
-              <CardContent>
-                <div className={`text-3xl font-mono font-bold ${parseFloat(data?.totalPnL || "0") >= 0 ? 'text-positive' : 'text-negative'}`} data-testid="text-total-pnl">
-                  {parseFloat(data?.totalPnL || "0") >= 0 ? '+' : ''}${data?.totalPnL}
-                </div>
-                <div className={`text-sm ${parseFloat(data?.totalPnL || "0") >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {parseFloat(data?.totalPnL || "0") >= 0 ? '+' : ''}{data?.totalPnLPercent}%
+          {/* Portfolio Summary - Mobile: Single row, Desktop: 3 cards */}
+          <div className="mb-4 sm:mb-4">
+            {/* Mobile Layout - All stats in one row */}
+            <Card className="md:hidden">
+              <CardContent className="p-3">
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-muted-foreground uppercase tracking-wide mb-0.5">Cash</div>
+                    <div className="font-mono font-bold" data-testid="text-cash-balance">${data?.balance}</div>
+                  </div>
+                  <div className="flex-1 min-w-0 text-center">
+                    <div className="text-muted-foreground uppercase tracking-wide mb-0.5">Portfolio</div>
+                    <div className="font-mono font-bold" data-testid="text-portfolio-value">${data?.portfolioValue}</div>
+                  </div>
+                  <div className="flex-1 min-w-0 text-right">
+                    <div className="text-muted-foreground uppercase tracking-wide mb-0.5">P&L</div>
+                    <div className={`font-mono font-bold ${parseFloat(data?.totalPnL || "0") >= 0 ? 'text-positive' : 'text-negative'}`} data-testid="text-total-pnl">
+                      {parseFloat(data?.totalPnL || "0") >= 0 ? '+' : ''}${data?.totalPnL}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
+
+            {/* Desktop Layout - 3 separate cards */}
+            <div className="hidden md:grid md:grid-cols-3 gap-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium uppercase tracking-wide">Cash Balance</CardTitle>
+                  <DollarSign className="w-4 h-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-mono font-bold" data-testid="text-cash-balance-desktop">${data?.balance}</div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium uppercase tracking-wide">Portfolio Value</CardTitle>
+                  <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-mono font-bold" data-testid="text-portfolio-value-desktop">${data?.portfolioValue}</div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium uppercase tracking-wide">Total P&L</CardTitle>
+                  {parseFloat(data?.totalPnL || "0") >= 0 ? (
+                    <TrendingUp className="w-4 h-4 text-positive" />
+                  ) : (
+                    <TrendingDown className="w-4 h-4 text-negative" />
+                  )}
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-3xl font-mono font-bold ${parseFloat(data?.totalPnL || "0") >= 0 ? 'text-positive' : 'text-negative'}`} data-testid="text-total-pnl-desktop">
+                    {parseFloat(data?.totalPnL || "0") >= 0 ? '+' : ''}${data?.totalPnL}
+                  </div>
+                  <div className={`text-sm ${parseFloat(data?.totalPnL || "0") >= 0 ? 'text-positive' : 'text-negative'}`}>
+                    {parseFloat(data?.totalPnL || "0") >= 0 ? '+' : ''}{data?.totalPnLPercent}%
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
 
@@ -151,42 +176,64 @@ export default function Portfolio() {
                 <CardTitle className="text-sm font-medium uppercase tracking-wide">Your Holdings</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                <div>
                   <table className="w-full">
-                    <thead className="border-b bg-muted/50">
+                    <thead className="border-b bg-muted/50 hidden sm:table-header-group">
                       <tr>
-                        <th className="text-left p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Asset</th>
-                        <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
-                        <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Avg Cost</th>
-                        <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Current Price</th>
-                        <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Value</th>
-                        <th className="text-right p-2 sm:p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">P&L</th>
-                        <th className="p-2 sm:p-4"></th>
+                        <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Asset</th>
+                        <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
+                        <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Avg Cost</th>
+                        <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Current Price</th>
+                        <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Total Value</th>
+                        <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">P&L</th>
+                        <th className="px-2 py-1.5"></th>
                       </tr>
                     </thead>
                     <tbody>
                       {data?.premiumShares && data.premiumShares > 0 && (
                         <tr className="border-b hover-elevate" data-testid="row-premium-shares">
-                          <td className="p-2 sm:p-4">
-                            <div className="flex items-center gap-3">
+                          {/* Mobile layout */}
+                          <td className="px-2 py-2 sm:hidden" colSpan={7}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <Crown className="w-8 h-8 text-primary flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-sm">Premium Share</div>
+                                  <div className="text-xs text-muted-foreground">Qty: {data.premiumShares} • Redeemable for 30 days</div>
+                                </div>
+                              </div>
+                              <Button
+                                size="sm"
+                                onClick={() => redeemPremiumMutation.mutate()}
+                                disabled={redeemPremiumMutation.isPending || data.isPremium}
+                                data-testid="button-redeem-premium"
+                              >
+                                {data.isPremium ? "Active" : "Redeem"}
+                              </Button>
+                            </div>
+                          </td>
+
+                          {/* Desktop layout */}
+                          <td className="px-2 py-1.5 hidden sm:table-cell">
+                            <div className="flex items-center gap-2">
                               <Crown className="w-8 h-8 text-primary" />
                               <div>
-                                <div className="font-medium">Premium Share</div>
+                                <div className="font-medium text-sm">Premium Share</div>
                                 <div className="text-xs text-muted-foreground">Redeemable for 30 days access</div>
                               </div>
                             </div>
                           </td>
-                          <td className="p-2 sm:p-4 text-right font-mono">{data.premiumShares}</td>
-                          <td className="p-2 sm:p-4 text-right font-mono">-</td>
-                          <td className="p-2 sm:p-4 text-right font-mono">-</td>
-                          <td className="p-2 sm:p-4 text-right font-mono">-</td>
-                          <td className="p-2 sm:p-4 text-right font-mono">-</td>
-                          <td className="p-2 sm:p-4">
+                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">{data.premiumShares}</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">-</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden md:table-cell">-</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden lg:table-cell">-</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">-</td>
+                          <td className="px-2 py-1.5 hidden sm:table-cell">
                             <Button
                               size="sm"
                               onClick={() => redeemPremiumMutation.mutate()}
                               disabled={redeemPremiumMutation.isPending || data.isPremium}
-                              data-testid="button-redeem-premium"
+                              data-testid="button-redeem-premium-desktop"
                             >
                               {data.isPremium ? "Active" : "Redeem"}
                             </Button>
@@ -194,32 +241,71 @@ export default function Portfolio() {
                         </tr>
                       )}
                       {data?.holdings.filter(h => h.assetType === "player").map((holding) => (
-                        <tr key={holding.id} className="border-b hover-elevate" data-testid={`row-holding-${holding.player?.id}`}>
-                          <td className="p-2 sm:p-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                                <span className="font-bold text-sm">
-                                  {holding.player?.firstName[0]}{holding.player?.lastName[0]}
-                                </span>
+                        <tr key={holding.id} className="border-b last:border-0 hover-elevate" data-testid={`row-holding-${holding.player?.id}`}>
+                          {/* Mobile layout - stacked info matching marketplace */}
+                          <td className="px-2 py-2 sm:hidden" colSpan={7}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                  <span className="font-bold text-xs">{holding.player?.firstName[0]}{holding.player?.lastName[0]}</span>
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-sm">{holding.player?.firstName} {holding.player?.lastName}</div>
+                                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
+                                    <span>{holding.player?.team}</span>
+                                    <span>•</span>
+                                    <span>{holding.player?.position}</span>
+                                    <span>•</span>
+                                    <span className="font-mono">Qty: {holding.quantity}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-xs mt-0.5">
+                                    <span className="text-muted-foreground">Avg: ${holding.avgCostBasis}</span>
+                                    <span className="text-muted-foreground">•</span>
+                                    <span className="font-mono font-bold text-foreground">
+                                      {holding.player?.lastTradePrice ? `$${holding.player.lastTradePrice}` : '-'}
+                                    </span>
+                                    {holding.pnl !== null && (
+                                      <>
+                                        <span className="text-muted-foreground">•</span>
+                                        <span className={parseFloat(holding.pnl) >= 0 ? 'text-positive' : 'text-negative'}>
+                                          {parseFloat(holding.pnl) >= 0 ? '+' : ''}${holding.pnl} ({parseFloat(holding.pnlPercent) >= 0 ? '+' : ''}{holding.pnlPercent}%)
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <Link href={`/player/${holding.player?.id}`}>
+                                <Button size="sm" data-testid={`button-trade-${holding.player?.id}`}>Trade</Button>
+                              </Link>
+                            </div>
+                          </td>
+
+                          {/* Desktop layout - table cells */}
+                          <td className="px-2 py-1.5 hidden sm:table-cell">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                <span className="font-bold text-xs">{holding.player?.firstName[0]}{holding.player?.lastName[0]}</span>
                               </div>
                               <div>
-                                <div className="font-medium">{holding.player?.firstName} {holding.player?.lastName}</div>
-                                <div className="text-xs text-muted-foreground">{holding.player?.team} · {holding.player?.position}</div>
+                                <div className="font-medium text-sm">{holding.player?.firstName} {holding.player?.lastName}</div>
+                                <div className="text-xs text-muted-foreground md:hidden">{holding.player?.team} • {holding.player?.position}</div>
+                                <div className="text-xs text-muted-foreground hidden md:inline">{holding.player?.team} • {holding.player?.position}</div>
                               </div>
                             </div>
                           </td>
-                          <td className="p-2 sm:p-4 text-right font-mono">{holding.quantity}</td>
-                          <td className="p-2 sm:p-4 text-right font-mono">${holding.avgCostBasis}</td>
-                          <td className="p-2 sm:p-4 text-right font-mono">
-                            {holding.player?.lastTradePrice ? `$${holding.player.lastTradePrice}` : <span className="text-muted-foreground text-sm">No value</span>}
+                          <td className="px-2 py-1.5 text-right font-mono text-sm hidden sm:table-cell">{holding.quantity}</td>
+                          <td className="px-2 py-1.5 text-right font-mono text-sm hidden sm:table-cell">${holding.avgCostBasis}</td>
+                          <td className="px-2 py-1.5 text-right font-mono text-sm hidden md:table-cell">
+                            {holding.player?.lastTradePrice ? `$${holding.player.lastTradePrice}` : <span className="text-muted-foreground text-xs">-</span>}
                           </td>
-                          <td className="p-2 sm:p-4 text-right font-mono font-bold">
-                            {holding.currentValue !== null ? `$${holding.currentValue}` : <span className="text-muted-foreground text-sm">-</span>}
+                          <td className="px-2 py-1.5 text-right font-mono font-bold text-sm hidden lg:table-cell">
+                            {holding.currentValue !== null ? `$${holding.currentValue}` : <span className="text-muted-foreground text-xs">-</span>}
                           </td>
-                          <td className="p-2 sm:p-4 text-right">
+                          <td className="px-2 py-1.5 text-right hidden sm:table-cell">
                             {holding.pnl !== null ? (
                               <div className={parseFloat(holding.pnl) >= 0 ? 'text-positive' : 'text-negative'}>
-                                <div className="font-mono font-medium">
+                                <div className="font-mono font-medium text-sm">
                                   {parseFloat(holding.pnl) >= 0 ? '+' : ''}${holding.pnl}
                                 </div>
                                 <div className="text-xs">
@@ -227,12 +313,12 @@ export default function Portfolio() {
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
+                              <span className="text-muted-foreground text-xs">-</span>
                             )}
                           </td>
-                          <td className="p-2 sm:p-4">
+                          <td className="px-2 py-1.5 hidden sm:table-cell">
                             <Link href={`/player/${holding.player?.id}`}>
-                              <Button size="sm" variant="outline">Trade</Button>
+                              <Button size="sm" data-testid={`button-trade-desktop-${holding.player?.id}`}>Trade</Button>
                             </Link>
                           </td>
                         </tr>
