@@ -607,8 +607,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
         team: team as string,
         position: position as string,
       });
-      // Enrich with market values (last trade prices)
-      const players = await Promise.all(playersRaw.map(enrichPlayerWithMarketValue));
+      // Enrich with market values and order book data
+      const players = await Promise.all(playersRaw.map(async (player) => {
+        const enriched = await enrichPlayerWithMarketValue(player);
+        const orderBook = await storage.getOrderBook(player.id);
+        
+        // Get best bid (highest buy price) and best ask (lowest sell price)
+        const bestBid = orderBook.bids.length > 0 && orderBook.bids[0].limitPrice 
+          ? orderBook.bids[0].limitPrice 
+          : null;
+        const bestAsk = orderBook.asks.length > 0 && orderBook.asks[0].limitPrice 
+          ? orderBook.asks[0].limitPrice 
+          : null;
+        
+        // Calculate total size at best bid and best ask
+        const bidSize = orderBook.bids.length > 0 && orderBook.bids[0].limitPrice
+          ? orderBook.bids
+              .filter(b => b.limitPrice === orderBook.bids[0].limitPrice)
+              .reduce((sum, b) => sum + (b.quantity - b.filledQuantity), 0)
+          : 0;
+        const askSize = orderBook.asks.length > 0 && orderBook.asks[0].limitPrice
+          ? orderBook.asks
+              .filter(a => a.limitPrice === orderBook.asks[0].limitPrice)
+              .reduce((sum, a) => sum + (a.quantity - a.filledQuantity), 0)
+          : 0;
+        
+        return {
+          ...enriched,
+          bestBid,
+          bestAsk,
+          bidSize,
+          askSize,
+        };
+      }));
       res.json(players);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
