@@ -157,7 +157,7 @@ function Header() {
         </div>
       </div>
       <div className="flex items-center gap-2">
-        {isAuthenticated && (
+        {isAuthenticated ? (
           <>
             <Link href={user?.id ? `/user/${user.id}` : "/profile"} className="hidden sm:block" data-testid="link-username">
               <div className="flex items-center gap-2 text-sm text-muted-foreground hover-elevate active-elevate-2 px-3 py-1.5 rounded-md transition-colors">
@@ -197,6 +197,15 @@ function Header() {
               <LogOut className="h-4 w-4" />
             </Button>
           </>
+        ) : (
+          <Button 
+            asChild
+            data-testid="button-header-login"
+          >
+            <a href="/api/login">
+              Sign In
+            </a>
+          </Button>
         )}
         <Button
           variant="ghost"
