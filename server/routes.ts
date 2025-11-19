@@ -184,6 +184,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: newSellFilled >= sellOrder.quantity ? "filled" : "partial",
           });
 
+          // Adjust locked shares for the sell order
+          const remainingSellLocked = sellOrder.quantity - newSellFilled;
+          await storage.adjustLockQuantity(sellOrder.id, remainingSellLocked);
+
           // Update holdings for buyer (Average Cost Method)
           const buyerHolding = await storage.getHolding(buyOrder.userId, "player", playerId);
           if (buyerHolding) {
@@ -882,11 +886,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Check holdings for sell orders
+      // Check holdings for sell orders - verify available (unlocked) shares
       if (side === "sell") {
-        const holding = await storage.getHolding(user.id, "player", req.params.playerId);
-        if (!holding || holding.quantity < quantity) {
-          return res.status(400).json({ error: "Insufficient shares" });
+        const availableShares = await storage.getAvailableShares(user.id, "player", req.params.playerId);
+        if (availableShares < quantity) {
+          return res.status(400).json({ error: "Insufficient available shares (some may be locked in orders or contests)" });
         }
       }
 
@@ -916,6 +920,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quantity,
         limitPrice: orderType === "limit" ? limitPrice : null,
       });
+
+      // Lock shares for sell orders to prevent double-spending
+      if (side === "sell") {
+        await storage.reserveShares(
+          user.id,
+          "player",
+          req.params.playerId,
+          "order",
+          order.id,
+          quantity
+        );
+      }
 
       // For market orders, match immediately
       if (orderType === "market") {
@@ -959,6 +975,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             filledQuantity: newFilled,
             status: newFilled >= availableOrder.quantity ? "filled" : "partial",
           });
+
+          // Adjust locked shares for the matched order (if it's a sell order)
+          if (availableOrder.side === "sell") {
+            const remainingLocked = availableOrder.quantity - newFilled;
+            await storage.adjustLockQuantity(availableOrder.id, remainingLocked);
+          }
 
           // Update holdings
           if (side === "buy") {
@@ -1042,6 +1064,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: remainingQty === 0 ? "filled" : "partial",
         });
 
+        // Adjust locked shares for sell market orders
+        if (side === "sell") {
+          await storage.adjustLockQuantity(order.id, remainingQty);
+        }
+
         // Broadcast real-time updates for order book and trades
         // Calculate VWAP (volume-weighted average price) for the market order
         const vwap = filledQty > 0 ? (totalCost / filledQty).toFixed(2) : lastFillPrice.toFixed(2);
@@ -1079,46 +1106,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!user) {
         return res.status(404).json({ error: "User not found" });
       }
-      const userHoldings = await storage.getUserHoldings(user.id);
+
+      // Optimized: Single JOIN query to get holdings + players + locks
+      const holdingsWithData = await storage.getUserHoldingsWithPlayers(user.id);
       const openOrders = await storage.getUserOrders(user.id, "open");
 
       let totalValue = 0;
       let totalPnL = 0;
       let totalCost = 0;
 
-      const enrichedHoldings = await Promise.all(
-        userHoldings.map(async (holding) => {
-          if (holding.assetType === "player") {
-            const player = await storage.getPlayer(holding.assetId);
-            if (player) {
-              const enrichedPlayer = await enrichPlayerWithMarketValue(player);
-              const { currentValue, pnl, pnlPercent } = calculatePnL(
-                holding.quantity,
-                holding.avgCostBasis,
-                enrichedPlayer.lastTradePrice
-              );
-              // Only add to totals if we have a valid market price
-              if (currentValue !== null) {
-                totalValue += parseFloat(currentValue);
-                totalPnL += parseFloat(pnl!);
-                totalCost += parseFloat(holding.totalCostBasis);
-              }
+      // Batch fetch all players for orders in one query
+      const orderPlayerIds = openOrders.map(o => o.playerId);
+      const orderPlayers = orderPlayerIds.length > 0 
+        ? await storage.getPlayersByIds(orderPlayerIds)
+        : [];
+      const orderPlayersMap = new Map(orderPlayers.map(p => [p.id, p]));
 
-              return { ...holding, player: enrichedPlayer, currentValue, pnl, pnlPercent };
-            }
+      const enrichedHoldings = holdingsWithData.map((item: any) => {
+        const holding = item.holding;
+        const player = item.player;
+        const lockedQuantity = Number(item.totalLocked || 0);
+
+        if (holding.assetType === "player" && player) {
+          const enrichedPlayer = { ...player, lastTradePrice: player.lastTradePrice || player.currentPrice };
+          const { currentValue, pnl, pnlPercent } = calculatePnL(
+            holding.quantity,
+            holding.avgCostBasis,
+            enrichedPlayer.lastTradePrice
+          );
+          
+          if (currentValue !== null) {
+            totalValue += parseFloat(currentValue);
+            totalPnL += parseFloat(pnl!);
+            totalCost += parseFloat(holding.totalCostBasis);
           }
-          return holding;
-        })
-      );
 
-      const enrichedOrders = await Promise.all(
-        openOrders.map(async (order) => ({
-          ...order,
-          player: await storage.getPlayer(order.playerId),
-        }))
-      );
+          return { 
+            ...holding, 
+            player: enrichedPlayer, 
+            currentValue, 
+            pnl, 
+            pnlPercent,
+            lockedQuantity,
+            availableQuantity: Math.max(0, holding.quantity - lockedQuantity)
+          };
+        }
+        return holding;
+      });
 
-      const premiumShares = userHoldings.find(h => h.assetType === "premium")?.quantity || 0;
+      const enrichedOrders = openOrders.map((order) => ({
+        ...order,
+        player: orderPlayersMap.get(order.playerId),
+      }));
+
+      const premiumShares = holdingsWithData.find((item: any) => item.holding.assetType === "premium")?.holding.quantity || 0;
 
       res.json({
         balance: user.balance,
@@ -1484,12 +1525,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Lineup cannot be empty" });
       }
 
-      // VALIDATE: Check user owns enough shares BEFORE creating entry
+      // VALIDATE: Check user has enough available shares BEFORE creating entry
+      // Available shares = total - locked (in orders, other contests, mining)
       for (const item of lineup) {
-        const holding = await storage.getHolding(user.id, "player", item.playerId);
-        if (!holding || holding.quantity < item.sharesEntered) {
+        const availableShares = await storage.getAvailableShares(user.id, "player", item.playerId);
+        if (availableShares < item.sharesEntered) {
           return res.status(400).json({ 
-            error: `Insufficient shares for player ${item.playerId}. Required: ${item.sharesEntered}, Available: ${holding?.quantity || 0}` 
+            error: `Insufficient available shares for player ${item.playerId}. Required: ${item.sharesEntered}, Available: ${availableShares}` 
           });
         }
       }

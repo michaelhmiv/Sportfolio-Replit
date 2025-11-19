@@ -2,6 +2,7 @@ import {
   users,
   players,
   holdings,
+  holdingsLocks,
   orders,
   trades,
   mining,
@@ -19,6 +20,8 @@ import {
   type Player,
   type InsertPlayer,
   type Holding,
+  type HoldingsLock,
+  type InsertHoldingsLock,
   type Order,
   type Trade,
   type Mining,
@@ -62,7 +65,17 @@ export interface IStorage {
   // Holdings methods
   getHolding(userId: string, assetType: string, assetId: string): Promise<Holding | undefined>;
   getUserHoldings(userId: string): Promise<Holding[]>;
+  getUserHoldingsWithPlayers(userId: string): Promise<any[]>;
   updateHolding(userId: string, assetType: string, assetId: string, quantity: number, avgCost: string): Promise<void>;
+  
+  // Holdings lock methods - prevent double-spending of shares
+  reserveShares(userId: string, assetType: string, assetId: string, lockType: string, lockReferenceId: string, quantity: number): Promise<HoldingsLock>;
+  releaseShares(lockId: string): Promise<void>;
+  releaseSharesByReference(lockReferenceId: string): Promise<void>;
+  getAvailableShares(userId: string, assetType: string, assetId: string): Promise<number>;
+  getLockedShares(userId: string, assetType: string, assetId: string): Promise<HoldingsLock[]>;
+  getTotalLockedQuantity(userId: string, assetType: string, assetId: string): Promise<number>;
+  adjustLockQuantity(lockReferenceId: string, newQuantity: number): Promise<void>;
   
   // Order methods
   createOrder(order: any): Promise<Order>;
@@ -351,6 +364,29 @@ export class DatabaseStorage implements IStorage {
       .where(eq(holdings.userId, userId));
   }
 
+  async getUserHoldingsWithPlayers(userId: string): Promise<any[]> {
+    const result = await db
+      .select({
+        holding: holdings,
+        player: players,
+        totalLocked: sql<number>`COALESCE(SUM(${holdingsLocks.lockedQuantity}), 0)`,
+      })
+      .from(holdings)
+      .leftJoin(players, and(
+        eq(holdings.assetType, "player"),
+        eq(holdings.assetId, players.id)
+      ))
+      .leftJoin(holdingsLocks, and(
+        eq(holdingsLocks.userId, holdings.userId),
+        eq(holdingsLocks.assetId, holdings.assetId),
+        eq(holdingsLocks.assetType, holdings.assetType)
+      ))
+      .where(eq(holdings.userId, userId))
+      .groupBy(holdings.id, players.id);
+
+    return result;
+  }
+
   async updateHolding(userId: string, assetType: string, assetId: string, quantity: number, avgCost: string): Promise<void> {
     const existing = await this.getHolding(userId, assetType, assetId);
     
@@ -402,6 +438,88 @@ export class DatabaseStorage implements IStorage {
         avgCostBasis: avgCostNormalized,
         totalCostBasis: totalCost,
       });
+    }
+  }
+
+  // Holdings lock methods - prevent double-spending of shares
+  async reserveShares(
+    userId: string,
+    assetType: string,
+    assetId: string,
+    lockType: string,
+    lockReferenceId: string,
+    quantity: number
+  ): Promise<HoldingsLock> {
+    const [lock] = await db
+      .insert(holdingsLocks)
+      .values({
+        userId,
+        assetType,
+        assetId,
+        lockType,
+        lockReferenceId,
+        lockedQuantity: quantity,
+      })
+      .returning();
+    return lock;
+  }
+
+  async releaseShares(lockId: string): Promise<void> {
+    await db
+      .delete(holdingsLocks)
+      .where(eq(holdingsLocks.id, lockId));
+  }
+
+  async releaseSharesByReference(lockReferenceId: string): Promise<void> {
+    await db
+      .delete(holdingsLocks)
+      .where(eq(holdingsLocks.lockReferenceId, lockReferenceId));
+  }
+
+  async getAvailableShares(userId: string, assetType: string, assetId: string): Promise<number> {
+    const holding = await this.getHolding(userId, assetType, assetId);
+    if (!holding) return 0;
+    
+    const lockedQuantity = await this.getTotalLockedQuantity(userId, assetType, assetId);
+    return Math.max(0, holding.quantity - lockedQuantity);
+  }
+
+  async getLockedShares(userId: string, assetType: string, assetId: string): Promise<HoldingsLock[]> {
+    return await db
+      .select()
+      .from(holdingsLocks)
+      .where(
+        and(
+          eq(holdingsLocks.userId, userId),
+          eq(holdingsLocks.assetType, assetType),
+          eq(holdingsLocks.assetId, assetId)
+        )
+      );
+  }
+
+  async getTotalLockedQuantity(userId: string, assetType: string, assetId: string): Promise<number> {
+    const result = await db
+      .select({ total: sql<number>`COALESCE(SUM(${holdingsLocks.lockedQuantity}), 0)` })
+      .from(holdingsLocks)
+      .where(
+        and(
+          eq(holdingsLocks.userId, userId),
+          eq(holdingsLocks.assetType, assetType),
+          eq(holdingsLocks.assetId, assetId)
+        )
+      );
+    
+    return Number(result[0]?.total || 0);
+  }
+
+  async adjustLockQuantity(lockReferenceId: string, newQuantity: number): Promise<void> {
+    if (newQuantity <= 0) {
+      await this.releaseSharesByReference(lockReferenceId);
+    } else {
+      await db
+        .update(holdingsLocks)
+        .set({ lockedQuantity: newQuantity })
+        .where(eq(holdingsLocks.lockReferenceId, lockReferenceId));
     }
   }
 
@@ -463,6 +581,9 @@ export class DatabaseStorage implements IStorage {
       .update(orders)
       .set({ status: "cancelled" })
       .where(eq(orders.id, orderId));
+    
+    // Release any locked shares for this order
+    await this.releaseSharesByReference(orderId);
   }
 
   // Trade methods

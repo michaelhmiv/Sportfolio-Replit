@@ -30,7 +30,9 @@ export default function Marketplace() {
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
   const [filterHasBuyOrders, setFilterHasBuyOrders] = useState(false);
   const [filterHasSellOrders, setFilterHasSellOrders] = useState(false);
-  const { subscribe } = useWebSocket();
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 50;
+  const { subscribe} = useWebSocket();
 
   const { data: teams } = useQuery<string[]>({
     queryKey: ["/api/teams"],
@@ -54,22 +56,32 @@ export default function Marketplace() {
     };
   }, [subscribe]);
 
-  const { data: players, isLoading } = useQuery<PlayerWithOrderBook[]>({
-    queryKey: ["/api/players", search, teamFilter, positionFilter, sortField, sortOrder],
+  const { data: playersData, isLoading } = useQuery<{ players: PlayerWithOrderBook[]; total: number }>({
+    queryKey: ["/api/players", search, teamFilter, positionFilter, page],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (search) params.append("search", search);
       if (teamFilter && teamFilter !== "all") params.append("team", teamFilter);
       if (positionFilter && positionFilter !== "all") params.append("position", positionFilter);
+      params.append("limit", String(ITEMS_PER_PAGE));
+      params.append("offset", String((page - 1) * ITEMS_PER_PAGE));
       
-      const url = `/api/players${params.toString() ? `?${params.toString()}` : ""}`;
+      const url = `/api/players?${params.toString()}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch players");
       const data = await res.json();
-      // API now returns { players, total } for pagination
-      return data.players || data;
+      return data;
     },
   });
+
+  const players = playersData?.players || [];
+  const totalCount = playersData?.total || 0;
+  const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [search, teamFilter, positionFilter]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -404,6 +416,38 @@ export default function Marketplace() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Pagination Controls */}
+            {!isLoading && filteredAndSortedPlayers.length > 0 && totalPages > 1 && (
+              <div className="mt-4 flex items-center justify-between px-2">
+                <div className="text-sm text-muted-foreground">
+                  Showing {((page - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(page * ITEMS_PER_PAGE, totalCount)} of {totalCount} players
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPage(p => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                    data-testid="button-prev-page"
+                  >
+                    Previous
+                  </Button>
+                  <div className="text-sm text-muted-foreground">
+                    Page {page} of {totalPages}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                    data-testid="button-next-page"
+                  >
+                    Next
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>
