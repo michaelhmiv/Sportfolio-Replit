@@ -32,7 +32,16 @@ All pages must include the following tracking and monetization scripts in the `<
 
 **Note:** This is a single-page application (SPA) - all routes share the same HTML file (`client/index.html`), so these tags automatically apply to every page. When adding new HTML files (if ever needed), these tags must be included in each file's `<head>` section.
 
-## Recent Changes (November 17, 2025)
+## Recent Changes 
+
+### November 19, 2025
+- **Authentication UX Improvements:** Fixed critical signup conversion issues
+  - Added `sameSite: "lax"` to session cookie configuration for proper OAuth redirect handling across modern browsers
+  - Added prominent "Sign In" button in header for non-authenticated users, improving discoverability
+  - Updated all landing page CTAs to explicitly say "Sign In with Replit" for clarity on auth provider
+  - End-to-end tested with OIDC flow confirming successful authentication and session persistence
+
+### November 17, 2025
 - **Admin Panel with Role-Based Access:** Implemented comprehensive admin page (`/admin`) with system stats dashboard and manual job trigger controls, secured with dual authentication (token-based for external cron, session-based with `isAdmin` flag for logged-in admins)
 - **Admin Security Model:** Added `isAdmin` boolean field to users table; admin button on profile page only visible to admin users; middleware properly validates both authentication paths with clear 401/503 error responses
 - **External Cron Setup:** Configured production to use external cron service (cron-job.org) for automated background jobs
