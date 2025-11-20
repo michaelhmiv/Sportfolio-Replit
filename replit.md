@@ -60,10 +60,20 @@ Query Parameters:
 - `sortOrder` (string): Sort direction - 'asc' or 'desc' (default: 'desc')
 - `hasBuyOrders` (boolean): Only show players with active buy orders (includes both 'open' and 'partial' statuses)
 - `hasSellOrders` (boolean): Only show players with active sell orders (includes both 'open' and 'partial' statuses)
+- `teamsPlayingOnDate` (string): Date in YYYY-MM-DD format - filters players to only those from teams playing on that date
 - `limit` (number): Results per page (default: 50, max: 200)
 - `offset` (number): Pagination offset
 
 Database indexes on firstName, lastName, team, position, lastTradePrice, volume24h, and priceChange24h ensure sub-150ms query performance. NULL handling uses `NULLS LAST` for both ASC and DESC sorts on price/bid/ask fields, ensuring players with real market data always appear before those without trades or order books.
+
+**Contest Entry Game Filtering:**
+The contest entry page displays games scheduled for the contest date in a collapsible section at the top of the page. Features include:
+- Expandable/collapsible "Games on [Date]" section showing game matchups and start times
+- Game cards display format: "[AWAY] @ [HOME]" with formatted time (e.g., "7:00 PM")
+- Toggle button to filter eligible players to only those from teams playing that day
+- Client-side filtering applied to user's portfolio (already a small dataset) for optimal performance
+- Filter combines with search - both work together to narrow down player selection
+- Visual feedback when filter is active (button style changes, shows team count)
 
 ### Background Jobs
 **Development Environment:** Background jobs run automatically via Node.js `node-cron` scheduler for tasks like `roster_sync`, `schedule_sync`, `stats_sync`, `stats_sync_live`, `settle_contests`, and `create_contests`.
