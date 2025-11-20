@@ -1074,11 +1074,43 @@ function PlayerCard({
 // MySportsFeeds format: YYYYMMDD-AWAY-HOME (e.g., 20251119-TOR-PHI)
 // Plain Text Sports format: https://plaintextsports.com/nba/YYYY-MM-DD/away-home
 function getPlainTextSportsUrl(gameId: string): string {
+  // Validate gameId exists and is a non-empty string
+  if (!gameId || typeof gameId !== 'string' || gameId.trim().length === 0) {
+    console.error('[Game Modal] Invalid gameId: empty or not a string');
+    return '#';
+  }
+  
   // Parse game ID: YYYYMMDD-AWAY-HOME
   const parts = gameId.split('-');
-  const datePart = parts[0]; // YYYYMMDD
-  const awayTeam = parts[1];
-  const homeTeam = parts[2];
+  
+  // Validate we have exactly 3 parts
+  if (parts.length !== 3) {
+    console.error('[Game Modal] Invalid gameId format (expected 3 parts):', gameId);
+    return '#';
+  }
+  
+  // Trim each part and validate before assignment
+  const datePart = (parts[0] || '').trim();
+  const awayTeam = (parts[1] || '').trim();
+  const homeTeam = (parts[2] || '').trim();
+  
+  // Validate date part is exactly 8 digits
+  if (!datePart || datePart.length !== 8 || !/^\d{8}$/.test(datePart)) {
+    console.error('[Game Modal] Invalid date format (expected YYYYMMDD):', gameId);
+    return '#';
+  }
+  
+  // Validate team codes are non-empty strings with only uppercase letters (2-4 chars)
+  if (!awayTeam || !homeTeam) {
+    console.error('[Game Modal] Invalid team codes (empty or undefined):', gameId);
+    return '#';
+  }
+  
+  // Team codes must be 2-4 uppercase letters (MySportsFeeds standard)
+  if (!/^[A-Z]{2,4}$/.test(awayTeam) || !/^[A-Z]{2,4}$/.test(homeTeam)) {
+    console.error('[Game Modal] Invalid team codes (expected 2-4 uppercase letters):', gameId, { awayTeam, homeTeam });
+    return '#';
+  }
   
   // Convert date from YYYYMMDD to YYYY-MM-DD
   const year = datePart.substring(0, 4);

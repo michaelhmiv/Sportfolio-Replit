@@ -80,9 +80,19 @@ Database indexes on firstName, lastName, team, position, lastTradePrice, volume2
 **Third-Party Services:**
 - **Neon Database:** Serverless PostgreSQL for data persistence.
 - **WebSocket Server:** Custom implementation for real-time updates and notifications.
+- **Plain Text Sports:** External live game stats provider linked from game details modal (plaintextsports.com).
 - **Google Fonts CDN:** For delivering typography.
 - **Google Analytics 4:** Tracking and analytics (Measurement ID: G-Q2SC72MKTF).
 - **Google AdSense:** Monetization via display ads (Publisher ID: ca-pub-3663304837019777).
+
+**Game Details Modal & Live Stats:**
+- Dashboard displays Recent Games widget with clickable game cards
+- GameDetailsModal shows game information (teams, scores, status, date/time)
+- Links to Plain Text Sports for live stats, play-by-play, and box scores
+- URL conversion: MySportsFeeds format `YYYYMMDD-AWAY-HOME` → Plain Text Sports format `https://plaintextsports.com/nba/YYYY-MM-DD/away-home`
+- Comprehensive input validation in `getPlainTextSportsUrl()` prevents crashes from malformed game IDs
+- Validation includes: type checking, part count, date format (8 digits), team codes (2-4 uppercase letters), trimming whitespace
+- Invalid game IDs return safe fallback href `'#'` with error logging instead of crashing
 
 **Authentication:**
 - **Replit Auth** integration for production-ready user authentication.
