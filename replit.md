@@ -85,14 +85,15 @@ Database indexes on firstName, lastName, team, position, lastTradePrice, volume2
 - **Google Analytics 4:** Tracking and analytics (Measurement ID: G-Q2SC72MKTF).
 - **Google AdSense:** Monetization via display ads (Publisher ID: ca-pub-3663304837019777).
 
-**Game Details Modal & Live Stats:**
-- Dashboard displays Recent Games widget with clickable game cards
-- GameDetailsModal shows game information (teams, scores, status, date/time)
-- Links to Plain Text Sports for live stats, play-by-play, and box scores
-- URL conversion: MySportsFeeds format `YYYYMMDD-AWAY-HOME` → Plain Text Sports format `https://plaintextsports.com/nba/YYYY-MM-DD/away-home`
-- Comprehensive input validation in `getPlainTextSportsUrl()` prevents crashes from malformed game IDs
-- Validation includes: type checking, part count, date format (8 digits), team codes (2-4 uppercase letters), trimming whitespace
-- Invalid game IDs return safe fallback href `'#'` with error logging instead of crashing
+**Game Details Flip Card & Live Stats:**
+- Dashboard displays Recent Games widget with clickable game cards featuring 3D flip animation
+- Click any game card to flip and reveal "Live Game Stats" button on the back
+- Front face shows team matchup, scores, game status, and date/time
+- Back face shows game details with button linking to Plain Text Sports for live stats, play-by-play, and box scores
+- URL builder `getPlainTextSportsUrl()` uses game.date, game.homeTeam, game.awayTeam directly from database
+- Format: `https://plaintextsports.com/nba/YYYY-MM-DD/away-home` (lowercase team codes)
+- Only one card flips at a time - clicking another card or clicking outside/pressing Escape flips the current card back
+- Smooth 3D CSS transforms with `perspective`, `preserve-3d`, and `backface-visibility` for professional flip effect
 
 **Authentication:**
 - **Replit Auth** integration for production-ready user authentication.
