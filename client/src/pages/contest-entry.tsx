@@ -263,13 +263,12 @@ export default function ContestEntry() {
                 {gamesData && gamesData.length > 0 && (
                   <Button
                     variant={showOnlyPlayingTeams ? "default" : "outline"}
-                    size="default"
+                    size="icon"
                     onClick={() => setShowOnlyPlayingTeams(!showOnlyPlayingTeams)}
                     className="flex-shrink-0"
                     data-testid="button-toggle-teams-filter"
                   >
-                    <Filter className="w-4 h-4 mr-2" />
-                    {showOnlyPlayingTeams ? `${teamsPlaying.length} Teams` : "Teams w/ Games"}
+                    <Calendar className="w-4 h-4" />
                   </Button>
                 )}
               </div>
