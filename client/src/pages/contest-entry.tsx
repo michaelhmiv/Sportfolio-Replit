@@ -269,7 +269,7 @@ export default function ContestEntry() {
                     data-testid="button-toggle-teams-filter"
                   >
                     <Filter className="w-4 h-4 mr-2" />
-                    {showOnlyPlayingTeams ? `${teamsPlaying.length} Teams` : "Filter"}
+                    {showOnlyPlayingTeams ? `${teamsPlaying.length} Teams` : "Teams w/ Games"}
                   </Button>
                 )}
               </div>
