@@ -52,12 +52,12 @@ export function MarketActivityWidget() {
 
   const getActivityIcon = (item: MarketActivity) => {
     if (item.activityType === "trade") {
-      return <TrendingUp className="w-4 h-4 text-positive" />;
+      return <TrendingUp className="w-4 h-4 text-blue-500" />;
     }
     if (item.side === "buy") {
-      return <TrendingUp className="w-4 h-4 text-positive" />;
+      return <TrendingUp className="w-4 h-4 text-blue-500" />;
     }
-    return <TrendingDown className="w-4 h-4 text-negative" />;
+    return <TrendingDown className="w-4 h-4 text-red-500" />;
   };
 
   const getActivityText = (item: MarketActivity) => {
