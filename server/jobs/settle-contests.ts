@@ -11,6 +11,7 @@
 import { storage } from "../storage";
 import { settleContest } from "../contest-scoring";
 import type { JobResult } from "./scheduler";
+import { fromZonedTime } from "date-fns-tz";
 
 export async function settleContests(): Promise<JobResult> {
   console.log("[settle_contests] Starting contest settlement...");
@@ -54,9 +55,17 @@ export async function settleContests(): Promise<JobResult> {
       console.log(`[settle_contests]   ✓ Contest endsAt has passed`);
       
       // Check 2: Are all games for this contest date completed?
+      // CRITICAL: Games are scheduled in Eastern Time, so we must use ET for date range
+      // to avoid timezone bugs where evening ET games fall outside UTC window
       const contestDate = new Date(contest.gameDate);
-      const startOfDay = new Date(contestDate.getFullYear(), contestDate.getMonth(), contestDate.getDate(), 0, 0, 0);
-      const endOfDay = new Date(contestDate.getFullYear(), contestDate.getMonth(), contestDate.getDate(), 23, 59, 59);
+      const dateStr = contestDate.toISOString().split('T')[0]; // YYYY-MM-DD
+      
+      // Create start/end of day in ET timezone, then convert to UTC for database query
+      const startOfDayETString = `${dateStr}T00:00:00`;
+      const endOfDayETString = `${dateStr}T23:59:59`;
+      const startOfDay = fromZonedTime(startOfDayETString, 'America/New_York');
+      const endOfDay = fromZonedTime(endOfDayETString, 'America/New_York');
+      
       const games = await storage.getDailyGames(startOfDay, endOfDay);
       
       console.log(`[settle_contests]   - Found ${games.length} games for contest date`);
