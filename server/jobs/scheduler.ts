@@ -13,6 +13,7 @@ import { syncStats } from "./sync-stats";
 import { syncStatsLive } from "./sync-stats-live";
 import { settleContests } from "./settle-contests";
 import { createContests } from "./create-contests";
+import { updateContestStatuses } from "./update-contest-statuses";
 
 export interface JobResult {
   requestCount: number;
@@ -68,6 +69,12 @@ export class JobScheduler {
         schedule: "* * * * *", // Every minute for live games
         enabled: true,
         handler: syncStatsLive,
+      },
+      {
+        name: "update_contest_statuses",
+        schedule: "* * * * *", // Every minute - transition contests from open to live
+        enabled: true,
+        handler: updateContestStatuses,
       },
       {
         name: "settle_contests",
@@ -178,6 +185,7 @@ export class JobScheduler {
       stats_sync: syncStats,
       stats_sync_live: syncStatsLive,
       create_contests: createContests,
+      update_contest_statuses: updateContestStatuses,
       settle_contests: settleContests,
     };
 
