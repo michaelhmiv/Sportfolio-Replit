@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar, Search, ChevronDown, BarChart3, ChevronLeft, ChevronRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar, Search, ChevronDown, BarChart3, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { Link } from "wouter";
 import type { Player, Mining, Contest, Trade, DailyGame } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
