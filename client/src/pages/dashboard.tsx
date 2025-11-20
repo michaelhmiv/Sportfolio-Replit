@@ -18,6 +18,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { calculateMiningShares } from "@shared/mining-utils";
+import { MarketActivityWidget } from "@/components/market-activity-widget";
 
 interface DashboardData {
   user: {
@@ -815,32 +816,7 @@ export default function Dashboard() {
           </Card>
 
           {/* Market Activity */}
-          <Card className="lg:col-span-3">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium uppercase tracking-wide">Recent Market Activity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1 sm:space-y-2">
-                {data?.recentTrades?.map((trade) => (
-                  <div key={trade.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center">
-                        <span className="text-xs font-bold">{trade.player.firstName[0]}{trade.player.lastName[0]}</span>
-                      </div>
-                      <div>
-                        <div className="font-medium text-sm">{trade.player.firstName} {trade.player.lastName}</div>
-                        <div className="text-xs text-muted-foreground">{trade.player.team}</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-mono font-bold">${trade.price}</div>
-                      <div className="text-xs text-muted-foreground">{trade.quantity} shares</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <MarketActivityWidget />
         </div>
       </div>
       </div>

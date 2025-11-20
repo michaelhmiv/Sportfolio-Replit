@@ -240,6 +240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           broadcast({ type: "orderBook", playerId }); // Update order book depth in real-time
+          broadcast({ type: "marketActivity" }); // Trigger activity feed refresh
           
           // Broadcast portfolio updates for both parties
           const updatedBuyer = await storage.getUser(buyOrder.userId);
@@ -721,6 +722,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Market activity feed
+  app.get("/api/market/activity", async (req, res) => {
+    try {
+      const { playerId, userId, limit } = req.query;
+      
+      const parsedLimit = limit ? parseInt(limit as string) : 50;
+      const safeLimit = isNaN(parsedLimit) ? 50 : Math.max(1, Math.min(parsedLimit, 100));
+      
+      const activity = await storage.getMarketActivity({
+        playerId: playerId as string,
+        userId: userId as string,
+        limit: safeLimit,
+      });
+      
+      res.json(activity);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Player detail page
   app.get("/api/player/:id", isAuthenticated, async (req, res) => {
     try {
@@ -1022,6 +1043,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.reserveCash(user.id, "order", order.id, lockAmount);
       }
 
+      // Broadcast order placed
+      broadcast({ type: "marketActivity" });
+
       // For market orders, match immediately
       if (orderType === "market") {
         const orderBook = await storage.getOrderBook(req.params.playerId);
@@ -1194,6 +1218,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/orders/:orderId/cancel", isAuthenticated, async (req, res) => {
     try {
       await storage.cancelOrder(req.params.orderId);
+      broadcast({ type: "marketActivity" });
       res.json({ success: true });
     } catch (error: any) {
       res.status(500).json({ error: error.message });

@@ -41,7 +41,8 @@ import {
   type InsertPlayerGameStats,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql, inArray } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, or } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -98,6 +99,7 @@ export interface IStorage {
   // Trade methods
   createTrade(trade: any): Promise<Trade>;
   getRecentTrades(playerId?: string, limit?: number): Promise<Trade[]>;
+  getMarketActivity(filters?: { playerId?: string; userId?: string; limit?: number }): Promise<any[]>;
   
   // Mining methods
   getMining(userId: string): Promise<Mining | undefined>;
@@ -840,6 +842,107 @@ export class DatabaseStorage implements IStorage {
       .from(trades)
       .orderBy(desc(trades.executedAt))
       .limit(limit);
+  }
+
+  async getMarketActivity(filters?: { playerId?: string; userId?: string; limit?: number }): Promise<any[]> {
+    const { playerId, userId, limit = 50 } = filters || {};
+    
+    // Create aliases for buyer and seller users
+    const buyer = alias(users, "buyer");
+    const seller = alias(users, "seller");
+    
+    // Build conditions for trades
+    const tradeConditions = [];
+    if (playerId) tradeConditions.push(eq(trades.playerId, playerId));
+    if (userId) tradeConditions.push(
+      or(eq(trades.buyerId, userId), eq(trades.sellerId, userId))
+    );
+    
+    // Build conditions for orders
+    const orderConditions = [];
+    if (playerId) orderConditions.push(eq(orders.playerId, playerId));
+    if (userId) orderConditions.push(eq(orders.userId, userId));
+    
+    // Fetch recent trades with player and user info
+    // Use a larger limit to ensure we get enough rows after merging
+    const fetchLimit = limit * 2;
+    
+    let tradesQuery = db
+      .select({
+        activityType: sql<string>`'trade'`,
+        id: trades.id,
+        playerId: trades.playerId,
+        playerFirstName: players.firstName,
+        playerLastName: players.lastName,
+        playerTeam: players.team,
+        userId: sql<string>`NULL`,
+        username: sql<string>`NULL`,
+        buyerId: trades.buyerId,
+        buyerUsername: buyer.username,
+        sellerId: trades.sellerId,
+        sellerUsername: seller.username,
+        side: sql<string>`NULL`,
+        orderType: sql<string>`NULL`,
+        quantity: trades.quantity,
+        price: trades.price,
+        limitPrice: sql<string>`NULL`,
+        timestamp: trades.executedAt,
+      })
+      .from(trades)
+      .innerJoin(players, eq(trades.playerId, players.id))
+      .innerJoin(buyer, eq(trades.buyerId, buyer.id))
+      .innerJoin(seller, eq(trades.sellerId, seller.id));
+    
+    // Only add where clause if conditions exist
+    if (tradeConditions.length > 0) {
+      tradesQuery = tradesQuery.where(and(...tradeConditions));
+    }
+    
+    const recentTrades = await tradesQuery
+      .orderBy(desc(trades.executedAt))
+      .limit(fetchLimit);
+    
+    // Fetch recent orders (placed and cancelled) with player and user info
+    let ordersQuery = db
+      .select({
+        activityType: sql<string>`CASE WHEN ${orders.status} = 'cancelled' THEN 'order_cancelled' ELSE 'order_placed' END`,
+        id: orders.id,
+        playerId: orders.playerId,
+        playerFirstName: players.firstName,
+        playerLastName: players.lastName,
+        playerTeam: players.team,
+        userId: orders.userId,
+        username: users.username,
+        buyerId: sql<string>`NULL`,
+        buyerUsername: sql<string>`NULL`,
+        sellerId: sql<string>`NULL`,
+        sellerUsername: sql<string>`NULL`,
+        side: orders.side,
+        orderType: orders.orderType,
+        quantity: sql<number>`GREATEST(${orders.quantity} - ${orders.filledQuantity}, 0)`,
+        price: sql<string>`NULL`,
+        limitPrice: orders.limitPrice,
+        timestamp: orders.createdAt,
+      })
+      .from(orders)
+      .innerJoin(players, eq(orders.playerId, players.id))
+      .innerJoin(users, eq(orders.userId, users.id));
+    
+    // Only add where clause if conditions exist
+    if (orderConditions.length > 0) {
+      ordersQuery = ordersQuery.where(and(...orderConditions));
+    }
+    
+    const recentOrders = await ordersQuery
+      .orderBy(desc(orders.createdAt))
+      .limit(fetchLimit);
+    
+    // Combine, sort by timestamp, and apply the final limit
+    const combined = [...recentTrades, ...recentOrders]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, limit); // Apply final limit after sorting
+    
+    return combined;
   }
 
   // Mining methods

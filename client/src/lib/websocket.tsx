@@ -83,6 +83,11 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             }
             queryClient.invalidateQueries({ queryKey: ['/api/contests'] });
             break;
+
+          case 'marketActivity':
+            // Invalidate market activity feed
+            queryClient.invalidateQueries({ queryKey: ['/api/market/activity'] });
+            break;
         }
       } catch (error) {
         console.error('[WebSocket] Failed to parse message:', error);

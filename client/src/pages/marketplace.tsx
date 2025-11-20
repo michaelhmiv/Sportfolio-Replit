@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, TrendingUp, TrendingDown, ArrowUpDown, Filter } from "lucide-react";
-import { Link } from "wouter";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, TrendingUp, TrendingDown, ArrowUpDown, Filter, Clock } from "lucide-react";
+import { Link, useLocation, useSearch } from "wouter";
 import type { Player } from "@shared/schema";
+import { formatDistanceToNow } from "date-fns";
 
 type PlayerWithOrderBook = Player & {
   bestBid: string | null;
@@ -23,6 +25,9 @@ type SortField = "price" | "volume" | "change" | "bid" | "ask";
 type SortOrder = "asc" | "desc";
 
 export default function Marketplace() {
+  const searchParams = new URLSearchParams(useSearch());
+  const [,setLocation] = useLocation();
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "players");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState<string>("all");
@@ -34,6 +39,19 @@ export default function Marketplace() {
   const [page, setPage] = useState(1);
   const ITEMS_PER_PAGE = 50;
   const { subscribe} = useWebSocket();
+
+  // Sync active tab with URL query parameter
+  useEffect(() => {
+    const tab = searchParams.get("tab");
+    if (tab && (tab === "players" || tab === "activity")) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    setLocation(value === "players" ? "/marketplace" : `/marketplace?tab=${value}`);
+  };
   
   // Debounce search input (250ms delay)
   useEffect(() => {
@@ -124,8 +142,15 @@ export default function Marketplace() {
           <p className="text-muted-foreground">Browse and trade player shares</p>
         </div>
 
-        {/* Filters */}
-        <Card className="mb-3 sm:mb-6">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
+          <TabsList className="grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
+            <TabsTrigger value="activity" data-testid="tab-activity">Market Activity</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="players" className="space-y-4">
+            {/* Filters */}
+            <Card>
           <CardContent className="p-3 sm:p-4 space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
               <div className="relative md:col-span-2">
@@ -441,7 +466,155 @@ export default function Marketplace() {
             )}
           </CardContent>
         </Card>
+          </TabsContent>
+
+          <TabsContent value="activity" className="space-y-4">
+            <MarketActivityFeed />
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
+  );
+}
+
+interface MarketActivity {
+  activityType: "trade" | "order_placed" | "order_cancelled";
+  id: string;
+  playerId: string;
+  playerFirstName: string;
+  playerLastName: string;
+  playerTeam: string;
+  userId: string | null;
+  username: string | null;
+  buyerId: string | null;
+  buyerUsername: string | null;
+  sellerId: string | null;
+  sellerUsername: string | null;
+  side: "buy" | "sell" | null;
+  orderType: "limit" | "market" | null;
+  quantity: number;
+  price: string | null;
+  limitPrice: string | null;
+  timestamp: string;
+}
+
+function MarketActivityFeed() {
+  const { subscribe } = useWebSocket();
+  
+  const { data: activity = [], isLoading } = useQuery<MarketActivity[]>({
+    queryKey: ["/api/market/activity"],
+    queryFn: async () => {
+      const response = await fetch("/api/market/activity?limit=100");
+      if (!response.ok) throw new Error("Failed to fetch market activity");
+      return response.json();
+    },
+  });
+
+  // Subscribe to WebSocket market activity events for real-time updates
+  useEffect(() => {
+    const unsubscribe = subscribe('marketActivity', () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/market/activity'] });
+    });
+    return unsubscribe;
+  }, [subscribe]);
+
+  const getActivityIcon = (item: MarketActivity) => {
+    if (item.activityType === "trade") {
+      return <TrendingUp className="w-5 h-5 text-positive" />;
+    }
+    if (item.side === "buy") {
+      return <TrendingUp className="w-5 h-5 text-positive" />;
+    }
+    return <TrendingDown className="w-5 h-5 text-negative" />;
+  };
+
+  const getActivityDescription = (item: MarketActivity) => {
+    if (item.activityType === "trade") {
+      return `${item.buyerUsername} bought from ${item.sellerUsername}`;
+    }
+    if (item.activityType === "order_placed") {
+      return `${item.username} placed ${item.side} ${item.orderType} order`;
+    }
+    if (item.activityType === "order_cancelled") {
+      return `${item.username} cancelled ${item.side} ${item.orderType} order`;
+    }
+    return "";
+  };
+
+  const getActivityBadge = (item: MarketActivity) => {
+    if (item.activityType === "trade") {
+      return <Badge variant="default">Trade</Badge>;
+    }
+    if (item.activityType === "order_placed") {
+      return (
+        <Badge variant="outline" className={item.side === "buy" ? "text-positive" : "text-negative"}>
+          {item.side} {item.orderType}
+        </Badge>
+      );
+    }
+    if (item.activityType === "order_cancelled") {
+      return <Badge variant="outline">Cancelled</Badge>;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="text-center text-muted-foreground">Loading activity...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0">
+        <CardTitle>Real-Time Market Activity</CardTitle>
+        <Clock className="w-5 h-5 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        {activity.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground">
+            No market activity yet
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {activity.map((item) => (
+              <div
+                key={`${item.activityType}-${item.id}`}
+                className="flex items-start gap-4 p-4 rounded-md border hover-elevate"
+                data-testid={`activity-${item.activityType}-${item.id}`}
+              >
+                <div className="flex-shrink-0 mt-1">
+                  {getActivityIcon(item)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <Link href={`/player/${item.playerId}`}>
+                      <span className="font-medium hover:underline">
+                        {item.playerFirstName} {item.playerLastName}
+                      </span>
+                    </Link>
+                    <Badge variant="outline" className="text-xs">{item.playerTeam}</Badge>
+                    {getActivityBadge(item)}
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-1">
+                    {getActivityDescription(item)}
+                  </p>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                    <span className="font-mono">
+                      {item.price ? `$${item.price}` : item.limitPrice ? `$${item.limitPrice}` : "-"}
+                    </span>
+                    <span>{item.quantity} shares</span>
+                    <span>{formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
