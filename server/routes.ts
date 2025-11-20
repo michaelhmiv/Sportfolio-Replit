@@ -1594,6 +1594,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: contest.name,
           sport: contest.sport,
           startsAt: contest.startsAt,
+          gameDate: contest.gameDate,
         },
         eligiblePlayers,
       });
@@ -1757,6 +1758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           name: contest.name,
           sport: contest.sport,
           startsAt: contest.startsAt,
+          gameDate: contest.gameDate,
         },
         entry: result.entry,
         lineup: enrichedLineup,
