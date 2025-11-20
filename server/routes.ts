@@ -619,7 +619,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/players", async (req, res) => {
     try {
-      const { search, team, position, limit, offset, sortBy, sortOrder, hasBuyOrders, hasSellOrders } = req.query;
+      const { search, team, position, limit, offset, sortBy, sortOrder, hasBuyOrders, hasSellOrders, teamsPlayingOnDate } = req.query;
       
       // Parse and validate pagination params
       const parsedLimit = limit ? parseInt(limit as string) : 50;
@@ -638,6 +638,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const safeHasBuyOrders = hasBuyOrders === 'true';
       const safeHasSellOrders = hasSellOrders === 'true';
       
+      // Handle teams playing on date filter
+      let teamsPlayingFilter: string[] | undefined = undefined;
+      if (teamsPlayingOnDate && typeof teamsPlayingOnDate === 'string') {
+        // Parse the date string (expected format: YYYY-MM-DD)
+        const dateMatch = (teamsPlayingOnDate as string).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (dateMatch) {
+          const [, year, month, day] = dateMatch;
+          const etOffset = -5; // ET is UTC-5 (EST) or UTC-4 (EDT), using -5 for simplicity
+          
+          // Create date in ET timezone
+          const startOfDayET = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 0, 0, 0);
+          const endOfDayET = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 23, 59, 59);
+          
+          // Convert ET boundaries to UTC for database query
+          const startOfDayUTC = new Date(startOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
+          const endOfDayUTC = new Date(endOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
+          
+          // Fetch games for that date
+          const games = await storage.getDailyGames(startOfDayUTC, endOfDayUTC);
+          
+          // Extract unique team codes
+          const teamsSet = new Set<string>();
+          games.forEach(game => {
+            teamsSet.add(game.homeTeam);
+            teamsSet.add(game.awayTeam);
+          });
+          teamsPlayingFilter = Array.from(teamsSet);
+        }
+      }
+      
       const { players: playersRaw, total } = await storage.getPlayersPaginated({
         search: search as string,
         team: team as string,
@@ -648,6 +678,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sortOrder: safeSortOrder,
         hasBuyOrders: safeHasBuyOrders,
         hasSellOrders: safeHasSellOrders,
+        teamsPlayingOnDate: teamsPlayingFilter,
       });
       
       // Enrich with market values and order book data (only for paginated results)

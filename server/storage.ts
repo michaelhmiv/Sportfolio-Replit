@@ -288,6 +288,7 @@ export class DatabaseStorage implements IStorage {
     sortOrder?: 'asc' | 'desc';
     hasBuyOrders?: boolean;
     hasSellOrders?: boolean;
+    teamsPlayingOnDate?: string[];
   }): Promise<{ players: Player[]; total: number }> {
     const { 
       search, team, position, 
@@ -295,10 +296,16 @@ export class DatabaseStorage implements IStorage {
       sortBy = 'volume',
       sortOrder = 'desc',
       hasBuyOrders,
-      hasSellOrders
+      hasSellOrders,
+      teamsPlayingOnDate
     } = filters || {};
     
     const conditions = this.buildPlayerQueryConditions({ search, team, position });
+    
+    // Add teams playing on date filter
+    if (teamsPlayingOnDate && teamsPlayingOnDate.length > 0) {
+      conditions.push(inArray(players.team, teamsPlayingOnDate));
+    }
     
     // Add order book filters using EXISTS subqueries
     // Include both 'open' and 'partial' statuses (partially filled orders are still active)
