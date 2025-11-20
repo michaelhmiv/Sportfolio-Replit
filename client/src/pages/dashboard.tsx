@@ -1070,43 +1070,34 @@ function PlayerCard({
   );
 }
 
-// Team code mapping: MySportsFeeds → Basketball Reference
-// Basketball Reference uses different abbreviations for some teams
-const TEAM_CODE_MAPPING: Record<string, string> = {
-  // Teams with different codes
-  'BKN': 'BRK', // Brooklyn Nets
-  'CHA': 'CHO', // Charlotte Hornets
-  'PHX': 'PHO', // Phoenix Suns
-  'NOP': 'NOP', // New Orleans Pelicans (same)
-  'OKC': 'OKC', // Oklahoma City Thunder (same)
-  // All other teams use the same codes - map them to themselves
-  'ATL': 'ATL', 'BOS': 'BOS', 'CLE': 'CLE', 'CHI': 'CHI', 'DAL': 'DAL',
-  'DEN': 'DEN', 'DET': 'DET', 'GSW': 'GSW', 'HOU': 'HOU', 'IND': 'IND',
-  'LAC': 'LAC', 'LAL': 'LAL', 'MEM': 'MEM', 'MIA': 'MIA', 'MIL': 'MIL',
-  'MIN': 'MIN', 'NYK': 'NYK', 'ORL': 'ORL', 'PHI': 'PHI', 'POR': 'POR',
-  'SAC': 'SAC', 'SAS': 'SAS', 'TOR': 'TOR', 'UTA': 'UTA', 'WAS': 'WAS',
-};
-
-// Helper function to convert MySportsFeeds game ID to Basketball Reference URL
-// MySportsFeeds format: YYYYMMDD-AWAY-HOME (e.g., 20251115-TOR-BOS)
-// Basketball Reference format: https://www.basketball-reference.com/boxscores/YYYYMMDD0HOME.html
-function getBasketballReferenceUrl(gameId: string, homeTeam: string): string {
-  // Extract the date portion (YYYYMMDD)
-  const datePart = gameId.split('-')[0];
+// Helper function to convert MySportsFeeds game ID to Plain Text Sports URL
+// MySportsFeeds format: YYYYMMDD-AWAY-HOME (e.g., 20251119-TOR-PHI)
+// Plain Text Sports format: https://plaintextsports.com/nba/YYYY-MM-DD/away-home
+function getPlainTextSportsUrl(gameId: string): string {
+  // Parse game ID: YYYYMMDD-AWAY-HOME
+  const parts = gameId.split('-');
+  const datePart = parts[0]; // YYYYMMDD
+  const awayTeam = parts[1];
+  const homeTeam = parts[2];
   
-  // Convert MySportsFeeds team code to Basketball Reference code
-  const bbRefTeamCode = TEAM_CODE_MAPPING[homeTeam] || homeTeam;
+  // Convert date from YYYYMMDD to YYYY-MM-DD
+  const year = datePart.substring(0, 4);
+  const month = datePart.substring(4, 6);
+  const day = datePart.substring(6, 8);
+  const formattedDate = `${year}-${month}-${day}`;
   
-  // Basketball Reference uses a "0" separator between date and team code
-  return `https://www.basketball-reference.com/boxscores/${datePart}0${bbRefTeamCode}.html`;
+  // Plain Text Sports uses lowercase team codes
+  const teams = `${awayTeam.toLowerCase()}-${homeTeam.toLowerCase()}`;
+  
+  return `https://plaintextsports.com/nba/${formattedDate}/${teams}`;
 }
 
-// Game Details Modal Component - Links to Basketball Reference
+// Game Details Modal Component - Links to Plain Text Sports
 function GameDetailsModal({ game, onClose }: { game: DailyGame | null; onClose: () => void }) {
   if (!game) return null;
   
   const effectiveStatus = getEffectiveGameStatus(game);
-  const basketballRefUrl = getBasketballReferenceUrl(game.gameId, game.homeTeam);
+  const plainTextSportsUrl = getPlainTextSportsUrl(game.gameId);
   
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -1166,20 +1157,20 @@ function GameDetailsModal({ game, onClose }: { game: DailyGame | null; onClose: 
             </div>
           </div>
 
-          {/* Basketball Reference Link */}
+          {/* Plain Text Sports Link */}
           <div className="pt-3">
             <Button
               asChild
               className="w-full"
               size="lg"
-              data-testid="button-view-basketball-reference"
+              data-testid="button-view-live-stats"
             >
-              <a href={basketballRefUrl} target="_blank" rel="noopener noreferrer">
-                View Live Stats on Basketball Reference →
+              <a href={plainTextSportsUrl} target="_blank" rel="noopener noreferrer">
+                View Live Stats & Play-by-Play →
               </a>
             </Button>
             <p className="text-xs text-muted-foreground text-center mt-2">
-              Opens in a new tab
+              Opens Plain Text Sports in a new tab
             </p>
           </div>
         </div>
