@@ -1145,50 +1145,56 @@ export class DatabaseStorage implements IStorage {
       return null;
     }
 
-    // Get the lineup with player details
-    const lineup = await db
-      .select({
-        id: contestLineups.id,
-        playerId: contestLineups.playerId,
-        playerFirstName: players.firstName,
-        playerLastName: players.lastName,
-        playerTeam: players.team,
-        playerPosition: players.position,
-        sharesEntered: contestLineups.sharesEntered,
-        fantasyPoints: contestLineups.fantasyPoints,
-        earnedScore: contestLineups.earnedScore,
-      })
-      .from(contestLineups)
-      .innerJoin(players, eq(contestLineups.playerId, players.id))
-      .where(eq(contestLineups.entryId, entryId));
+    // Only show lineups after contest locks (status is "live" or "completed")
+    // Before that, return empty lineup to hide other users' entries
+    let lineupWithPercentages: any[] = [];
+    
+    if (contest.status === "live" || contest.status === "completed") {
+      // Get the lineup with player details
+      const lineup = await db
+        .select({
+          id: contestLineups.id,
+          playerId: contestLineups.playerId,
+          playerFirstName: players.firstName,
+          playerLastName: players.lastName,
+          playerTeam: players.team,
+          playerPosition: players.position,
+          sharesEntered: contestLineups.sharesEntered,
+          fantasyPoints: contestLineups.fantasyPoints,
+          earnedScore: contestLineups.earnedScore,
+        })
+        .from(contestLineups)
+        .innerJoin(players, eq(contestLineups.playerId, players.id))
+        .where(eq(contestLineups.entryId, entryId));
 
-    // For each player, calculate percentage of total shares entered for that player in this contest
-    const lineupWithPercentages = await Promise.all(
-      lineup.map(async (lineupItem) => {
-        // Sum all shares entered for this player across all entries in the contest
-        const [totalSharesResult] = await db
-          .select({
-            totalShares: sql<number>`CAST(COALESCE(SUM(${contestLineups.sharesEntered}), 0) AS INTEGER)`,
-          })
-          .from(contestLineups)
-          .leftJoin(contestEntries, eq(contestLineups.entryId, contestEntries.id))
-          .where(and(
-            eq(contestEntries.contestId, contestId),
-            eq(contestLineups.playerId, lineupItem.playerId)
-          ));
+      // For each player, calculate percentage of total shares entered for that player in this contest
+      lineupWithPercentages = await Promise.all(
+        lineup.map(async (lineupItem) => {
+          // Sum all shares entered for this player across all entries in the contest
+          const [totalSharesResult] = await db
+            .select({
+              totalShares: sql<number>`CAST(COALESCE(SUM(${contestLineups.sharesEntered}), 0) AS INTEGER)`,
+            })
+            .from(contestLineups)
+            .leftJoin(contestEntries, eq(contestLineups.entryId, contestEntries.id))
+            .where(and(
+              eq(contestEntries.contestId, contestId),
+              eq(contestLineups.playerId, lineupItem.playerId)
+            ));
 
-        const totalPlayerShares = totalSharesResult?.totalShares || 0;
-        const percentage = totalPlayerShares > 0 
-          ? ((lineupItem.sharesEntered / totalPlayerShares) * 100).toFixed(2)
-          : "0.00";
+          const totalPlayerShares = totalSharesResult?.totalShares || 0;
+          const percentage = totalPlayerShares > 0 
+            ? ((lineupItem.sharesEntered / totalPlayerShares) * 100).toFixed(2)
+            : "0.00";
 
-        return {
-          ...lineupItem,
-          totalPlayerSharesInContest: totalPlayerShares,
-          ownershipPercentage: percentage,
-        };
-      })
-    );
+          return {
+            ...lineupItem,
+            totalPlayerSharesInContest: totalPlayerShares,
+            ownershipPercentage: percentage,
+          };
+        })
+      );
+    }
 
     // Net winnings equals payout (no entry fees in this system)
     const payout = parseFloat(entry.payout);
