@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Search, Plus, Minus, Trophy, ChevronDown, Calendar, Filter } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -197,7 +198,7 @@ export default function ContestEntry() {
           </p>
         </div>
 
-        {/* Games Schedule & Filter */}
+        {/* Games Schedule */}
         {gamesData && gamesData.length > 0 && (
           <Card className="mb-4">
             <Collapsible open={isGamesOpen} onOpenChange={setIsGamesOpen}>
@@ -220,7 +221,7 @@ export default function ContestEntry() {
                 </div>
               </CardHeader>
               <CollapsibleContent>
-                <CardContent className="space-y-2">
+                <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                     {gamesData.map((game) => (
                       <div 
@@ -237,21 +238,6 @@ export default function ContestEntry() {
                       </div>
                     ))}
                   </div>
-                  
-                  <div className="pt-3 border-t">
-                    <Button
-                      variant={showOnlyPlayingTeams ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setShowOnlyPlayingTeams(!showOnlyPlayingTeams)}
-                      className="w-full"
-                      data-testid="button-toggle-teams-filter"
-                    >
-                      <Filter className="w-4 h-4 mr-2" />
-                      {showOnlyPlayingTeams 
-                        ? `Showing only players from today's games (${teamsPlaying.length} teams)` 
-                        : "Show only players from today's games"}
-                    </Button>
-                  </div>
                 </CardContent>
               </CollapsibleContent>
             </Collapsible>
@@ -263,15 +249,29 @@ export default function ContestEntry() {
           <Card>
             <CardHeader>
               <CardTitle className="text-sm font-medium uppercase tracking-wide">Your Eligible Players</CardTitle>
-              <div className="relative mt-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search players..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                  data-testid="input-search-eligible"
-                />
+              <div className="flex items-center gap-2 mt-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search players..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-search-eligible"
+                  />
+                </div>
+                {gamesData && gamesData.length > 0 && (
+                  <Button
+                    variant={showOnlyPlayingTeams ? "default" : "outline"}
+                    size="default"
+                    onClick={() => setShowOnlyPlayingTeams(!showOnlyPlayingTeams)}
+                    className="flex-shrink-0"
+                    data-testid="button-toggle-teams-filter"
+                  >
+                    <Filter className="w-4 h-4 mr-2" />
+                    {showOnlyPlayingTeams ? `${teamsPlaying.length} Teams` : "Filter"}
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-2 max-h-[600px] overflow-y-auto">
@@ -353,35 +353,32 @@ export default function ContestEntry() {
                         </Button>
                       </div>
                       
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateShares(entry.playerId, entry.sharesEntered - 1)}
-                          disabled={entry.sharesEntered <= 1}
-                          data-testid={`button-decrease-${entry.playerId}`}
-                        >
-                          -
-                        </Button>
-                        <Input
-                          type="number"
-                          value={entry.sharesEntered}
-                          onChange={(e) => updateShares(entry.playerId, parseInt(e.target.value) || 1)}
-                          className="text-center font-mono"
-                          min={1}
-                          max={entry.maxShares}
-                          data-testid={`input-shares-${entry.playerId}`}
-                        />
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateShares(entry.playerId, entry.sharesEntered + 1)}
-                          disabled={entry.sharesEntered >= entry.maxShares}
-                          data-testid={`button-increase-${entry.playerId}`}
-                        >
-                          +
-                        </Button>
-                        <span className="text-sm text-muted-foreground">/ {entry.maxShares}</span>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1">
+                            <Slider
+                              value={[entry.sharesEntered]}
+                              onValueChange={(value) => updateShares(entry.playerId, value[0])}
+                              min={1}
+                              max={entry.maxShares}
+                              step={1}
+                              className="cursor-pointer"
+                              data-testid={`slider-shares-${entry.playerId}`}
+                            />
+                          </div>
+                          <Input
+                            type="number"
+                            value={entry.sharesEntered}
+                            onChange={(e) => updateShares(entry.playerId, parseInt(e.target.value) || 1)}
+                            className="w-20 text-center font-mono"
+                            min={1}
+                            max={entry.maxShares}
+                            data-testid={`input-shares-${entry.playerId}`}
+                          />
+                        </div>
+                        <div className="text-xs text-muted-foreground text-right">
+                          Max: {entry.maxShares} shares
+                        </div>
                       </div>
                     </div>
                   ))}
