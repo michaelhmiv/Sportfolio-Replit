@@ -3,6 +3,7 @@ import {
   players,
   holdings,
   holdingsLocks,
+  balanceLocks,
   orders,
   trades,
   mining,
@@ -22,6 +23,7 @@ import {
   type Holding,
   type HoldingsLock,
   type InsertHoldingsLock,
+  type BalanceLock,
   type Order,
   type Trade,
   type Mining,
@@ -76,6 +78,14 @@ export interface IStorage {
   getLockedShares(userId: string, assetType: string, assetId: string): Promise<HoldingsLock[]>;
   getTotalLockedQuantity(userId: string, assetType: string, assetId: string): Promise<number>;
   adjustLockQuantity(lockReferenceId: string, newQuantity: number): Promise<void>;
+  
+  // Balance lock methods - prevent double-spending of cash
+  reserveCash(userId: string, lockType: string, lockReferenceId: string, amount: string): Promise<BalanceLock>;
+  releaseCash(lockId: string): Promise<void>;
+  releaseCashByReference(lockReferenceId: string): Promise<void>;
+  getAvailableBalance(userId: string): Promise<number>;
+  getTotalLockedBalance(userId: string): Promise<number>;
+  adjustLockAmount(lockReferenceId: string, newAmount: string): Promise<void>;
   
   // Order methods
   createOrder(order: any): Promise<Order>;
@@ -641,6 +651,99 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  // Cash lock methods - prevent double-spending balance on buy orders
+  async reserveCash(
+    userId: string,
+    lockType: string,
+    lockReferenceId: string,
+    amount: string
+  ): Promise<BalanceLock> {
+    // CRITICAL: Use transaction with row-level lock to prevent race conditions
+    return await db.transaction(async (tx) => {
+      // Step 1: Lock the user row to prevent concurrent modifications
+      const [user] = await tx
+        .select()
+        .from(users)
+        .where(eq(users.id, userId))
+        .for('update'); // SELECT ... FOR UPDATE - prevents concurrent reservations
+
+      if (!user) {
+        throw new Error(`User ${userId} not found`);
+      }
+
+      // Step 2: Calculate available balance (total - locked)
+      const totalLocked = await this.getTotalLockedBalance(userId, tx);
+      const availableBalance = parseFloat(user.balance) - totalLocked;
+      const requestedAmount = parseFloat(amount);
+
+      if (availableBalance < requestedAmount) {
+        throw new Error(
+          `Insufficient available balance. Available: $${availableBalance.toFixed(2)}, Requested: $${requestedAmount.toFixed(2)}`
+        );
+      }
+
+      // Step 3: Create the cash lock
+      const [lock] = await tx
+        .insert(balanceLocks)
+        .values({
+          userId,
+          lockType,
+          lockReferenceId,
+          lockedAmount: amount,
+        })
+        .returning();
+
+      return lock;
+    });
+  }
+
+  async releaseCash(lockId: string): Promise<void> {
+    await db
+      .delete(balanceLocks)
+      .where(eq(balanceLocks.id, lockId));
+  }
+
+  async releaseCashByReference(lockReferenceId: string): Promise<void> {
+    await db
+      .delete(balanceLocks)
+      .where(eq(balanceLocks.lockReferenceId, lockReferenceId));
+  }
+
+  async getAvailableBalance(userId: string, tx?: any): Promise<number> {
+    const dbContext = tx || db;
+    const [user] = await dbContext
+      .select()
+      .from(users)
+      .where(eq(users.id, userId));
+    
+    if (!user) return 0;
+    
+    const lockedAmount = await this.getTotalLockedBalance(userId, tx);
+    return Math.max(0, parseFloat(user.balance) - lockedAmount);
+  }
+
+  async getTotalLockedBalance(userId: string, tx?: any): Promise<number> {
+    const dbContext = tx || db;
+    const result = await dbContext
+      .select({ total: sql<number>`COALESCE(SUM(${balanceLocks.lockedAmount}), 0)` })
+      .from(balanceLocks)
+      .where(eq(balanceLocks.userId, userId));
+    
+    return Number(result[0]?.total || 0);
+  }
+
+  async adjustLockAmount(lockReferenceId: string, newAmount: string): Promise<void> {
+    const amountNum = parseFloat(newAmount);
+    if (amountNum <= 0) {
+      await this.releaseCashByReference(lockReferenceId);
+    } else {
+      await db
+        .update(balanceLocks)
+        .set({ lockedAmount: newAmount })
+        .where(eq(balanceLocks.lockReferenceId, lockReferenceId));
+    }
+  }
+
   // Order methods
   async createOrder(order: any): Promise<Order> {
     const [created] = await db
@@ -700,8 +803,11 @@ export class DatabaseStorage implements IStorage {
       .set({ status: "cancelled" })
       .where(eq(orders.id, orderId));
     
-    // Release any locked shares for this order
+    // Release any locked shares for this order (sell orders)
     await this.releaseSharesByReference(orderId);
+    
+    // Release any locked cash for this order (buy orders)
+    await this.releaseCashByReference(orderId);
   }
 
   // Trade methods

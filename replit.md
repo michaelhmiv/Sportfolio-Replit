@@ -33,6 +33,16 @@ The `holdings_locks` table implements a transactional locking mechanism to preve
 - Automatic lock releases on order cancellation, partial/full order fills, and contest settlement
 - All lock operations are transactional to guarantee data consistency under high concurrency
 
+**Cash Locking System (Double-Spend Prevention):**
+The `balance_locks` table implements a parallel locking mechanism to prevent users from placing buy orders that exceed their available balance. Key features:
+- Lock types: "order" (buy orders reserve cash until filled/cancelled)
+- Available balance formula: `user.balance - SUM(balance_locks.lockedAmount)`
+- Atomic cash reservations using database transactions to prevent race conditions
+- Automatic lock adjustments on partial buy order fills (releases proportional to filled quantity)
+- Automatic lock releases on buy order cancellation or full fills
+- Buy order validation checks available balance before order creation
+- All cash lock operations are transactional to guarantee data consistency under high concurrency
+
 **Performance Optimizations:**
 - Portfolio endpoint uses SQL JOIN query (`getUserHoldingsWithPlayers`) to fetch holdings + players + locks in a single database round-trip, eliminating N+1 query issues
 - Marketplace implements pagination (50 items per page) with limit/offset for fast page loads

@@ -92,6 +92,21 @@ export const holdingsLocks = pgTable("holdings_locks", {
   lockTypeIdx: index("locks_type_idx").on(table.lockType),
 }));
 
+// Balance locks table - tracks reserved cash to prevent double-spending
+// Available balance = users.balance - SUM(balance_locks.lockedAmount)
+export const balanceLocks = pgTable("balance_locks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  lockType: text("lock_type").notNull(), // "order" (for buy orders)
+  lockReferenceId: varchar("lock_reference_id").notNull(), // order ID
+  lockedAmount: decimal("locked_amount", { precision: 20, scale: 2 }).notNull().default("0.00"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("balance_locks_user_idx").on(table.userId),
+  referenceIdx: index("balance_locks_reference_idx").on(table.lockReferenceId),
+  lockTypeIdx: index("balance_locks_type_idx").on(table.lockType),
+}));
+
 // Orders table - limit and market orders on the order book
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -396,6 +411,8 @@ export type InsertHolding = z.infer<typeof insertHoldingSchema>;
 
 export type HoldingsLock = typeof holdingsLocks.$inferSelect;
 export type InsertHoldingsLock = z.infer<typeof insertHoldingsLockSchema>;
+
+export type BalanceLock = typeof balanceLocks.$inferSelect;
 
 export type Order = typeof orders.$inferSelect;
 export type InsertOrder = z.infer<typeof insertOrderSchema>;

@@ -184,9 +184,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: newSellFilled >= sellOrder.quantity ? "filled" : "partial",
           });
 
+          // Adjust locked resources
           // Adjust locked shares for the sell order
           const remainingSellLocked = sellOrder.quantity - newSellFilled;
           await storage.adjustLockQuantity(sellOrder.id, remainingSellLocked);
+          
+          // Adjust locked cash for the buy order
+          const remainingBuyQuantity = buyOrder.quantity - newBuyFilled;
+          const buyLimitPrice = parseFloat(buyOrder.limitPrice || "0");
+          const remainingBuyLocked = (remainingBuyQuantity * buyLimitPrice).toFixed(2);
+          await storage.adjustLockAmount(buyOrder.id, remainingBuyLocked);
 
           // Update holdings for buyer (Average Cost Method)
           const buyerHolding = await storage.getHolding(buyOrder.userId, "player", playerId);
@@ -888,7 +895,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Invalid limit price" });
       }
 
-      // Check balance for buy orders
+      // Check available balance for buy orders (total - locked)
       if (side === "buy") {
         let price: number;
         
@@ -912,9 +919,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         
         const cost = quantity * price;
+        const availableBalance = await storage.getAvailableBalance(user.id);
         
-        if (parseFloat(user.balance) < cost) {
-          return res.status(400).json({ error: "Insufficient balance" });
+        if (availableBalance < cost) {
+          return res.status(400).json({ error: `Insufficient available balance. Available: $${availableBalance.toFixed(2)}, Required: $${cost.toFixed(2)}` });
         }
       }
 
@@ -953,8 +961,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         limitPrice: orderType === "limit" ? limitPrice : null,
       });
 
-      // Lock shares for sell orders to prevent double-spending
+      // Lock resources to prevent double-spending
       if (side === "sell") {
+        // Lock shares for sell orders
         await storage.reserveShares(
           user.id,
           "player",
@@ -963,6 +972,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
           order.id,
           quantity
         );
+      } else if (side === "buy") {
+        // Lock cash for buy orders
+        const lockPrice = orderType === "limit" ? parseFloat(limitPrice) : await (async () => {
+          const orderBook = await storage.getOrderBook(req.params.playerId);
+          const validAsks = orderBook.asks.filter(o => 
+            o.limitPrice && 
+            parseFloat(o.limitPrice) > 0 && 
+            (o.quantity - o.filledQuantity) > 0
+          );
+          return Math.max(...validAsks.map(o => parseFloat(o.limitPrice!)));
+        })();
+        
+        const lockAmount = (quantity * lockPrice).toFixed(2);
+        await storage.reserveCash(user.id, "order", order.id, lockAmount);
       }
 
       // For market orders, match immediately
@@ -1008,10 +1031,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             status: newFilled >= availableOrder.quantity ? "filled" : "partial",
           });
 
-          // Adjust locked shares for the matched order (if it's a sell order)
+          // Adjust locked resources for the matched order
           if (availableOrder.side === "sell") {
+            // Adjust locked shares for sell orders
             const remainingLocked = availableOrder.quantity - newFilled;
             await storage.adjustLockQuantity(availableOrder.id, remainingLocked);
+          } else {
+            // Adjust locked cash for buy orders
+            const remainingLocked = availableOrder.quantity - newFilled;
+            const orderPrice = parseFloat(availableOrder.limitPrice || "0");
+            const remainingCashLocked = (remainingLocked * orderPrice).toFixed(2);
+            await storage.adjustLockAmount(availableOrder.id, remainingCashLocked);
           }
 
           // Update holdings
@@ -1096,9 +1126,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
           status: remainingQty === 0 ? "filled" : "partial",
         });
 
-        // Adjust locked shares for sell market orders
+        // Adjust locked resources for the placed market order
         if (side === "sell") {
+          // Adjust locked shares for sell market orders
           await storage.adjustLockQuantity(order.id, remainingQty);
+        } else {
+          // Adjust locked cash for buy market orders
+          // For market orders, we need to release excess locked cash since actual cost may be less
+          // The actual cost is totalCost, so we can release the difference
+          await storage.releaseCashByReference(order.id);
         }
 
         // Broadcast real-time updates for order book and trades
