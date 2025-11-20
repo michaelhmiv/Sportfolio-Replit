@@ -5,11 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Plus, Minus, Trophy } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Search, Plus, Minus, Trophy, ChevronDown, Calendar, Filter } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { invalidatePortfolioQueries, invalidateContestQueries } from "@/lib/cache-invalidation";
-import type { Player, Holding } from "@shared/schema";
+import type { Player, Holding, DailyGame } from "@shared/schema";
+import { format } from "date-fns";
 
 interface ContestEntryData {
   contest: {
@@ -17,6 +19,7 @@ interface ContestEntryData {
     name: string;
     sport: string;
     startsAt: string;
+    gameDate: string;
   };
   eligiblePlayers: (Holding & { player: Player; isEligible: boolean })[];
 }
@@ -36,6 +39,8 @@ export default function ContestEntry() {
   const { toast } = useToast();
   const [search, setSearch] = useState("");
   const [lineup, setLineup] = useState<Map<string, LineupEntry>>(new Map());
+  const [showOnlyPlayingTeams, setShowOnlyPlayingTeams] = useState(false);
+  const [isGamesOpen, setIsGamesOpen] = useState(false);
   const isEditMode = !!entryId;
 
   const { data, isLoading } = useQuery<ContestEntryData>({
@@ -47,6 +52,16 @@ export default function ContestEntry() {
   const { data: existingEntry, isLoading: isLoadingEntry } = useQuery<any>({
     queryKey: ["/api/contest", id, "entry", entryId],
     enabled: isEditMode,
+  });
+
+  // Get contest data to access gameDate
+  const contestData = isEditMode ? existingEntry?.contest : data?.contest;
+  
+  // Fetch games for the contest date
+  const { data: gamesData } = useQuery<DailyGame[]>({
+    queryKey: ["/api/games/date", contestData?.gameDate],
+    enabled: !!contestData?.gameDate,
+    select: (games) => games || [],
   });
 
   // Pre-populate lineup in edit mode using API-provided eligiblePlayers
@@ -143,12 +158,25 @@ export default function ContestEntry() {
     );
   }
 
-  const contestData = isEditMode ? existingEntry?.contest : data?.contest;
   const eligiblePlayers = isEditMode ? (existingEntry?.eligiblePlayers || []) : (data?.eligiblePlayers || []);
-  const filteredPlayers = eligiblePlayers.filter((holding: any) =>
-    holding.player.firstName.toLowerCase().includes(search.toLowerCase()) ||
-    holding.player.lastName.toLowerCase().includes(search.toLowerCase())
-  );
+  
+  // Extract teams playing on contest date
+  const teamsPlaying = gamesData ? Array.from(new Set([
+    ...gamesData.map(g => g.homeTeam),
+    ...gamesData.map(g => g.awayTeam)
+  ])) : [];
+  
+  // Apply filters
+  const filteredPlayers = eligiblePlayers.filter((holding: any) => {
+    // Search filter
+    const matchesSearch = holding.player.firstName.toLowerCase().includes(search.toLowerCase()) ||
+      holding.player.lastName.toLowerCase().includes(search.toLowerCase());
+    
+    // Teams playing filter
+    const matchesTeamsFilter = !showOnlyPlayingTeams || teamsPlaying.includes(holding.player.team);
+    
+    return matchesSearch && matchesTeamsFilter;
+  });
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
@@ -163,6 +191,67 @@ export default function ContestEntry() {
             {isEditMode ? "Edit your lineup before the contest locks" : "Select players from your portfolio to enter this contest"}
           </p>
         </div>
+
+        {/* Games Schedule & Filter */}
+        {gamesData && gamesData.length > 0 && (
+          <Card className="mb-4">
+            <Collapsible open={isGamesOpen} onOpenChange={setIsGamesOpen}>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-5 h-5 text-primary" />
+                    <CardTitle className="text-sm font-medium uppercase tracking-wide">
+                      Games on {contestData?.gameDate ? format(new Date(contestData.gameDate), "MMM d, yyyy") : "Contest Date"}
+                    </CardTitle>
+                    <Badge variant="outline" data-testid="badge-games-count">
+                      {gamesData.length} {gamesData.length === 1 ? 'Game' : 'Games'}
+                    </Badge>
+                  </div>
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" size="sm" data-testid="button-toggle-games">
+                      <ChevronDown className={`w-4 h-4 transition-transform ${isGamesOpen ? 'rotate-180' : ''}`} />
+                    </Button>
+                  </CollapsibleTrigger>
+                </div>
+              </CardHeader>
+              <CollapsibleContent>
+                <CardContent className="space-y-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {gamesData.map((game) => (
+                      <div 
+                        key={game.id} 
+                        className="p-3 border rounded-md bg-card/50"
+                        data-testid={`game-card-${game.id}`}
+                      >
+                        <div className="text-sm font-medium text-center">
+                          {game.awayTeam} @ {game.homeTeam}
+                        </div>
+                        <div className="text-xs text-muted-foreground text-center mt-1">
+                          {format(new Date(game.startTime), "h:mm a")}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  <div className="pt-3 border-t">
+                    <Button
+                      variant={showOnlyPlayingTeams ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => setShowOnlyPlayingTeams(!showOnlyPlayingTeams)}
+                      className="w-full"
+                      data-testid="button-toggle-teams-filter"
+                    >
+                      <Filter className="w-4 h-4 mr-2" />
+                      {showOnlyPlayingTeams 
+                        ? `Showing only players from today's games (${teamsPlaying.length} teams)` 
+                        : "Show only players from today's games"}
+                    </Button>
+                  </div>
+                </CardContent>
+              </CollapsibleContent>
+            </Collapsible>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {/* Available Players */}
