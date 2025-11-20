@@ -750,8 +750,8 @@ export default function Dashboard() {
       </div>
       </div>
 
-      {/* Game Stats Dialog */}
-      <GameStatsDialog 
+      {/* Game Details Modal */}
+      <GameDetailsModal 
         game={selectedGame} 
         onClose={() => setSelectedGame(null)} 
       />
@@ -884,8 +884,6 @@ export default function Dashboard() {
           </div>
         </DialogContent>
       </Dialog>
-
-      <GameStatsDialog game={selectedGame} onClose={() => setSelectedGame(null)} />
     </>
   );
 }
@@ -1072,206 +1070,118 @@ function PlayerCard({
   );
 }
 
-// Game Stats Dialog Component
-function GameStatsDialog({ game, onClose }: { game: DailyGame | null; onClose: () => void }) {
-  const { data: boxScore, isLoading } = useQuery<any>({
-    queryKey: [`/api/games/${game?.gameId}/stats`],
-    enabled: !!game,
-  });
+// Team code mapping: MySportsFeeds → Basketball Reference
+// Basketball Reference uses different abbreviations for some teams
+const TEAM_CODE_MAPPING: Record<string, string> = {
+  // Teams with different codes
+  'BKN': 'BRK', // Brooklyn Nets
+  'CHA': 'CHO', // Charlotte Hornets
+  'PHX': 'PHO', // Phoenix Suns
+  'NOP': 'NOP', // New Orleans Pelicans (same)
+  'OKC': 'OKC', // Oklahoma City Thunder (same)
+  // All other teams use the same codes - map them to themselves
+  'ATL': 'ATL', 'BOS': 'BOS', 'CLE': 'CLE', 'CHI': 'CHI', 'DAL': 'DAL',
+  'DEN': 'DEN', 'DET': 'DET', 'GSW': 'GSW', 'HOU': 'HOU', 'IND': 'IND',
+  'LAC': 'LAC', 'LAL': 'LAL', 'MEM': 'MEM', 'MIA': 'MIA', 'MIL': 'MIL',
+  'MIN': 'MIN', 'NYK': 'NYK', 'ORL': 'ORL', 'PHI': 'PHI', 'POR': 'POR',
+  'SAC': 'SAC', 'SAS': 'SAS', 'TOR': 'TOR', 'UTA': 'UTA', 'WAS': 'WAS',
+};
 
+// Helper function to convert MySportsFeeds game ID to Basketball Reference URL
+// MySportsFeeds format: YYYYMMDD-AWAY-HOME (e.g., 20251115-TOR-BOS)
+// Basketball Reference format: https://www.basketball-reference.com/boxscores/YYYYMMDD0HOME.html
+function getBasketballReferenceUrl(gameId: string, homeTeam: string): string {
+  // Extract the date portion (YYYYMMDD)
+  const datePart = gameId.split('-')[0];
+  
+  // Convert MySportsFeeds team code to Basketball Reference code
+  const bbRefTeamCode = TEAM_CODE_MAPPING[homeTeam] || homeTeam;
+  
+  // Basketball Reference uses a "0" separator between date and team code
+  return `https://www.basketball-reference.com/boxscores/${datePart}0${bbRefTeamCode}.html`;
+}
+
+// Game Details Modal Component - Links to Basketball Reference
+function GameDetailsModal({ game, onClose }: { game: DailyGame | null; onClose: () => void }) {
   if (!game) return null;
+  
+  const effectiveStatus = getEffectiveGameStatus(game);
+  const basketballRefUrl = getBasketballReferenceUrl(game.gameId, game.homeTeam);
   
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-lg" data-testid="dialog-game-details">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold">
+          <DialogTitle className="text-2xl font-bold" data-testid="text-game-title">
             {game.awayTeam} @ {game.homeTeam}
           </DialogTitle>
-          <DialogDescription>
-            {new Date(game.startTime).toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at {new Date(game.startTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-            {game.venue && <span className="ml-2">• {game.venue}</span>}
+          <DialogDescription data-testid="text-game-datetime">
+            {new Date(game.startTime).toLocaleDateString([], { 
+              weekday: 'long', 
+              month: 'long', 
+              day: 'numeric', 
+              year: 'numeric' 
+            })} at {new Date(game.startTime).toLocaleTimeString([], { 
+              hour: 'numeric', 
+              minute: '2-digit' 
+            })}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3">
+        <div className="space-y-4">
           {/* Score Display */}
-          <div className="grid grid-cols-3 gap-2 items-center">
+          <div className="grid grid-cols-3 gap-3 items-center">
             <div className="text-center">
-              <h3 className="text-lg font-semibold mb-2">{game.awayTeam}</h3>
-              {game.awayScore !== null && (
-                <div className="text-4xl font-bold font-mono">{game.awayScore}</div>
+              <h3 className="text-lg font-semibold mb-2" data-testid="text-away-team">{game.awayTeam}</h3>
+              {(effectiveStatus === 'completed' || effectiveStatus === 'inprogress') && game.awayScore !== null ? (
+                <div className="text-5xl font-bold font-mono" data-testid="text-away-score">{game.awayScore}</div>
+              ) : (
+                <div className="text-2xl text-muted-foreground" data-testid="text-away-status">-</div>
               )}
             </div>
+            
             <div className="flex items-center justify-center">
-              <div className="text-sm">
-                {game.status === "inprogress" && <Badge variant="destructive">Live</Badge>}
-                {game.status === "scheduled" && <Badge variant="secondary">Scheduled</Badge>}
-                {game.status === "completed" && <Badge variant="outline">Final</Badge>}
-              </div>
+              <Badge 
+                variant={
+                  effectiveStatus === 'inprogress' ? 'default' : 
+                  effectiveStatus === 'completed' ? 'secondary' : 
+                  'outline'
+                }
+                className="text-sm px-3 py-1"
+                data-testid="badge-game-status"
+              >
+                {effectiveStatus === 'inprogress' ? 'LIVE' : 
+                 effectiveStatus === 'completed' ? 'FINAL' : 
+                 'SCHEDULED'}
+              </Badge>
             </div>
+            
             <div className="text-center">
-              <h3 className="text-lg font-semibold mb-2">{game.homeTeam}</h3>
-              {game.homeScore !== null && (
-                <div className="text-4xl font-bold font-mono">{game.homeScore}</div>
+              <h3 className="text-lg font-semibold mb-2" data-testid="text-home-team">{game.homeTeam}</h3>
+              {(effectiveStatus === 'completed' || effectiveStatus === 'inprogress') && game.homeScore !== null ? (
+                <div className="text-5xl font-bold font-mono" data-testid="text-home-score">{game.homeScore}</div>
+              ) : (
+                <div className="text-2xl text-muted-foreground" data-testid="text-home-status">-</div>
               )}
             </div>
           </div>
 
-          {/* Loading State */}
-          {isLoading && (
-            <div className="text-center py-4 text-muted-foreground">
-              Loading box score...
-            </div>
-          )}
-
-          {/* No Stats Available */}
-          {!isLoading && boxScore?.message && (
-            <div className="text-center py-4 text-muted-foreground">
-              {boxScore.message}
-            </div>
-          )}
-
-          {/* Top Performers */}
-          {!isLoading && boxScore?.topPerformers && (
-            <Card data-testid="card-top-performers">
-              <CardHeader>
-                <CardTitle className="text-sm font-medium uppercase tracking-wide">Top Performers</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <div className="text-center p-3 bg-muted rounded-md" data-testid="card-leading-scorer">
-                    <div className="text-xs text-muted-foreground mb-1">Leading Scorer</div>
-                    <div className="font-semibold" data-testid="text-scorer-name">{boxScore.topPerformers.topScorer.playerName}</div>
-                    <div className="text-2xl font-bold font-mono text-primary" data-testid="text-scorer-points">{boxScore.topPerformers.topScorer.points} PTS</div>
-                  </div>
-                  <div className="text-center p-3 bg-muted rounded-md" data-testid="card-leading-rebounder">
-                    <div className="text-xs text-muted-foreground mb-1">Leading Rebounder</div>
-                    <div className="font-semibold" data-testid="text-rebounder-name">{boxScore.topPerformers.topRebounder.playerName}</div>
-                    <div className="text-2xl font-bold font-mono text-primary" data-testid="text-rebounder-rebounds">{boxScore.topPerformers.topRebounder.rebounds} REB</div>
-                  </div>
-                  <div className="text-center p-3 bg-muted rounded-md" data-testid="card-leading-assister">
-                    <div className="text-xs text-muted-foreground mb-1">Leading Assist</div>
-                    <div className="font-semibold" data-testid="text-assister-name">{boxScore.topPerformers.topAssister.playerName}</div>
-                    <div className="text-2xl font-bold font-mono text-primary" data-testid="text-assister-assists">{boxScore.topPerformers.topAssister.assists} AST</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Box Score Tables */}
-          {!isLoading && boxScore?.awayTeam?.players && boxScore.awayTeam.players.length > 0 && (
-            <>
-              {/* Away Team Box Score */}
-              <Card data-testid="card-away-boxscore">
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium uppercase tracking-wide">{game.awayTeam} Box Score</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="border-b bg-muted/50">
-                        <tr>
-                          <th className="text-left p-3 font-semibold">Player</th>
-                          <th className="text-center p-3 font-semibold">MIN</th>
-                          <th className="text-center p-3 font-semibold">PTS</th>
-                          <th className="text-center p-3 font-semibold">REB</th>
-                          <th className="text-center p-3 font-semibold">AST</th>
-                          <th className="text-center p-3 font-semibold">STL</th>
-                          <th className="text-center p-3 font-semibold">BLK</th>
-                          <th className="text-center p-3 font-semibold">TO</th>
-                          <th className="text-center p-3 font-semibold">FP</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {boxScore.awayTeam.players.map((player: any) => (
-                          <tr key={player.playerId} className="border-b last:border-0 hover-elevate" data-testid={`row-player-${player.playerId}`}>
-                            <td className="p-3 font-medium" data-testid={`text-player-name-${player.playerId}`}>{player.playerName}</td>
-                            <td className="p-3 text-center font-mono">{player.minutes}</td>
-                            <td className="p-3 text-center font-mono font-semibold" data-testid={`text-player-points-${player.playerId}`}>{player.points}</td>
-                            <td className="p-3 text-center font-mono">{player.rebounds}</td>
-                            <td className="p-3 text-center font-mono">{player.assists}</td>
-                            <td className="p-3 text-center font-mono">{player.steals}</td>
-                            <td className="p-3 text-center font-mono">{player.blocks}</td>
-                            <td className="p-3 text-center font-mono">{player.turnovers}</td>
-                            <td className="p-3 text-center font-mono text-primary">{player.fantasyPoints.toFixed(1)}</td>
-                          </tr>
-                        ))}
-                        {boxScore.awayTeam.totals && (
-                          <tr className="border-t-2 bg-muted/30 font-semibold" data-testid="row-away-team-totals">
-                            <td className="p-3">TEAM TOTALS</td>
-                            <td className="p-3 text-center">-</td>
-                            <td className="p-3 text-center font-mono" data-testid="text-away-total-points">{boxScore.awayTeam.totals.points}</td>
-                            <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.rebounds}</td>
-                            <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.assists}</td>
-                            <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.steals}</td>
-                            <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.blocks}</td>
-                            <td className="p-3 text-center font-mono">{boxScore.awayTeam.totals.turnovers}</td>
-                            <td className="p-3 text-center">-</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Home Team Box Score */}
-              <Card data-testid="card-home-boxscore">
-                <CardHeader>
-                  <CardTitle className="text-sm font-medium uppercase tracking-wide">{game.homeTeam} Box Score</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="border-b bg-muted/50">
-                        <tr>
-                          <th className="text-left p-3 font-semibold">Player</th>
-                          <th className="text-center p-3 font-semibold">MIN</th>
-                          <th className="text-center p-3 font-semibold">PTS</th>
-                          <th className="text-center p-3 font-semibold">REB</th>
-                          <th className="text-center p-3 font-semibold">AST</th>
-                          <th className="text-center p-3 font-semibold">STL</th>
-                          <th className="text-center p-3 font-semibold">BLK</th>
-                          <th className="text-center p-3 font-semibold">TO</th>
-                          <th className="text-center p-3 font-semibold">FP</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {boxScore.homeTeam.players.map((player: any) => (
-                          <tr key={player.playerId} className="border-b last:border-0 hover-elevate" data-testid={`row-player-${player.playerId}`}>
-                            <td className="p-3 font-medium" data-testid={`text-player-name-${player.playerId}`}>{player.playerName}</td>
-                            <td className="p-3 text-center font-mono">{player.minutes}</td>
-                            <td className="p-3 text-center font-mono font-semibold" data-testid={`text-player-points-${player.playerId}`}>{player.points}</td>
-                            <td className="p-3 text-center font-mono">{player.rebounds}</td>
-                            <td className="p-3 text-center font-mono">{player.assists}</td>
-                            <td className="p-3 text-center font-mono">{player.steals}</td>
-                            <td className="p-3 text-center font-mono">{player.blocks}</td>
-                            <td className="p-3 text-center font-mono">{player.turnovers}</td>
-                            <td className="p-3 text-center font-mono text-primary">{player.fantasyPoints.toFixed(1)}</td>
-                          </tr>
-                        ))}
-                        {boxScore.homeTeam.totals && (
-                          <tr className="border-t-2 bg-muted/30 font-semibold" data-testid="row-home-team-totals">
-                            <td className="p-3">TEAM TOTALS</td>
-                            <td className="p-3 text-center">-</td>
-                            <td className="p-3 text-center font-mono" data-testid="text-home-total-points">{boxScore.homeTeam.totals.points}</td>
-                            <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.rebounds}</td>
-                            <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.assists}</td>
-                            <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.steals}</td>
-                            <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.blocks}</td>
-                            <td className="p-3 text-center font-mono">{boxScore.homeTeam.totals.turnovers}</td>
-                            <td className="p-3 text-center">-</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
+          {/* Basketball Reference Link */}
+          <div className="pt-3">
+            <Button
+              asChild
+              className="w-full"
+              size="lg"
+              data-testid="button-view-basketball-reference"
+            >
+              <a href={basketballRefUrl} target="_blank" rel="noopener noreferrer">
+                View Live Stats on Basketball Reference →
+              </a>
+            </Button>
+            <p className="text-xs text-muted-foreground text-center mt-2">
+              Opens in a new tab
+            </p>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
