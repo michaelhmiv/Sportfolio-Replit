@@ -844,24 +844,12 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  async getMarketActivity(filters?: { playerId?: string; userId?: string; limit?: number }): Promise<any[]> {
-    const { playerId, userId, limit = 50 } = filters || {};
+  async getMarketActivity(filters?: { playerId?: string; userId?: string; playerSearch?: string; limit?: number }): Promise<any[]> {
+    const { playerId, userId, playerSearch, limit = 50 } = filters || {};
     
     // Create aliases for buyer and seller users
     const buyer = alias(users, "buyer");
     const seller = alias(users, "seller");
-    
-    // Build conditions for trades
-    const tradeConditions = [];
-    if (playerId) tradeConditions.push(eq(trades.playerId, playerId));
-    if (userId) tradeConditions.push(
-      or(eq(trades.buyerId, userId), eq(trades.sellerId, userId))
-    );
-    
-    // Build conditions for orders
-    const orderConditions = [];
-    if (playerId) orderConditions.push(eq(orders.playerId, playerId));
-    if (userId) orderConditions.push(eq(orders.userId, userId));
     
     // Fetch recent trades with player and user info
     // Use a larger limit to ensure we get enough rows after merging
@@ -893,7 +881,18 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(buyer, eq(trades.buyerId, buyer.id))
       .innerJoin(seller, eq(trades.sellerId, seller.id));
     
-    // Only add where clause if conditions exist
+    // Build and apply where conditions for trades (after joins)
+    const tradeConditions = [];
+    if (playerId) tradeConditions.push(eq(trades.playerId, playerId));
+    if (userId) tradeConditions.push(
+      or(eq(trades.buyerId, userId), eq(trades.sellerId, userId))
+    );
+    if (playerSearch) {
+      const searchPattern = `%${playerSearch}%`;
+      tradeConditions.push(
+        sql`(${players.firstName} ILIKE ${searchPattern} OR ${players.lastName} ILIKE ${searchPattern})`
+      );
+    }
     if (tradeConditions.length > 0) {
       tradesQuery = tradesQuery.where(and(...tradeConditions));
     }
@@ -928,7 +927,16 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(players, eq(orders.playerId, players.id))
       .innerJoin(users, eq(orders.userId, users.id));
     
-    // Only add where clause if conditions exist
+    // Build and apply where conditions for orders (after joins)
+    const orderConditions = [];
+    if (playerId) orderConditions.push(eq(orders.playerId, playerId));
+    if (userId) orderConditions.push(eq(orders.userId, userId));
+    if (playerSearch) {
+      const searchPattern = `%${playerSearch}%`;
+      orderConditions.push(
+        sql`(${players.firstName} ILIKE ${searchPattern} OR ${players.lastName} ILIKE ${searchPattern})`
+      );
+    }
     if (orderConditions.length > 0) {
       ordersQuery = ordersQuery.where(and(...orderConditions));
     }

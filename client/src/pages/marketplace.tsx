@@ -500,11 +500,26 @@ interface MarketActivity {
 
 function MarketActivityFeed() {
   const { subscribe } = useWebSocket();
+  const [playerFilter, setPlayerFilter] = useState("");
+  const [debouncedPlayerFilter, setDebouncedPlayerFilter] = useState("");
   
+  // Debounce player filter
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedPlayerFilter(playerFilter);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [playerFilter]);
+
   const { data: activity = [], isLoading } = useQuery<MarketActivity[]>({
-    queryKey: ["/api/market/activity"],
+    queryKey: ["/api/market/activity", debouncedPlayerFilter],
     queryFn: async () => {
-      const response = await fetch("/api/market/activity?limit=100");
+      const params = new URLSearchParams();
+      params.append("limit", "150");
+      if (debouncedPlayerFilter) {
+        params.append("playerSearch", debouncedPlayerFilter);
+      }
+      const response = await fetch(`/api/market/activity?${params.toString()}`);
       if (!response.ok) throw new Error("Failed to fetch market activity");
       return response.json();
     },
@@ -518,43 +533,39 @@ function MarketActivityFeed() {
     return unsubscribe;
   }, [subscribe]);
 
-  const getActivityIcon = (item: MarketActivity) => {
+  const getActivityLabel = (item: MarketActivity) => {
     if (item.activityType === "trade") {
-      return <TrendingUp className="w-5 h-5 text-positive" />;
-    }
-    if (item.side === "buy") {
-      return <TrendingUp className="w-5 h-5 text-positive" />;
-    }
-    return <TrendingDown className="w-5 h-5 text-negative" />;
-  };
-
-  const getActivityDescription = (item: MarketActivity) => {
-    if (item.activityType === "trade") {
-      return `${item.buyerUsername} bought from ${item.sellerUsername}`;
-    }
-    if (item.activityType === "order_placed") {
-      return `${item.username} placed ${item.side} ${item.orderType} order`;
+      return { type: "Trade", color: "text-foreground font-semibold" };
     }
     if (item.activityType === "order_cancelled") {
-      return `${item.username} cancelled ${item.side} ${item.orderType} order`;
+      return { type: "Cancelled", color: "text-muted-foreground" };
     }
-    return "";
+    // order_placed
+    const orderTypeLabel = item.orderType === "limit" ? "Limit" : "Market";
+    return { 
+      type: orderTypeLabel, 
+      color: item.side === "buy" ? "text-positive" : "text-negative" 
+    };
   };
 
-  const getActivityBadge = (item: MarketActivity) => {
+  const getSideLabel = (item: MarketActivity) => {
     if (item.activityType === "trade") {
-      return <Badge variant="default">Trade</Badge>;
+      return null; // No side label for trades
     }
-    if (item.activityType === "order_placed") {
+    return item.side === "buy" ? "Buy" : "Sell";
+  };
+
+  const getUsername = (item: MarketActivity) => {
+    if (item.activityType === "trade") {
       return (
-        <Badge variant="outline" className={item.side === "buy" ? "text-positive" : "text-negative"}>
-          {item.side} {item.orderType}
-        </Badge>
+        <span className="text-xs">
+          <span className="text-positive">{item.buyerUsername}</span>
+          <span className="text-muted-foreground mx-1">←</span>
+          <span className="text-negative">{item.sellerUsername}</span>
+        </span>
       );
     }
-    if (item.activityType === "order_cancelled") {
-      return <Badge variant="outline">Cancelled</Badge>;
-    }
+    return <span className="text-xs">{item.username || "Unknown"}</span>;
   };
 
   if (isLoading) {
@@ -569,49 +580,82 @@ function MarketActivityFeed() {
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between space-y-0">
-        <CardTitle>Real-Time Market Activity</CardTitle>
-        <Clock className="w-5 h-5 text-muted-foreground" />
+      <CardHeader className="pb-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <CardTitle>Market Activity</CardTitle>
+            <Clock className="w-4 h-4 text-muted-foreground" />
+          </div>
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Filter by player..."
+              value={playerFilter}
+              onChange={(e) => setPlayerFilter(e.target.value)}
+              className="pl-8 h-9"
+              data-testid="input-filter-activity-player"
+            />
+          </div>
+        </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         {activity.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
-            No market activity yet
+            {debouncedPlayerFilter ? "No activity for this player" : "No market activity yet"}
           </div>
         ) : (
-          <div className="space-y-3">
-            {activity.map((item) => (
-              <div
-                key={`${item.activityType}-${item.id}`}
-                className="flex items-start gap-4 p-4 rounded-md border hover-elevate"
-                data-testid={`activity-${item.activityType}-${item.id}`}
-              >
-                <div className="flex-shrink-0 mt-1">
-                  {getActivityIcon(item)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <div className="divide-y">
+            {activity.map((item) => {
+              const label = getActivityLabel(item);
+              const sideLabel = getSideLabel(item);
+              return (
+                <div
+                  key={`${item.activityType}-${item.id}`}
+                  className="flex items-center gap-2 px-3 py-2 hover-elevate text-sm"
+                  data-testid={`activity-${item.activityType}-${item.id}`}
+                >
+                  {/* Time */}
+                  <div className="w-16 text-xs text-muted-foreground flex-shrink-0 hidden sm:block">
+                    {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true }).replace("about ", "").replace(" ago", "")}
+                  </div>
+                  
+                  {/* Side and Order Type */}
+                  <div className="w-20 text-xs font-medium flex-shrink-0">
+                    {sideLabel && <span className={item.side === "buy" ? "text-positive" : "text-negative"}>{sideLabel} </span>}
+                    <span className={label.color}>{label.type}</span>
+                  </div>
+                  
+                  {/* Player */}
+                  <div className="flex-1 min-w-0">
                     <Link href={`/player/${item.playerId}`}>
-                      <span className="font-medium hover:underline">
+                      <span className="font-medium hover:underline truncate block">
                         {item.playerFirstName} {item.playerLastName}
                       </span>
                     </Link>
-                    <Badge variant="outline" className="text-xs">{item.playerTeam}</Badge>
-                    {getActivityBadge(item)}
                   </div>
-                  <p className="text-sm text-muted-foreground mb-1">
-                    {getActivityDescription(item)}
-                  </p>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                    <span className="font-mono">
-                      {item.price ? `$${item.price}` : item.limitPrice ? `$${item.limitPrice}` : "-"}
-                    </span>
-                    <span>{item.quantity} shares</span>
-                    <span>{formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}</span>
+                  
+                  {/* Team */}
+                  <div className="w-12 text-xs text-muted-foreground hidden md:block flex-shrink-0">
+                    {item.playerTeam}
+                  </div>
+                  
+                  {/* Price */}
+                  <div className="w-16 text-right font-mono text-xs flex-shrink-0">
+                    {item.price ? `$${item.price}` : item.limitPrice ? `$${item.limitPrice}` : "-"}
+                  </div>
+                  
+                  {/* Quantity */}
+                  <div className="w-14 text-right text-xs text-muted-foreground flex-shrink-0 hidden lg:block">
+                    {item.quantity}×
+                  </div>
+                  
+                  {/* User */}
+                  <div className="w-32 text-muted-foreground truncate hidden xl:block flex-shrink-0">
+                    {getUsername(item)}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </CardContent>

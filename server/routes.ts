@@ -725,14 +725,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Market activity feed
   app.get("/api/market/activity", async (req, res) => {
     try {
-      const { playerId, userId, limit } = req.query;
+      const { playerId, userId, playerSearch, limit } = req.query;
       
       const parsedLimit = limit ? parseInt(limit as string) : 50;
-      const safeLimit = isNaN(parsedLimit) ? 50 : Math.max(1, Math.min(parsedLimit, 100));
+      const safeLimit = isNaN(parsedLimit) ? 50 : Math.max(1, Math.min(parsedLimit, 200));
       
       const activity = await storage.getMarketActivity({
         playerId: playerId as string,
         userId: userId as string,
+        playerSearch: playerSearch as string,
         limit: safeLimit,
       });
       
