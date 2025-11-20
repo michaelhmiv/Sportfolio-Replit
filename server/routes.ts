@@ -719,6 +719,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }))
         : [];
 
+      // Calculate available balance (excluding locked cash for buy orders)
+      const availableBalance = await storage.getAvailableBalance(user.id);
+
       res.json({
         player,
         priceHistory,
@@ -739,7 +742,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             seller: await storage.getUser(trade.sellerId),
           }))
         ),
-        userBalance: user.balance,
+        userBalance: availableBalance.toFixed(2),
         userHolding,
       });
     } catch (error: any) {
