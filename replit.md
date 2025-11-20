@@ -76,9 +76,39 @@ The contest entry page displays games scheduled for the contest date in a collap
 - Visual feedback when filter is active (button style changes, shows team count)
 
 ### Background Jobs
-**Development Environment:** Background jobs run automatically via Node.js `node-cron` scheduler for tasks like `roster_sync`, `schedule_sync`, `stats_sync`, `stats_sync_live`, `settle_contests`, and `create_contests`.
+**Development Environment:** Background jobs run automatically via Node.js `node-cron` scheduler for tasks like `roster_sync`, `schedule_sync`, `stats_sync`, `stats_sync_live`, `update_contest_statuses`, `settle_contests`, and `create_contests`.
 
 **Production Environment:** Production uses an external cron service (cron-job.org) to trigger jobs via secure admin API endpoints at `/api/admin/jobs/trigger` and `/api/admin/stats`, protected by `ADMIN_API_TOKEN`. A web UI at `/admin` (accessible from the profile page) allows for manual job control and system monitoring.
+
+**Contest Lifecycle & Settlement System:**
+Contests automatically progress through a three-stage lifecycle managed by background jobs:
+
+1. **Contest Creation** (`create_contests` - runs daily at midnight UTC):
+   - Creates new 50/50 contests for games scheduled in the next 7 days
+   - Sets `status="open"`, `startsAt` (earliest game time), and `endsAt` (23:59:59 ET on game day)
+   - Prevents duplicate contests for the same date
+
+2. **Status Transition** (`update_contest_statuses` - runs every minute):
+   - Monitors all "open" contests and transitions them to "live" when `startsAt` is reached
+   - **Critical**: Contests must be "live" before they can be settled
+   - Comprehensive logging shows status changes and timing
+
+3. **Contest Settlement** (`settle_contests` - runs every 5 minutes):
+   - Only processes contests with `status="live"`
+   - **Dual Settlement Criteria** (both must be satisfied):
+     a. Current time has passed contest `endsAt` (23:59:59 ET)
+     b. **All games for the contest date have `status="completed"`** (verified via MySportsFeeds sync)
+   - Settlement process:
+     - Fetches all games for contest date using `getDailyGames()`
+     - Validates every game has finished (status="completed")
+     - Calculates proportional fantasy scores based on player share ownership
+     - Ranks entries, determines winners (top 50% for 50/50 contests)
+     - Distributes prize pool equally among winners
+     - Updates user balances atomically
+     - Marks contest as `status="completed"`
+   - **Robust Logging**: Shows why contests aren't settling (incomplete games, timing, etc.)
+
+This system ensures contests only settle when all games are truly final, preventing premature payouts while games are still in progress or postponed.
 
 ## External Dependencies
 
