@@ -150,6 +150,13 @@ This system ensures contests only settle when all games are truly final, prevent
 - All sensitive data (OAuth codes, state params, tokens) automatically redacted; user IDs truncated to first 8 chars.
 - Complete troubleshooting guide available in `AUTH_DEBUG.md`.
 
+**Production Deployment Configuration (CRITICAL):**
+To ensure authentication works correctly in production deployments, you MUST set `NODE_ENV=production` in Replit Secrets:
+1. Open the Secrets tool in your Repl
+2. Add a new secret with Key: `NODE_ENV` and Value: `production`
+3. Redeploy your application
+This disables the development authentication bypass and enables proper OAuth flow with secure cookies. Without this setting, users will experience the "window closes immediately" issue after clicking Allow on the OAuth screen.
+
 **Public Access:**
 - Contests and Leaderboards are publicly viewable without authentication.
 - Authentication is only required to enter contests, trade shares, or mine players.
