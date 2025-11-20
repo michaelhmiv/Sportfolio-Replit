@@ -57,10 +57,15 @@ export default function ContestEntry() {
   // Get contest data to access gameDate
   const contestData = isEditMode ? existingEntry?.contest : data?.contest;
   
+  // Extract just the date portion (YYYY-MM-DD) from gameDate
+  const formattedGameDate = contestData?.gameDate 
+    ? format(new Date(contestData.gameDate), "yyyy-MM-dd")
+    : undefined;
+  
   // Fetch games for the contest date
   const { data: gamesData } = useQuery<DailyGame[]>({
-    queryKey: ["/api/games/date", contestData?.gameDate],
-    enabled: !!contestData?.gameDate,
+    queryKey: ["/api/games/date", formattedGameDate],
+    enabled: !!formattedGameDate,
     select: (games) => games || [],
   });
 
