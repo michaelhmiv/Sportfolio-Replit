@@ -57,8 +57,8 @@ export async function syncPlayerGameLogs(): Promise<JobResult> {
           return await fetchPlayerGameLogs(player.id, 100); // Fetch up to 100 games
         });
         
-        // Wait 5 seconds between every player request (3am run - prioritize avoiding rate limits)
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // Wait 10 seconds between every player request (backfill - prioritize avoiding rate limits)
+        await new Promise(resolve => setTimeout(resolve, 10000));
 
         if (!gameLogs || gameLogs.length === 0) {
           console.log(`[sync_player_game_logs] No game logs for player ${player.firstName} ${player.lastName}`);
