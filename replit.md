@@ -16,6 +16,8 @@ The frontend uses React, TypeScript, Vite, Wouter for routing, and TanStack Quer
 A centralized cache invalidation utility (`client/src/lib/cache-invalidation.ts`) ensures instant synchronization of portfolio data across all pages.
 A centralized WebSocket provider (`client/src/lib/websocket.tsx`) manages a single WebSocket connection for real-time updates across the application, with automatic reconnection and event broadcasting.
 
+A notification system (`client/src/lib/notification-context.tsx`) tracks unread activity with badge notifications on the Portfolio tab. Notifications appear for background events (trade executions when limit orders match, contest settlements/payouts) but not for user-initiated actions (placing orders, mining claims, entering contests). The unread count is persisted in localStorage and clears when viewing the Activity tab.
+
 ### Backend
 The backend is an Express.js server with TypeScript, supporting HTTP and WebSockets. It uses Drizzle ORM with a PostgreSQL database (Neon serverless) and Zod for validation. Core domain models include Users, Players, Holdings, Orders, Trades, Mining, Contests, and Price History. The system features atomic balance updates and precise timezone handling. API design is RESTful for data and uses WebSockets for live updates.
 
