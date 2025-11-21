@@ -30,11 +30,9 @@ export async function syncPlayerGameLogs(): Promise<JobResult> {
     for (let i = 0; i < activePlayers.length; i++) {
       const player = activePlayers[i];
       
-      // MySportsFeeds requires 5-second backoff between game log requests
-      if (i > 0 && i % 10 === 0) {
+      // Progress logging every 5 players
+      if (i > 0 && i % 5 === 0) {
         console.log(`[sync_player_game_logs] Progress: ${i}/${activePlayers.length} players synced`);
-        console.log(`[sync_player_game_logs] Waiting 5 seconds before next batch...`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
       }
       
       try {
@@ -43,6 +41,9 @@ export async function syncPlayerGameLogs(): Promise<JobResult> {
           requestCount++;
           return await fetchPlayerGameLogs(player.id, 100); // Fetch up to 100 games
         });
+        
+        // Wait 2 seconds between every player request for safer rate limiting
+        await new Promise(resolve => setTimeout(resolve, 2000));
 
         if (!gameLogs || gameLogs.length === 0) {
           console.log(`[sync_player_game_logs] No game logs for player ${player.firstName} ${player.lastName}`);

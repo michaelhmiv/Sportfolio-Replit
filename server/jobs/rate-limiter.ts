@@ -18,7 +18,7 @@ export class MySportsFeedsRateLimiter {
   private processing = false;
 
   constructor(
-    private maxRequests: number = 200,
+    private maxRequests: number = 150,
     private windowMs: number = 5 * 60 * 1000 // 5 minutes
   ) {
     this.bucket = {
@@ -85,7 +85,7 @@ export class MySportsFeedsRateLimiter {
   async executeWithRetry<T>(
     fn: () => Promise<T>,
     maxAttempts: number = 3,
-    baseDelay: number = 2000
+    baseDelay: number = 5000
   ): Promise<T> {
     let lastError: Error | undefined;
 

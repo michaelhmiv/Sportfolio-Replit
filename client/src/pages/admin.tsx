@@ -39,6 +39,7 @@ interface SystemStats {
 
 const jobDescriptions = {
   roster_sync: "Sync NBA player roster from MySportsFeeds",
+  sync_player_game_logs: "Cache all player game logs with pre-calculated fantasy points",
   schedule_sync: "Update game schedules and live scores",
   stats_sync: "Sync completed game statistics",
   create_contests: "Generate contests for upcoming games",

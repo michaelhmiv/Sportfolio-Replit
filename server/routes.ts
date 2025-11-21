@@ -2489,7 +2489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'jobName required' });
       }
       
-      const validJobs = ['roster_sync', 'schedule_sync', 'stats_sync', 'create_contests', 'settle_contests'];
+      const validJobs = ['roster_sync', 'sync_player_game_logs', 'schedule_sync', 'stats_sync', 'create_contests', 'settle_contests'];
       if (!validJobs.includes(jobName)) {
         return res.status(400).json({ error: `Invalid jobName. Must be one of: ${validJobs.join(', ')}` });
       }

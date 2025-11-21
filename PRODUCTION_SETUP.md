@@ -15,6 +15,7 @@ Your Sportfolio app requires these automated jobs:
 3. **schedule_sync** - Updates game schedules and live scores
 4. **stats_sync** - Syncs completed game statistics
 5. **roster_sync** - Updates NBA player roster
+6. **sync_player_game_logs** - Caches player game logs with pre-calculated fantasy points (reduces API calls by ~95%)
 
 ## Setup Instructions
 
@@ -118,6 +119,26 @@ For each job below, create a new cron job in cron-job.org:
 - **Headers:**
   - Name: `Content-Type`, Value: `application/json`
   - Name: `Authorization`, Value: `Bearer YOUR_ADMIN_API_TOKEN`
+
+#### Job 6: Player Game Logs Sync (Daily at 6 AM ET)
+
+- **Title:** Sportfolio - Sync Player Game Logs
+- **URL:** `https://your-repl-name.replit.app/api/admin/jobs/trigger`
+- **Schedule:** Daily at 06:00 AM Eastern Time (11:00 UTC during DST, 10:00 UTC otherwise)
+  - Use cron expression: `0 10 * * *` (adjust for your timezone)
+- **Request Method:** POST
+- **Request Body:**
+  ```json
+  {"jobName": "sync_player_game_logs"}
+  ```
+- **Headers:**
+  - Name: `Content-Type`, Value: `application/json`
+  - Name: `Authorization`, Value: `Bearer YOUR_ADMIN_API_TOKEN`
+- **Notes:**
+  - This job caches all player game logs with pre-calculated fantasy points
+  - Reduces MySportsFeeds API calls by ~95%
+  - First run will backfill entire season (~15 minutes)
+  - Uses conservative rate limiting (150 req/5min, 2s delay between players)
 
 ### Step 5: Test Your Setup
 
