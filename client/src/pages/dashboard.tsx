@@ -981,9 +981,9 @@ function PlayerCard({
   isPending: boolean;
   isSelected?: boolean;
 }) {
+  // Always load stats (not conditional on expansion)
   const { data: statsData, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/player", player.id, "stats"],
-    enabled: isExpanded,
   });
 
   const { data: recentGamesData, isLoading: gamesLoading } = useQuery<any>({
@@ -1016,17 +1016,19 @@ function PlayerCard({
                 </div>
               </div>
               
-              {/* Season Averages */}
+              {/* Season Averages - Always Visible */}
               {stats && !statsLoading ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] sm:text-xs text-muted-foreground mt-2">
                   <span className="font-mono"><span className="font-bold">{stats.pointsPerGame || "0.0"}</span> PPG</span>
                   <span className="font-mono"><span className="font-bold">{stats.reboundsPerGame || "0.0"}</span> RPG</span>
                   <span className="font-mono"><span className="font-bold">{stats.assistsPerGame || "0.0"}</span> APG</span>
                   <span className="text-muted-foreground/60">·</span>
                   <span>{stats.gamesPlayed || 0} GP</span>
+                  <span className="text-muted-foreground/60">·</span>
+                  <span className="font-mono"><span className="font-bold">{stats.avgFantasyPointsPerGame || "0.0"}</span> FPG</span>
                 </div>
-              ) : isExpanded && statsLoading ? (
-                <div className="text-xs text-muted-foreground mt-2">Loading stats...</div>
+              ) : statsLoading ? (
+                <div className="text-[10px] sm:text-xs text-muted-foreground mt-2">Loading stats...</div>
               ) : null}
             </div>
 
