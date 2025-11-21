@@ -145,6 +145,20 @@ export interface IStorage {
   getPlayerGameStats(playerId: string, gameId: string): Promise<PlayerGameStats | undefined>;
   getAllPlayerGameStats(playerId: string): Promise<PlayerGameStats[]>;
   getGameStatsByGameId(gameId: string): Promise<PlayerGameStats[]>;
+  getPlayerSeasonStatsFromLogs(playerId: string): Promise<{
+    gamesPlayed: number;
+    avgFantasyPointsPerGame: string;
+    pointsPerGame: string;
+    reboundsPerGame: string;
+    assistsPerGame: string;
+    fieldGoalPct: string;
+    threePointPct: string;
+    freeThrowPct: string;
+    steals: number;
+    blocks: number;
+    minutesPerGame: string;
+  } | null>;
+  getPlayerRecentGamesFromLogs(playerId: string, limit: number): Promise<any[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1662,6 +1676,116 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(playerGameStats)
       .where(eq(playerGameStats.gameId, gameId));
+  }
+
+  async getPlayerSeasonStatsFromLogs(playerId: string): Promise<{
+    gamesPlayed: number;
+    avgFantasyPointsPerGame: string;
+    pointsPerGame: string;
+    reboundsPerGame: string;
+    assistsPerGame: string;
+    fieldGoalPct: string;
+    threePointPct: string;
+    freeThrowPct: string;
+    steals: number;
+    blocks: number;
+    minutesPerGame: string;
+  } | null> {
+    const gameLogs = await db
+      .select()
+      .from(playerGameStats)
+      .where(eq(playerGameStats.playerId, playerId))
+      .orderBy(desc(playerGameStats.gameDate));
+
+    if (gameLogs.length === 0) {
+      return null;
+    }
+
+    const gamesPlayed = gameLogs.length;
+    
+    // Sum all stats
+    let totalFantasyPoints = 0;
+    let totalPoints = 0;
+    let totalRebounds = 0;
+    let totalAssists = 0;
+    let totalSteals = 0;
+    let totalBlocks = 0;
+    let totalMinutes = 0;
+    let totalFieldGoalsMade = 0;
+    let totalFieldGoalsAttempted = 0;
+    let totalThreePointersMade = 0;
+    let totalThreePointersAttempted = 0;
+    let totalFreeThrowsMade = 0;
+    let totalFreeThrowsAttempted = 0;
+
+    for (const log of gameLogs) {
+      totalFantasyPoints += parseFloat(log.fantasyPoints);
+      totalPoints += log.points;
+      totalRebounds += log.rebounds;
+      totalAssists += log.assists;
+      totalSteals += log.steals;
+      totalBlocks += log.blocks;
+      totalMinutes += log.minutes;
+      totalFieldGoalsMade += log.fieldGoalsMade || 0;
+      totalFieldGoalsAttempted += log.fieldGoalsAttempted || 0;
+      totalThreePointersMade += log.threePointersMade || 0;
+      totalThreePointersAttempted += log.threePointersAttempted || 0;
+      totalFreeThrowsMade += log.freeThrowsMade || 0;
+      totalFreeThrowsAttempted += log.freeThrowsAttempted || 0;
+    }
+
+    const fieldGoalPct = totalFieldGoalsAttempted > 0 
+      ? ((totalFieldGoalsMade / totalFieldGoalsAttempted) * 100).toFixed(1)
+      : "0.0";
+    const threePointPct = totalThreePointersAttempted > 0
+      ? ((totalThreePointersMade / totalThreePointersAttempted) * 100).toFixed(1)
+      : "0.0";
+    const freeThrowPct = totalFreeThrowsAttempted > 0
+      ? ((totalFreeThrowsMade / totalFreeThrowsAttempted) * 100).toFixed(1)
+      : "0.0";
+
+    return {
+      gamesPlayed,
+      avgFantasyPointsPerGame: (totalFantasyPoints / gamesPlayed).toFixed(2),
+      pointsPerGame: (totalPoints / gamesPlayed).toFixed(1),
+      reboundsPerGame: (totalRebounds / gamesPlayed).toFixed(1),
+      assistsPerGame: (totalAssists / gamesPlayed).toFixed(1),
+      fieldGoalPct,
+      threePointPct,
+      freeThrowPct,
+      steals: totalSteals,
+      blocks: totalBlocks,
+      minutesPerGame: (totalMinutes / gamesPlayed).toFixed(1),
+    };
+  }
+
+  async getPlayerRecentGamesFromLogs(playerId: string, limit: number = 10): Promise<any[]> {
+    const gameLogs = await db
+      .select()
+      .from(playerGameStats)
+      .where(eq(playerGameStats.playerId, playerId))
+      .orderBy(desc(playerGameStats.gameDate))
+      .limit(limit);
+
+    return gameLogs.map(log => ({
+      game: {
+        id: parseInt(log.gameId),
+        date: log.gameDate.toISOString(),
+        opponent: log.opponentTeam || "UNK",
+        isHome: log.homeAway === "home",
+      },
+      stats: {
+        points: log.points,
+        rebounds: log.rebounds,
+        assists: log.assists,
+        steals: log.steals,
+        blocks: log.blocks,
+        turnovers: log.turnovers,
+        threePointersMade: log.threePointersMade,
+        minutes: log.minutes,
+        fantasyPoints: parseFloat(log.fantasyPoints),
+      },
+    }));
   }
 }
 

@@ -231,7 +231,12 @@ export const playerGameStats = pgTable("player_game_stats", {
   homeAway: text("home_away"), // "home" or "away"
   minutes: integer("minutes").notNull().default(0), // Minutes played
   points: integer("points").notNull().default(0),
+  fieldGoalsMade: integer("field_goals_made").notNull().default(0),
+  fieldGoalsAttempted: integer("field_goals_attempted").notNull().default(0),
   threePointersMade: integer("three_pointers_made").notNull().default(0),
+  threePointersAttempted: integer("three_pointers_attempted").notNull().default(0),
+  freeThrowsMade: integer("free_throws_made").notNull().default(0),
+  freeThrowsAttempted: integer("free_throws_attempted").notNull().default(0),
   rebounds: integer("rebounds").notNull().default(0),
   assists: integer("assists").notNull().default(0),
   steals: integer("steals").notNull().default(0),
