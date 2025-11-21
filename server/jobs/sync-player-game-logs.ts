@@ -19,6 +19,7 @@ export async function syncPlayerGameLogs(): Promise<JobResult> {
   let requestCount = 0;
   let recordsProcessed = 0;
   let errorCount = 0;
+  let skippedPlayers = 0;
 
   try {
     // Get all active players
@@ -30,12 +31,25 @@ export async function syncPlayerGameLogs(): Promise<JobResult> {
     for (let i = 0; i < activePlayers.length; i++) {
       const player = activePlayers[i];
       
-      // Progress logging every 5 players
-      if (i > 0 && i % 5 === 0) {
-        console.log(`[sync_player_game_logs] Progress: ${i}/${activePlayers.length} players synced`);
+      // Progress logging every 10 players
+      if (i > 0 && i % 10 === 0) {
+        console.log(`[sync_player_game_logs] Progress: ${i}/${activePlayers.length} players processed (${skippedPlayers} skipped, ${requestCount} API calls)`);
       }
       
       try {
+        // RESUMABLE: Check if player already has cached data for this season
+        const existingGames = await storage.getAllPlayerGameStats(player.id);
+        const seasonGames = existingGames.filter(g => g.season === SEASON);
+        if (seasonGames.length > 0) {
+          skippedPlayers++;
+          if (i < 10 || i % 25 === 0) {
+            console.log(`[sync_player_game_logs] Skipping ${player.firstName} ${player.lastName} - already has ${seasonGames.length} cached games`);
+          }
+          continue;
+        }
+        
+        console.log(`[sync_player_game_logs] Fetching data for ${player.firstName} ${player.lastName} (${i + 1}/${activePlayers.length})`);
+        
         // Fetch all game logs for this player (no limit)
         const gameLogs = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
           requestCount++;
@@ -126,7 +140,9 @@ export async function syncPlayerGameLogs(): Promise<JobResult> {
       }
     }
 
-    console.log(`[sync_player_game_logs] Completed: ${recordsProcessed} game logs synced from ${activePlayers.length} players`);
+    const newPlayersSynced = activePlayers.length - skippedPlayers;
+    console.log(`[sync_player_game_logs] Completed: ${recordsProcessed} game logs synced`);
+    console.log(`[sync_player_game_logs] Players: ${newPlayersSynced} newly synced, ${skippedPlayers} already cached (${activePlayers.length} total)`);
     console.log(`[sync_player_game_logs] API requests: ${requestCount}, Errors: ${errorCount}`);
     
     return { requestCount, recordsProcessed, errorCount };
