@@ -3,6 +3,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -18,6 +20,7 @@ import {
   XCircle,
   Clock,
   Play,
+  Download,
 } from "lucide-react";
 
 interface SystemStats {
@@ -49,6 +52,9 @@ const jobDescriptions = {
 export default function Admin() {
   const { toast } = useToast();
   const [runningJobs, setRunningJobs] = useState<Set<string>>(new Set());
+  const [backfillStartDate, setBackfillStartDate] = useState("2025-11-17");
+  const [backfillEndDate, setBackfillEndDate] = useState("2025-11-21");
+  const [isBackfilling, setIsBackfilling] = useState(false);
 
   const { data: stats, isLoading } = useQuery<SystemStats>({
     queryKey: ["/api/admin/stats"],
@@ -88,6 +94,45 @@ export default function Admin() {
 
   const handleTriggerJob = (jobName: string) => {
     triggerJobMutation.mutate(jobName);
+  };
+
+  const backfillMutation = useMutation({
+    mutationFn: async ({ startDate, endDate }: { startDate: string; endDate: string }) => {
+      const res = await apiRequest("POST", "/api/admin/backfill", { startDate, endDate });
+      return await res.json();
+    },
+    onMutate: () => {
+      setIsBackfilling(true);
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({
+        title: "Backfill completed",
+        description: `${data.result.recordsProcessed} game logs cached, ${data.result.errorCount} errors, ${data.result.requestCount} API requests`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Backfill failed",
+        description: error.message || "Failed to run backfill",
+        variant: "destructive",
+      });
+    },
+    onSettled: () => {
+      setIsBackfilling(false);
+    },
+  });
+
+  const handleBackfill = () => {
+    if (!backfillStartDate || !backfillEndDate) {
+      toast({
+        title: "Invalid dates",
+        description: "Please select both start and end dates",
+        variant: "destructive",
+      });
+      return;
+    }
+    backfillMutation.mutate({ startDate: backfillStartDate, endDate: backfillEndDate });
   };
 
   if (isLoading) {
@@ -182,6 +227,68 @@ export default function Admin() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Backfill Controls */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Download className="w-5 h-5" />
+              Game Logs Backfill
+            </CardTitle>
+            <CardDescription>
+              Manually backfill game logs for a specific date range. The daily cron job only fetches yesterday's games. Use this for initial setup or catching up after downtime.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="backfill-start-date">Start Date</Label>
+                  <Input
+                    id="backfill-start-date"
+                    type="date"
+                    value={backfillStartDate}
+                    onChange={(e) => setBackfillStartDate(e.target.value)}
+                    disabled={isBackfilling}
+                    data-testid="input-backfill-start-date"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="backfill-end-date">End Date</Label>
+                  <Input
+                    id="backfill-end-date"
+                    type="date"
+                    value={backfillEndDate}
+                    onChange={(e) => setBackfillEndDate(e.target.value)}
+                    disabled={isBackfilling}
+                    data-testid="input-backfill-end-date"
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={handleBackfill}
+                disabled={isBackfilling}
+                className="gap-2"
+                data-testid="button-run-backfill"
+              >
+                {isBackfilling ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Running Backfill...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    Run Backfill
+                  </>
+                )}
+              </Button>
+              <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                <strong>Note:</strong> Backfilling is slow (~5-10 minutes for full season). Each date requires a 5-second API call. The daily cron job completes in ~5 seconds since it only fetches yesterday.
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Job Controls */}
         <Card>
