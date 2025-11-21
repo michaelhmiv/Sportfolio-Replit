@@ -11,7 +11,8 @@ import { fetchPlayerGameLogs, calculateFantasyPoints } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
 
-const SEASON = "2024-2025-regular";
+// Use the current NBA season (MySportsFeeds API uses "latest" which auto-resolves to current season)
+const SEASON = "2025-2026-regular";
 
 export async function syncPlayerGameLogs(): Promise<JobResult> {
   console.log("[sync_player_game_logs] Starting player game logs sync...");
