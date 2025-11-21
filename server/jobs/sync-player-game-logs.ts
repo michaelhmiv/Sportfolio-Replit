@@ -22,8 +22,20 @@ import { fetchDailyPlayerGameLogs, calculateFantasyPoints } from "../mysportsfee
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
 
-// Use the current NBA season
-const SEASON = "2025-2026-regular";
+/**
+ * Get current NBA season using same logic as mysportsfeeds.ts
+ * July handoff: Jul-Dec uses current year, Jan-Jun uses previous year
+ */
+function getCurrentSeason(): string {
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const seasonStartYear = currentMonth >= 6 ? currentYear : currentYear - 1;
+  const seasonEndYear = seasonStartYear + 1;
+  return `${seasonStartYear}-${seasonEndYear}-regular`;
+}
+
+const SEASON = getCurrentSeason(); // Dynamically resolves to current competitive season
 
 export async function syncPlayerGameLogs(): Promise<JobResult> {
   console.log("[sync_player_game_logs] Starting date-based game logs sync...");
@@ -65,6 +77,7 @@ export async function syncPlayerGameLogs(): Promise<JobResult> {
         console.log(`[sync_player_game_logs] Fetching games for date ${dateStr} (${datesProcessed}/${totalDays})`);
         
         // Fetch ALL players' games for this date using Daily endpoint (5-second backoff)
+        // Note: Upsert handles duplicates efficiently, so no resume logic needed
         const dayGameLogs = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
           requestCount++;
           return await fetchDailyPlayerGameLogs(currentDate);

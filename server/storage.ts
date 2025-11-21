@@ -45,7 +45,7 @@ import {
   type InsertPlayerGameStats,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql, inArray, or } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, or, gte, lte } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "crypto";
 
@@ -179,6 +179,7 @@ export interface IStorage {
   getPlayerGameStats(playerId: string, gameId: string): Promise<PlayerGameStats | undefined>;
   getAllPlayerGameStats(playerId: string): Promise<PlayerGameStats[]>;
   getGameStatsByGameId(gameId: string): Promise<PlayerGameStats[]>;
+  getGameLogsCountForDate(dateStr: string, season: string): Promise<number>;
   getPlayerSeasonStatsFromLogs(playerId: string): Promise<{
     gamesPlayed: number;
     avgFantasyPointsPerGame: string;
@@ -1710,6 +1711,26 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(playerGameStats)
       .where(eq(playerGameStats.gameId, gameId));
+  }
+
+  async getGameLogsCountForDate(dateStr: string, season: string): Promise<number> {
+    // Count how many game logs exist for a specific date and season
+    const startOfDay = new Date(dateStr);
+    const endOfDay = new Date(dateStr);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    const result = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(playerGameStats)
+      .where(
+        and(
+          eq(playerGameStats.season, season),
+          gte(playerGameStats.gameDate, startOfDay),
+          lte(playerGameStats.gameDate, endOfDay)
+        )
+      );
+    
+    return result[0]?.count || 0;
   }
 
   async getPlayerSeasonStatsFromLogs(playerId: string): Promise<{

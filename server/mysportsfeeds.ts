@@ -1,7 +1,38 @@
 import axios from "axios";
 
 const API_BASE = "https://api.mysportsfeeds.com/v2.1/pull/nba";
-const SEASON = "latest"; // Automatically uses current season (2024-2025 or 2025-2026)
+
+/**
+ * Get current NBA season for MySportsFeeds API calls
+ * Uses July handoff logic to handle NBA calendar transitions
+ * 
+ * NBA Calendar:
+ * - July-September: Offseason (prepare for upcoming season)
+ * - October: Preseason begins (new season)
+ * - October-April: Regular season 
+ * - April-June: Playoffs
+ * 
+ * Season resolution:
+ * - July-December (months 6-11): Use current year as season start (e.g., Nov 2025 → "2025-2026-regular")
+ * - January-June (months 0-5): Use previous year as season start (e.g., Feb 2025 → "2024-2025-regular")
+ * 
+ * @returns Current competitive season string (e.g., "2025-2026-regular")
+ */
+function getCurrentSeason(): string {
+  const now = new Date();
+  const currentMonth = now.getMonth(); // 0-11 (0=Jan, 6=Jul, 9=Oct)
+  const currentYear = now.getFullYear();
+  
+  // July handoff: Jul-Dec uses current year, Jan-Jun uses previous year
+  const seasonStartYear = currentMonth >= 6 ? currentYear : currentYear - 1;
+  const seasonEndYear = seasonStartYear + 1;
+  
+  // Always use regular season for roster/stats queries
+  // Playoffs have same roster, so regular season data is sufficient
+  return `${seasonStartYear}-${seasonEndYear}-regular`;
+}
+
+const SEASON = getCurrentSeason(); // Dynamically set to current competitive season
 
 if (!process.env.MYSPORTSFEEDS_API_KEY) {
   console.warn("MYSPORTSFEEDS_API_KEY not set. Using mock data.");
