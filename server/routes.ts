@@ -910,6 +910,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Batch fetch fantasy points per game for multiple players
+  app.get("/api/players/fantasy-points", async (req, res) => {
+    try {
+      const { ids } = req.query;
+      
+      if (!ids || typeof ids !== 'string') {
+        return res.status(400).json({ error: "ids parameter required" });
+      }
+
+      const playerIds = ids.split(',').filter(id => id.trim());
+      
+      if (playerIds.length === 0) {
+        return res.json({});
+      }
+
+      // Fetch FPG for each player in parallel
+      const fpgResults = await Promise.all(
+        playerIds.map(async (playerId) => {
+          try {
+            const player = await storage.getPlayer(playerId);
+            if (!player) return { playerId, fpg: null };
+
+            // Fetch game logs for this season to calculate FPG
+            const gameLogs = await fetchPlayerGameLogs(playerId, 100);
+            
+            if (!gameLogs || gameLogs.length === 0) {
+              return { playerId, fpg: 0 };
+            }
+
+            let totalFantasyPoints = 0;
+            let gamesWithStats = 0;
+            
+            for (const log of gameLogs) {
+              if (log && log.stats) {
+                const logStats = log.stats || {};
+                const offense = logStats.offense || {};
+                const rebounds = logStats.rebounds || {};
+                const fieldGoals = logStats.fieldGoals || {};
+                const defense = logStats.defense || {};
+                
+                const fantasyPoints = calculateFantasyPoints({
+                  points: offense.pts || 0,
+                  threePointersMade: fieldGoals.fg3PtMade || 0,
+                  rebounds: rebounds.reb || 0,
+                  assists: offense.ast || 0,
+                  steals: defense.stl || 0,
+                  blocks: defense.blk || 0,
+                  turnovers: offense.tov || 0,
+                });
+                
+                totalFantasyPoints += fantasyPoints;
+                gamesWithStats++;
+              }
+            }
+            
+            const fpg = gamesWithStats > 0 ? totalFantasyPoints / gamesWithStats : 0;
+            return { playerId, fpg: parseFloat(fpg.toFixed(1)) };
+          } catch (error: any) {
+            console.error(`[API] Error calculating FPG for player ${playerId}:`, error.message);
+            return { playerId, fpg: 0 };
+          }
+        })
+      );
+
+      // Convert array to object for easier lookup
+      const fpgMap: Record<string, number> = {};
+      fpgResults.forEach(result => {
+        if (result.fpg !== null) {
+          fpgMap[result.playerId] = result.fpg;
+        }
+      });
+
+      res.json(fpgMap);
+    } catch (error: any) {
+      console.error("[API] Error fetching batch fantasy points:", error.message);
+      res.status(500).json({ error: "Failed to fetch fantasy points" });
+    }
+  });
+
   // Player recent games (last 10 games)
   app.get("/api/player/:id/recent-games", async (req, res) => {
     try {

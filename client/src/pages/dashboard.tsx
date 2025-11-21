@@ -81,7 +81,7 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
-  const [sortBy, setSortBy] = useState<'ppg' | 'fpg' | 'value'>('ppg');
+  const [sortBy, setSortBy] = useState<'fpg' | 'value'>('fpg');
   
   // Debounce search input (250ms delay)
   useEffect(() => {
@@ -198,83 +198,49 @@ export default function Dashboard() {
   // Filter only for mining eligibility (server-side handles search and team filter)
   const filteredPlayers = playersData?.filter(p => p.isEligibleForMining) || [];
 
-  // Store stats for all players to enable sorting
-  const [playerStats, setPlayerStats] = useState<Map<string, any>>(new Map());
-  const [statsLoading, setStatsLoading] = useState(false);
+  // Store FPG (Fantasy Points per Game) for sorting
+  const [playerFPG, setPlayerFPG] = useState<Map<string, number>>(new Map());
+  const [fpgLoading, setFpgLoading] = useState(false);
 
-  // Track which players we need to fetch stats for based on actual IDs
-  // This dependency ensures we re-fetch when the player composition changes
-  const playerIds = filteredPlayers.map(p => p.id).sort().join(',');
-
-  // Fetch stats for all filtered players - incrementally loads missing stats
-  // Note: We intentionally don't include filteredPlayers or playerStats in deps
-  // - playerIds already captures all composition changes (what matters for fetching)
-  // - playerStats in deps would cause infinite loop (we update it here)
-  // - filteredPlayers is stable within each effect run via closure
+  // Fetch FPG for all players when modal opens
   useEffect(() => {
     if (!showPlayerSelection || filteredPlayers.length === 0) return;
 
-    // Only fetch stats for players we don't have yet
-    const playersNeedingStats = filteredPlayers.filter(p => !playerStats.has(p.id));
-    
-    if (playersNeedingStats.length === 0) {
-      // All visible players already have stats
-      return;
-    }
-
-    const fetchAllStats = async () => {
-      setStatsLoading(true);
+    const fetchFPG = async () => {
+      setFpgLoading(true);
       try {
-        const statsMap = new Map(playerStats); // Preserve existing stats
+        const ids = filteredPlayers.map(p => p.id).join(',');
+        const response = await fetch(`/api/players/fantasy-points?ids=${ids}`);
+        const data = await response.json();
         
-        // Batch fetch in chunks of 20 to avoid overwhelming the API
-        const chunkSize = 20;
-        for (let i = 0; i < playersNeedingStats.length; i += chunkSize) {
-          const chunk = playersNeedingStats.slice(i, i + chunkSize);
-          await Promise.all(
-            chunk.map(async (player) => {
-              try {
-                const response = await fetch(`/api/player/${player.id}/stats`);
-                const data = await response.json();
-                if (data?.stats) {
-                  statsMap.set(player.id, data.stats);
-                }
-              } catch (error) {
-                console.error(`Failed to fetch stats for player ${player.id}:`, error);
-              }
-            })
-          );
-        }
+        // Convert object to Map
+        const fpgMap = new Map<string, number>();
+        Object.keys(data).forEach(playerId => {
+          fpgMap.set(playerId, data[playerId]);
+        });
         
-        setPlayerStats(statsMap);
+        setPlayerFPG(fpgMap);
+      } catch (error) {
+        console.error('Failed to fetch FPG data:', error);
       } finally {
-        setStatsLoading(false);
+        setFpgLoading(false);
       }
     };
 
-    fetchAllStats();
-  }, [showPlayerSelection, playerIds]);
+    fetchFPG();
+  }, [showPlayerSelection, filteredPlayers.length]);
 
   // Sort players based on selected criteria
   const sortedPlayers = [...filteredPlayers].sort((a, b) => {
     if (sortBy === 'value') {
-      // Sort by market value (lastTradePrice) - always available
+      // Sort by market value (lastTradePrice)
       const aPrice = parseFloat(a.lastTradePrice || '0');
       const bPrice = parseFloat(b.lastTradePrice || '0');
       if (bPrice !== aPrice) return bPrice - aPrice; // Descending
-    } else if (sortBy === 'ppg') {
-      // Sort by points per game - requires stats
-      const aStats = playerStats.get(a.id);
-      const bStats = playerStats.get(b.id);
-      const aPPG = parseFloat(aStats?.pointsPerGame || '0');
-      const bPPG = parseFloat(bStats?.pointsPerGame || '0');
-      if (bPPG !== aPPG) return bPPG - aPPG; // Descending
     } else if (sortBy === 'fpg') {
-      // Sort by fantasy points per game - requires stats
-      const aStats = playerStats.get(a.id);
-      const bStats = playerStats.get(b.id);
-      const aFPG = parseFloat(aStats?.avgFantasyPointsPerGame || '0');
-      const bFPG = parseFloat(bStats?.avgFantasyPointsPerGame || '0');
+      // Sort by fantasy points per game
+      const aFPG = playerFPG.get(a.id) || 0;
+      const bFPG = playerFPG.get(b.id) || 0;
       if (bFPG !== aFPG) return bFPG - aFPG; // Descending
     }
     // Fallback: alphabetical by last name for stable ordering
@@ -976,19 +942,11 @@ export default function Dashboard() {
               <div className="flex gap-1.5">
                 <Button
                   size="sm"
-                  variant={sortBy === 'ppg' ? 'default' : 'outline'}
-                  onClick={() => setSortBy('ppg')}
-                  className="text-xs"
-                  data-testid="button-sort-ppg"
-                >
-                  PPG
-                </Button>
-                <Button
-                  size="sm"
                   variant={sortBy === 'fpg' ? 'default' : 'outline'}
                   onClick={() => setSortBy('fpg')}
                   className="text-xs"
                   data-testid="button-sort-fpg"
+                  disabled={fpgLoading}
                 >
                   Fantasy Pts
                 </Button>
@@ -1002,8 +960,8 @@ export default function Dashboard() {
                   Market Value
                 </Button>
               </div>
-              {statsLoading && (
-                <span className="text-xs text-muted-foreground ml-2">Loading stats...</span>
+              {fpgLoading && (
+                <span className="text-xs text-muted-foreground ml-2">Loading...</span>
               )}
             </div>
           </div>
@@ -1036,6 +994,7 @@ export default function Dashboard() {
                   <PlayerCard
                     key={player.id}
                     player={player}
+                    fpg={playerFPG.get(player.id)}
                     isExpanded={expandedPlayerId === player.id}
                     onToggleExpand={() => setExpandedPlayerId(
                       expandedPlayerId === player.id ? null : player.id
@@ -1109,6 +1068,7 @@ function PlayerCard({
   onSelect, 
   isPending,
   isSelected = false,
+  fpg,
 }: { 
   player: Player; 
   isExpanded: boolean; 
@@ -1116,10 +1076,12 @@ function PlayerCard({
   onSelect: () => void; 
   isPending: boolean;
   isSelected?: boolean;
+  fpg?: number;
 }) {
-  // Always load stats (not conditional on expansion)
+  // Load full stats only when expanded
   const { data: statsData, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/player", player.id, "stats"],
+    enabled: isExpanded,
   });
 
   const { data: recentGamesData, isLoading: gamesLoading } = useQuery<any>({
@@ -1145,27 +1107,19 @@ function PlayerCard({
                   <div className="font-medium truncate">{player.firstName} {player.lastName}</div>
                   <div className="text-sm text-muted-foreground">{player.team} · {player.position}</div>
                 </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="text-lg font-mono font-bold">
-                    {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-sm">No value</span>}
-                  </div>
-                </div>
               </div>
               
-              {/* Season Averages - Always Visible */}
-              {stats && !statsLoading ? (
-                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] sm:text-xs text-muted-foreground mt-2">
-                  <span className="font-mono"><span className="font-bold">{stats.pointsPerGame || "0.0"}</span> PPG</span>
-                  <span className="font-mono"><span className="font-bold">{stats.reboundsPerGame || "0.0"}</span> RPG</span>
-                  <span className="font-mono"><span className="font-bold">{stats.assistsPerGame || "0.0"}</span> APG</span>
-                  <span className="text-muted-foreground/60">·</span>
-                  <span>{stats.gamesPlayed || 0} GP</span>
-                  <span className="text-muted-foreground/60">·</span>
-                  <span className="font-mono"><span className="font-bold">{stats.avgFantasyPointsPerGame || "0.0"}</span> FPG</span>
+              {/* FPG and Market Value - Always Visible */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] sm:text-xs text-muted-foreground mt-2">
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground/70">FPG:</span>
+                  <span className="font-mono font-bold text-foreground">{fpg !== undefined ? fpg.toFixed(1) : '0.0'}</span>
                 </div>
-              ) : statsLoading ? (
-                <div className="text-[10px] sm:text-xs text-muted-foreground mt-2">Loading stats...</div>
-              ) : null}
+                <div className="flex items-center gap-1">
+                  <span className="text-muted-foreground/70">Value:</span>
+                  <span className="font-mono font-bold text-foreground">{player.lastTradePrice ? `$${player.lastTradePrice}` : '$0.00'}</span>
+                </div>
+              </div>
             </div>
 
             <div className="flex flex-col gap-2 flex-shrink-0">
@@ -1198,13 +1152,31 @@ function PlayerCard({
           <CollapsibleContent>
             {isExpanded && (
               <div className="mt-4 pt-4 border-t space-y-3">
-                {/* Full Season Stats */}
-                {stats && (
+                {/* Season Stats - Dropdown */}
+                {statsLoading ? (
+                  <div className="text-xs text-muted-foreground">Loading stats...</div>
+                ) : stats ? (
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                      Season Stats
+                      Season Averages
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-3 mb-3">
+                      <div className="text-center p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">PPG</div>
+                        <div className="font-mono font-bold">{stats.pointsPerGame || "0.0"}</div>
+                      </div>
+                      <div className="text-center p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">RPG</div>
+                        <div className="font-mono font-bold">{stats.reboundsPerGame || "0.0"}</div>
+                      </div>
+                      <div className="text-center p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">APG</div>
+                        <div className="font-mono font-bold">{stats.assistsPerGame || "0.0"}</div>
+                      </div>
+                      <div className="text-center p-2 rounded-md bg-muted/50">
+                        <div className="text-xs text-muted-foreground">GP</div>
+                        <div className="font-mono font-bold">{stats.gamesPlayed || 0}</div>
+                      </div>
                       <div className="text-center p-2 rounded-md bg-muted/50">
                         <div className="text-xs text-muted-foreground">FG%</div>
                         <div className="font-mono font-bold">{stats.fieldGoalPct || "0.0"}%</div>
@@ -1231,7 +1203,7 @@ function PlayerCard({
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
 
                 {/* Last 5 Games */}
                 {recentGames.length > 0 && (
