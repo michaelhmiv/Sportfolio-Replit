@@ -51,13 +51,35 @@ import { randomUUID } from "crypto";
 
 // Season helper: Get current competitive season patterns (regular + playoffs, exclude preseason)
 // Returns array of season strings to include in queries
+// 
+// NBA Calendar:
+// - July-September: Offseason (no games, but prepare for upcoming season)
+// - October: Preseason begins (new season, but EXCLUDED from competitive stats)
+// - October-April: Regular season (INCLUDED in competitive stats)
+// - April-June: Playoffs (INCLUDED in competitive stats, combines with regular)
 function getCurrentCompetitiveSeasons(): string[] {
-  const currentYear = new Date().getFullYear();
-  // NBA season spans two calendar years (e.g., 2025-2026)
+  const now = new Date();
+  const currentMonth = now.getMonth(); // 0-11 (0=Jan, 6=Jul, 9=Oct)
+  const currentYear = now.getFullYear();
+  
+  // Determine season start year based on NBA calendar:
+  // - July-December (months 6-11): Use current year as season start
+  // - January-June (months 0-5): Use previous year as season start
+  // 
+  // Examples:
+  // - Nov 2025 → 2025-2026 (current season in progress)
+  // - Feb 2025 → 2024-2025 (season started Oct 2024)
+  // - Jul 2025 → 2025-2026 (preparing for new season starting Oct 2025)
+  // - Jun 2025 → 2024-2025 (playoffs for season that started Oct 2024)
+  const seasonStartYear = currentMonth >= 6 ? currentYear : currentYear - 1;
+  const seasonEndYear = seasonStartYear + 1;
+  
   // Include both regular season and playoffs for rolling competitive average
+  // Preseason is explicitly EXCLUDED per user requirements
+  // Note: MySportsFeeds uses "playoff" (singular) not "playoffs"
   return [
-    `${currentYear}-${currentYear + 1}-regular`,
-    `${currentYear}-${currentYear + 1}-playoff`,
+    `${seasonStartYear}-${seasonEndYear}-regular`,
+    `${seasonStartYear}-${seasonEndYear}-playoff`,
   ];
 }
 
