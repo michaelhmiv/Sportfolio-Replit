@@ -40,21 +40,12 @@ async function fetchCurrentSeasonFromAPI(): Promise<string> {
     const data = await response.json();
     
     // Extract season slug from response
-    // Expected format: { currentseason: { season: [{ details: { slug: "2024-2025-regular", intervalType: "regular", ... } }] } }
-    const seasonData = data?.currentseason?.season?.[0];
-    if (seasonData?.details?.slug) {
-      return seasonData.details.slug;
-    }
-    
-    // Fallback: construct from details if slug not present
-    if (seasonData?.details) {
-      const { name, intervalType } = seasonData.details;
-      // Parse "2024-2025 Regular" to "2024-2025-regular"
-      if (name && intervalType) {
-        const yearMatch = name.match(/(\d{4})-(\d{4})/);
-        if (yearMatch) {
-          return `${yearMatch[1]}-${yearMatch[2]}-${intervalType.toLowerCase()}`;
-        }
+    // Expected format: { lastUpdatedOn: "...", seasons: [{ name: "2025-2026 Regular", slug: "2025-2026-regular", seasonInterval: "REGULAR", ... }] }
+    const seasons = data?.seasons;
+    if (Array.isArray(seasons) && seasons.length > 0) {
+      const currentSeason = seasons[0]; // First season is the current one
+      if (currentSeason.slug) {
+        return currentSeason.slug;
       }
     }
     
