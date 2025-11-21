@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
+import { LiveLogViewer } from "@/components/live-log-viewer";
 import {
   Settings,
   RefreshCw,
@@ -73,6 +74,7 @@ export default function Admin() {
   const [backfillStartDate, setBackfillStartDate] = useState("2025-11-17");
   const [backfillEndDate, setBackfillEndDate] = useState("2025-11-21");
   const [isBackfilling, setIsBackfilling] = useState(false);
+  const [backfillOperationId, setBackfillOperationId] = useState<string | null>(null);
   
   // Blog post state
   const [blogDialogOpen, setBlogDialogOpen] = useState(false);
@@ -124,12 +126,13 @@ export default function Admin() {
   };
 
   const backfillMutation = useMutation({
-    mutationFn: async ({ startDate, endDate }: { startDate: string; endDate: string }) => {
-      const res = await apiRequest("POST", "/api/admin/backfill", { startDate, endDate });
+    mutationFn: async ({ startDate, endDate, operationId }: { startDate: string; endDate: string; operationId: string }) => {
+      const res = await apiRequest("POST", "/api/admin/backfill", { startDate, endDate, operationId });
       return await res.json();
     },
-    onMutate: () => {
+    onMutate: ({ operationId }) => {
       setIsBackfilling(true);
+      setBackfillOperationId(operationId);
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
@@ -162,7 +165,10 @@ export default function Admin() {
       });
       return;
     }
-    backfillMutation.mutate({ startDate: backfillStartDate, endDate: backfillEndDate });
+    
+    // Generate unique operation ID
+    const operationId = `backfill-${Date.now()}`;
+    backfillMutation.mutate({ startDate: backfillStartDate, endDate: backfillEndDate, operationId });
   };
 
   // Blog posts query
@@ -458,6 +464,18 @@ export default function Admin() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Live Log Viewer for Backfill */}
+        {backfillOperationId && (
+          <LiveLogViewer
+            operationId={backfillOperationId}
+            title="Backfill Game Logs - Live Status"
+            description="Real-time progress and logs from the backfill operation"
+            onComplete={() => {
+              setBackfillOperationId(null);
+            }}
+          />
+        )}
 
         {/* Job Controls */}
         <Card>

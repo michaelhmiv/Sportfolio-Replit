@@ -20,11 +20,13 @@ import { storage } from "../storage";
 import { fetchDailyPlayerGameLogs, calculateFantasyPoints } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
+import type { ProgressCallback } from "../lib/admin-stream";
 
 export interface SyncOptions {
   mode?: 'daily' | 'backfill';
   startDate?: Date;
   endDate?: Date;
+  progressCallback?: ProgressCallback;
 }
 
 /**
@@ -43,9 +45,16 @@ function getCurrentSeason(): string {
 const SEASON = getCurrentSeason(); // Dynamically resolves to current competitive season
 
 export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<JobResult> {
-  const { mode = 'daily', startDate, endDate } = options;
+  const { mode = 'daily', startDate, endDate, progressCallback } = options;
   
   console.log(`[sync_player_game_logs] Starting in ${mode.toUpperCase()} mode...`);
+  
+  // Emit start event if callback provided
+  progressCallback?.({
+    type: 'info',
+    timestamp: new Date().toISOString(),
+    message: `Starting game logs sync in ${mode.toUpperCase()} mode`,
+  });
   
   let requestCount = 0;
   let recordsProcessed = 0;
@@ -65,6 +74,11 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
       rangeStart = yesterday;
       rangeEnd = yesterday;
       console.log(`[sync_player_game_logs] DAILY mode: Fetching ${rangeStart.toDateString()} only`);
+      progressCallback?.({
+        type: 'info',
+        timestamp: new Date().toISOString(),
+        message: `DAILY mode: Fetching ${rangeStart.toDateString()} only`,
+      });
     } else {
       // BACKFILL MODE: Use provided date range or default to season start -> today
       if (startDate && endDate) {
@@ -79,12 +93,18 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
         rangeEnd = now;
       }
       
-      const totalDays = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-      console.log(`[sync_player_game_logs] BACKFILL mode: Processing ${totalDays} dates from ${rangeStart.toDateString()} to ${rangeEnd.toDateString()}`);
+      console.log(`[sync_player_game_logs] BACKFILL mode: Processing dates from ${rangeStart.toDateString()} to ${rangeEnd.toDateString()}`);
+      progressCallback?.({
+        type: 'info',
+        timestamp: new Date().toISOString(),
+        message: `BACKFILL mode: Processing dates from ${rangeStart.toDateString()} to ${rangeEnd.toDateString()}`,
+        data: { startDate: rangeStart.toISOString(), endDate: rangeEnd.toISOString() },
+      });
     }
 
     const currentDate = new Date(rangeStart);
     let datesProcessed = 0;
+    const totalDays = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
     
     // Iterate through each date in the range
     while (currentDate <= rangeEnd) {
@@ -93,16 +113,43 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
       
       // Progress logging every 5 dates (only in backfill mode)
       if (mode === 'backfill' && datesProcessed % 5 === 0) {
-        const totalDays = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         console.log(`[sync_player_game_logs] Progress: ${datesProcessed}/${totalDays} dates processed (${skippedDates} skipped, ${requestCount} API calls, ${recordsProcessed} games cached)`);
+        
+        // Emit progress event
+        progressCallback?.({
+          type: 'progress',
+          timestamp: new Date().toISOString(),
+          message: `Progress: ${datesProcessed}/${totalDays} dates processed`,
+          data: {
+            current: datesProcessed,
+            total: totalDays,
+            percentage: Math.round((datesProcessed / totalDays) * 100),
+            stats: {
+              datesProcessed,
+              skippedDates,
+              apiCalls: requestCount,
+              gamesCached: recordsProcessed,
+              errors: errorCount,
+            },
+          },
+        });
       }
       
       try {
         if (mode === 'daily') {
           console.log(`[sync_player_game_logs] Fetching games for date ${dateStr}`);
+          progressCallback?.({
+            type: 'info',
+            timestamp: new Date().toISOString(),
+            message: `Fetching games for ${dateStr}`,
+          });
         } else {
-          const totalDays = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
           console.log(`[sync_player_game_logs] Fetching games for date ${dateStr} (${datesProcessed}/${totalDays})`);
+          progressCallback?.({
+            type: 'debug',
+            timestamp: new Date().toISOString(),
+            message: `[${datesProcessed}/${totalDays}] Processing ${dateStr}...`,
+          });
         }
         
         // Fetch ALL players' games for this date using Daily endpoint (5-second backoff)
@@ -128,14 +175,29 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
             console.warn(`  - API error or rate limiting`);
             console.warn(`  - Games still in progress (unlikely at cron run time 6 AM ET)`);
             console.warn(`  Action: Check MySportsFeeds API status if this persists`);
+            progressCallback?.({
+              type: 'warning',
+              timestamp: new Date().toISOString(),
+              message: `No games returned for ${dateStr} (possible off-day or API issue)`,
+            });
           } else {
             console.log(`[sync_player_game_logs] No games on ${dateStr} (likely off day)`);
+            progressCallback?.({
+              type: 'debug',
+              timestamp: new Date().toISOString(),
+              message: `No games on ${dateStr} (skipped)`,
+            });
           }
           currentDate.setDate(currentDate.getDate() + 1);
           continue;
         }
 
         console.log(`[sync_player_game_logs] Found ${dayGameLogs.length} games on ${dateStr}`);
+        progressCallback?.({
+          type: 'info',
+          timestamp: new Date().toISOString(),
+          message: `✓ Found ${dayGameLogs.length} games on ${dateStr}`,
+        });
 
         // Process and store each game log
         for (const gameLog of dayGameLogs) {
@@ -202,11 +264,23 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
             recordsProcessed++;
           } catch (error: any) {
             console.error(`[sync_player_game_logs] Error storing game ${gameLog.game?.id}:`, error.message);
+            progressCallback?.({
+              type: 'error',
+              timestamp: new Date().toISOString(),
+              message: `Error storing game ${gameLog.game?.id}: ${error.message}`,
+              data: { error: error.message, stack: error.stack },
+            });
             errorCount++;
           }
         }
       } catch (error: any) {
         console.error(`[sync_player_game_logs] Error syncing date ${dateStr}:`, error.message);
+        progressCallback?.({
+          type: 'error',
+          timestamp: new Date().toISOString(),
+          message: `Error syncing date ${dateStr}: ${error.message}`,
+          data: { date: dateStr, error: error.message, stack: error.stack },
+        });
         errorCount++;
         // Continue with next date instead of failing entire job
       }
@@ -225,12 +299,46 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
       console.warn(`[sync_player_game_logs] DEGRADED: Daily sync made ${requestCount} API calls but cached 0 games`);
       console.warn(`[sync_player_game_logs] This is unusual - either it's a legitimate off-day or there's an API issue`);
       console.warn(`[sync_player_game_logs] Check job logs and MySportsFeeds API status`);
+      progressCallback?.({
+        type: 'warning',
+        timestamp: new Date().toISOString(),
+        message: 'Daily sync made API calls but cached 0 games (possible off-day)',
+      });
       // Don't increment errorCount since this might be legitimate, but log the concern
     }
+    
+    // Emit completion event
+    const success = errorCount === 0;
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: success 
+        ? `✓ Sync completed successfully: ${recordsProcessed} games cached`
+        : `⚠ Sync completed with errors: ${recordsProcessed} games cached, ${errorCount} errors`,
+      data: {
+        success,
+        summary: {
+          recordsProcessed,
+          datesProcessed,
+          skippedDates,
+          requestCount,
+          errorCount,
+        },
+      },
+    });
     
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {
     console.error("[sync_player_game_logs] Failed:", error.message);
+    
+    // Emit fatal error event
+    progressCallback?.({
+      type: 'error',
+      timestamp: new Date().toISOString(),
+      message: `Fatal error: ${error.message}`,
+      data: { error: error.message, stack: error.stack },
+    });
+    
     throw error;
   }
 }

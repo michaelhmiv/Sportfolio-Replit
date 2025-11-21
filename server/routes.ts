@@ -2705,10 +2705,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin endpoint: SSE stream for operation logs
+  app.get("/api/admin/stream/:operationId", adminAuth, (req, res) => {
+    const { operationId } = req.params;
+    
+    // Set SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+    
+    // Send initial connection message
+    res.write(`data: ${JSON.stringify({
+      type: 'info',
+      timestamp: new Date().toISOString(),
+      message: `Connected to operation ${operationId}`,
+    })}\n\n`);
+    
+    // Register this client with the stream manager
+    const { adminStreamManager } = require('./lib/admin-stream');
+    adminStreamManager.registerClient(operationId, res);
+    
+    console.log(`[SSE] Client connected to operation ${operationId}`);
+    
+    // Handle client disconnect
+    req.on('close', () => {
+      console.log(`[SSE] Client disconnected from operation ${operationId}`);
+      adminStreamManager.unregisterClient(operationId, res);
+    });
+  });
+
   // Admin endpoint: Backfill game logs for date range
   app.post("/api/admin/backfill", adminAuth, async (req, res) => {
     try {
-      const { startDate, endDate } = req.body;
+      const { startDate, endDate, operationId } = req.body;
       const clientIp = req.ip || req.connection.remoteAddress;
       
       if (!startDate || !endDate) {
@@ -2763,12 +2793,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[ADMIN] Backfill requested by ${clientIp}: ${startDate} to ${endDate} (${daysDiff + 1} days)`);
       
+      // Create progress callback if operationId provided
+      let progressCallback;
+      if (operationId) {
+        const { createProgressCallback } = await import('./lib/admin-stream');
+        progressCallback = createProgressCallback(operationId);
+      }
+      
       // Import syncPlayerGameLogs here to avoid circular dependency
       const { syncPlayerGameLogs } = await import('./jobs/sync-player-game-logs');
       const result = await syncPlayerGameLogs({
         mode: 'backfill',
         startDate: start,
         endDate: end,
+        progressCallback,
       });
       
       // Determine status based on errors
