@@ -2641,7 +2641,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     // Check 2: Session-based auth with admin role (for logged-in admin users)
-    if (req.isAuthenticated && req.isAuthenticated()) {
+    // Works with both passport session auth AND dev bypass (which sets req.user)
+    if ((req.isAuthenticated && req.isAuthenticated()) || req.user) {
       try {
         const userId = getUserId(req);
         const user = await storage.getUser(userId);
