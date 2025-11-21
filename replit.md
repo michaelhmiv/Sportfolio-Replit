@@ -32,8 +32,8 @@ Share and cash locking systems (`holdings_locks` and `balance_locks` tables) imp
 A persistent stats caching layer dramatically reduces MySportsFeeds API calls by ~95%, ensuring scalability and instant page loads:
 
 **Caching Tables:**
-- `player_season_summaries`: Stores season averages (PPG, RPG, APG, etc.), shooting percentages, and pre-calculated fantasy points per game. **Auto-recalculated via SQL aggregation** from `player_game_stats` after each stats sync (hourly + real-time during live games).
-- `player_game_stats`: Stores individual game statistics, updated hourly and in real-time during live games.
+- `player_season_summaries`: Stores season averages (PPG, RPG, APG, etc.), shooting percentages, and pre-calculated fantasy points per game. **Auto-recalculated via SQL aggregation** from `player_game_stats` after each stats sync (hourly + real-time during live games). Aggregation groups by `(playerId, season)` to support multi-season data.
+- `player_game_stats`: Stores individual game statistics, updated hourly and in real-time during live games. Season is derived from game date using `deriveSeasonFromDate()` utility.
 
 **Database Aggregation Approach:**
 - Season summaries are calculated by aggregating `player_game_stats` locally using SQL reduce operations, eliminating MySportsFeeds API dependency for season stats.
@@ -44,6 +44,16 @@ A persistent stats caching layer dramatically reduces MySportsFeeds API calls by
 - `GET /api/players`: Reads FPG from `player_season_summaries` instead of calling MySportsFeeds API for each player (reduces ~500 API calls per marketplace page load to 0).
 - `GET /api/player/:id/stats`: Reads season averages from `player_season_summaries` instead of live API calls.
 - `GET /api/player/:id/recent-games`: Reads from `player_game_stats` instead of calling MySportsFeeds game logs API.
+
+**Season Derivation:**
+The system uses `deriveSeasonFromDate()` (in `server/utils/season.ts`) to determine the NBA season from game dates. This heuristic-based approach classifies games as:
+- Regular season: October through mid-April
+- Playoffs: Mid-April through June
+
+**Known Limitation:** The April 15 playoff cutoff is approximate. Actual NBA playoff start dates vary by year (typically April 15-20, with play-in games around April 11-14). Early playoff/play-in games before April 15 may be misclassified as regular season. Impact is minimal as it affects only a small window of games. For production enhancement, consider:
+- Parsing `intervalType` from MySportsFeeds API responses if available
+- Adding `isPlayoffs` flag to `dailyGames` schema and syncing from API metadata
+- Maintaining an authoritative calendar of season transitions
 
 Performance optimizations include SQL JOINs to prevent N+1 queries, marketplace pagination, batch player fetches, React Query caching, and persistent database-backed stats caching with automatic aggregation.
 
