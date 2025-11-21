@@ -48,8 +48,10 @@ export function LiveLogViewer({
   const [autoScroll, setAutoScroll] = useState(true);
 
   useEffect(() => {
-    // Connect to SSE stream
-    const eventSource = new EventSource(`/api/admin/stream/${operationId}`);
+    // Connect to SSE stream with credentials
+    const eventSource = new EventSource(`/api/admin/stream/${operationId}`, {
+      withCredentials: true
+    });
     eventSourceRef.current = eventSource;
 
     eventSource.onopen = () => {

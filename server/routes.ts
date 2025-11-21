@@ -2655,8 +2655,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         refresh_token: 'dev-mock-refresh',
       };
       
-      req.user = mockUser;
-      console.log('[ADMIN] Dev mode auth bypass active - created mock user');
+      // Use passport's login to properly serialize and persist the session
+      req.login(mockUser, (err: any) => {
+        if (err) {
+          console.error('[ADMIN] Failed to establish mock session:', err);
+          return res.status(500).json({ error: 'Session initialization failed' });
+        }
+        console.log(`[ADMIN] Dev bypass: ${req.method} ${req.path} - mock session established`);
+        next();
+      });
+      return; // Prevent falling through to Check 3
     }
     
     // Check 3: Admin role check with req.user
