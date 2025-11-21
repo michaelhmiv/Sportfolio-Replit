@@ -9,6 +9,7 @@ import { storage } from "../storage";
 import { fetchPlayerGameStats, calculateFantasyPoints } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
+import { CURRENT_SEASON } from "../../shared/schema";
 
 export async function syncStats(): Promise<JobResult> {
   console.log("[stats_sync] Starting game stats sync...");
@@ -91,7 +92,7 @@ export async function syncStats(): Promise<JobResult> {
               playerId: gamelog.player.id,
               gameId: game.gameId,
               gameDate: game.date,
-              season: "2024-2025-regular",
+              season: CURRENT_SEASON, // TODO: Derive from game date for multi-season support
               opponentTeam: gamelog.team.abbreviation === game.homeTeam ? game.awayTeam : game.homeTeam,
               homeAway: gamelog.team.abbreviation === game.homeTeam ? "home" : "away",
               minutes: offense.minSeconds ? Math.floor(offense.minSeconds / 60) : 0,

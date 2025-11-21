@@ -3,6 +3,10 @@ import { pgTable, text, varchar, decimal, integer, timestamp, boolean, index, js
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Current NBA season
+// TODO: In the future, derive season from game date for full multi-season support
+export const CURRENT_SEASON = "2024-2025-regular";
+
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
   "sessions",
