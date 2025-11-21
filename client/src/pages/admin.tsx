@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
@@ -21,6 +23,12 @@ import {
   Clock,
   Play,
   Download,
+  FileText,
+  Plus,
+  Edit,
+  Trash2,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 interface SystemStats {
@@ -49,12 +57,31 @@ const jobDescriptions = {
   settle_contests: "Settle completed contests and distribute winnings",
 };
 
+interface BlogPost {
+  id: string;
+  title: string;
+  slug: string;
+  excerpt: string;
+  content: string;
+  publishedAt: string | null;
+  createdAt: string;
+}
+
 export default function Admin() {
   const { toast } = useToast();
   const [runningJobs, setRunningJobs] = useState<Set<string>>(new Set());
   const [backfillStartDate, setBackfillStartDate] = useState("2025-11-17");
   const [backfillEndDate, setBackfillEndDate] = useState("2025-11-21");
   const [isBackfilling, setIsBackfilling] = useState(false);
+  
+  // Blog post state
+  const [blogDialogOpen, setBlogDialogOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState<BlogPost | null>(null);
+  const [blogTitle, setBlogTitle] = useState("");
+  const [blogSlug, setBlogSlug] = useState("");
+  const [blogExcerpt, setBlogExcerpt] = useState("");
+  const [blogContent, setBlogContent] = useState("");
+  const [blogPublished, setBlogPublished] = useState(false);
 
   const { data: stats, isLoading } = useQuery<SystemStats>({
     queryKey: ["/api/admin/stats"],
@@ -136,6 +163,145 @@ export default function Admin() {
       return;
     }
     backfillMutation.mutate({ startDate: backfillStartDate, endDate: backfillEndDate });
+  };
+
+  // Blog posts query
+  const { data: blogPostsData } = useQuery<{ posts: BlogPost[]; total: number }>({
+    queryKey: ["/api/admin/blog"],
+  });
+
+  // Blog mutations
+  const createBlogPostMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/admin/blog", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blog"] });
+      setBlogDialogOpen(false);
+      resetBlogForm();
+      toast({
+        title: "Blog post created",
+        description: "Your blog post has been created successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to create post",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateBlogPostMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await apiRequest("PATCH", `/api/admin/blog/${id}`, data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blog"] });
+      setBlogDialogOpen(false);
+      resetBlogForm();
+      toast({
+        title: "Blog post updated",
+        description: "Your blog post has been updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to update post",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const deleteBlogPostMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest("DELETE", `/api/admin/blog/${id}`, {});
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/blog"] });
+      toast({
+        title: "Blog post deleted",
+        description: "The blog post has been deleted",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to delete post",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetBlogForm = () => {
+    setBlogTitle("");
+    setBlogSlug("");
+    setBlogExcerpt("");
+    setBlogContent("");
+    setBlogPublished(false);
+    setEditingPost(null);
+  };
+
+  const handleOpenBlogDialog = (post?: BlogPost) => {
+    if (post) {
+      setEditingPost(post);
+      setBlogTitle(post.title);
+      setBlogSlug(post.slug);
+      setBlogExcerpt(post.excerpt);
+      setBlogContent(post.content);
+      setBlogPublished(!!post.publishedAt);
+    } else {
+      resetBlogForm();
+    }
+    setBlogDialogOpen(true);
+  };
+
+  const handleSaveBlogPost = () => {
+    if (!blogTitle || !blogSlug || !blogExcerpt || !blogContent) {
+      toast({
+        title: "Validation error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const data = {
+      title: blogTitle,
+      slug: blogSlug,
+      excerpt: blogExcerpt,
+      content: blogContent,
+      publishedAt: blogPublished ? new Date().toISOString() : null,
+    };
+
+    if (editingPost) {
+      updateBlogPostMutation.mutate({ id: editingPost.id, data });
+    } else {
+      createBlogPostMutation.mutate(data);
+    }
+  };
+
+  const handleDeleteBlogPost = (id: string) => {
+    if (confirm("Are you sure you want to delete this blog post?")) {
+      deleteBlogPostMutation.mutate(id);
+    }
+  };
+
+  // Auto-generate slug from title
+  const handleTitleChange = (value: string) => {
+    setBlogTitle(value);
+    if (!editingPost) {
+      const slug = value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+      setBlogSlug(slug);
+    }
   };
 
   if (isLoading) {
@@ -332,6 +498,154 @@ export default function Admin() {
                 </Button>
               </div>
             ))}
+          </CardContent>
+        </Card>
+
+        {/* Blog Posts Management */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                <div>
+                  <CardTitle>Blog Posts</CardTitle>
+                  <CardDescription>Manage blog content for SEO and user engagement</CardDescription>
+                </div>
+              </div>
+              <Dialog open={blogDialogOpen} onOpenChange={setBlogDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gap-2" onClick={() => handleOpenBlogDialog()} data-testid="button-create-blog-post">
+                    <Plus className="w-4 h-4" />
+                    New Post
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>{editingPost ? "Edit Blog Post" : "Create Blog Post"}</DialogTitle>
+                    <DialogDescription>
+                      {editingPost ? "Update your blog post content" : "Create a new blog post for Sportfolio"}
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="blog-title">Title</Label>
+                      <Input
+                        id="blog-title"
+                        placeholder="Enter blog post title"
+                        value={blogTitle}
+                        onChange={(e) => handleTitleChange(e.target.value)}
+                        data-testid="input-blog-title"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="blog-slug">Slug (URL)</Label>
+                      <Input
+                        id="blog-slug"
+                        placeholder="url-friendly-slug"
+                        value={blogSlug}
+                        onChange={(e) => setBlogSlug(e.target.value)}
+                        data-testid="input-blog-slug"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="blog-excerpt">Excerpt</Label>
+                      <Textarea
+                        id="blog-excerpt"
+                        placeholder="Brief summary (shown in blog listing)"
+                        value={blogExcerpt}
+                        onChange={(e) => setBlogExcerpt(e.target.value)}
+                        rows={3}
+                        data-testid="textarea-blog-excerpt"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="blog-content">Content</Label>
+                      <Textarea
+                        id="blog-content"
+                        placeholder="Full blog post content"
+                        value={blogContent}
+                        onChange={(e) => setBlogContent(e.target.value)}
+                        rows={10}
+                        data-testid="textarea-blog-content"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        id="blog-published"
+                        type="checkbox"
+                        checked={blogPublished}
+                        onChange={(e) => setBlogPublished(e.target.checked)}
+                        className="h-4 w-4"
+                        data-testid="checkbox-blog-published"
+                      />
+                      <Label htmlFor="blog-published">Published (visible to public)</Label>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setBlogDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleSaveBlogPost} data-testid="button-save-blog-post">
+                      {editingPost ? "Update" : "Create"} Post
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {blogPostsData && blogPostsData.posts.length > 0 ? (
+              <div className="space-y-2">
+                {blogPostsData.posts.map((post) => (
+                  <div
+                    key={post.id}
+                    className="flex items-center justify-between p-3 rounded-lg border hover-elevate"
+                    data-testid={`blog-post-item-${post.id}`}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-sm truncate">{post.title}</h3>
+                        {post.publishedAt ? (
+                          <Badge variant="default" className="text-xs">
+                            <Eye className="w-3 h-3 mr-1" />
+                            Published
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary" className="text-xs">
+                            <EyeOff className="w-3 h-3 mr-1" />
+                            Draft
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">{post.excerpt}</p>
+                      <p className="text-xs text-muted-foreground mt-1">/{post.slug}</p>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleOpenBlogDialog(post)}
+                        data-testid={`button-edit-blog-${post.id}`}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleDeleteBlogPost(post.id)}
+                        data-testid={`button-delete-blog-${post.id}`}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                No blog posts yet. Create your first post to improve SEO and engage users!
+              </div>
+            )}
           </CardContent>
         </Card>
 

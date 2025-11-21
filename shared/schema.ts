@@ -297,11 +297,36 @@ export const jobExecutionLogs = pgTable("job_execution_logs", {
   scheduledIdx: index("scheduled_idx").on(table.scheduledFor),
 }));
 
+// Blog posts table - admin-created content for SEO and user engagement
+export const blogPosts = pgTable("blog_posts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  slug: text("slug").notNull().unique(), // URL-friendly version of title
+  excerpt: text("excerpt").notNull(), // Brief summary for listing pages
+  content: text("content").notNull(), // Full blog post content (can be markdown or HTML)
+  authorId: varchar("author_id").notNull().references(() => users.id),
+  publishedAt: timestamp("published_at"), // null = draft, non-null = published
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  slugIdx: index("blog_slug_idx").on(table.slug),
+  publishedIdx: index("blog_published_idx").on(table.publishedAt),
+  authorIdx: index("blog_author_idx").on(table.authorId),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   holdings: many(holdings),
   orders: many(orders),
   contestEntries: many(contestEntries),
+  blogPosts: many(blogPosts),
+}));
+
+export const blogPostsRelations = relations(blogPosts, ({ one }) => ({
+  author: one(users, {
+    fields: [blogPosts.authorId],
+    references: [users.id],
+  }),
 }));
 
 export const playersRelations = relations(players, ({ many }) => ({
@@ -466,3 +491,12 @@ export type PriceHistory = typeof priceHistory.$inferSelect;
 
 export type InsertContestEntry = z.infer<typeof insertContestEntrySchema>;
 export type InsertContestLineup = z.infer<typeof insertContestLineupSchema>;
+
+export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type BlogPost = typeof blogPosts.$inferSelect;
+export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;

@@ -16,6 +16,7 @@ import {
   priceHistory,
   dailyGames,
   jobExecutionLogs,
+  blogPosts,
   type User,
   type InsertUser,
   type UpsertUser,
@@ -43,9 +44,11 @@ import {
   type InsertJobExecutionLog,
   type PlayerGameStats,
   type InsertPlayerGameStats,
+  type BlogPost,
+  type InsertBlogPost,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql, inArray, or, gte, lte } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, or, gte, lte, isNotNull, count } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "crypto";
 
@@ -194,6 +197,13 @@ export interface IStorage {
     minutesPerGame: string;
   } | null>;
   getPlayerRecentGamesFromLogs(playerId: string, limit: number): Promise<any[]>;
+  
+  // Blog post methods
+  getBlogPosts(options: { limit: number; offset: number; publishedOnly: boolean }): Promise<{ posts: BlogPost[]; total: number }>;
+  getBlogPostBySlug(slug: string): Promise<BlogPost | undefined>;
+  createBlogPost(post: InsertBlogPost): Promise<BlogPost>;
+  updateBlogPost(id: string, updates: Partial<BlogPost>): Promise<BlogPost | undefined>;
+  deleteBlogPost(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1849,6 +1859,60 @@ export class DatabaseStorage implements IStorage {
         fantasyPoints: parseFloat(log.fantasyPoints),
       },
     }));
+  }
+
+  // Blog post methods
+  async getBlogPosts(options: { limit: number; offset: number; publishedOnly: boolean }): Promise<{ posts: BlogPost[]; total: number }> {
+    const { limit, offset, publishedOnly } = options;
+    
+    let query = db.select().from(blogPosts);
+    
+    if (publishedOnly) {
+      query = query.where(isNotNull(blogPosts.publishedAt));
+    }
+    
+    const posts = await query
+      .orderBy(desc(blogPosts.publishedAt), desc(blogPosts.createdAt))
+      .limit(limit)
+      .offset(offset);
+    
+    // Get total count
+    let countQuery = db.select({ count: count() }).from(blogPosts);
+    if (publishedOnly) {
+      countQuery = countQuery.where(isNotNull(blogPosts.publishedAt));
+    }
+    const [{ count: total }] = await countQuery;
+    
+    return { posts, total };
+  }
+
+  async getBlogPostBySlug(slug: string): Promise<BlogPost | undefined> {
+    const [post] = await db
+      .select()
+      .from(blogPosts)
+      .where(eq(blogPosts.slug, slug));
+    return post || undefined;
+  }
+
+  async createBlogPost(post: InsertBlogPost): Promise<BlogPost> {
+    const [created] = await db
+      .insert(blogPosts)
+      .values(post)
+      .returning();
+    return created;
+  }
+
+  async updateBlogPost(id: string, updates: Partial<BlogPost>): Promise<BlogPost | undefined> {
+    const [updated] = await db
+      .update(blogPosts)
+      .set(updates)
+      .where(eq(blogPosts.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteBlogPost(id: string): Promise<void> {
+    await db.delete(blogPosts).where(eq(blogPosts.id, id));
   }
 }
 

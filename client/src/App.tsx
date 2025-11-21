@@ -9,6 +9,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import { BottomNav } from "@/components/bottom-nav";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { HelpDialog } from "@/components/help-dialog";
+import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { WebSocketProvider, useWebSocket } from "@/lib/websocket";
@@ -27,6 +28,13 @@ import Admin from "@/pages/admin";
 import Landing from "@/pages/landing";
 import AuthError from "@/pages/auth-error";
 import NotFound from "@/pages/not-found";
+import Blog from "@/pages/blog";
+import BlogPost from "@/pages/blog-post";
+import Privacy from "@/pages/privacy";
+import Terms from "@/pages/terms";
+import About from "@/pages/about";
+import Contact from "@/pages/contact";
+import HowItWorks from "@/pages/how-it-works";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
 import { LogOut, User } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
@@ -59,6 +67,13 @@ function Router() {
       <Route path="/leaderboards" component={Leaderboards} />
       <Route path="/user/:id" component={UserProfile} />
       <Route path="/marketplace" component={Marketplace} />
+      <Route path="/blog" component={Blog} />
+      <Route path="/blog/:slug" component={BlogPost} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
+      <Route path="/about" component={About} />
+      <Route path="/contact" component={Contact} />
+      <Route path="/how-it-works" component={HowItWorks} />
       
       {/* Protected routes - require authentication */}
       <Route path="/player/:id">
@@ -245,10 +260,11 @@ function App() {
               </div>
               <div className="flex flex-col flex-1 overflow-x-hidden">
                 <Header />
-                <main className="flex-1 overflow-y-auto overflow-x-hidden pb-0 sm:pb-0">
-                  <div className="pb-20 sm:pb-0">
+                <main className="flex-1 overflow-y-auto overflow-x-hidden pb-0 sm:pb-0 flex flex-col">
+                  <div className="pb-20 sm:pb-0 flex-1">
                     <Router />
                   </div>
+                  <Footer />
                 </main>
               </div>
             </div>

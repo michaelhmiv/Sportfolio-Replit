@@ -2253,6 +2253,200 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Blog posts - public listing (published posts only)
+  app.get("/api/blog", async (req, res) => {
+    try {
+      const { limit, offset } = req.query;
+      const parsedLimit = limit ? parseInt(limit as string) : 20;
+      const parsedOffset = offset ? parseInt(offset as string) : 0;
+      
+      const safeLimit = isNaN(parsedLimit) ? 20 : Math.max(1, Math.min(parsedLimit, 100));
+      const safeOffset = isNaN(parsedOffset) ? 0 : Math.max(0, parsedOffset);
+      
+      const { posts, total } = await storage.getBlogPosts({ 
+        limit: safeLimit, 
+        offset: safeOffset,
+        publishedOnly: true,
+      });
+      
+      res.json({ posts, total, limit: safeLimit, offset: safeOffset });
+    } catch (error: any) {
+      console.error("[blog] Error fetching posts:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Blog post detail - public (by slug)
+  app.get("/api/blog/:slug", async (req, res) => {
+    try {
+      const post = await storage.getBlogPostBySlug(req.params.slug);
+      
+      if (!post) {
+        return res.status(404).json({ error: "Blog post not found" });
+      }
+      
+      // Only return published posts to public
+      if (!post.publishedAt) {
+        return res.status(404).json({ error: "Blog post not found" });
+      }
+      
+      // Get author information
+      const author = await storage.getUser(post.authorId);
+      
+      res.json({ 
+        post,
+        author: author ? {
+          id: author.id,
+          username: author.username,
+          firstName: author.firstName,
+          lastName: author.lastName,
+          profileImageUrl: author.profileImageUrl,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error("[blog] Error fetching post:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin: List all blog posts (including drafts)
+  app.get("/api/admin/blog", adminAuth, async (req, res) => {
+    try {
+      const { limit, offset } = req.query;
+      const parsedLimit = limit ? parseInt(limit as string) : 50;
+      const parsedOffset = offset ? parseInt(offset as string) : 0;
+      
+      const safeLimit = isNaN(parsedLimit) ? 50 : Math.max(1, Math.min(parsedLimit, 200));
+      const safeOffset = isNaN(parsedOffset) ? 0 : Math.max(0, parsedOffset);
+      
+      const { posts, total } = await storage.getBlogPosts({ 
+        limit: safeLimit, 
+        offset: safeOffset,
+        publishedOnly: false, // Show drafts for admin
+      });
+      
+      res.json({ posts, total, limit: safeLimit, offset: safeOffset });
+    } catch (error: any) {
+      console.error("[admin/blog] Error fetching posts:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin: Create blog post
+  app.post("/api/admin/blog", adminAuth, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      
+      // Validate request body
+      const { title, slug, excerpt, content, publishedAt } = req.body;
+      
+      if (!title?.trim() || !slug?.trim() || !excerpt?.trim() || !content?.trim()) {
+        return res.status(400).json({ error: "title, slug, excerpt, and content are required and cannot be empty" });
+      }
+      
+      // Validate slug format (alphanumeric and hyphens only)
+      if (!/^[a-z0-9-]+$/.test(slug)) {
+        return res.status(400).json({ error: "slug must contain only lowercase letters, numbers, and hyphens" });
+      }
+      
+      const post = await storage.createBlogPost({
+        title: title.trim(),
+        slug: slug.trim(),
+        excerpt: excerpt.trim(),
+        content: content.trim(),
+        authorId: userId,
+        publishedAt: publishedAt ? new Date(publishedAt) : null,
+      });
+      
+      res.json({ post });
+    } catch (error: any) {
+      console.error("[admin/blog] Error creating post:", error);
+      
+      // Handle duplicate slug error
+      if (error.message && error.message.includes('duplicate key') || error.code === '23505') {
+        return res.status(409).json({ error: "A blog post with this slug already exists" });
+      }
+      
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin: Update blog post
+  app.patch("/api/admin/blog/:id", adminAuth, async (req, res) => {
+    try {
+      const { title, slug, excerpt, content, publishedAt } = req.body;
+      
+      const updates: any = {};
+      
+      // Validate and trim provided fields
+      if (title !== undefined) {
+        if (!title.trim()) {
+          return res.status(400).json({ error: "title cannot be empty" });
+        }
+        updates.title = title.trim();
+      }
+      
+      if (slug !== undefined) {
+        if (!slug.trim()) {
+          return res.status(400).json({ error: "slug cannot be empty" });
+        }
+        // Validate slug format
+        if (!/^[a-z0-9-]+$/.test(slug)) {
+          return res.status(400).json({ error: "slug must contain only lowercase letters, numbers, and hyphens" });
+        }
+        updates.slug = slug.trim();
+      }
+      
+      if (excerpt !== undefined) {
+        if (!excerpt.trim()) {
+          return res.status(400).json({ error: "excerpt cannot be empty" });
+        }
+        updates.excerpt = excerpt.trim();
+      }
+      
+      if (content !== undefined) {
+        if (!content.trim()) {
+          return res.status(400).json({ error: "content cannot be empty" });
+        }
+        updates.content = content.trim();
+      }
+      
+      if (publishedAt !== undefined) {
+        updates.publishedAt = publishedAt ? new Date(publishedAt) : null;
+      }
+      
+      updates.updatedAt = new Date();
+      
+      const post = await storage.updateBlogPost(req.params.id, updates);
+      
+      if (!post) {
+        return res.status(404).json({ error: "Blog post not found" });
+      }
+      
+      res.json({ post });
+    } catch (error: any) {
+      console.error("[admin/blog] Error updating post:", error);
+      
+      // Handle duplicate slug error
+      if (error.message && error.message.includes('duplicate key') || error.code === '23505') {
+        return res.status(409).json({ error: "A blog post with this slug already exists" });
+      }
+      
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin: Delete blog post
+  app.delete("/api/admin/blog/:id", adminAuth, async (req, res) => {
+    try {
+      await storage.deleteBlogPost(req.params.id);
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[admin/blog] Error deleting post:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Public user profile (anyone can view)
   app.get("/api/user/:userId/profile", async (req, res) => {
     try {

@@ -28,7 +28,9 @@ The backend is an Express.js server with TypeScript, supporting HTTP and WebSock
 **Game Logs Caching:** Player game logs are fetched using MySportsFeeds **Daily Player Gamelogs endpoint** (NOT Seasonal) to optimize API rate limits. The date-based approach fetches ALL players' games for each date in a single request (~50 dates from Oct 1 to today = ~50 API calls total). Daily endpoint has 5-second backoff (6 points/request) vs Seasonal endpoint's 30-second backoff (31 points/request), making it 6x faster. Backfill completes in ~5-10 minutes instead of 4+ hours. Upsert operations handle duplicates efficiently, ensuring complete coverage even across multiple runs. All game logs are cached with pre-calculated fantasy points to eliminate API calls on player views.
 
 ### Database Schema
-The database includes tables for `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `mining_claims`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, `price_history`, `holdings_locks`, and `balance_locks`. Indexing is optimized for user-asset relationships, player filtering, and order book queries. Player shares are permanent across seasons.
+The database includes tables for `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `mining_claims`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, `price_history`, `holdings_locks`, `balance_locks`, and `blog_posts`. Indexing is optimized for user-asset relationships, player filtering, and order book queries. Player shares are permanent across seasons.
+
+**Blog System:** The `blog_posts` table stores admin-created content for SEO and user engagement. Each post includes title, slug (unique, URL-friendly), excerpt, full content, author reference, and publishedAt timestamp (null = draft). Blog posts support draft/published states and are managed through an admin-only interface. Public blog pages display only published posts with pagination support.
 
 An activity tracking system aggregates mining claims, trades, and contest entries into a unified timeline with filtering and pagination.
 
@@ -67,6 +69,19 @@ The goal is a professional, data-rich interface where users can quickly scan and
 -   **Player Page:** Standalone trading page with price chart, order book, recent trades, and contest performance metrics. Contest performance (appearances, total earnings, win rate) always displays with fallback to zero values when data unavailable.
 -   **Public Marketplace Access:** Marketplace page accessible without authentication, allowing visitors to browse player listings before signing up.
 
+## Content & SEO
+
+**Blog System:** Admin-controlled blog at `/blog` provides original content for SEO and user engagement. Admins can create, edit, and delete blog posts via the admin panel (`/admin`). Blog posts support drafts (unpublished) and published states, with slug-based URLs (`/blog/[slug]`). Public blog pages show only published posts with pagination.
+
+**Static Pages for AdSense Compliance:** Comprehensive legal and informational pages meet Google AdSense requirements:
+- **Privacy Policy** (`/privacy`): Data collection, usage, retention, cookies, and user rights
+- **Terms of Service** (`/terms`): User obligations, virtual currency rules, intellectual property, liability, and dispute resolution
+- **About Us** (`/about`): Platform mission, features, and community information
+- **Contact** (`/contact`): Support channels (Discord primary), response times, and contact information
+- **How It Works** (`/how-it-works`): Detailed guides on trading, mining, contests, and platform features
+
+**Footer Navigation:** Site footer (`client/src/components/footer.tsx`) provides easy access to all static pages, blog, and key platform sections. Footer appears on every page for consistent navigation.
+
 ## External Dependencies
 
 -   **MySportsFeeds API:** Provides NBA player rosters, game schedules, and statistics (v2.1 CORE and STATS tiers).
@@ -75,5 +90,5 @@ The goal is a professional, data-rich interface where users can quickly scan and
 -   **Plain Text Sports:** External link for live game statistics.
 -   **Google Fonts CDN:** For typography.
 -   **Google Analytics 4:** For tracking and analytics.
--   **Google AdSense:** For monetization.
+-   **Google AdSense:** For monetization (platform ready for application with comprehensive content and legal pages).
 -   **Replit Auth:** Used for production-ready user authentication, supporting various OAuth providers and managing secure sessions with PostgreSQL-backed storage. New users receive a starting balance.
