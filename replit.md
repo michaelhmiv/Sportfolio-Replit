@@ -56,6 +56,11 @@ The goal is a professional, data-rich interface where users can quickly scan and
 -   **PlayerName Component:** A reusable component that makes player names clickable, opening a detailed player modal with stats, recent games, and market information.
 -   **UserName Component:** A reusable component that makes usernames clickable, navigating to user profile pages.
 
+### Player Information System
+-   **PlayerModal:** Compact single-view modal displaying market information, season stats, and recent games without tabs. Uses marketplace-style typography (text-xs, text-[10px]) and tight spacing (gap-1, gap-2, p-2). Recent games show most recent first with expandable "see more" functionality (loads 5 games at a time).
+-   **Player Page:** Standalone trading page with price chart, order book, recent trades, and contest performance metrics. Contest performance (appearances, total earnings, win rate) always displays with fallback to zero values when data unavailable.
+-   **Public Marketplace Access:** Marketplace page accessible without authentication, allowing visitors to browse player listings before signing up.
+
 ## External Dependencies
 
 -   **MySportsFeeds API:** Provides NBA player rosters, game schedules, and statistics (v2.1 CORE and STATS tiers).
