@@ -106,9 +106,12 @@ export default function Admin() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      
+      const variant = data.status === 'degraded' ? 'default' : 'default';
       toast({
-        title: "Backfill completed",
+        title: data.status === 'degraded' ? "Backfill completed with errors" : "Backfill completed",
         description: `${data.result.recordsProcessed} game logs cached, ${data.result.errorCount} errors, ${data.result.requestCount} API requests`,
+        variant: data.status === 'degraded' ? 'destructive' : undefined,
       });
     },
     onError: (error: any) => {

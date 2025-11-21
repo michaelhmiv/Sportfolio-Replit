@@ -2521,18 +2521,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'startDate and endDate required (YYYY-MM-DD format)' });
       }
       
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      
-      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      // Validate date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
         return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
       }
       
-      if (start > end) {
-        return res.status(400).json({ error: 'startDate must be before endDate' });
+      // Parse and normalize dates to UTC midnight
+      const start = new Date(startDate + 'T00:00:00.000Z');
+      const end = new Date(endDate + 'T00:00:00.000Z');
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: 'Invalid date values' });
       }
       
-      console.log(`[ADMIN] Backfill requested by ${clientIp}: ${startDate} to ${endDate}`);
+      if (start > end) {
+        return res.status(400).json({ error: 'startDate must be before or equal to endDate' });
+      }
+      
+      // Enforce max range (90 days to prevent abuse and rate limit exhaustion)
+      const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+      const MAX_DAYS = 90;
+      if (daysDiff > MAX_DAYS) {
+        return res.status(400).json({ 
+          error: `Date range too large. Maximum ${MAX_DAYS} days allowed. You requested ${daysDiff} days.` 
+        });
+      }
+      
+      // Validate dates are not in the future
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      if (start > now || end > now) {
+        return res.status(400).json({ error: 'Cannot backfill future dates' });
+      }
+      
+      // Validate dates are within current season range (Oct 1 to now)
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+      const seasonStartYear = currentMonth >= 6 ? currentYear : currentYear - 1;
+      const seasonStart = new Date(seasonStartYear, 9, 1); // Oct 1
+      
+      if (start < seasonStart) {
+        return res.status(400).json({ 
+          error: `startDate must be on or after season start (${seasonStart.toISOString().split('T')[0]})` 
+        });
+      }
+      
+      console.log(`[ADMIN] Backfill requested by ${clientIp}: ${startDate} to ${endDate} (${daysDiff + 1} days)`);
       
       // Import syncPlayerGameLogs here to avoid circular dependency
       const { syncPlayerGameLogs } = await import('./jobs/sync-player-game-logs');
@@ -2542,11 +2577,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         endDate: end,
       });
       
-      console.log(`[ADMIN] Backfill completed - ${result.recordsProcessed} game logs cached, ${result.errorCount} errors, ${result.requestCount} API requests`);
+      // Determine status based on errors
+      const status = result.errorCount > 0 ? 'degraded' : 'success';
+      
+      console.log(`[ADMIN] Backfill ${status} - ${result.recordsProcessed} game logs cached, ${result.errorCount} errors, ${result.requestCount} API requests`);
       
       res.json({
-        success: true,
+        success: status === 'success',
+        status,
         result,
+        message: result.errorCount > 0 
+          ? `Backfill completed with ${result.errorCount} errors. Check logs for details.`
+          : 'Backfill completed successfully',
       });
     } catch (error: any) {
       console.error('[ADMIN] Backfill failed:', error.message);
