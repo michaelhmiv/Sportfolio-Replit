@@ -1,81 +1,97 @@
 /**
  * Player Game Logs Sync Job
  * 
- * Fetches and caches ALL player game logs from the current season.
+ * Fetches and caches ALL player game logs from the current season using Daily endpoint.
+ * 
+ * APPROACH: Date-based iteration (NOT per-player)
+ * - Iterates through dates from Oct 1 to today (~50 dates)
+ * - Fetches ALL players' games for each date in ONE request  
+ * - Daily endpoint: 5-second backoff = 6 points per request
+ * - Total time: ~50 requests × 5 seconds = ~5-10 minutes
+ * 
+ * CRITICAL: Uses Daily Player Gamelogs endpoint (DO NOT use Seasonal)
+ * - Daily: 5s backoff, fetches all players per date
+ * - Seasonal: 30s backoff, fetches one player per request (6x slower, wrong approach)
+ * 
  * Stores with pre-calculated fantasy points to eliminate API calls on player views.
  * Runs once daily at 6 AM ET after all games are finalized.
  */
 
 import { storage } from "../storage";
-import { fetchPlayerGameLogs, calculateFantasyPoints } from "../mysportsfeeds";
+import { fetchDailyPlayerGameLogs, calculateFantasyPoints } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
 
-// Use the current NBA season (MySportsFeeds API uses "latest" which auto-resolves to current season)
+// Use the current NBA season
 const SEASON = "2025-2026-regular";
 
 export async function syncPlayerGameLogs(): Promise<JobResult> {
-  console.log("[sync_player_game_logs] Starting player game logs sync...");
+  console.log("[sync_player_game_logs] Starting date-based game logs sync...");
   
   let requestCount = 0;
   let recordsProcessed = 0;
   let errorCount = 0;
-  let skippedPlayers = 0;
+  let skippedDates = 0;
 
   try {
-    // Get all active players
-    const players = await storage.getPlayers({ search: "", team: "", position: "" });
-    const activePlayers = players.filter(p => p.isActive);
+    // Calculate season date range (Oct 1 to today)
+    const now = new Date();
+    const currentMonth = now.getMonth(); // 0-11
+    const currentYear = now.getFullYear();
     
-    console.log(`[sync_player_game_logs] Found ${activePlayers.length} active players to sync`);
+    // Determine season start year (July+ uses current year, Jan-Jun uses previous year)
+    const seasonStartYear = currentMonth >= 6 ? currentYear : currentYear - 1;
+    const seasonStart = new Date(seasonStartYear, 9, 1); // Oct 1 (month 9 = October)
+    const seasonEnd = now;
+    
+    // Calculate total days to process
+    const totalDays = Math.ceil((seasonEnd.getTime() - seasonStart.getTime()) / (1000 * 60 * 60 * 24));
+    console.log(`[sync_player_game_logs] Processing ${totalDays} dates from ${seasonStart.toDateString()} to ${seasonEnd.toDateString()}`);
 
-    for (let i = 0; i < activePlayers.length; i++) {
-      const player = activePlayers[i];
+    const currentDate = new Date(seasonStart);
+    let datesProcessed = 0;
+    
+    // Iterate through each date from season start to today
+    while (currentDate <= seasonEnd) {
+      datesProcessed++;
+      const dateStr = currentDate.toISOString().split('T')[0];
       
-      // Progress logging every 10 players
-      if (i > 0 && i % 10 === 0) {
-        console.log(`[sync_player_game_logs] Progress: ${i}/${activePlayers.length} players processed (${skippedPlayers} skipped, ${requestCount} API calls)`);
+      // Progress logging every 5 dates
+      if (datesProcessed % 5 === 0) {
+        console.log(`[sync_player_game_logs] Progress: ${datesProcessed}/${totalDays} dates processed (${skippedDates} skipped, ${requestCount} API calls, ${recordsProcessed} games cached)`);
       }
       
       try {
-        // RESUMABLE: Check if player already has cached data for this season
-        const existingGames = await storage.getAllPlayerGameStats(player.id);
-        const seasonGames = existingGames.filter(g => g.season === SEASON);
-        if (seasonGames.length > 0) {
-          skippedPlayers++;
-          if (i < 10 || i % 25 === 0) {
-            console.log(`[sync_player_game_logs] Skipping ${player.firstName} ${player.lastName} - already has ${seasonGames.length} cached games`);
-          }
-          continue;
-        }
+        console.log(`[sync_player_game_logs] Fetching games for date ${dateStr} (${datesProcessed}/${totalDays})`);
         
-        console.log(`[sync_player_game_logs] Fetching data for ${player.firstName} ${player.lastName} (${i + 1}/${activePlayers.length})`);
-        
-        // Fetch all game logs for this player (no limit)
-        const gameLogs = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
+        // Fetch ALL players' games for this date using Daily endpoint (5-second backoff)
+        const dayGameLogs = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
           requestCount++;
-          return await fetchPlayerGameLogs(player.id, 100); // Fetch up to 100 games
+          return await fetchDailyPlayerGameLogs(currentDate);
         });
         
-        // Wait 10 seconds between every player request (backfill - prioritize avoiding rate limits)
-        await new Promise(resolve => setTimeout(resolve, 10000));
+        // Wait 5 seconds between date requests (Daily endpoint backoff requirement)
+        await new Promise(resolve => setTimeout(resolve, 5000));
 
-        if (!gameLogs || gameLogs.length === 0) {
-          console.log(`[sync_player_game_logs] No game logs for player ${player.firstName} ${player.lastName}`);
+        if (!dayGameLogs || dayGameLogs.length === 0) {
+          skippedDates++;
+          console.log(`[sync_player_game_logs] No games on ${dateStr} (likely off day)`);
+          currentDate.setDate(currentDate.getDate() + 1);
           continue;
         }
 
-        console.log(`[sync_player_game_logs] Player ${player.firstName} ${player.lastName}: ${gameLogs.length} games`);
+        console.log(`[sync_player_game_logs] Found ${dayGameLogs.length} games on ${dateStr}`);
 
         // Process and store each game log
-        for (const gameLog of gameLogs) {
+        for (const gameLog of dayGameLogs) {
           try {
-            if (!gameLog.game || !gameLog.stats) {
+            if (!gameLog.game || !gameLog.stats || !gameLog.player) {
               continue;
             }
 
             const game = gameLog.game;
             const stats = gameLog.stats;
+            const player = gameLog.player;
             const offense = stats.offense || {};
             const rebounds_stats = stats.rebounds || {};
             const fieldGoals = stats.fieldGoals || {};
@@ -94,13 +110,13 @@ export async function syncPlayerGameLogs(): Promise<JobResult> {
             });
 
             // Determine home/away
-            const playerTeamAbbr = gameLog.team?.abbreviation || player.team;
+            const playerTeamAbbr = gameLog.team?.abbreviation;
             const isHome = game.homeTeamAbbreviation === playerTeamAbbr;
             const opponentTeam = isHome 
               ? game.awayTeamAbbreviation 
               : game.homeTeamAbbreviation;
 
-            // Store in database
+            // Store in database (upsert handles duplicates)
             await storage.upsertPlayerGameStats({
               playerId: player.id,
               gameId: game.id.toString(),
@@ -123,8 +139,8 @@ export async function syncPlayerGameLogs(): Promise<JobResult> {
               steals: defense.stl || 0,
               blocks: defense.blk || 0,
               turnovers: offense.tov || 0,
-              isDoubleDouble: false, // We can calculate this if needed
-              isTripleDouble: false,  // We can calculate this if needed
+              isDoubleDouble: false,
+              isTripleDouble: false,
               fantasyPoints: fantasyPoints.toFixed(2),
             });
 
@@ -135,15 +151,17 @@ export async function syncPlayerGameLogs(): Promise<JobResult> {
           }
         }
       } catch (error: any) {
-        console.error(`[sync_player_game_logs] Error syncing player ${player.id}:`, error.message);
+        console.error(`[sync_player_game_logs] Error syncing date ${dateStr}:`, error.message);
         errorCount++;
-        // Continue with next player instead of failing entire job
+        // Continue with next date instead of failing entire job
       }
+      
+      // Move to next date
+      currentDate.setDate(currentDate.getDate() + 1);
     }
 
-    const newPlayersSynced = activePlayers.length - skippedPlayers;
     console.log(`[sync_player_game_logs] Completed: ${recordsProcessed} game logs synced`);
-    console.log(`[sync_player_game_logs] Players: ${newPlayersSynced} newly synced, ${skippedPlayers} already cached (${activePlayers.length} total)`);
+    console.log(`[sync_player_game_logs] Dates: ${datesProcessed} total, ${skippedDates} skipped (no games)`);
     console.log(`[sync_player_game_logs] API requests: ${requestCount}, Errors: ${errorCount}`);
     
     return { requestCount, recordsProcessed, errorCount };

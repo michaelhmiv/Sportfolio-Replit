@@ -145,10 +145,44 @@ export async function fetchPlayerSeasonStats(playerId: string): Promise<any> {
 }
 
 /**
- * Fetch player game logs (last N games)
- * Returns detailed per-game stats
+ * Fetch ALL players' game logs for a specific date using Daily Player Gamelogs endpoint
+ * 
+ * IMPORTANT RATE LIMITS (MySportsFeeds):
+ * - Daily Player Gamelogs: 5-second backoff = 6 points per request
+ * - Seasonal Player Gamelogs: 30-second backoff = 31 points per request (DO NOT USE)
+ * - Limit per minute: 100 points
+ * 
+ * This endpoint fetches ALL players' games for a specific date in ONE request.
+ * For backfill, call this ~50 times (Oct 1 - today) to cache all players.
+ * 
+ * Returns all game logs for the specified date (all players)
  */
-export async function fetchPlayerGameLogs(playerId: string, limit: number = 5): Promise<any[]> {
+export async function fetchDailyPlayerGameLogs(date: Date): Promise<any[]> {
+  try {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}${month}${day}`;
+    
+    // Use Daily Player Gamelogs endpoint (5-second backoff)
+    // NOTE: NO player filter - returns all players' games for this date
+    const response = await apiClient.get(`/${SEASON}/date/${dateStr}/player_gamelogs.json`);
+    return response.data.gamelogs || [];
+  } catch (error: any) {
+    console.error(`[MySportsFeeds] Error fetching daily gamelogs for ${date.toISOString()}:`, error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetch single player's game logs (for individual lookups, not bulk backfill)
+ * Filters cached data locally - does NOT make API calls
+ */
+export async function fetchPlayerGameLogs(playerId: string, limit: number = 100): Promise<any[]> {
+  // NOTE: This function is deprecated for backfill use
+  // Use fetchDailyPlayerGameLogs() for bulk operations instead
+  console.warn('[MySportsFeeds] fetchPlayerGameLogs called - consider using fetchDailyPlayerGameLogs for backfill');
+  
   try {
     const response = await apiClient.get(`/${SEASON}/player_gamelogs.json`, {
       params: {
