@@ -152,6 +152,8 @@ export interface IStorage {
   upsertPlayerSeasonSummary(summary: InsertPlayerSeasonSummary): Promise<PlayerSeasonSummary>;
   getPlayerSeasonSummary(playerId: string, season?: string): Promise<PlayerSeasonSummary | undefined>;
   getAllPlayerSeasonSummaries(season?: string): Promise<PlayerSeasonSummary[]>;
+  recalculatePlayerSeasonSummary(playerId: string, season?: string): Promise<PlayerSeasonSummary | null>;
+  recalculateAllPlayerSeasonSummaries(season?: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1725,6 +1727,98 @@ export class DatabaseStorage implements IStorage {
       .from(playerSeasonSummaries)
       .where(eq(playerSeasonSummaries.season, season))
       .orderBy(desc(playerSeasonSummaries.fantasyPointsPerGame));
+  }
+
+  /**
+   * Recalculate a single player's season summary by aggregating their game stats
+   * This eliminates the need to call MySportsFeeds API for season stats
+   */
+  async recalculatePlayerSeasonSummary(playerId: string, season: string = "2024-2025-regular"): Promise<PlayerSeasonSummary | null> {
+    // Aggregate stats from player_game_stats table
+    const gameStats = await db
+      .select()
+      .from(playerGameStats)
+      .where(
+        and(
+          eq(playerGameStats.playerId, playerId),
+          eq(playerGameStats.season, season)
+        )
+      );
+
+    if (gameStats.length === 0) {
+      // No game stats available, delete any existing summary
+      await db
+        .delete(playerSeasonSummaries)
+        .where(
+          and(
+            eq(playerSeasonSummaries.playerId, playerId),
+            eq(playerSeasonSummaries.season, season)
+          )
+        );
+      return null;
+    }
+
+    const gamesPlayed = gameStats.length;
+
+    // Calculate per-game averages
+    const totals = gameStats.reduce(
+      (acc, game) => ({
+        points: acc.points + game.points,
+        rebounds: acc.rebounds + game.rebounds,
+        assists: acc.assists + game.assists,
+        steals: acc.steals + game.steals,
+        blocks: acc.blocks + game.blocks,
+        turnovers: acc.turnovers + game.turnovers,
+        threePointersMade: acc.threePointersMade + game.threePointersMade,
+        minutes: acc.minutes + game.minutes,
+        fantasyPoints: acc.fantasyPoints + parseFloat(game.fantasyPoints),
+      }),
+      { points: 0, rebounds: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0, threePointersMade: 0, minutes: 0, fantasyPoints: 0 }
+    );
+
+    const summary = {
+      playerId,
+      season,
+      gamesPlayed,
+      ptsPerGame: (totals.points / gamesPlayed).toFixed(2),
+      rebPerGame: (totals.rebounds / gamesPlayed).toFixed(2),
+      astPerGame: (totals.assists / gamesPlayed).toFixed(2),
+      stlPerGame: (totals.steals / gamesPlayed).toFixed(2),
+      blkPerGame: (totals.blocks / gamesPlayed).toFixed(2),
+      tovPerGame: (totals.turnovers / gamesPlayed).toFixed(2),
+      fg3PerGame: (totals.threePointersMade / gamesPlayed).toFixed(2),
+      minPerGame: (totals.minutes / gamesPlayed).toFixed(2),
+      // Shooting percentages - set to 0 for now as we don't track makes/attempts in game stats
+      fgPct: "0.00",
+      fg3Pct: "0.00",
+      ftPct: "0.00",
+      // Fantasy points per game - average of all game fantasy points
+      fantasyPointsPerGame: (totals.fantasyPoints / gamesPlayed).toFixed(2),
+    };
+
+    return await this.upsertPlayerSeasonSummary(summary);
+  }
+
+  /**
+   * Recalculate season summaries for all players with game stats
+   * Returns count of players recalculated
+   */
+  async recalculateAllPlayerSeasonSummaries(season: string = "2024-2025-regular"): Promise<number> {
+    // Get all unique player IDs who have game stats this season
+    const playerIds = await db
+      .selectDistinct({ playerId: playerGameStats.playerId })
+      .from(playerGameStats)
+      .where(eq(playerGameStats.season, season));
+
+    let recalculated = 0;
+    for (const { playerId } of playerIds) {
+      const result = await this.recalculatePlayerSeasonSummary(playerId, season);
+      if (result) {
+        recalculated++;
+      }
+    }
+
+    return recalculated;
   }
 }
 
