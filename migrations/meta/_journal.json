@@ -8,13 +8,6 @@
       "when": 1763527462652,
       "tag": "0000_sloppy_dazzler",
       "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1763700075133,
-      "tag": "0001_spooky_devos",
-      "breakpoints": true
     }
   ]
 }

@@ -22,49 +22,18 @@ A notification system (`client/src/lib/notification-context.tsx`) tracks unread 
 The backend is an Express.js server with TypeScript, supporting HTTP and WebSockets. It uses Drizzle ORM with a PostgreSQL database (Neon serverless) and Zod for validation. Core domain models include Users, Players, Holdings, Orders, Trades, Mining, Contests, and Price History. The system features atomic balance updates and precise timezone handling. API design is RESTful for data and uses WebSockets for live updates.
 
 ### Database Schema
-The database includes tables for `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `mining_claims`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, `player_season_summaries`, `price_history`, `holdings_locks`, and `balance_locks`. Indexing is optimized for user-asset relationships, player filtering, and order book queries. Player shares are permanent across seasons.
+The database includes tables for `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `mining_claims`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, `price_history`, `holdings_locks`, and `balance_locks`. Indexing is optimized for user-asset relationships, player filtering, and order book queries. Player shares are permanent across seasons.
 
 An activity tracking system aggregates mining claims, trades, and contest entries into a unified timeline with filtering and pagination.
 
 Share and cash locking systems (`holdings_locks` and `balance_locks` tables) implement transactional locking mechanisms to prevent double-spending of shares and funds across orders, contests, and mining operations. These systems use atomic reservations with `SELECT...FOR UPDATE` and ensure automatic lock releases or adjustments.
 
-### Performance & Caching Architecture
-A persistent stats caching layer dramatically reduces MySportsFeeds API calls by ~95%, ensuring scalability and instant page loads:
-
-**Caching Tables:**
-- `player_season_summaries`: Stores season averages (PPG, RPG, APG, etc.), shooting percentages, and pre-calculated fantasy points per game. **Auto-recalculated via SQL aggregation** from `player_game_stats` after each stats sync (hourly + real-time during live games). Aggregation groups by `(playerId, season)` to support multi-season data.
-- `player_game_stats`: Stores individual game statistics, updated hourly and in real-time during live games. Season is derived from game date using `deriveSeasonFromDate()` utility.
-
-**Database Aggregation Approach:**
-- Season summaries are calculated by aggregating `player_game_stats` locally using SQL reduce operations, eliminating MySportsFeeds API dependency for season stats.
-- Recalculation is automatic: `stats_sync` (hourly) and `stats_sync_live` (every minute during games) trigger `recalculatePlayerSeasonSummary()` for affected players.
-- MySportsFeeds throttling (30-second backoff for Seasonal Player Gamelogs) made API-based sync impractical (3.9 hours for all players). Database aggregation is instant and scalable.
-
-**API Optimization:**
-- `GET /api/players`: Reads FPG from `player_season_summaries` instead of calling MySportsFeeds API for each player (reduces ~500 API calls per marketplace page load to 0).
-- `GET /api/player/:id/stats`: Reads season averages from `player_season_summaries` instead of live API calls.
-- `GET /api/player/:id/recent-games`: Reads from `player_game_stats` instead of calling MySportsFeeds game logs API.
-
-**Season Management:**
-The system uses MySportsFeeds API's built-in season handling via the `current_season` endpoint, which provides authoritative season information including automatic playoff detection. A lightweight caching service (`server/season-service.ts`) fetches and caches the current season slug with a 1-hour TTL. The `CURRENT_SEASON` constant ("2024-2025-regular") serves as a fallback if the API is unavailable. This ensures accurate season tracking across regular season and playoffs without manual updates.
-
-Performance optimizations include SQL JOINs to prevent N+1 queries, marketplace pagination, batch player fetches, React Query caching, and persistent database-backed stats caching with automatic aggregation.
+Performance optimizations include SQL JOINs to prevent N+1 queries, marketplace pagination, batch player fetches, and React Query caching.
 
 The `GET /api/players` endpoint supports comprehensive server-side search, filter, and sort operations for the player database, with optimized database indexes for performance. Contest entry pages dynamically filter players based on games scheduled for the contest date.
 
 ### Background Jobs
-Background jobs, managed by `node-cron` in development and an external cron service in production, handle data synchronization and contest management:
-
-**Data Sync Jobs:**
-- `roster_sync` (daily 5am ET): Updates player rosters, team assignments, and mining eligibility
-- `schedule_sync` (every minute): Fetches daily game schedules and live scores
-- `stats_sync` (hourly): Syncs completed game statistics to `player_game_stats`, then auto-recalculates season summaries for affected players
-- `stats_sync_live` (every minute): Real-time stats updates during live games, then auto-recalculates season summaries for affected players
-
-**Contest Jobs:**
-- `create_contests` (daily midnight): Creates 50/50 contests for upcoming games
-- `update_contest_statuses` (every minute): Transitions contests from open to live
-- `settle_contests` (every 5 minutes): Distributes prizes when contests complete
+Background jobs, managed by `node-cron` in development and an external cron service in production, handle tasks like `roster_sync`, `schedule_sync`, `stats_sync`, `stats_sync_live`, `update_contest_statuses`, `settle_contests`, and `create_contests`.
 
 The Contest Lifecycle & Settlement System automatically progresses contests through creation, status transition (open to live), and settlement stages. Settlement is contingent on both the contest `endsAt` time passing and all associated games being `completed` to ensure accurate prize distribution.
 

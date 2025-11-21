@@ -9,7 +9,6 @@ import { storage } from "../storage";
 import { fetchPlayerGameStats, calculateFantasyPoints } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
-import { getCurrentSeasonSlug } from "../season-service";
 
 export async function syncStats(): Promise<JobResult> {
   console.log("[stats_sync] Starting game stats sync...");
@@ -17,11 +16,6 @@ export async function syncStats(): Promise<JobResult> {
   let requestCount = 0;
   let recordsProcessed = 0;
   let errorCount = 0;
-  const playersToRecalculate = new Set<string>(); // Track players needing season summary updates
-
-  // Fetch current season slug from MySportsFeeds API (cached for 1 hour)
-  const currentSeason = await getCurrentSeasonSlug();
-  console.log(`[stats_sync] Using season: ${currentSeason}`);
 
   try {
     // Get games from last 24 hours (catches late-night games from previous day)
@@ -96,7 +90,7 @@ export async function syncStats(): Promise<JobResult> {
               playerId: gamelog.player.id,
               gameId: game.gameId,
               gameDate: game.date,
-              season: currentSeason,
+              season: "2024-2025-regular",
               opponentTeam: gamelog.team.abbreviation === game.homeTeam ? game.awayTeam : game.homeTeam,
               homeAway: gamelog.team.abbreviation === game.homeTeam ? "home" : "away",
               minutes: offense.minSeconds ? Math.floor(offense.minSeconds / 60) : 0,
@@ -112,8 +106,6 @@ export async function syncStats(): Promise<JobResult> {
               fantasyPoints: fantasyPoints.toString(),
             });
 
-            // Track player for season summary recalculation
-            playersToRecalculate.add(gamelog.player.id);
             recordsProcessed++;
           } catch (error: any) {
             console.error(`[stats_sync] Failed to store player stats:`, error.message);
@@ -128,21 +120,6 @@ export async function syncStats(): Promise<JobResult> {
 
     console.log(`[stats_sync] Successfully processed ${recordsProcessed} player stats, ${errorCount} errors`);
     console.log(`[stats_sync] API requests made: ${requestCount}`);
-    
-    // Recalculate season summaries for affected players
-    if (playersToRecalculate.size > 0) {
-      console.log(`[stats_sync] Recalculating season summaries for ${playersToRecalculate.size} players...`);
-      let recalculatedCount = 0;
-      for (const playerId of playersToRecalculate) {
-        try {
-          await storage.recalculatePlayerSeasonSummary(playerId);
-          recalculatedCount++;
-        } catch (error: any) {
-          console.error(`[stats_sync] Failed to recalculate summary for player ${playerId}:`, error.message);
-        }
-      }
-      console.log(`[stats_sync] Recalculated ${recalculatedCount}/${playersToRecalculate.size} season summaries`);
-    }
     
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {

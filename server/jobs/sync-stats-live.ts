@@ -11,7 +11,6 @@ import { fetchPlayerGameStats, calculateFantasyPoints } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
 import { broadcast } from "../websocket";
-import { getCurrentSeasonSlug } from "../season-service";
 
 export async function syncStatsLive(): Promise<JobResult> {
   console.log("[stats_sync_live] Starting live game stats sync...");
@@ -20,11 +19,6 @@ export async function syncStatsLive(): Promise<JobResult> {
   let recordsProcessed = 0;
   let errorCount = 0;
   const processedGames = new Set<string>(); // Track which games had stats updates
-  const playersToRecalculate = new Set<string>(); // Track players needing season summary updates
-
-  // Fetch current season slug from MySportsFeeds API (cached for 1 hour)
-  const currentSeason = await getCurrentSeasonSlug();
-  console.log(`[stats_sync_live] Using season: ${currentSeason}`);
 
   try {
     // Get today's games only
@@ -104,7 +98,7 @@ export async function syncStatsLive(): Promise<JobResult> {
               playerId: gamelog.player.id,
               gameId: game.gameId,
               gameDate: game.date,
-              season: currentSeason,
+              season: "2024-2025-regular",
               opponentTeam: gamelog.team.abbreviation === game.homeTeam ? game.awayTeam : game.homeTeam,
               homeAway: gamelog.team.abbreviation === game.homeTeam ? "home" : "away",
               minutes: offense.minSeconds ? Math.floor(offense.minSeconds / 60) : 0,
@@ -120,8 +114,6 @@ export async function syncStatsLive(): Promise<JobResult> {
               fantasyPoints: fantasyPoints.toString(),
             });
 
-            // Track player for season summary recalculation
-            playersToRecalculate.add(gamelog.player.id);
             recordsProcessed++;
             processedGames.add(game.gameId); // Mark that this game had updates
           } catch (error: any) {
@@ -154,21 +146,6 @@ export async function syncStatsLive(): Promise<JobResult> {
 
     console.log(`[stats_sync_live] ✓ Processed ${recordsProcessed} player stats from ${liveGames.length} live games, ${errorCount} errors`);
     console.log(`[stats_sync_live] API requests made: ${requestCount}`);
-    
-    // Recalculate season summaries for affected players
-    if (playersToRecalculate.size > 0) {
-      console.log(`[stats_sync_live] Recalculating season summaries for ${playersToRecalculate.size} players...`);
-      let recalculatedCount = 0;
-      for (const playerId of playersToRecalculate) {
-        try {
-          await storage.recalculatePlayerSeasonSummary(playerId);
-          recalculatedCount++;
-        } catch (error: any) {
-          console.error(`[stats_sync_live] Failed to recalculate summary for player ${playerId}:`, error.message);
-        }
-      }
-      console.log(`[stats_sync_live] Recalculated ${recalculatedCount}/${playersToRecalculate.size} season summaries`);
-    }
     
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {
