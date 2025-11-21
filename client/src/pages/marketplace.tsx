@@ -544,7 +544,7 @@ function MarketActivityFeed() {
     const orderTypeLabel = item.orderType === "limit" ? "Limit" : "Market";
     return { 
       type: orderTypeLabel, 
-      color: item.side === "buy" ? "text-positive" : "text-negative" 
+      color: item.side === "buy" ? "text-blue-500" : "text-red-500" 
     };
   };
 
@@ -559,9 +559,9 @@ function MarketActivityFeed() {
     if (item.activityType === "trade") {
       return (
         <span className="text-xs">
-          <span className="text-positive">{item.buyerUsername}</span>
+          <span className="text-blue-500">{item.buyerUsername}</span>
           <span className="text-muted-foreground mx-1">←</span>
-          <span className="text-negative">{item.sellerUsername}</span>
+          <span className="text-red-500">{item.sellerUsername}</span>
         </span>
       );
     }
@@ -621,7 +621,7 @@ function MarketActivityFeed() {
                   
                   {/* Side and Order Type */}
                   <div className="w-20 text-xs font-medium flex-shrink-0">
-                    {sideLabel && <span className={item.side === "buy" ? "text-positive" : "text-negative"}>{sideLabel} </span>}
+                    {sideLabel && <span className={item.side === "buy" ? "text-blue-500" : "text-red-500"}>{sideLabel} </span>}
                     <span className={label.color}>{label.type}</span>
                   </div>
                   

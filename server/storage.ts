@@ -30,6 +30,7 @@ import {
   type MiningSplit,
   type InsertMiningSplit,
   type Contest,
+  type InsertContest,
   type ContestEntry,
   type InsertContestEntry,
   type InsertContestLineup,
