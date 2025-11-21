@@ -11,6 +11,7 @@ import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
 import { calculateAccrualUpdate } from "@shared/mining-utils";
 import { createContests } from "./jobs/create-contests";
+import { calculateContestLeaderboard } from "./contest-scoring";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1756,6 +1757,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const result = await createContests();
       res.json(result);
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint to re-score a contest without redistributing payouts
+  app.post("/api/admin/contests/:id/rescore", adminAuth, async (req, res) => {
+    try {
+      const contestId = req.params.id;
+      console.log(`[admin] Manually re-scoring contest ${contestId}...`);
+      
+      const contest = await storage.getContest(contestId);
+      if (!contest) {
+        return res.status(404).json({ error: "Contest not found" });
+      }
+      
+      // Only allow re-scoring of completed contests
+      if (contest.status !== "completed") {
+        return res.status(400).json({ 
+          error: `Cannot re-score contest with status "${contest.status}". Only completed contests can be re-scored.` 
+        });
+      }
+      
+      // Recalculate leaderboard (updates scores, ranks, and lineup fantasy points)
+      // This does NOT redistribute payouts
+      const leaderboard = await calculateContestLeaderboard(contestId);
+      
+      console.log(`[admin] Contest ${contestId} re-scored successfully. ${leaderboard.length} entries processed.`);
+      
+      res.json({
+        success: true,
+        contestId,
+        contestName: contest.name,
+        entriesProcessed: leaderboard.length,
+        leaderboard: leaderboard.slice(0, 10), // Return top 10 for verification
+      });
+    } catch (error: any) {
+      console.error("[admin] Error re-scoring contest:", error.message);
       res.status(500).json({ error: error.message });
     }
   });

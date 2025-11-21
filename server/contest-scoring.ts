@@ -75,12 +75,14 @@ export async function getPlayerFantasyPoints(
     }
     
     for (const stat of stats) {
-      const current = pointsByPlayer.get(stat.playerId) || 0;
+      // Normalize player ID to string to match contest lineup player IDs
+      const playerId = String(stat.playerId);
+      const current = pointsByPlayer.get(playerId) || 0;
       const fantasyPoints = parseFloat(stat.fantasyPoints) || 0;
-      pointsByPlayer.set(stat.playerId, current + fantasyPoints);
+      pointsByPlayer.set(playerId, current + fantasyPoints);
       
       if (fantasyPoints > 0) {
-        console.log(`[getPlayerFantasyPoints]   - Player ${stat.playerId}: ${fantasyPoints} fantasy points`);
+        console.log(`[getPlayerFantasyPoints]   - Player ${playerId}: ${fantasyPoints} fantasy points`);
       }
     }
   }
@@ -239,6 +241,15 @@ export async function settleContest(contestId: string): Promise<void> {
   if (leaderboard.length === 0) {
     console.log(`[settleContest] No entries in contest ${contestId}, nothing to settle`);
     return;
+  }
+
+  // Safety guard: Check if ANY player has non-zero fantasy points
+  // If all scores are 0, game stats likely aren't synced yet - delay settlement
+  const hasAnyScores = leaderboard.some(entry => entry.totalScore > 0);
+  if (!hasAnyScores) {
+    console.warn(`[settleContest] ⚠️ Contest ${contestId} has ALL zero scores - game stats may not be synced yet`);
+    console.warn(`[settleContest] Delaying settlement until game stats are available to prevent incorrect payouts`);
+    throw new Error(`Cannot settle contest ${contestId}: All scores are 0.00. Game stats may not be synced yet.`);
   }
 
   const totalPrizePool = parseFloat(contest.totalPrizePool);
