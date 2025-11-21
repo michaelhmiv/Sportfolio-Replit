@@ -19,6 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { calculateMiningShares } from "@shared/mining-utils";
 import { MarketActivityWidget } from "@/components/market-activity-widget";
+import { PlayerName } from "@/components/player-name";
 
 interface DashboardData {
   user: {
@@ -670,7 +671,14 @@ export default function Dashboard() {
                           <span className="text-[10px] font-bold">{entry.player.firstName[0]}{entry.player.lastName[0]}</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate">{entry.player.firstName} {entry.player.lastName}</div>
+                          <div className="font-medium truncate">
+                            <PlayerName 
+                              playerId={entry.player.id} 
+                              firstName={entry.player.firstName} 
+                              lastName={entry.player.lastName}
+                              className="text-xs"
+                            />
+                          </div>
                           <div className="text-[10px] text-muted-foreground">{entry.sharesPerHour} sh/hr</div>
                         </div>
                       </div>

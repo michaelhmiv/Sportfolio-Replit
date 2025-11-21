@@ -13,6 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import type { Holding, Order, Player } from "@shared/schema";
+import { PlayerName } from "@/components/player-name";
 
 interface PortfolioData {
   balance: string;
@@ -409,7 +410,13 @@ export default function Portfolio() {
                                 <Badge variant="outline" className="capitalize">{order.orderType}</Badge>
                               </td>
                               <td className="p-2 sm:p-4">
-                                <div className="font-medium">{order.player.firstName} {order.player.lastName}</div>
+                                <div className="font-medium">
+                                  <PlayerName 
+                                    playerId={order.player.id} 
+                                    firstName={order.player.firstName} 
+                                    lastName={order.player.lastName}
+                                  />
+                                </div>
                                 <div className="text-xs text-muted-foreground">{order.player.team}</div>
                               </td>
                               <td className="p-2 sm:p-4 text-right">

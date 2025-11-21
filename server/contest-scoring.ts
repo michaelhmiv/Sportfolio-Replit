@@ -58,28 +58,34 @@ export async function calculateTotalSharesByPlayer(contestId: string): Promise<M
  */
 export async function getPlayerFantasyPoints(
   contestId: string,
-  gameIds: (string | number)[]
+  gameIds: string[]
 ): Promise<Map<string, number>> {
   const pointsByPlayer = new Map<string, number>();
 
+  console.log(`[getPlayerFantasyPoints] Contest ${contestId}: Processing ${gameIds.length} games`);
+  console.log(`[getPlayerFantasyPoints] GameIds:`, gameIds);
+
   for (const gameId of gameIds) {
-    // Ensure gameId is a number - handle both numeric and string gameIds
-    const numericGameId = typeof gameId === 'number' ? gameId : parseInt(gameId, 10);
+    const stats = await storage.getGameStatsByGameId(gameId);
     
-    if (isNaN(numericGameId)) {
-      console.warn(`[getPlayerFantasyPoints] Invalid gameId: ${gameId}, skipping`);
-      continue;
+    console.log(`[getPlayerFantasyPoints] Game ${gameId}: Found ${stats.length} player stats`);
+    
+    if (stats.length === 0) {
+      console.warn(`[getPlayerFantasyPoints] ⚠️ No stats found for game ${gameId} - stats may not be synced yet`);
     }
-    
-    const stats = await storage.getGameStatsByGameId(numericGameId);
     
     for (const stat of stats) {
       const current = pointsByPlayer.get(stat.playerId) || 0;
       const fantasyPoints = parseFloat(stat.fantasyPoints) || 0;
       pointsByPlayer.set(stat.playerId, current + fantasyPoints);
+      
+      if (fantasyPoints > 0) {
+        console.log(`[getPlayerFantasyPoints]   - Player ${stat.playerId}: ${fantasyPoints} fantasy points`);
+      }
     }
   }
 
+  console.log(`[getPlayerFantasyPoints] Total players with fantasy points: ${pointsByPlayer.size}`);
   return pointsByPlayer;
 }
 
@@ -99,12 +105,20 @@ export async function calculateContestLeaderboard(contestId: string): Promise<Le
     return [];
   }
 
+  console.log(`[calculateContestLeaderboard] Contest ${contestId}: Calculating leaderboard for ${entries.length} entries`);
+
   // Get game IDs for this contest (based on gameDate)
   const contestDate = new Date(contest.gameDate);
   const startOfDay = new Date(contestDate.getFullYear(), contestDate.getMonth(), contestDate.getDate(), 0, 0, 0);
   const endOfDay = new Date(contestDate.getFullYear(), contestDate.getMonth(), contestDate.getDate(), 23, 59, 59);
   const games = await storage.getDailyGames(startOfDay, endOfDay);
   const gameIds = games.map(g => g.gameId);
+
+  console.log(`[calculateContestLeaderboard] Contest date: ${contestDate.toISOString()}`);
+  console.log(`[calculateContestLeaderboard] Found ${games.length} games for this contest date`);
+  games.forEach(g => {
+    console.log(`[calculateContestLeaderboard]   - Game ${g.gameId}: ${g.awayTeam} @ ${g.homeTeam} (${g.status})`);
+  });
 
   // Calculate total shares per player across all entries
   const totalSharesByPlayer = await calculateTotalSharesByPlayer(contestId);
@@ -142,6 +156,12 @@ export async function calculateContestLeaderboard(contestId: string): Promise<Le
       // Calculate proportional score: (my shares / total shares) × fantasy points
       const earnedScore = totalShares > 0 ? (lineup.sharesEntered / totalShares) * fantasyPoints : 0;
       totalScore += earnedScore;
+
+      if (fantasyPoints === 0) {
+        console.warn(`[calculateContestLeaderboard] ⚠️ Player ${player?.firstName} ${player?.lastName} (${lineup.playerId}) has 0 fantasy points!`);
+      } else {
+        console.log(`[calculateContestLeaderboard] Player ${player?.firstName} ${player?.lastName}: ${fantasyPoints} FP, ${lineup.sharesEntered}/${totalShares} shares = ${earnedScore.toFixed(2)} earned`);
+      }
 
       playerDetails.push({
         entryId: entry.id,

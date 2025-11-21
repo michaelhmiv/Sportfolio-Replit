@@ -2,8 +2,11 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
 import { storage } from "./storage";
+import { db } from "./db";
 import { fetchActivePlayers, calculateFantasyPoints, fetchPlayerSeasonStats, fetchPlayerGameLogs } from "./mysportsfeeds";
 import type { InsertPlayer, Player, User, Holding } from "@shared/schema";
+import { contestLineups, contestEntries, contests, holdings } from "@shared/schema";
+import { sql, eq, desc, and } from "drizzle-orm";
 import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
 import { calculateAccrualUpdate } from "@shared/mining-utils";
@@ -865,7 +868,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Player recent games (last 5 games)
+  // Player recent games (last 10 games)
   app.get("/api/player/:id/recent-games", async (req, res) => {
     try {
       const player = await storage.getPlayer(req.params.id);
@@ -874,8 +877,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Player not found" });
       }
 
-      // Fetch last 5 games from MySportsFeeds
-      const gameLogs = await fetchPlayerGameLogs(player.id, 5);
+      // Fetch last 10 games from MySportsFeeds
+      const gameLogs = await fetchPlayerGameLogs(player.id, 10);
       
       if (!gameLogs || gameLogs.length === 0) {
         return res.json({ recentGames: [] });
@@ -891,6 +894,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const rebounds = stats.rebounds || {};
           const fieldGoals = stats.fieldGoals || {};
           const defense = stats.defense || {};
+          
+          // Calculate fantasy points for this game
+          const fantasyPoints = calculateFantasyPoints({
+            points: offense.pts || 0,
+            threePointersMade: fieldGoals.fg3PtMade || 0,
+            rebounds: rebounds.reb || 0,
+            assists: offense.ast || 0,
+            steals: defense.stl || 0,
+            blocks: defense.blk || 0,
+            turnovers: offense.tov || 0,
+          });
+          
           return {
             game: {
               id: log.game?.id || 0,
@@ -911,6 +926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               fieldGoalsAttempted: fieldGoals.fgAtt || 0,
               threePointersMade: fieldGoals.fg3PtMade || 0,
               minutes: stats.miscellaneous?.minSeconds ? Math.floor(stats.miscellaneous.minSeconds / 60) : 0,
+              fantasyPoints,
             },
           };
         });
@@ -923,6 +939,158 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recentGames: [],
         error: "Game logs temporarily unavailable"
       });
+    }
+  });
+
+  // Player contest earnings and performance
+  app.get("/api/player/:id/contest-earnings", async (req, res) => {
+    try {
+      const player = await storage.getPlayer(req.params.id);
+      
+      if (!player) {
+        return res.status(404).json({ error: "Player not found" });
+      }
+
+      // Query contest lineups for this player across all completed contests
+      const playerContestLineups = await db
+        .select({
+          contestId: contests.id,
+          entryId: contestLineups.entryId,
+          sharesEntered: contestLineups.sharesEntered,
+          fantasyPoints: contestLineups.fantasyPoints,
+          earnedScore: contestLineups.earnedScore,
+          contestName: contests.name,
+          contestDate: contests.gameDate,
+          contestStatus: contests.status,
+          entryRank: contestEntries.rank,
+          entryPayout: contestEntries.payout,
+          totalEntries: contests.entryCount,
+        })
+        .from(contestLineups)
+        .innerJoin(contestEntries, eq(contestLineups.entryId, contestEntries.id))
+        .innerJoin(contests, eq(contestEntries.contestId, contests.id))
+        .where(eq(contestLineups.playerId, player.id))
+        .orderBy(desc(contests.gameDate));
+
+      // Calculate aggregate stats
+      const totalAppearances = playerContestLineups.length;
+      const completedContests = playerContestLineups.filter((c: any) => c.contestStatus === 'completed');
+      
+      // Calculate total earnings (sum of payouts from entries where this player was used)
+      // Note: This counts the full entry payout, which might include other players
+      const totalEarnings = completedContests.reduce((sum: number, c: any) => {
+        return sum + parseFloat(c.entryPayout || "0");
+      }, 0);
+
+      // Calculate average fantasy points from contest performances
+      const avgFantasyPoints = completedContests.length > 0
+        ? completedContests.reduce((sum: number, c: any) => sum + parseFloat(c.fantasyPoints || "0"), 0) / completedContests.length
+        : 0;
+
+      // Calculate win rate (entries that finished in the top 50%)
+      const winningEntries = completedContests.filter((c: any) => {
+        if (!c.entryRank || !c.totalEntries) return false;
+        return c.entryRank <= Math.ceil(c.totalEntries / 2);
+      });
+      const winRate = completedContests.length > 0 
+        ? (winningEntries.length / completedContests.length) * 100 
+        : 0;
+
+      res.json({
+        player: {
+          id: player.id,
+          firstName: player.firstName,
+          lastName: player.lastName,
+        },
+        contestPerformance: {
+          totalAppearances,
+          completedContests: completedContests.length,
+          totalEarnings: totalEarnings.toFixed(2),
+          avgFantasyPoints: avgFantasyPoints.toFixed(2),
+          winRate: winRate.toFixed(1),
+        },
+        recentContests: playerContestLineups.slice(0, 10).map((c: any) => ({
+          contestName: c.contestName,
+          contestDate: c.contestDate,
+          status: c.contestStatus,
+          fantasyPoints: c.fantasyPoints,
+          earnedScore: c.earnedScore,
+          sharesEntered: c.sharesEntered,
+          entryRank: c.entryRank,
+          entryPayout: c.entryPayout,
+        })),
+      });
+    } catch (error: any) {
+      console.error("[API] Error fetching contest earnings:", error.message);
+      res.json({ 
+        contestPerformance: null,
+        recentContests: [],
+        error: "Contest data temporarily unavailable"
+      });
+    }
+  });
+
+  // Player shares info (total shares outstanding and market cap)
+  app.get("/api/player/:id/shares-info", async (req, res) => {
+    try {
+      const player = await storage.getPlayer(req.params.id);
+      
+      if (!player) {
+        return res.status(404).json({ error: "Player not found" });
+      }
+
+      // Calculate total shares outstanding across all users
+      const totalSharesResult = await db
+        .select({ total: sql<number>`COALESCE(SUM(${holdings.quantity}), 0)` })
+        .from(holdings)
+        .where(
+          and(
+            eq(holdings.assetType, "player"),
+            eq(holdings.assetId, player.id)
+          )
+        );
+
+      const totalShares = Number(totalSharesResult[0]?.total || 0);
+
+      // Use last trade price as the current market price, fallback to currentPrice
+      const sharePrice = parseFloat(player.lastTradePrice || player.currentPrice);
+      
+      // Calculate market cap = total shares × price
+      const marketCap = totalShares * sharePrice;
+
+      // Get number of unique holders
+      const holdersResult = await db
+        .select({ count: sql<number>`COUNT(DISTINCT ${holdings.userId})` })
+        .from(holdings)
+        .where(
+          and(
+            eq(holdings.assetType, "player"),
+            eq(holdings.assetId, player.id),
+            sql`${holdings.quantity} > 0`
+          )
+        );
+
+      const totalHolders = Number(holdersResult[0]?.count || 0);
+
+      res.json({
+        player: {
+          id: player.id,
+          firstName: player.firstName,
+          lastName: player.lastName,
+          team: player.team,
+        },
+        sharesInfo: {
+          totalSharesOutstanding: totalShares,
+          currentSharePrice: sharePrice.toFixed(2),
+          marketCap: marketCap.toFixed(2),
+          totalHolders,
+          volume24h: player.volume24h,
+          priceChange24h: player.priceChange24h,
+        },
+      });
+    } catch (error: any) {
+      console.error("[API] Error fetching shares info:", error.message);
+      res.status(500).json({ error: error.message });
     }
   });
 
