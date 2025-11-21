@@ -9,6 +9,7 @@ import { Trophy, Users, DollarSign, Clock, Calendar, ChevronLeft, ChevronRight }
 import { Link } from "wouter";
 import { format } from "date-fns";
 import type { Contest, ContestEntry } from "@shared/schema";
+import { AdSenseAd } from "@/components/adsense-ad";
 
 interface ContestsData {
   contests: Contest[];
@@ -311,6 +312,17 @@ export default function Contests() {
                   </Card>
                 </div>
           </>
+        )}
+
+        {/* AdSense Ad - Contests */}
+        {data && data.contests.length > 0 && (
+          <div className="my-6">
+            <AdSenseAd 
+              slot="9148489051" 
+              format="auto" 
+              fullWidthResponsive={true}
+            />
+          </div>
         )}
         
         {/* My Entries */}

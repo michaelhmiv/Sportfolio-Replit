@@ -1,10 +1,20 @@
 import { useEffect } from "react";
 
 interface AdSenseAdProps {
+  slot: string;
+  format?: string;
+  layoutKey?: string;
+  fullWidthResponsive?: boolean;
   className?: string;
 }
 
-export function AdSenseAd({ className = "" }: AdSenseAdProps) {
+export function AdSenseAd({ 
+  slot,
+  format = "fluid",
+  layoutKey,
+  fullWidthResponsive = false,
+  className = "" 
+}: AdSenseAdProps) {
   useEffect(() => {
     try {
       // Push ad to AdSense queue
@@ -21,10 +31,11 @@ export function AdSenseAd({ className = "" }: AdSenseAdProps) {
       <ins
         className="adsbygoogle"
         style={{ display: "block" }}
-        data-ad-format="fluid"
-        data-ad-layout-key="-i2-7+2w-11-86"
+        data-ad-format={format}
+        {...(layoutKey && { "data-ad-layout-key": layoutKey })}
         data-ad-client="ca-pub-3663304837019777"
-        data-ad-slot="8848272002"
+        data-ad-slot={slot}
+        {...(fullWidthResponsive && { "data-full-width-responsive": "true" })}
       />
     </div>
   );

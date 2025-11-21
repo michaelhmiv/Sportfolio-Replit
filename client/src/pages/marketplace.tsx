@@ -452,7 +452,7 @@ export default function Marketplace() {
                           playerRow,
                           <tr key={`ad-${index}`} className="border-b">
                             <td colSpan={7} className="p-0">
-                              <AdSenseAd className="py-4" />
+                              <AdSenseAd slot="8848272002" format="fluid" layoutKey="-i2-7+2w-11-86" className="py-4" />
                             </td>
                           </tr>
                         ];
