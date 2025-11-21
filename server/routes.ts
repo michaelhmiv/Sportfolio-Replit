@@ -2620,49 +2620,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin middleware - validates ADMIN_API_TOKEN (for external cron) OR isAdmin flag (for logged-in users)
   async function adminAuth(req: any, res: any, next: any) {
-    console.log('[ADMIN_DEBUG] adminAuth called for:', req.path);
-    console.log('[ADMIN_DEBUG] req.user exists:', !!req.user);
-    console.log('[ADMIN_DEBUG] req.isAuthenticated exists:', typeof req.isAuthenticated);
-    
     const token = req.headers.authorization?.replace('Bearer ', '');
     const expectedToken = process.env.ADMIN_API_TOKEN;
     
     // Check 1: Token-based auth (for external cron jobs)
     if (token) {
-      // If token is provided but ADMIN_API_TOKEN is not configured
       if (!expectedToken) {
         console.warn('[ADMIN] ADMIN_API_TOKEN not configured - admin endpoints disabled for external access');
         return res.status(503).json({ error: 'Admin endpoints not configured' });
       }
-      // Token-based auth success
       if (token === expectedToken) {
         return next();
       }
-      // Token provided but incorrect - authentication failed
       const clientIp = req.ip || req.connection.remoteAddress;
       console.warn(`[ADMIN] Invalid token from ${clientIp} to ${req.path}`);
       return res.status(401).json({ error: 'Unauthorized - invalid token' });
     }
     
-    // Check 2: Session-based auth with admin role (for logged-in admin users)
-    // Works with both passport session auth AND dev bypass (which sets req.user)
-    if ((req.isAuthenticated && req.isAuthenticated()) || req.user) {
-      try {
-        const userId = getUserId(req);
-        console.log('[ADMIN_DEBUG] userId:', userId);
-        const user = await storage.getUser(userId);
-        console.log('[ADMIN_DEBUG] user:', user ? { id: user.id, isAdmin: user.isAdmin } : 'null');
-        if (user?.isAdmin) {
-          console.log('[ADMIN_DEBUG] Access granted!');
-          return next();
-        } else {
-          console.log('[ADMIN_DEBUG] User found but isAdmin =', user?.isAdmin);
-        }
-      } catch (error) {
-        console.error('[ADMIN] Error checking admin status:', error);
+    // Check 2: Direct admin role check - works with any authentication method
+    try {
+      let userId: string | null = null;
+      
+      // Try to get userId from req.user (works with both passport and dev bypass)
+      if (req.user?.claims?.sub) {
+        userId = req.user.claims.sub;
+      } else if (req.user?.id) {
+        userId = req.user.id;
       }
-    } else {
-      console.log('[ADMIN_DEBUG] No auth detected - req.user:', !!req.user, 'req.isAuthenticated:', typeof req.isAuthenticated);
+      
+      // If we have a userId, check admin status in database
+      if (userId) {
+        const user = await storage.getUser(userId);
+        if (user?.isAdmin) {
+          return next();
+        }
+      }
+    } catch (error) {
+      console.error('[ADMIN] Error checking admin status:', error);
     }
     
     const clientIp = req.ip || req.connection.remoteAddress;
