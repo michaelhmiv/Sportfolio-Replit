@@ -208,13 +208,7 @@ export default function ContestLeaderboard() {
                         </td>
                         <td className="px-2 py-2">
                           <div className="flex items-center gap-1">
-                            <button
-                              onClick={() => handleViewEntry(entry.entryId)}
-                              className="text-sm font-medium hover:text-primary hover:underline cursor-pointer text-left truncate max-w-[120px]"
-                              data-testid={`button-view-entry-${entry.userId}`}
-                            >
-                              <UserName userId={entry.userId} username={entry.username} className="text-sm" />
-                            </button>
+                            <UserName userId={entry.userId} username={entry.username} className="text-sm font-medium" data-testid={`link-user-${entry.userId}`} />
                             {isMyEntry && <Badge variant="outline" className="text-[10px] px-1">You</Badge>}
                           </div>
                         </td>

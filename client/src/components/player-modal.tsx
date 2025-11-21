@@ -262,7 +262,7 @@ export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) 
                     <div className="space-y-1.5">
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">Avg Fantasy Pts/G</span>
-                        <span className="font-bold text-primary" data-testid="stat-avg-fp">{stats.avgFantasyPointsPerGame}</span>
+                        <span className="font-bold text-primary" data-testid="stat-avg-fp">{stats.avgFantasyPointsPerGame} FP</span>
                       </div>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">Points Per Game</span>
@@ -366,17 +366,6 @@ export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) 
                         </div>
                       ))}
                     </div>
-                    {recentGames.length > 5 && (
-                      <div className="mt-3 text-center">
-                        <a 
-                          href={`/player/${playerId}`} 
-                          className="text-sm text-primary hover:underline"
-                          data-testid="link-see-more-games"
-                        >
-                          See all {recentGames.length} games →
-                        </a>
-                      </div>
-                    )}
                   </>
                 ) : (
                   <div className="text-center text-sm text-muted-foreground py-6">

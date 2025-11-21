@@ -37,6 +37,25 @@ Background jobs, managed by `node-cron` in development and an external cron serv
 
 The Contest Lifecycle & Settlement System automatically progresses contests through creation, status transition (open to live), and settlement stages. Settlement is contingent on both the contest `endsAt` time passing and all associated games being `completed` to ensure accurate prize distribution.
 
+## Design Principles
+
+### Compact & Information-Dense UI
+Sportfolio prioritizes information density and compact layouts inspired by professional financial trading platforms. The design philosophy emphasizes showing maximum relevant information without wasted space:
+
+-   **Typography:** Use marketplace-style font sizes (text-sm, text-xs) for lists and data displays. Larger text is reserved for headlines and primary metrics only.
+-   **Spacing:** Minimize padding and gaps between elements. Use tight spacing (gap-1.5, gap-2, pb-1, pb-2) instead of spacious layouts common in "general AI" designs.
+-   **Card Design:** Keep cards compact with reduced padding. Card headers should use smaller titles (text-sm) and minimal bottom padding (pb-1, pb-2).
+-   **List Items:** Design list items to be concise, showing multiple entries in a viewport without scrolling. Prioritize horizontal space usage.
+-   **Modals & Dialogs:** Maximize information visible at once. Show only essential items (e.g., 5 recent games) with "see more" links to full pages rather than long scrollable lists.
+-   **Data Visualization:** Present stats in compact grids with small labels and tight spacing. Use abbreviated labels (PPG, RPG, APG) where appropriate.
+
+The goal is a professional, data-rich interface where users can quickly scan and process information, similar to Bloomberg Terminal or professional trading platforms. Avoid spacious, magazine-style layouts that waste screen real estate.
+
+### Interactive Elements
+-   **Clickable Names:** All player names and usernames throughout the application are clickable, opening player modals or navigating to user profiles respectively.
+-   **PlayerName Component:** A reusable component that makes player names clickable, opening a detailed player modal with stats, recent games, and market information.
+-   **UserName Component:** A reusable component that makes usernames clickable, navigating to user profile pages.
+
 ## External Dependencies
 
 -   **MySportsFeeds API:** Provides NBA player rosters, game schedules, and statistics (v2.1 CORE and STATS tiers).
