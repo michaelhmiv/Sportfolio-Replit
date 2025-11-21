@@ -1094,11 +1094,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const totalShares = Number(totalSharesResult[0]?.total || 0);
 
-      // Use last trade price as the current market price, fallback to currentPrice
-      const sharePrice = parseFloat(player.lastTradePrice || player.currentPrice);
-      
-      // Calculate market cap = total shares × price
-      const marketCap = totalShares * sharePrice;
+      // Use ONLY last trade price - never fall back to placeholder currentPrice
+      // If no trades have occurred, price and market cap are null
+      const sharePrice = player.lastTradePrice ? parseFloat(player.lastTradePrice) : null;
+      const marketCap = sharePrice !== null ? totalShares * sharePrice : null;
 
       // Get number of unique holders
       const holdersResult = await db
@@ -1123,8 +1122,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         sharesInfo: {
           totalSharesOutstanding: totalShares,
-          currentSharePrice: sharePrice.toFixed(2),
-          marketCap: marketCap.toFixed(2),
+          currentSharePrice: sharePrice !== null ? sharePrice.toFixed(2) : null,
+          marketCap: marketCap !== null ? marketCap.toFixed(2) : null,
           totalHolders,
           volume24h: player.volume24h,
           priceChange24h: player.priceChange24h,

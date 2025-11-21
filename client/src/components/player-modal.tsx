@@ -15,8 +15,8 @@ interface PlayerModalProps {
 
 interface SharesInfo {
   totalSharesOutstanding: number;
-  currentSharePrice: string;
-  marketCap: string;
+  currentSharePrice: string | null;
+  marketCap: string | null;
   totalHolders: number;
   volume24h: number;
   priceChange24h: string;
@@ -126,11 +126,15 @@ export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) 
               <div className="grid grid-cols-3 gap-x-2 gap-y-1.5 text-xs">
                 <div>
                   <div className="text-muted-foreground text-[10px]">Price</div>
-                  <div className="font-bold" data-testid="text-share-price">${sharesInfo.currentSharePrice}</div>
+                  <div className="font-bold" data-testid="text-share-price">
+                    {sharesInfo.currentSharePrice ? `$${sharesInfo.currentSharePrice}` : <span className="text-muted-foreground text-[10px] font-normal">-</span>}
+                  </div>
                 </div>
                 <div>
                   <div className="text-muted-foreground text-[10px]">Market Cap</div>
-                  <div className="font-bold" data-testid="text-market-cap">${sharesInfo.marketCap}</div>
+                  <div className="font-bold" data-testid="text-market-cap">
+                    {sharesInfo.marketCap ? `$${sharesInfo.marketCap}` : <span className="text-muted-foreground text-[10px] font-normal">-</span>}
+                  </div>
                 </div>
                 <div>
                   <div className="text-muted-foreground text-[10px]">Shares</div>

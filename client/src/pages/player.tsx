@@ -131,10 +131,10 @@ export default function PlayerPage() {
       const price = parseFloat(limitPrice) || 0;
       return (qty * price).toFixed(2);
     } else {
-      // Market order uses best available price or current price as estimate
+      // Market order uses best available price or last trade price as estimate (never placeholder currentPrice)
       const price = side === "buy" 
-        ? parseFloat(data?.orderBook.asks[0]?.price || data?.player.currentPrice || "0")
-        : parseFloat(data?.orderBook.bids[0]?.price || data?.player.currentPrice || "0");
+        ? parseFloat(data?.orderBook.asks[0]?.price || data?.player.lastTradePrice || "0")
+        : parseFloat(data?.orderBook.bids[0]?.price || data?.player.lastTradePrice || "0");
       return (qty * price).toFixed(2);
     }
   };
@@ -142,8 +142,8 @@ export default function PlayerPage() {
   const setMaxQuantity = () => {
     if (side === "buy") {
       const price = orderType === "limit" 
-        ? parseFloat(limitPrice) || parseFloat(data?.player.currentPrice || "0")
-        : parseFloat(data?.orderBook.asks[0]?.price || data?.player.currentPrice || "0");
+        ? parseFloat(limitPrice) || parseFloat(data?.player.lastTradePrice || "0")
+        : parseFloat(data?.orderBook.asks[0]?.price || data?.player.lastTradePrice || "0");
       
       if (price <= 0) return; // Avoid division by zero
       const maxQty = Math.floor(parseFloat(data?.userBalance || "0") / price);
