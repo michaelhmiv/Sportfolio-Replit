@@ -2645,13 +2645,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if ((req.isAuthenticated && req.isAuthenticated()) || req.user) {
       try {
         const userId = getUserId(req);
+        console.log('[ADMIN_DEBUG] userId:', userId);
         const user = await storage.getUser(userId);
+        console.log('[ADMIN_DEBUG] user:', user ? { id: user.id, isAdmin: user.isAdmin } : 'null');
         if (user?.isAdmin) {
+          console.log('[ADMIN_DEBUG] Access granted!');
           return next();
+        } else {
+          console.log('[ADMIN_DEBUG] User found but isAdmin =', user?.isAdmin);
         }
       } catch (error) {
         console.error('[ADMIN] Error checking admin status:', error);
       }
+    } else {
+      console.log('[ADMIN_DEBUG] No auth detected - req.user:', !!req.user, 'req.isAuthenticated:', typeof req.isAuthenticated);
     }
     
     const clientIp = req.ip || req.connection.remoteAddress;
