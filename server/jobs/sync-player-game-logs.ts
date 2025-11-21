@@ -120,7 +120,17 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
 
         if (!dayGameLogs || dayGameLogs.length === 0) {
           skippedDates++;
-          console.log(`[sync_player_game_logs] No games on ${dateStr} (likely off day)`);
+          // In daily mode, warn if we expected games but got none (potential API issue)
+          // In backfill mode, just log (could be legitimate off-day)
+          if (mode === 'daily') {
+            console.warn(`[sync_player_game_logs] WARNING: No games returned for ${dateStr}. This could indicate:`);
+            console.warn(`  - Legitimate off-day (no NBA games scheduled)`);
+            console.warn(`  - API error or rate limiting`);
+            console.warn(`  - Games still in progress (unlikely at cron run time 6 AM ET)`);
+            console.warn(`  Action: Check MySportsFeeds API status if this persists`);
+          } else {
+            console.log(`[sync_player_game_logs] No games on ${dateStr} (likely off day)`);
+          }
           currentDate.setDate(currentDate.getDate() + 1);
           continue;
         }
@@ -208,6 +218,15 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
     console.log(`[sync_player_game_logs] Completed: ${recordsProcessed} game logs synced`);
     console.log(`[sync_player_game_logs] Dates: ${datesProcessed} total, ${skippedDates} skipped (no games)`);
     console.log(`[sync_player_game_logs] API requests: ${requestCount}, Errors: ${errorCount}`);
+    
+    // In daily mode, if we processed 1 date and got 0 games AND made an API call, treat as degraded
+    // This catches the case where API returned empty results when we expected data
+    if (mode === 'daily' && recordsProcessed === 0 && requestCount > 0) {
+      console.warn(`[sync_player_game_logs] DEGRADED: Daily sync made ${requestCount} API calls but cached 0 games`);
+      console.warn(`[sync_player_game_logs] This is unusual - either it's a legitimate off-day or there's an API issue`);
+      console.warn(`[sync_player_game_logs] Check job logs and MySportsFeeds API status`);
+      // Don't increment errorCount since this might be legitimate, but log the concern
+    }
     
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {
