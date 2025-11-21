@@ -21,6 +21,8 @@ A notification system (`client/src/lib/notification-context.tsx`) tracks unread 
 ### Backend
 The backend is an Express.js server with TypeScript, supporting HTTP and WebSockets. It uses Drizzle ORM with a PostgreSQL database (Neon serverless) and Zod for validation. Core domain models include Users, Players, Holdings, Orders, Trades, Mining, Contests, and Price History. The system features atomic balance updates and precise timezone handling. API design is RESTful for data and uses WebSockets for live updates.
 
+**Season Filtering System:** The `getCurrentCompetitiveSeasons()` helper provides intelligent season resolution based on the NBA calendar. It returns current competitive season phases (regular + playoffs combined, preseason excluded) for accurate player statistics. The helper uses a July handoff: Jan-Jun returns previous season (e.g., Feb 2025 → "2024-2025-*"), Jul-Dec returns current season (e.g., Nov 2025 → "2025-2026-*"). This ensures rolling averages combine regular and playoff performance while maintaining database granularity for future filtering. Player game logs are cached locally with pre-calculated fantasy points to eliminate excessive API calls.
+
 ### Database Schema
 The database includes tables for `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `mining_claims`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, `price_history`, `holdings_locks`, and `balance_locks`. Indexing is optimized for user-asset relationships, player filtering, and order book queries. Player shares are permanent across seasons.
 
