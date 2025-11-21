@@ -20,6 +20,7 @@ import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { calculateMiningShares } from "@shared/mining-utils";
 import { MarketActivityWidget } from "@/components/market-activity-widget";
 import { PlayerName } from "@/components/player-name";
+import { AdSenseAd } from "@/components/adsense-ad";
 
 interface DashboardData {
   user: {
@@ -80,6 +81,7 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
+  const [sortBy, setSortBy] = useState<'ppg' | 'fpg' | 'value'>('ppg');
   
   // Debounce search input (250ms delay)
   useEffect(() => {
@@ -195,6 +197,62 @@ export default function Dashboard() {
 
   // Filter only for mining eligibility (server-side handles search and team filter)
   const filteredPlayers = playersData?.filter(p => p.isEligibleForMining) || [];
+
+  // Store stats for all players to enable sorting
+  const [playerStats, setPlayerStats] = useState<Map<string, any>>(new Map());
+
+  // Fetch stats for all filtered players when they change
+  useEffect(() => {
+    if (!showPlayerSelection || filteredPlayers.length === 0) return;
+
+    const fetchAllStats = async () => {
+      const statsMap = new Map();
+      
+      // Fetch stats for all players in parallel
+      await Promise.all(
+        filteredPlayers.map(async (player) => {
+          try {
+            const response = await fetch(`/api/player/${player.id}/stats`);
+            const data = await response.json();
+            if (data?.stats) {
+              statsMap.set(player.id, data.stats);
+            }
+          } catch (error) {
+            console.error(`Failed to fetch stats for player ${player.id}:`, error);
+          }
+        })
+      );
+      
+      setPlayerStats(statsMap);
+    };
+
+    fetchAllStats();
+  }, [filteredPlayers.length, showPlayerSelection]);
+
+  // Sort players based on selected criteria
+  const sortedPlayers = [...filteredPlayers].sort((a, b) => {
+    if (sortBy === 'value') {
+      // Sort by market value (lastTradePrice)
+      const aPrice = parseFloat(a.lastTradePrice || '0');
+      const bPrice = parseFloat(b.lastTradePrice || '0');
+      return bPrice - aPrice; // Descending
+    } else if (sortBy === 'ppg') {
+      // Sort by points per game
+      const aStats = playerStats.get(a.id);
+      const bStats = playerStats.get(b.id);
+      const aPPG = parseFloat(aStats?.pointsPerGame || '0');
+      const bPPG = parseFloat(bStats?.pointsPerGame || '0');
+      return bPPG - aPPG; // Descending
+    } else if (sortBy === 'fpg') {
+      // Sort by fantasy points per game
+      const aStats = playerStats.get(a.id);
+      const bStats = playerStats.get(b.id);
+      const aFPG = parseFloat(aStats?.avgFantasyPointsPerGame || '0');
+      const bFPG = parseFloat(bStats?.avgFantasyPointsPerGame || '0');
+      return bFPG - aFPG; // Descending
+    }
+    return 0;
+  });
 
   // Get unique teams for filter
   const { data: teams } = useQuery<string[]>({
@@ -859,29 +917,65 @@ export default function Dashboard() {
             </DialogDescription>
           </DialogHeader>
           
-          {/* Search and Filter */}
-          <div className="flex flex-col sm:flex-row gap-3 px-1">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search players..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-                data-testid="input-search-players"
-              />
+          {/* Search, Filter, and Sort */}
+          <div className="flex flex-col gap-3 px-1">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search players..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-players"
+                />
+              </div>
+              <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+                <SelectTrigger className="w-full sm:w-40" data-testid="select-team-filter">
+                  <SelectValue placeholder="All Teams" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" data-testid="team-option-all">All Teams</SelectItem>
+                  {uniqueTeams.map((team) => (
+                    <SelectItem key={team} value={team} data-testid={`team-option-${team}`}>{team}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-              <SelectTrigger className="w-full sm:w-40" data-testid="select-team-filter">
-                <SelectValue placeholder="All Teams" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" data-testid="team-option-all">All Teams</SelectItem>
-                {uniqueTeams.map((team) => (
-                  <SelectItem key={team} value={team} data-testid={`team-option-${team}`}>{team}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            
+            {/* Sort Controls */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Sort by:</span>
+              <div className="flex gap-1.5">
+                <Button
+                  size="sm"
+                  variant={sortBy === 'ppg' ? 'default' : 'outline'}
+                  onClick={() => setSortBy('ppg')}
+                  className="text-xs"
+                  data-testid="button-sort-ppg"
+                >
+                  PPG
+                </Button>
+                <Button
+                  size="sm"
+                  variant={sortBy === 'fpg' ? 'default' : 'outline'}
+                  onClick={() => setSortBy('fpg')}
+                  className="text-xs"
+                  data-testid="button-sort-fpg"
+                >
+                  Fantasy Pts
+                </Button>
+                <Button
+                  size="sm"
+                  variant={sortBy === 'value' ? 'default' : 'outline'}
+                  onClick={() => setSortBy('value')}
+                  className="text-xs"
+                  data-testid="button-sort-value"
+                >
+                  Market Value
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Selected Players List */}
@@ -906,9 +1000,9 @@ export default function Dashboard() {
 
           <div className="overflow-y-auto flex-1 px-1">
             <div className="space-y-2">
-              {filteredPlayers.map((player) => {
+              {sortedPlayers.flatMap((player, index) => {
                 const isSelected = selectedPlayers.some(p => p.id === player.id);
-                return (
+                const playerCard = (
                   <PlayerCard
                     key={player.id}
                     player={player}
@@ -933,9 +1027,21 @@ export default function Dashboard() {
                     isSelected={isSelected}
                   />
                 );
+
+                // Insert ad after every 6 players (but not after the last player)
+                if ((index + 1) % 6 === 0 && index < sortedPlayers.length - 1) {
+                  return [
+                    playerCard,
+                    <div key={`ad-${index}`} className="py-2">
+                      <AdSenseAd slot="2800193816" />
+                    </div>
+                  ];
+                }
+
+                return [playerCard];
               })}
             </div>
-            {filteredPlayers.length === 0 && (
+            {sortedPlayers.length === 0 && (
               <div className="text-center py-6 text-muted-foreground">
                 <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>No players found matching your criteria</p>
