@@ -11,6 +11,7 @@ import { syncRoster } from "./sync-roster";
 import { syncSchedule } from "./sync-schedule";
 import { syncStats } from "./sync-stats";
 import { syncStatsLive } from "./sync-stats-live";
+import { syncPlayerGameLogs } from "./sync-player-game-logs";
 import { settleContests } from "./settle-contests";
 import { createContests } from "./create-contests";
 import { updateContestStatuses } from "./update-contest-statuses";
@@ -51,6 +52,12 @@ export class JobScheduler {
         schedule: "0 5 * * *", // Daily at 5:00 AM ET
         enabled: true,
         handler: syncRoster,
+      },
+      {
+        name: "sync_player_game_logs",
+        schedule: "0 6 * * *", // Daily at 6:00 AM ET - after games finalize
+        enabled: true,
+        handler: syncPlayerGameLogs,
       },
       {
         name: "schedule_sync",
@@ -181,6 +188,7 @@ export class JobScheduler {
   async triggerJob(jobName: string): Promise<JobResult> {
     const jobConfigs: Record<string, () => Promise<JobResult>> = {
       roster_sync: syncRoster,
+      sync_player_game_logs: syncPlayerGameLogs,
       schedule_sync: syncSchedule,
       stats_sync: syncStats,
       stats_sync_live: syncStatsLive,
