@@ -9,9 +9,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { useNotifications } from "@/lib/notification-context";
 
 const menuItems = [
   {
@@ -40,6 +42,7 @@ export function AppSidebar() {
   const [location, setLocation] = useLocation();
   const { isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const { unreadCount } = useNotifications();
 
   const handleNavigation = (item: typeof menuItems[0], e: React.MouseEvent) => {
     // Portfolio tab requires authentication
@@ -72,6 +75,15 @@ export function AppSidebar() {
                     >
                       <item.icon className="w-5 h-5" />
                       <span>{item.title}</span>
+                      {item.title === "Portfolio" && unreadCount > 0 && (
+                        <Badge 
+                          variant="default" 
+                          className="ml-auto min-w-5 h-5 flex items-center justify-center px-1.5 text-xs"
+                          data-testid="badge-notification-count"
+                        >
+                          {unreadCount}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

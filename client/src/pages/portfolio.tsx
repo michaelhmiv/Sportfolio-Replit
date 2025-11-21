@@ -1,6 +1,7 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useWebSocket } from "@/lib/websocket";
+import { useNotifications } from "@/lib/notification-context";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -61,10 +62,19 @@ interface ActivityResponse {
 export default function Portfolio() {
   const { toast } = useToast();
   const { subscribe } = useWebSocket();
+  const { clearUnread } = useNotifications();
+  const [activeTab, setActiveTab] = useState("holdings");
 
   const { data, isLoading } = useQuery<PortfolioData>({
     queryKey: ["/api/portfolio"],
   });
+
+  // Clear notifications when viewing Activity tab
+  useEffect(() => {
+    if (activeTab === "activity") {
+      clearUnread();
+    }
+  }, [activeTab, clearUnread]);
 
   // WebSocket listener for real-time portfolio updates
   useEffect(() => {
@@ -197,7 +207,7 @@ export default function Portfolio() {
           </div>
         </div>
 
-        <Tabs defaultValue="holdings" className="space-y-3 sm:space-y-3">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-3">
           <TabsList>
             <TabsTrigger value="holdings" data-testid="tab-holdings">Holdings</TabsTrigger>
             <TabsTrigger value="orders" data-testid="tab-open-orders">Open Orders</TabsTrigger>

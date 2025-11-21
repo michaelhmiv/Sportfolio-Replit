@@ -12,6 +12,7 @@ import { HelpDialog } from "@/components/help-dialog";
 import { Button } from "@/components/ui/button";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { WebSocketProvider, useWebSocket } from "@/lib/websocket";
+import { NotificationProvider } from "@/lib/notification-context";
 import { useAuth } from "@/hooks/useAuth";
 import Dashboard from "@/pages/dashboard";
 import Marketplace from "@/pages/marketplace";
@@ -237,25 +238,27 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <WebSocketProvider>
-        <TooltipProvider>
-          <SidebarProvider style={style as React.CSSProperties}>
-          <div className="flex h-screen w-full overflow-x-hidden">
-            <div className="hidden sm:flex">
-              <AppSidebar />
+        <NotificationProvider>
+          <TooltipProvider>
+            <SidebarProvider style={style as React.CSSProperties}>
+            <div className="flex h-screen w-full overflow-x-hidden">
+              <div className="hidden sm:flex">
+                <AppSidebar />
+              </div>
+              <div className="flex flex-col flex-1 overflow-x-hidden">
+                <Header />
+                <main className="flex-1 overflow-y-auto overflow-x-hidden pb-0 sm:pb-0">
+                  <div className="pb-20 sm:pb-0">
+                    <Router />
+                  </div>
+                </main>
+              </div>
             </div>
-            <div className="flex flex-col flex-1 overflow-x-hidden">
-              <Header />
-              <main className="flex-1 overflow-y-auto overflow-x-hidden pb-0 sm:pb-0">
-                <div className="pb-20 sm:pb-0">
-                  <Router />
-                </div>
-              </main>
-            </div>
-          </div>
-          <BottomNav />
-        </SidebarProvider>
-        <Toaster />
-      </TooltipProvider>
+            <BottomNav />
+          </SidebarProvider>
+          <Toaster />
+        </TooltipProvider>
+        </NotificationProvider>
       </WebSocketProvider>
     </QueryClientProvider>
   );
