@@ -2511,6 +2511,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Admin endpoint: Backfill game logs for date range
+  app.post("/api/admin/backfill", adminAuth, async (req, res) => {
+    try {
+      const { startDate, endDate } = req.body;
+      const clientIp = req.ip || req.connection.remoteAddress;
+      
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: 'startDate and endDate required (YYYY-MM-DD format)' });
+      }
+      
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({ error: 'Invalid date format. Use YYYY-MM-DD' });
+      }
+      
+      if (start > end) {
+        return res.status(400).json({ error: 'startDate must be before endDate' });
+      }
+      
+      console.log(`[ADMIN] Backfill requested by ${clientIp}: ${startDate} to ${endDate}`);
+      
+      // Import syncPlayerGameLogs here to avoid circular dependency
+      const { syncPlayerGameLogs } = await import('./jobs/sync-player-game-logs');
+      const result = await syncPlayerGameLogs({
+        mode: 'backfill',
+        startDate: start,
+        endDate: end,
+      });
+      
+      console.log(`[ADMIN] Backfill completed - ${result.recordsProcessed} game logs cached, ${result.errorCount} errors, ${result.requestCount} API requests`);
+      
+      res.json({
+        success: true,
+        result,
+      });
+    } catch (error: any) {
+      console.error('[ADMIN] Backfill failed:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Initialize players on first run by triggering roster sync
   async function initializePlayers() {
     try {

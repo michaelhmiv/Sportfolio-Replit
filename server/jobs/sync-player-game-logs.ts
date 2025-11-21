@@ -1,26 +1,31 @@
 /**
  * Player Game Logs Sync Job
  * 
- * Fetches and caches ALL player game logs from the current season using Daily endpoint.
+ * TWO MODES:
+ * 1. DAILY MODE (default): Fetches only yesterday's games (~5 seconds, used by cron)
+ * 2. BACKFILL MODE: Fetches date range for initial setup (~5-10 minutes, admin-triggered)
  * 
  * APPROACH: Date-based iteration (NOT per-player)
- * - Iterates through dates from Oct 1 to today (~50 dates)
  * - Fetches ALL players' games for each date in ONE request  
  * - Daily endpoint: 5-second backoff = 6 points per request
- * - Total time: ~50 requests × 5 seconds = ~5-10 minutes
  * 
  * CRITICAL: Uses Daily Player Gamelogs endpoint (DO NOT use Seasonal)
  * - Daily: 5s backoff, fetches all players per date
  * - Seasonal: 30s backoff, fetches one player per request (6x slower, wrong approach)
  * 
  * Stores with pre-calculated fantasy points to eliminate API calls on player views.
- * Runs once daily at 6 AM ET after all games are finalized.
  */
 
 import { storage } from "../storage";
 import { fetchDailyPlayerGameLogs, calculateFantasyPoints } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
+
+export interface SyncOptions {
+  mode?: 'daily' | 'backfill';
+  startDate?: Date;
+  endDate?: Date;
+}
 
 /**
  * Get current NBA season using same logic as mysportsfeeds.ts
@@ -37,8 +42,10 @@ function getCurrentSeason(): string {
 
 const SEASON = getCurrentSeason(); // Dynamically resolves to current competitive season
 
-export async function syncPlayerGameLogs(): Promise<JobResult> {
-  console.log("[sync_player_game_logs] Starting date-based game logs sync...");
+export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<JobResult> {
+  const { mode = 'daily', startDate, endDate } = options;
+  
+  console.log(`[sync_player_game_logs] Starting in ${mode.toUpperCase()} mode...`);
   
   let requestCount = 0;
   let recordsProcessed = 0;
@@ -46,35 +53,57 @@ export async function syncPlayerGameLogs(): Promise<JobResult> {
   let skippedDates = 0;
 
   try {
-    // Calculate season date range (Oct 1 to today)
-    const now = new Date();
-    const currentMonth = now.getMonth(); // 0-11
-    const currentYear = now.getFullYear();
+    // Calculate date range based on mode
+    let rangeStart: Date;
+    let rangeEnd: Date;
     
-    // Determine season start year (July+ uses current year, Jan-Jun uses previous year)
-    const seasonStartYear = currentMonth >= 6 ? currentYear : currentYear - 1;
-    const seasonStart = new Date(seasonStartYear, 9, 1); // Oct 1 (month 9 = October)
-    const seasonEnd = now;
-    
-    // Calculate total days to process
-    const totalDays = Math.ceil((seasonEnd.getTime() - seasonStart.getTime()) / (1000 * 60 * 60 * 24));
-    console.log(`[sync_player_game_logs] Processing ${totalDays} dates from ${seasonStart.toDateString()} to ${seasonEnd.toDateString()}`);
+    if (mode === 'daily') {
+      // DAILY MODE: Only fetch yesterday's games
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      yesterday.setHours(0, 0, 0, 0);
+      rangeStart = yesterday;
+      rangeEnd = yesterday;
+      console.log(`[sync_player_game_logs] DAILY mode: Fetching ${rangeStart.toDateString()} only`);
+    } else {
+      // BACKFILL MODE: Use provided date range or default to season start -> today
+      if (startDate && endDate) {
+        rangeStart = startDate;
+        rangeEnd = endDate;
+      } else {
+        const now = new Date();
+        const currentMonth = now.getMonth(); // 0-11
+        const currentYear = now.getFullYear();
+        const seasonStartYear = currentMonth >= 6 ? currentYear : currentYear - 1;
+        rangeStart = new Date(seasonStartYear, 9, 1); // Oct 1
+        rangeEnd = now;
+      }
+      
+      const totalDays = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      console.log(`[sync_player_game_logs] BACKFILL mode: Processing ${totalDays} dates from ${rangeStart.toDateString()} to ${rangeEnd.toDateString()}`);
+    }
 
-    const currentDate = new Date(seasonStart);
+    const currentDate = new Date(rangeStart);
     let datesProcessed = 0;
     
-    // Iterate through each date from season start to today
-    while (currentDate <= seasonEnd) {
+    // Iterate through each date in the range
+    while (currentDate <= rangeEnd) {
       datesProcessed++;
       const dateStr = currentDate.toISOString().split('T')[0];
       
-      // Progress logging every 5 dates
-      if (datesProcessed % 5 === 0) {
+      // Progress logging every 5 dates (only in backfill mode)
+      if (mode === 'backfill' && datesProcessed % 5 === 0) {
+        const totalDays = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
         console.log(`[sync_player_game_logs] Progress: ${datesProcessed}/${totalDays} dates processed (${skippedDates} skipped, ${requestCount} API calls, ${recordsProcessed} games cached)`);
       }
       
       try {
-        console.log(`[sync_player_game_logs] Fetching games for date ${dateStr} (${datesProcessed}/${totalDays})`);
+        if (mode === 'daily') {
+          console.log(`[sync_player_game_logs] Fetching games for date ${dateStr}`);
+        } else {
+          const totalDays = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+          console.log(`[sync_player_game_logs] Fetching games for date ${dateStr} (${datesProcessed}/${totalDays})`);
+        }
         
         // Fetch ALL players' games for this date using Daily endpoint (5-second backoff)
         // Note: Upsert handles duplicates efficiently, so no resume logic needed
@@ -84,7 +113,10 @@ export async function syncPlayerGameLogs(): Promise<JobResult> {
         });
         
         // Wait 5 seconds between date requests (Daily endpoint backoff requirement)
-        await new Promise(resolve => setTimeout(resolve, 5000));
+        // Skip wait on last iteration in daily mode for faster execution
+        if (mode === 'backfill' || currentDate < rangeEnd) {
+          await new Promise(resolve => setTimeout(resolve, 5000));
+        }
 
         if (!dayGameLogs || dayGameLogs.length === 0) {
           skippedDates++;

@@ -57,7 +57,7 @@ export class JobScheduler {
         name: "sync_player_game_logs",
         schedule: "0 6 * * *", // Daily at 6:00 AM ET - after games finalize
         enabled: true,
-        handler: syncPlayerGameLogs,
+        handler: () => syncPlayerGameLogs({ mode: 'daily' }),
       },
       {
         name: "schedule_sync",
