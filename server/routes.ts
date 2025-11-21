@@ -463,7 +463,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Get all player stats for this game
-      const stats = await storage.getGameStatsByGameId(gameIdNum);
+      const stats = await storage.getGameStatsByGameId(gameId);
       
       if (!stats || stats.length === 0) {
         return res.json({
@@ -830,11 +830,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // MySportsFeeds structure: offense, defense, rebounds, fieldGoals, freeThrows, etc.
       const stats = seasonStats.stats || {};
       
+      // Calculate average fantasy points per game
+      let avgFantasyPointsPerGame = 0;
+      try {
+        const gameLogs = await fetchPlayerGameLogs(player.id, 100); // Fetch all games this season
+        if (gameLogs && gameLogs.length > 0) {
+          let totalFantasyPoints = 0;
+          let gamesWithStats = 0;
+          
+          for (const log of gameLogs) {
+            if (log && log.stats) {
+              const logStats = log.stats || {};
+              const offense = logStats.offense || {};
+              const rebounds = logStats.rebounds || {};
+              const fieldGoals = logStats.fieldGoals || {};
+              const defense = logStats.defense || {};
+              
+              const fantasyPoints = calculateFantasyPoints({
+                points: offense.pts || 0,
+                threePointersMade: fieldGoals.fg3PtMade || 0,
+                rebounds: rebounds.reb || 0,
+                assists: offense.ast || 0,
+                steals: defense.stl || 0,
+                blocks: defense.blk || 0,
+                turnovers: offense.tov || 0,
+              });
+              
+              totalFantasyPoints += fantasyPoints;
+              gamesWithStats++;
+            }
+          }
+          
+          if (gamesWithStats > 0) {
+            avgFantasyPointsPerGame = totalFantasyPoints / gamesWithStats;
+          }
+        }
+      } catch (error: any) {
+        console.error("[API] Error calculating avg fantasy points:", error.message);
+        // Continue with 0 if calculation fails
+      }
+      
       res.json({
         player: seasonStats.player || { firstName: player.firstName, lastName: player.lastName },
         team: seasonStats.team || { abbreviation: player.team },
         stats: {
           gamesPlayed: stats.gamesPlayed || 0,
+          // Fantasy scoring
+          avgFantasyPointsPerGame: avgFantasyPointsPerGame.toFixed(1),
           // Scoring - MySportsFeeds provides per-game averages
           points: stats.offense?.pts || 0,
           pointsPerGame: stats.offense?.ptsPerGame?.toFixed(1) || "0.0",
