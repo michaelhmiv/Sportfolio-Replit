@@ -2637,18 +2637,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ error: 'Unauthorized - invalid token' });
     }
     
-    // Check 2: Direct admin role check - works with any authentication method
+    // Check 2: Dev mode bypass - create mock user if needed
+    const isDev = process.env.NODE_ENV === 'development';
+    const bypassAuth = process.env.DEV_BYPASS_AUTH !== 'false';
+    
+    if (isDev && bypassAuth && !req.user) {
+      // Create a mock dev user session (same as in replitAuth.ts)
+      const mockUser = {
+        claims: {
+          sub: 'dev-user-12345678',
+          email: 'dev@example.com',
+          first_name: 'Dev',
+          last_name: 'User',
+        },
+        expires_at: Math.floor(Date.now() / 1000) + 86400,
+        access_token: 'dev-mock-token',
+        refresh_token: 'dev-mock-refresh',
+      };
+      
+      req.user = mockUser;
+      console.log('[ADMIN] Dev mode auth bypass active - created mock user');
+    }
+    
+    // Check 3: Admin role check with req.user
     try {
       let userId: string | null = null;
       
-      // Try to get userId from req.user (works with both passport and dev bypass)
       if (req.user?.claims?.sub) {
         userId = req.user.claims.sub;
       } else if (req.user?.id) {
         userId = req.user.id;
       }
       
-      // If we have a userId, check admin status in database
       if (userId) {
         const user = await storage.getUser(userId);
         if (user?.isAdmin) {
