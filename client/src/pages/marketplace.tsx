@@ -14,6 +14,7 @@ import { Link, useLocation, useSearch } from "wouter";
 import type { Player } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { PlayerName } from "@/components/player-name";
+import { AdSenseAd } from "@/components/adsense-ad";
 
 type PlayerWithOrderBook = Player & {
   bestBid: string | null;
@@ -335,7 +336,8 @@ export default function Marketplace() {
                     </tr>
                   </thead>
                   <tbody>
-                    {players.map((player: PlayerWithOrderBook) => (
+                    {players.flatMap((player: PlayerWithOrderBook, index: number) => {
+                      const playerRow = (
                       <tr 
                         key={player.id} 
                         className="border-b last:border-0 hover-elevate"
@@ -442,7 +444,22 @@ export default function Marketplace() {
                           </Link>
                         </td>
                       </tr>
-                    ))}
+                      );
+
+                      // Insert ad after every 6 players (but not after the last player)
+                      if ((index + 1) % 6 === 0 && index < players.length - 1) {
+                        return [
+                          playerRow,
+                          <tr key={`ad-${index}`} className="border-b">
+                            <td colSpan={7} className="p-0">
+                              <AdSenseAd className="py-4" />
+                            </td>
+                          </tr>
+                        ];
+                      }
+
+                      return [playerRow];
+                    })}
                   </tbody>
                 </table>
               </div>
