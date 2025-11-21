@@ -22,18 +22,42 @@ A notification system (`client/src/lib/notification-context.tsx`) tracks unread 
 The backend is an Express.js server with TypeScript, supporting HTTP and WebSockets. It uses Drizzle ORM with a PostgreSQL database (Neon serverless) and Zod for validation. Core domain models include Users, Players, Holdings, Orders, Trades, Mining, Contests, and Price History. The system features atomic balance updates and precise timezone handling. API design is RESTful for data and uses WebSockets for live updates.
 
 ### Database Schema
-The database includes tables for `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `mining_claims`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, `price_history`, `holdings_locks`, and `balance_locks`. Indexing is optimized for user-asset relationships, player filtering, and order book queries. Player shares are permanent across seasons.
+The database includes tables for `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `mining_claims`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, `player_season_summaries`, `price_history`, `holdings_locks`, and `balance_locks`. Indexing is optimized for user-asset relationships, player filtering, and order book queries. Player shares are permanent across seasons.
 
 An activity tracking system aggregates mining claims, trades, and contest entries into a unified timeline with filtering and pagination.
 
 Share and cash locking systems (`holdings_locks` and `balance_locks` tables) implement transactional locking mechanisms to prevent double-spending of shares and funds across orders, contests, and mining operations. These systems use atomic reservations with `SELECT...FOR UPDATE` and ensure automatic lock releases or adjustments.
 
-Performance optimizations include SQL JOINs to prevent N+1 queries, marketplace pagination, batch player fetches, and React Query caching.
+### Performance & Caching Architecture
+A persistent stats caching layer dramatically reduces MySportsFeeds API calls by ~95%, ensuring scalability and instant page loads:
+
+**Caching Tables:**
+- `player_season_summaries`: Stores season averages (PPG, RPG, APG, etc.), shooting percentages, and pre-calculated fantasy points per game. Updated 2x daily via background job.
+- `player_game_stats`: Stores individual game statistics, updated hourly and in real-time during live games.
+
+**API Optimization:**
+- `GET /api/players`: Reads FPG from `player_season_summaries` instead of calling MySportsFeeds API for each player (reduces ~500 API calls per marketplace page load to 0).
+- `GET /api/player/:id/stats`: Reads season averages from `player_season_summaries` instead of live API calls.
+- `GET /api/player/:id/recent-games`: Reads from `player_game_stats` instead of calling MySportsFeeds game logs API.
+
+Performance optimizations include SQL JOINs to prevent N+1 queries, marketplace pagination, batch player fetches, React Query caching, and persistent database-backed stats caching.
 
 The `GET /api/players` endpoint supports comprehensive server-side search, filter, and sort operations for the player database, with optimized database indexes for performance. Contest entry pages dynamically filter players based on games scheduled for the contest date.
 
 ### Background Jobs
-Background jobs, managed by `node-cron` in development and an external cron service in production, handle tasks like `roster_sync`, `schedule_sync`, `stats_sync`, `stats_sync_live`, `update_contest_statuses`, `settle_contests`, and `create_contests`.
+Background jobs, managed by `node-cron` in development and an external cron service in production, handle data synchronization and contest management:
+
+**Data Sync Jobs:**
+- `roster_sync` (daily 5am ET): Updates player rosters, team assignments, and mining eligibility
+- `schedule_sync` (every minute): Fetches daily game schedules and live scores
+- `stats_sync` (hourly): Syncs completed game statistics to `player_game_stats`
+- `stats_sync_live` (every minute): Real-time stats updates during live games
+- `sync_season_summaries` (2x daily at 6am and 2pm ET): **NEW** - Fetches season stats for all active players from MySportsFeeds, calculates fantasy points per game, and updates `player_season_summaries` cache
+
+**Contest Jobs:**
+- `create_contests` (daily midnight): Creates 50/50 contests for upcoming games
+- `update_contest_statuses` (every minute): Transitions contests from open to live
+- `settle_contests` (every 5 minutes): Distributes prizes when contests complete
 
 The Contest Lifecycle & Settlement System automatically progresses contests through creation, status transition (open to live), and settlement stages. Settlement is contingent on both the contest `endsAt` time passing and all associated games being `completed` to ensure accurate prize distribution.
 

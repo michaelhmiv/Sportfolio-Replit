@@ -710,37 +710,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .reduce((sum, a) => sum + (a.quantity - a.filledQuantity), 0)
           : 0;
         
-        // Calculate average fantasy points per game from season stats
+        // Get fantasy points per game from cached season summaries
         let avgFantasyPointsPerGame = "0.0";
-        try {
-          const seasonStats = await fetchPlayerSeasonStats(player.id);
-          if (seasonStats?.stats) {
-            const stats = seasonStats.stats;
-            const offense = stats.offense || {};
-            const defense = stats.defense || {};
-            const rebounds = stats.rebounds || {};
-            const fieldGoals = stats.fieldGoals || {};
-            
-            // Only calculate FPG if player has games played
-            if (stats.gamesPlayed && stats.gamesPlayed > 0) {
-              // Calculate FPG from season averages using fantasy points formula
-              // Formula: PTS*1.0 + 3PM*0.5 + REB*1.25 + AST*1.5 + STL*2.0 + BLK*2.0 + TO*-0.5
-              const fpg = 
-                (offense.ptsPerGame || 0) * 1.0 +
-                (fieldGoals.fg3PtMadePerGame || 0) * 0.5 +
-                (rebounds.rebPerGame || 0) * 1.25 +
-                (offense.astPerGame || 0) * 1.5 +
-                (defense.stlPerGame || 0) * 2.0 +
-                (defense.blkPerGame || 0) * 2.0 +
-                (offense.tovPerGame || 0) * -0.5;
-              
-              avgFantasyPointsPerGame = fpg.toFixed(1);
-            }
-          }
-        } catch (error: any) {
-          // If season stats unavailable, keep default 0.0
-          // This is expected for players who haven't played yet this season
-          console.error(`[API] Error fetching season stats for ${player.id}:`, error.message);
+        const seasonSummary = await storage.getPlayerSeasonSummary(player.id);
+        if (seasonSummary && seasonSummary.gamesPlayed > 0) {
+          avgFantasyPointsPerGame = parseFloat(seasonSummary.fantasyPointsPerGame).toFixed(1);
         }
         
         return {
@@ -849,89 +823,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Player not found" });
       }
 
-      // Fetch season stats from MySportsFeeds
-      const seasonStats = await fetchPlayerSeasonStats(player.id);
+      // Get season stats from cached summaries
+      const seasonSummary = await storage.getPlayerSeasonSummary(player.id);
       
-      if (!seasonStats || !seasonStats.stats) {
+      if (!seasonSummary || seasonSummary.gamesPlayed === 0) {
         return res.json({ 
           player: { firstName: player.firstName, lastName: player.lastName },
           team: { abbreviation: player.team },
           stats: null 
         });
       }
-
-      // Extract and format stats with defensive null checks
-      // MySportsFeeds structure: offense, defense, rebounds, fieldGoals, freeThrows, etc.
-      const stats = seasonStats.stats || {};
-      
-      // Calculate average fantasy points per game
-      let avgFantasyPointsPerGame = 0;
-      try {
-        const gameLogs = await fetchPlayerGameLogs(player.id, 100); // Fetch all games this season
-        if (gameLogs && gameLogs.length > 0) {
-          let totalFantasyPoints = 0;
-          let gamesWithStats = 0;
-          
-          for (const log of gameLogs) {
-            if (log && log.stats) {
-              const logStats = log.stats || {};
-              const offense = logStats.offense || {};
-              const rebounds = logStats.rebounds || {};
-              const fieldGoals = logStats.fieldGoals || {};
-              const defense = logStats.defense || {};
-              
-              const fantasyPoints = calculateFantasyPoints({
-                points: offense.pts || 0,
-                threePointersMade: fieldGoals.fg3PtMade || 0,
-                rebounds: rebounds.reb || 0,
-                assists: offense.ast || 0,
-                steals: defense.stl || 0,
-                blocks: defense.blk || 0,
-                turnovers: offense.tov || 0,
-              });
-              
-              totalFantasyPoints += fantasyPoints;
-              gamesWithStats++;
-            }
-          }
-          
-          if (gamesWithStats > 0) {
-            avgFantasyPointsPerGame = totalFantasyPoints / gamesWithStats;
-          }
-        }
-      } catch (error: any) {
-        console.error("[API] Error calculating avg fantasy points:", error.message);
-        // Continue with 0 if calculation fails
-      }
       
       res.json({
-        player: seasonStats.player || { firstName: player.firstName, lastName: player.lastName },
-        team: seasonStats.team || { abbreviation: player.team },
+        player: { firstName: player.firstName, lastName: player.lastName },
+        team: { abbreviation: player.team },
         stats: {
-          gamesPlayed: stats.gamesPlayed || 0,
+          gamesPlayed: seasonSummary.gamesPlayed,
           // Fantasy scoring
-          avgFantasyPointsPerGame: avgFantasyPointsPerGame.toFixed(1),
-          // Scoring - MySportsFeeds provides per-game averages
-          points: stats.offense?.pts || 0,
-          pointsPerGame: stats.offense?.ptsPerGame?.toFixed(1) || "0.0",
-          fieldGoalPct: stats.fieldGoals?.fgPct?.toFixed(1) || "0.0",
-          threePointPct: stats.fieldGoals?.fg3PtPct?.toFixed(1) || "0.0",
-          freeThrowPct: stats.freeThrows?.ftPct?.toFixed(1) || "0.0",
+          avgFantasyPointsPerGame: parseFloat(seasonSummary.fantasyPointsPerGame).toFixed(1),
+          // Scoring
+          points: 0, // Not stored in summary
+          pointsPerGame: parseFloat(seasonSummary.ptsPerGame).toFixed(1),
+          fieldGoalPct: parseFloat(seasonSummary.fgPct).toFixed(1),
+          threePointPct: parseFloat(seasonSummary.fg3Pct).toFixed(1),
+          freeThrowPct: parseFloat(seasonSummary.ftPct).toFixed(1),
           // Rebounding
-          rebounds: stats.rebounds?.reb || 0,
-          reboundsPerGame: stats.rebounds?.rebPerGame?.toFixed(1) || "0.0",
-          offensiveRebounds: stats.rebounds?.offReb || 0,
-          defensiveRebounds: stats.rebounds?.defReb || 0,
+          rebounds: 0, // Not stored in summary
+          reboundsPerGame: parseFloat(seasonSummary.rebPerGame).toFixed(1),
+          offensiveRebounds: 0, // Not stored in summary
+          defensiveRebounds: 0, // Not stored in summary
           // Playmaking
-          assists: stats.offense?.ast || 0,
-          assistsPerGame: stats.offense?.astPerGame?.toFixed(1) || "0.0",
-          turnovers: stats.offense?.tov || 0,
+          assists: 0, // Not stored in summary
+          assistsPerGame: parseFloat(seasonSummary.astPerGame).toFixed(1),
+          turnovers: 0, // Not stored in summary
           // Defense
-          steals: stats.defense?.stl || 0,
-          blocks: stats.defense?.blk || 0,
+          steals: 0, // Not stored in summary
+          blocks: 0, // Not stored in summary
           // Minutes
-          minutes: stats.miscellaneous?.minSeconds ? Math.floor(stats.miscellaneous.minSeconds / 60) : 0,
-          minutesPerGame: stats.miscellaneous?.minSecondsPerGame ? (stats.miscellaneous.minSecondsPerGame / 60).toFixed(1) : "0.0",
+          minutes: 0, // Not stored in summary
+          minutesPerGame: parseFloat(seasonSummary.minPerGame).toFixed(1),
         },
       });
     } catch (error: any) {
@@ -953,59 +883,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Player not found" });
       }
 
-      // Fetch last 10 games from MySportsFeeds
-      const gameLogs = await fetchPlayerGameLogs(player.id, 10);
+      // Get last 10 games from cached player_game_stats
+      const gameStats = await storage.getAllPlayerGameStats(player.id);
       
-      if (!gameLogs || gameLogs.length === 0) {
+      if (!gameStats || gameStats.length === 0) {
         return res.json({ recentGames: [] });
       }
 
-      // Format game logs with defensive null checks
-      // MySportsFeeds gamelogs structure: stats.{offense, rebounds, fieldGoals, defense, miscellaneous}
-      const recentGames = gameLogs
-        .filter((log: any) => log && log.game && log.stats) // Filter out invalid entries
-        .map((log: any) => {
-          const stats = log.stats || {};
-          const offense = stats.offense || {};
-          const rebounds = stats.rebounds || {};
-          const fieldGoals = stats.fieldGoals || {};
-          const defense = stats.defense || {};
-          
-          // Calculate fantasy points for this game
-          const fantasyPoints = calculateFantasyPoints({
-            points: offense.pts || 0,
-            threePointersMade: fieldGoals.fg3PtMade || 0,
-            rebounds: rebounds.reb || 0,
-            assists: offense.ast || 0,
-            steals: defense.stl || 0,
-            blocks: defense.blk || 0,
-            turnovers: offense.tov || 0,
-          });
-          
-          return {
-            game: {
-              id: log.game?.id || 0,
-              date: log.game?.startTime || new Date().toISOString(),
-              opponent: log.game?.homeTeamAbbreviation === log.team?.abbreviation 
-                ? log.game?.awayTeamAbbreviation || "UNK"
-                : log.game?.homeTeamAbbreviation || "UNK",
-              isHome: log.game?.homeTeamAbbreviation === log.team?.abbreviation,
-            },
-            stats: {
-              points: offense.pts || 0,
-              rebounds: rebounds.reb || 0,
-              assists: offense.ast || 0,
-              steals: defense.stl || 0,
-              blocks: defense.blk || 0,
-              turnovers: offense.tov || 0,
-              fieldGoalsMade: fieldGoals.fgMade || 0,
-              fieldGoalsAttempted: fieldGoals.fgAtt || 0,
-              threePointersMade: fieldGoals.fg3PtMade || 0,
-              minutes: stats.miscellaneous?.minSeconds ? Math.floor(stats.miscellaneous.minSeconds / 60) : 0,
-              fantasyPoints,
-            },
-          };
-        });
+      // Format game stats (already sorted by date DESC in storage)
+      const recentGames = gameStats.slice(0, 10).map((stats) => ({
+        game: {
+          id: stats.gameId,
+          date: stats.gameDate.toISOString(),
+          opponent: stats.opponentTeam,
+          isHome: stats.homeAway === 'home',
+        },
+        stats: {
+          points: stats.points,
+          rebounds: stats.rebounds,
+          assists: stats.assists,
+          steals: stats.steals,
+          blocks: stats.blocks,
+          turnovers: stats.turnovers,
+          fieldGoalsMade: 0, // Not stored in player_game_stats
+          fieldGoalsAttempted: 0, // Not stored in player_game_stats
+          threePointersMade: stats.threePointersMade,
+          minutes: stats.minutes,
+          fantasyPoints: parseFloat(stats.fantasyPoints),
+        },
+      }));
 
       res.json({ recentGames });
     } catch (error: any) {

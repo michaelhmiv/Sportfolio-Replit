@@ -245,6 +245,35 @@ export const playerGameStats = pgTable("player_game_stats", {
   playerGameIdx: index("player_game_idx").on(table.playerId, table.gameId),
 }));
 
+// Player season summaries table - cached season stats from MySportsFeeds
+export const playerSeasonSummaries = pgTable("player_season_summaries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  playerId: varchar("player_id").notNull().references(() => players.id),
+  season: text("season").notNull().default("2024-2025-regular"),
+  gamesPlayed: integer("games_played").notNull().default(0),
+  // Per-game averages
+  ptsPerGame: decimal("pts_per_game", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  rebPerGame: decimal("reb_per_game", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  astPerGame: decimal("ast_per_game", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  stlPerGame: decimal("stl_per_game", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  blkPerGame: decimal("blk_per_game", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  tovPerGame: decimal("tov_per_game", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  fg3PerGame: decimal("fg3_per_game", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  minPerGame: decimal("min_per_game", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  // Shooting percentages
+  fgPct: decimal("fg_pct", { precision: 5, scale: 2 }).notNull().default("0.00"),
+  fg3Pct: decimal("fg3_pct", { precision: 5, scale: 2 }).notNull().default("0.00"),
+  ftPct: decimal("ft_pct", { precision: 5, scale: 2 }).notNull().default("0.00"),
+  // Pre-calculated fantasy points per game
+  fantasyPointsPerGame: decimal("fantasy_points_per_game", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  // Cache metadata
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  playerSeasonIdx: index("player_season_idx").on(table.playerId, table.season),
+  fantasyPointsIdx: index("fantasy_points_idx").on(table.fantasyPointsPerGame),
+  seasonIdx: index("season_idx").on(table.season),
+}));
+
 // Price history table - for charts
 export const priceHistory = pgTable("price_history", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -410,6 +439,11 @@ export const insertPlayerGameStatsSchema = createInsertSchema(playerGameStats).o
   lastFetchedAt: true,
 });
 
+export const insertPlayerSeasonSummarySchema = createInsertSchema(playerSeasonSummaries).omit({
+  id: true,
+  updatedAt: true,
+});
+
 export const insertMiningClaimSchema = createInsertSchema(miningClaims).omit({
   id: true,
   claimedAt: true,
@@ -452,6 +486,9 @@ export type InsertJobExecutionLog = z.infer<typeof insertJobExecutionLogSchema>;
 
 export type PlayerGameStats = typeof playerGameStats.$inferSelect;
 export type InsertPlayerGameStats = z.infer<typeof insertPlayerGameStatsSchema>;
+
+export type PlayerSeasonSummary = typeof playerSeasonSummaries.$inferSelect;
+export type InsertPlayerSeasonSummary = z.infer<typeof insertPlayerSeasonSummarySchema>;
 
 export type Contest = typeof contests.$inferSelect;
 export type ContestEntry = typeof contestEntries.$inferSelect;

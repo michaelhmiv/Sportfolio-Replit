@@ -13,6 +13,7 @@ import {
   contestEntries,
   contestLineups,
   playerGameStats,
+  playerSeasonSummaries,
   priceHistory,
   dailyGames,
   jobExecutionLogs,
@@ -33,7 +34,6 @@ import {
   type MiningClaim,
   type InsertMiningClaim,
   type Contest,
-  type InsertContest,
   type ContestEntry,
   type InsertContestEntry,
   type InsertContestLineup,
@@ -43,6 +43,8 @@ import {
   type InsertJobExecutionLog,
   type PlayerGameStats,
   type InsertPlayerGameStats,
+  type PlayerSeasonSummary,
+  type InsertPlayerSeasonSummary,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, or } from "drizzle-orm";
@@ -145,6 +147,11 @@ export interface IStorage {
   getPlayerGameStats(playerId: string, gameId: string): Promise<PlayerGameStats | undefined>;
   getAllPlayerGameStats(playerId: string): Promise<PlayerGameStats[]>;
   getGameStatsByGameId(gameId: string): Promise<PlayerGameStats[]>;
+  
+  // Player season summaries methods (persistent stats caching)
+  upsertPlayerSeasonSummary(summary: InsertPlayerSeasonSummary): Promise<PlayerSeasonSummary>;
+  getPlayerSeasonSummary(playerId: string, season?: string): Promise<PlayerSeasonSummary | undefined>;
+  getAllPlayerSeasonSummaries(season?: string): Promise<PlayerSeasonSummary[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1662,6 +1669,62 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(playerGameStats)
       .where(eq(playerGameStats.gameId, gameId));
+  }
+
+  // Player season summaries methods (persistent stats caching)
+  async upsertPlayerSeasonSummary(summary: InsertPlayerSeasonSummary): Promise<PlayerSeasonSummary> {
+    const season = summary.season || "2024-2025-regular";
+    const [existing] = await db
+      .select()
+      .from(playerSeasonSummaries)
+      .where(
+        and(
+          eq(playerSeasonSummaries.playerId, summary.playerId),
+          eq(playerSeasonSummaries.season, season)
+        )
+      );
+
+    if (existing) {
+      const [updated] = await db
+        .update(playerSeasonSummaries)
+        .set({
+          ...summary,
+          updatedAt: new Date(),
+        })
+        .where(eq(playerSeasonSummaries.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db
+        .insert(playerSeasonSummaries)
+        .values({
+          ...summary,
+          season,
+        })
+        .returning();
+      return created;
+    }
+  }
+
+  async getPlayerSeasonSummary(playerId: string, season: string = "2024-2025-regular"): Promise<PlayerSeasonSummary | undefined> {
+    const [summary] = await db
+      .select()
+      .from(playerSeasonSummaries)
+      .where(
+        and(
+          eq(playerSeasonSummaries.playerId, playerId),
+          eq(playerSeasonSummaries.season, season)
+        )
+      );
+    return summary || undefined;
+  }
+
+  async getAllPlayerSeasonSummaries(season: string = "2024-2025-regular"): Promise<PlayerSeasonSummary[]> {
+    return await db
+      .select()
+      .from(playerSeasonSummaries)
+      .where(eq(playerSeasonSummaries.season, season))
+      .orderBy(desc(playerSeasonSummaries.fantasyPointsPerGame));
   }
 }
 
