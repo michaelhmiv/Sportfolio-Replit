@@ -2840,30 +2840,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/stream/:operationId", adminAuth, (req, res) => {
     const { operationId } = req.params;
     
-    // Set SSE headers
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-    res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
-    
-    // Send initial connection message
-    res.write(`data: ${JSON.stringify({
-      type: 'info',
-      timestamp: new Date().toISOString(),
-      message: `Connected to operation ${operationId}`,
-    })}\n\n`);
-    
-    // Register this client with the stream manager
-    const { adminStreamManager } = require('./lib/admin-stream');
-    adminStreamManager.registerClient(operationId, res);
-    
-    console.log(`[SSE] Client connected to operation ${operationId}`);
-    
-    // Handle client disconnect
-    req.on('close', () => {
-      console.log(`[SSE] Client disconnected from operation ${operationId}`);
-      adminStreamManager.unregisterClient(operationId, res);
-    });
+    try {
+      // Set SSE headers
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.setHeader('X-Accel-Buffering', 'no'); // Disable nginx buffering
+      
+      // Send initial connection message
+      res.write(`data: ${JSON.stringify({
+        type: 'info',
+        timestamp: new Date().toISOString(),
+        message: `Connected to operation ${operationId}`,
+      })}\n\n`);
+      
+      // Register this client with the stream manager
+      const { adminStreamManager } = require('./lib/admin-stream');
+      adminStreamManager.registerClient(operationId, res);
+      
+      console.log(`[SSE] Client connected to operation ${operationId}`);
+      
+      // Handle client disconnect
+      req.on('close', () => {
+        console.log(`[SSE] Client disconnected from operation ${operationId}`);
+        adminStreamManager.unregisterClient(operationId, res);
+      });
+      
+      // Prevent error handler from trying to send JSON response
+      req.on('error', (err) => {
+        console.error(`[SSE] Stream error for ${operationId}:`, err);
+        if (!res.writableEnded) {
+          res.end();
+        }
+      });
+    } catch (error: any) {
+      console.error(`[SSE] Failed to setup stream for ${operationId}:`, error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: error.message });
+      } else {
+        res.end();
+      }
+    }
   });
 
   // Admin endpoint: Backfill game logs for date range
