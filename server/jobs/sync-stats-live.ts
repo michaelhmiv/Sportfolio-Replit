@@ -11,7 +11,7 @@ import { fetchPlayerGameStats, calculateFantasyPoints } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
 import { broadcast } from "../websocket";
-import { deriveSeasonFromDate } from "../utils/season";
+import { CURRENT_SEASON } from "../../shared/schema";
 
 export async function syncStatsLive(): Promise<JobResult> {
   console.log("[stats_sync_live] Starting live game stats sync...");
@@ -96,13 +96,11 @@ export async function syncStatsLive(): Promise<JobResult> {
               turnovers: offense.tov || 0,
             });
 
-            const season = deriveSeasonFromDate(new Date(game.date));
-            
             await storage.upsertPlayerGameStats({
               playerId: gamelog.player.id,
               gameId: game.gameId,
               gameDate: game.date,
-              season,
+              season: CURRENT_SEASON, // MySportsFeeds "latest" keyword handles current season automatically
               opponentTeam: gamelog.team.abbreviation === game.homeTeam ? game.awayTeam : game.homeTeam,
               homeAway: gamelog.team.abbreviation === game.homeTeam ? "home" : "away",
               minutes: offense.minSeconds ? Math.floor(offense.minSeconds / 60) : 0,

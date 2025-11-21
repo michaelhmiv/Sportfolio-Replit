@@ -45,15 +45,8 @@ A persistent stats caching layer dramatically reduces MySportsFeeds API calls by
 - `GET /api/player/:id/stats`: Reads season averages from `player_season_summaries` instead of live API calls.
 - `GET /api/player/:id/recent-games`: Reads from `player_game_stats` instead of calling MySportsFeeds game logs API.
 
-**Season Derivation:**
-The system uses `deriveSeasonFromDate()` (in `server/utils/season.ts`) to determine the NBA season from game dates. This heuristic-based approach classifies games as:
-- Regular season: October through mid-April
-- Playoffs: Mid-April through June
-
-**Known Limitation:** The April 15 playoff cutoff is approximate. Actual NBA playoff start dates vary by year (typically April 15-20, with play-in games around April 11-14). Early playoff/play-in games before April 15 may be misclassified as regular season. Impact is minimal as it affects only a small window of games. For production enhancement, consider:
-- Parsing `intervalType` from MySportsFeeds API responses if available
-- Adding `isPlayoffs` flag to `dailyGames` schema and syncing from API metadata
-- Maintaining an authoritative calendar of season transitions
+**Season Management:**
+The system uses MySportsFeeds API's built-in season handling via the "latest" keyword, which automatically resolves to the current active season (regular or playoff). The `CURRENT_SEASON` constant ("2024-2025-regular") is used as a stable identifier for data storage and aggregation. MySportsFeeds handles the complexity of season transitions, playoff detection, and multi-season data through their API endpoints.
 
 Performance optimizations include SQL JOINs to prevent N+1 queries, marketplace pagination, batch player fetches, React Query caching, and persistent database-backed stats caching with automatic aggregation.
 

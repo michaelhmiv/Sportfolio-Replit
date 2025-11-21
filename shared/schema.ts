@@ -4,7 +4,8 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Current NBA season
-// TODO: In the future, derive season from game date for full multi-season support
+// MySportsFeeds API uses "latest" keyword to automatically fetch current season data
+// This constant is used for data storage and aggregation
 export const CURRENT_SEASON = "2024-2025-regular";
 
 // Session storage table (required for Replit Auth)
