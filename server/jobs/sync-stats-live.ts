@@ -10,10 +10,17 @@ import { storage } from "../storage";
 import { fetchPlayerGameStats, calculateFantasyPoints } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
+import type { ProgressCallback } from "../lib/admin-stream";
 import { broadcast } from "../websocket";
 
-export async function syncStatsLive(): Promise<JobResult> {
+export async function syncStatsLive(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[stats_sync_live] Starting live game stats sync...");
+  
+  progressCallback?.({
+    type: 'info',
+    timestamp: new Date().toISOString(),
+    message: 'Starting live stats sync job',
+  });
   
   let requestCount = 0;
   let recordsProcessed = 0;
@@ -32,14 +39,34 @@ export async function syncStatsLive(): Promise<JobResult> {
     // Short-circuit if no live games
     if (liveGames.length === 0) {
       console.log(`[stats_sync_live] No live games in progress, skipping`);
+      
+      progressCallback?.({
+        type: 'info',
+        timestamp: new Date().toISOString(),
+        message: 'No live games in progress, skipping',
+      });
+      
       return { requestCount: 0, recordsProcessed: 0, errorCount: 0 };
     }
 
     console.log(`[stats_sync_live] Found ${liveGames.length} live games to process`);
+    
+    progressCallback?.({
+      type: 'info',
+      timestamp: new Date().toISOString(),
+      message: `Found ${liveGames.length} live games to process`,
+      data: { totalGames: liveGames.length },
+    });
 
     // Rate limit budget: if >6 concurrent games, we might need to back off
     if (liveGames.length > 6) {
       console.warn(`[stats_sync_live] Warning: ${liveGames.length} concurrent live games may strain rate limits`);
+      
+      progressCallback?.({
+        type: 'warning',
+        timestamp: new Date().toISOString(),
+        message: `Warning: ${liveGames.length} concurrent live games may strain rate limits`,
+      });
     }
 
     for (let i = 0; i < liveGames.length; i++) {
@@ -52,6 +79,17 @@ export async function syncStatsLive(): Promise<JobResult> {
       }
       
       try {
+        progressCallback?.({
+          type: 'info',
+          timestamp: new Date().toISOString(),
+          message: `Processing live game ${i + 1}/${liveGames.length}: ${game.awayTeam} @ ${game.homeTeam}`,
+          data: {
+            current: i + 1,
+            total: liveGames.length,
+            gameId: game.gameId,
+          },
+        });
+        
         const gamelogs = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
           requestCount++;
           return await fetchPlayerGameStats(game.gameId, new Date(game.date));
@@ -154,9 +192,33 @@ export async function syncStatsLive(): Promise<JobResult> {
     console.log(`[stats_sync_live] ✓ Processed ${recordsProcessed} player stats from ${liveGames.length} live games, ${errorCount} errors`);
     console.log(`[stats_sync_live] API requests made: ${requestCount}`);
     
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: errorCount > 0
+        ? `Live stats sync completed with ${errorCount} errors: ${recordsProcessed} player stats from ${liveGames.length} games`
+        : `Live stats sync completed successfully: ${recordsProcessed} player stats from ${liveGames.length} games`,
+      data: {
+        success: errorCount === 0,
+        statsProcessed: recordsProcessed,
+        errors: errorCount,
+        apiCalls: requestCount,
+        gamesProcessed: liveGames.length,
+        broadcasts: processedGames.size,
+      },
+    });
+    
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {
     console.error("[stats_sync_live] Failed:", error.message);
+    
+    progressCallback?.({
+      type: 'error',
+      timestamp: new Date().toISOString(),
+      message: `Live stats sync failed: ${error.message}`,
+      data: { error: error.message, stack: error.stack },
+    });
+    
     // Degrade gracefully - log but don't throw hard
     return { requestCount, recordsProcessed, errorCount: errorCount + 1 };
   }

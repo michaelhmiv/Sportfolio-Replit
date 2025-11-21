@@ -191,11 +191,11 @@ export class JobScheduler {
     const jobConfigs: Record<string, (callback?: ProgressCallback) => Promise<JobResult>> = {
       roster_sync: (callback) => syncRoster(callback),
       sync_player_game_logs: (callback) => syncPlayerGameLogs({ progressCallback: callback }),
-      schedule_sync: () => syncSchedule(),
-      stats_sync: () => syncStats(),
-      stats_sync_live: () => syncStatsLive(),
-      create_contests: () => createContests(),
-      update_contest_statuses: () => updateContestStatuses(),
+      schedule_sync: (callback) => syncSchedule(callback),
+      stats_sync: (callback) => syncStats(callback),
+      stats_sync_live: (callback) => syncStatsLive(callback),
+      create_contests: (callback) => createContests(callback),
+      update_contest_statuses: (callback) => updateContestStatuses(callback),
       settle_contests: (callback) => settleContests(callback),
     };
 

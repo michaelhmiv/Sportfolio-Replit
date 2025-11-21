@@ -10,6 +10,7 @@
 import { storage } from "../storage";
 import { fetchDailyGames } from "../mysportsfeeds";
 import type { JobResult } from "./scheduler";
+import type { ProgressCallback } from "../lib/admin-stream";
 import { fromZonedTime } from "date-fns-tz";
 
 interface GameDay {
@@ -17,8 +18,14 @@ interface GameDay {
   gameCount: number;
 }
 
-export async function createContests(): Promise<JobResult> {
+export async function createContests(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[create_contests] Starting contest creation...");
+  
+  progressCallback?.({
+    type: 'info',
+    timestamp: new Date().toISOString(),
+    message: 'Starting contest creation job',
+  });
   
   let requestCount = 0;
   let contestsCreated = 0;
@@ -27,6 +34,13 @@ export async function createContests(): Promise<JobResult> {
   try {
     // Fetch upcoming games for the next 7 days
     console.log("[create_contests] Fetching NBA schedule for next 7 days...");
+    
+    progressCallback?.({
+      type: 'info',
+      timestamp: new Date().toISOString(),
+      message: 'Fetching NBA schedule for next 7 days',
+    });
+    
     const gameDays = new Map<string, GameDay>();
     const now = new Date();
     
@@ -72,10 +86,24 @@ export async function createContests(): Promise<JobResult> {
 
     if (gameDays.size === 0) {
       console.log("[create_contests] No upcoming games found in next 7 days");
+      
+      progressCallback?.({
+        type: 'info',
+        timestamp: new Date().toISOString(),
+        message: 'No upcoming games found in next 7 days',
+      });
+      
       return { requestCount, recordsProcessed: 0, errorCount: 0 };
     }
 
     console.log(`[create_contests] Found ${gameDays.size} unique game days with games`);
+    
+    progressCallback?.({
+      type: 'info',
+      timestamp: new Date().toISOString(),
+      message: `Found ${gameDays.size} unique game days with games`,
+      data: { gameDays: gameDays.size, apiCalls: requestCount },
+    });
 
     // Create contests for each game day
     for (const [dateStr, gameDay] of Array.from(gameDays.entries())) {
@@ -90,6 +118,13 @@ export async function createContests(): Promise<JobResult> {
 
         if (contestExists) {
           console.log(`[create_contests] Contest already exists for ${dateStr}, skipping...`);
+          
+          progressCallback?.({
+            type: 'debug',
+            timestamp: new Date().toISOString(),
+            message: `Contest already exists for ${dateStr}, skipping`,
+          });
+          
           continue;
         }
 
@@ -122,13 +157,40 @@ export async function createContests(): Promise<JobResult> {
 
         contestsCreated++;
         console.log(`[create_contests] ✓ Created contest for ${dateStr} (${gameDay.gameCount} games)`);
+        
+        progressCallback?.({
+          type: 'info',
+          timestamp: new Date().toISOString(),
+          message: `✓ Created contest for ${dateStr} (${gameDay.gameCount} games)`,
+          data: { date: dateStr, gameCount: gameDay.gameCount },
+        });
       } catch (error: any) {
         console.error(`[create_contests] Failed to create contest for ${dateStr}:`, error.message);
         errorCount++;
+        
+        progressCallback?.({
+          type: 'warning',
+          timestamp: new Date().toISOString(),
+          message: `Failed to create contest for ${dateStr}: ${error.message}`,
+        });
       }
     }
 
     console.log(`[create_contests] Created ${contestsCreated} new contests, ${errorCount} errors`);
+    
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: errorCount > 0
+        ? `Contest creation completed with ${errorCount} errors: ${contestsCreated} contests created`
+        : `Contest creation completed successfully: ${contestsCreated} contests created`,
+      data: {
+        success: errorCount === 0,
+        contestsCreated,
+        errors: errorCount,
+        apiCalls: requestCount,
+      },
+    });
     
     return { 
       requestCount, 
@@ -137,6 +199,14 @@ export async function createContests(): Promise<JobResult> {
     };
   } catch (error: any) {
     console.error("[create_contests] Failed:", error.message);
+    
+    progressCallback?.({
+      type: 'error',
+      timestamp: new Date().toISOString(),
+      message: `Contest creation failed: ${error.message}`,
+      data: { error: error.message, stack: error.stack },
+    });
+    
     throw error;
   }
 }

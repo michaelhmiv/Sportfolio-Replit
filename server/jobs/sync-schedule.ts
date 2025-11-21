@@ -10,10 +10,17 @@ import { storage } from "../storage";
 import { fetchDailyGames, fetchGameStatus, normalizeGameStatus } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
+import type { ProgressCallback } from "../lib/admin-stream";
 import { broadcast } from "../websocket";
 
-export async function syncSchedule(): Promise<JobResult> {
+export async function syncSchedule(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[schedule_sync] Starting game schedule sync...");
+  
+  progressCallback?.({
+    type: 'info',
+    timestamp: new Date().toISOString(),
+    message: 'Starting schedule sync job',
+  });
   
   let requestCount = 0;
   let recordsProcessed = 0;
@@ -32,13 +39,36 @@ export async function syncSchedule(): Promise<JobResult> {
     }
 
     console.log(`[schedule_sync] Fetching games for dates range`);
+    
+    progressCallback?.({
+      type: 'info',
+      timestamp: new Date().toISOString(),
+      message: `Fetching games for ${dates.length} dates (7 days back to 14 days forward)`,
+      data: { totalDates: dates.length },
+    });
 
-    for (const date of dates) {
+    for (let i = 0; i < dates.length; i++) {
+      const date = dates[i];
       try {
         const games = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
           requestCount++;
           return await fetchDailyGames(date);
         });
+        
+        // Progress update every 5 dates
+        if ((i + 1) % 5 === 0) {
+          progressCallback?.({
+            type: 'progress',
+            timestamp: new Date().toISOString(),
+            message: `Fetched ${i + 1}/${dates.length} dates`,
+            data: {
+              current: i + 1,
+              total: dates.length,
+              percentage: Math.round(((i + 1) / dates.length) * 100),
+              stats: { gamesStored: recordsProcessed, errors: errorCount },
+            },
+          });
+        }
 
         // Store games in database
         for (const game of games) {
@@ -86,6 +116,14 @@ export async function syncSchedule(): Promise<JobResult> {
     // Broadcast updates for games with scores
     if (gamesWithUpdates.size > 0) {
       console.log(`[schedule_sync] Broadcasting updates for ${gamesWithUpdates.size} games with scores`);
+      
+      progressCallback?.({
+        type: 'info',
+        timestamp: new Date().toISOString(),
+        message: `Broadcasting updates for ${gamesWithUpdates.size} games with score changes`,
+        data: { gamesWithUpdates: gamesWithUpdates.size },
+      });
+      
       const gameIds = Array.from(gamesWithUpdates);
       for (const gameId of gameIds) {
         broadcast({
@@ -106,9 +144,32 @@ export async function syncSchedule(): Promise<JobResult> {
     console.log(`[schedule_sync] Successfully processed ${recordsProcessed} games, ${errorCount} errors`);
     console.log(`[schedule_sync] API requests made: ${requestCount}`);
     
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: errorCount > 0
+        ? `Schedule sync completed with ${errorCount} errors: ${recordsProcessed} games processed`
+        : `Schedule sync completed successfully: ${recordsProcessed} games processed`,
+      data: {
+        success: errorCount === 0,
+        gamesProcessed: recordsProcessed,
+        errors: errorCount,
+        apiCalls: requestCount,
+        broadcasts: gamesWithUpdates.size,
+      },
+    });
+    
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {
     console.error("[schedule_sync] Failed:", error.message);
+    
+    progressCallback?.({
+      type: 'error',
+      timestamp: new Date().toISOString(),
+      message: `Schedule sync failed: ${error.message}`,
+      data: { error: error.message, stack: error.stack },
+    });
+    
     throw error;
   }
 }

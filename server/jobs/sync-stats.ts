@@ -9,9 +9,16 @@ import { storage } from "../storage";
 import { fetchPlayerGameStats, calculateFantasyPoints } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
+import type { ProgressCallback } from "../lib/admin-stream";
 
-export async function syncStats(): Promise<JobResult> {
+export async function syncStats(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[stats_sync] Starting game stats sync...");
+  
+  progressCallback?.({
+    type: 'info',
+    timestamp: new Date().toISOString(),
+    message: 'Starting stats sync job',
+  });
   
   let requestCount = 0;
   let recordsProcessed = 0;
@@ -33,6 +40,13 @@ export async function syncStats(): Promise<JobResult> {
     );
 
     console.log(`[stats_sync] Found ${relevantGames.length} games to process`);
+    
+    progressCallback?.({
+      type: 'info',
+      timestamp: new Date().toISOString(),
+      message: `Found ${relevantGames.length} games to process (last 24 hours)`,
+      data: { totalGames: relevantGames.length },
+    });
 
     for (let i = 0; i < relevantGames.length; i++) {
       const game = relevantGames[i];
@@ -44,6 +58,17 @@ export async function syncStats(): Promise<JobResult> {
       }
       
       try {
+        progressCallback?.({
+          type: 'info',
+          timestamp: new Date().toISOString(),
+          message: `Processing game ${i + 1}/${relevantGames.length}: ${game.awayTeam} @ ${game.homeTeam}`,
+          data: {
+            current: i + 1,
+            total: relevantGames.length,
+            gameId: game.gameId,
+          },
+        });
+        
         const gamelogs = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
           requestCount++;
           return await fetchPlayerGameStats(game.gameId, new Date(game.date));
@@ -128,9 +153,32 @@ export async function syncStats(): Promise<JobResult> {
     console.log(`[stats_sync] Successfully processed ${recordsProcessed} player stats, ${errorCount} errors`);
     console.log(`[stats_sync] API requests made: ${requestCount}`);
     
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: errorCount > 0
+        ? `Stats sync completed with ${errorCount} errors: ${recordsProcessed} player stats processed`
+        : `Stats sync completed successfully: ${recordsProcessed} player stats processed`,
+      data: {
+        success: errorCount === 0,
+        statsProcessed: recordsProcessed,
+        errors: errorCount,
+        apiCalls: requestCount,
+        gamesProcessed: relevantGames.length,
+      },
+    });
+    
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {
     console.error("[stats_sync] Failed:", error.message);
+    
+    progressCallback?.({
+      type: 'error',
+      timestamp: new Date().toISOString(),
+      message: `Stats sync failed: ${error.message}`,
+      data: { error: error.message, stack: error.stack },
+    });
+    
     throw error;
   }
 }
