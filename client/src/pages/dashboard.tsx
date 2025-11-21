@@ -202,7 +202,17 @@ export default function Dashboard() {
   const [playerFPG, setPlayerFPG] = useState<Map<string, number>>(new Map());
   const [fpgLoading, setFpgLoading] = useState(false);
 
-  // Fetch FPG for all players when modal opens
+  // Track player IDs for dependency
+  const playerIds = filteredPlayers.map(p => p.id).sort().join(',');
+
+  // Clear FPG when modal closes to avoid stale data
+  useEffect(() => {
+    if (!showPlayerSelection && playerFPG.size > 0) {
+      setPlayerFPG(new Map());
+    }
+  }, [showPlayerSelection]);
+
+  // Fetch FPG for all players when modal opens or player list changes
   useEffect(() => {
     if (!showPlayerSelection || filteredPlayers.length === 0) return;
 
@@ -228,7 +238,7 @@ export default function Dashboard() {
     };
 
     fetchFPG();
-  }, [showPlayerSelection, filteredPlayers.length]);
+  }, [showPlayerSelection, playerIds]);
 
   // Sort players based on selected criteria
   const sortedPlayers = [...filteredPlayers].sort((a, b) => {
