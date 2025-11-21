@@ -46,7 +46,7 @@ A persistent stats caching layer dramatically reduces MySportsFeeds API calls by
 - `GET /api/player/:id/recent-games`: Reads from `player_game_stats` instead of calling MySportsFeeds game logs API.
 
 **Season Management:**
-The system uses MySportsFeeds API's built-in season handling via the "latest" keyword, which automatically resolves to the current active season (regular or playoff). The `CURRENT_SEASON` constant ("2024-2025-regular") is used as a stable identifier for data storage and aggregation. MySportsFeeds handles the complexity of season transitions, playoff detection, and multi-season data through their API endpoints.
+The system uses MySportsFeeds API's built-in season handling via the `current_season` endpoint, which provides authoritative season information including automatic playoff detection. A lightweight caching service (`server/season-service.ts`) fetches and caches the current season slug with a 1-hour TTL. The `CURRENT_SEASON` constant ("2024-2025-regular") serves as a fallback if the API is unavailable. This ensures accurate season tracking across regular season and playoffs without manual updates.
 
 Performance optimizations include SQL JOINs to prevent N+1 queries, marketplace pagination, batch player fetches, React Query caching, and persistent database-backed stats caching with automatic aggregation.
 

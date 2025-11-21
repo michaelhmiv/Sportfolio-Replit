@@ -9,7 +9,7 @@ import { storage } from "../storage";
 import { fetchPlayerGameStats, calculateFantasyPoints } from "../mysportsfeeds";
 import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
-import { CURRENT_SEASON } from "../../shared/schema";
+import { getCurrentSeasonSlug } from "../season-service";
 
 export async function syncStats(): Promise<JobResult> {
   console.log("[stats_sync] Starting game stats sync...");
@@ -18,6 +18,10 @@ export async function syncStats(): Promise<JobResult> {
   let recordsProcessed = 0;
   let errorCount = 0;
   const playersToRecalculate = new Set<string>(); // Track players needing season summary updates
+
+  // Fetch current season slug from MySportsFeeds API (cached for 1 hour)
+  const currentSeason = await getCurrentSeasonSlug();
+  console.log(`[stats_sync] Using season: ${currentSeason}`);
 
   try {
     // Get games from last 24 hours (catches late-night games from previous day)
@@ -92,7 +96,7 @@ export async function syncStats(): Promise<JobResult> {
               playerId: gamelog.player.id,
               gameId: game.gameId,
               gameDate: game.date,
-              season: CURRENT_SEASON, // MySportsFeeds "latest" keyword handles current season automatically
+              season: currentSeason,
               opponentTeam: gamelog.team.abbreviation === game.homeTeam ? game.awayTeam : game.homeTeam,
               homeAway: gamelog.team.abbreviation === game.homeTeam ? "home" : "away",
               minutes: offense.minSeconds ? Math.floor(offense.minSeconds / 60) : 0,
