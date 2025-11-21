@@ -2620,6 +2620,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin middleware - validates ADMIN_API_TOKEN (for external cron) OR isAdmin flag (for logged-in users)
   async function adminAuth(req: any, res: any, next: any) {
+    console.log('[ADMIN_DEBUG] adminAuth called for:', req.path);
+    console.log('[ADMIN_DEBUG] req.user exists:', !!req.user);
+    console.log('[ADMIN_DEBUG] req.isAuthenticated exists:', typeof req.isAuthenticated);
+    
     const token = req.headers.authorization?.replace('Bearer ', '');
     const expectedToken = process.env.ADMIN_API_TOKEN;
     
