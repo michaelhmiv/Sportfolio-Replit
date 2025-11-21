@@ -20,6 +20,7 @@ import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { calculateMiningShares } from "@shared/mining-utils";
 import { MarketActivityWidget } from "@/components/market-activity-widget";
 import { PlayerName } from "@/components/player-name";
+import { AdSenseAd } from "@/components/adsense-ad";
 
 interface DashboardData {
   user: {
@@ -984,32 +985,40 @@ export default function Dashboard() {
 
           <div className="overflow-y-auto flex-1 px-1">
             <div className="space-y-2">
-              {filteredPlayers.map((player) => {
+              {filteredPlayers.map((player, index) => {
                 const isSelected = selectedPlayers.some(p => p.id === player.id);
                 return (
-                  <PlayerCard
-                    key={player.id}
-                    player={player}
-                    isExpanded={expandedPlayerId === player.id}
-                    onToggleExpand={() => setExpandedPlayerId(
-                      expandedPlayerId === player.id ? null : player.id
+                  <>
+                    <PlayerCard
+                      key={player.id}
+                      player={player}
+                      isExpanded={expandedPlayerId === player.id}
+                      onToggleExpand={() => setExpandedPlayerId(
+                        expandedPlayerId === player.id ? null : player.id
+                      )}
+                      onSelect={() => {
+                        if (isSelected) {
+                          setSelectedPlayers(prev => prev.filter(p => p.id !== player.id));
+                        } else if (selectedPlayers.length < 10) {
+                          setSelectedPlayers(prev => [...prev, player]);
+                        } else {
+                          toast({
+                            title: "Maximum Reached",
+                            description: "You can select up to 10 players",
+                            variant: "destructive",
+                          });
+                        }
+                      }}
+                      isPending={startMiningMutation.isPending}
+                      isSelected={isSelected}
+                    />
+                    {/* Insert ad every 6 players */}
+                    {(index + 1) % 6 === 0 && index < filteredPlayers.length - 1 && (
+                      <div key={`ad-${index}`} className="my-2">
+                        <AdSenseAd slot="2800193816" format="fluid" layoutKey="-i2-7+2w-11-86" />
+                      </div>
                     )}
-                    onSelect={() => {
-                      if (isSelected) {
-                        setSelectedPlayers(prev => prev.filter(p => p.id !== player.id));
-                      } else if (selectedPlayers.length < 10) {
-                        setSelectedPlayers(prev => [...prev, player]);
-                      } else {
-                        toast({
-                          title: "Maximum Reached",
-                          description: "You can select up to 10 players",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                    isPending={startMiningMutation.isPending}
-                    isSelected={isSelected}
-                  />
+                  </>
                 );
               })}
             </div>

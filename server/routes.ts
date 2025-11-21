@@ -710,12 +710,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .reduce((sum, a) => sum + (a.quantity - a.filledQuantity), 0)
           : 0;
         
-        // Calculate average fantasy points per game from player stats
-        const gameStats = await storage.getAllPlayerGameStats(player.id);
+        // Calculate average fantasy points per game from season stats
         let avgFantasyPointsPerGame = "0.0";
-        if (gameStats.length > 0) {
-          const totalFantasyPoints = gameStats.reduce((sum, stat) => sum + parseFloat(stat.fantasyPoints), 0);
-          avgFantasyPointsPerGame = (totalFantasyPoints / gameStats.length).toFixed(1);
+        try {
+          const seasonStats = await fetchPlayerSeasonStats(player.id);
+          if (seasonStats?.stats) {
+            const stats = seasonStats.stats;
+            const offense = stats.offense || {};
+            const defense = stats.defense || {};
+            const rebounds = stats.rebounds || {};
+            const fieldGoals = stats.fieldGoals || {};
+            
+            // Calculate FPG from season averages using fantasy points formula
+            // Formula: PTS*1.0 + 3PM*0.5 + REB*1.25 + AST*1.5 + STL*2.0 + BLK*2.0 + TO*-0.5
+            const fpg = 
+              (offense.ptsPerGame || 0) * 1.0 +
+              (fieldGoals.fg3PtMadePerGame || 0) * 0.5 +
+              (rebounds.rebPerGame || 0) * 1.25 +
+              (offense.astPerGame || 0) * 1.5 +
+              (defense.stlPerGame || 0) * 2.0 +
+              (defense.blkPerGame || 0) * 2.0 +
+              (offense.tovPerGame || 0) * -0.5;
+            
+            avgFantasyPointsPerGame = fpg.toFixed(1);
+          }
+        } catch (error: any) {
+          // If season stats unavailable, keep default 0.0
+          console.error(`[API] Error fetching season stats for ${player.id}:`, error.message);
         }
         
         return {
