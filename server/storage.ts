@@ -1124,7 +1124,8 @@ export class DatabaseStorage implements IStorage {
             playerName: `${trade.playerFirstName} ${trade.playerLastName}`,
             playerTeam: trade.playerTeam,
             quantity: trade.quantity,
-            price: trade.price,
+            tradePrice: trade.price,
+            side: 'buy',
           },
         });
       });
@@ -1161,7 +1162,8 @@ export class DatabaseStorage implements IStorage {
             playerName: `${trade.playerFirstName} ${trade.playerLastName}`,
             playerTeam: trade.playerTeam,
             quantity: trade.quantity,
-            price: trade.price,
+            tradePrice: trade.price,
+            side: 'sell',
           },
         });
       });
@@ -1255,9 +1257,9 @@ export class DatabaseStorage implements IStorage {
         description = `Claimed ${meta.sharesClaimed} shares${meta.playerName ? ` of ${meta.playerName}` : ''}`;
       } else if (activity.category === 'market') {
         if (activity.subtype === 'trade_buy') {
-          description = `Bought ${meta.quantity} shares of ${meta.playerName} @ $${meta.price}`;
+          description = `Bought ${meta.quantity} shares of ${meta.playerName} @ $${meta.tradePrice}`;
         } else if (activity.subtype === 'trade_sell') {
-          description = `Sold ${meta.quantity} shares of ${meta.playerName} @ $${meta.price}`;
+          description = `Sold ${meta.quantity} shares of ${meta.playerName} @ $${meta.tradePrice}`;
         }
       } else if (activity.category === 'contest') {
         if (activity.subtype === 'contest_entry') {
