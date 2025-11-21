@@ -199,11 +199,7 @@ export default function Contests() {
                                 View Details
                               </Button>
                             </Link>
-                            {isLocked ? (
-                              <Button className="flex-1" disabled data-testid={`button-enter-${contest.id}`}>
-                                Locked
-                              </Button>
-                            ) : (
+                            {!isLocked && (
                               <Link href={`/contest/${contest.id}/entry`} className="flex-1">
                                 <Button className="w-full" data-testid={`button-enter-${contest.id}`}>
                                   Enter
