@@ -2,10 +2,9 @@ import { useEffect } from "react";
 
 interface AdSenseAdProps {
   className?: string;
-  slot?: string;
 }
 
-export function AdSenseAd({ className = "", slot = "8848272002" }: AdSenseAdProps) {
+export function AdSenseAd({ className = "" }: AdSenseAdProps) {
   useEffect(() => {
     try {
       // Push ad to AdSense queue
@@ -25,7 +24,7 @@ export function AdSenseAd({ className = "", slot = "8848272002" }: AdSenseAdProp
         data-ad-format="fluid"
         data-ad-layout-key="-i2-7+2w-11-86"
         data-ad-client="ca-pub-3663304837019777"
-        data-ad-slot={slot}
+        data-ad-slot="8848272002"
       />
     </div>
   );

@@ -20,7 +20,6 @@ import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { calculateMiningShares } from "@shared/mining-utils";
 import { MarketActivityWidget } from "@/components/market-activity-widget";
 import { PlayerName } from "@/components/player-name";
-import { AdSenseAd } from "@/components/adsense-ad";
 
 interface DashboardData {
   user: {
@@ -81,7 +80,6 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
-  const [sortBy, setSortBy] = useState<'fpg' | 'value'>('fpg');
   
   // Debounce search input (250ms delay)
   useEffect(() => {
@@ -197,65 +195,6 @@ export default function Dashboard() {
 
   // Filter only for mining eligibility (server-side handles search and team filter)
   const filteredPlayers = playersData?.filter(p => p.isEligibleForMining) || [];
-
-  // Store FPG (Fantasy Points per Game) for sorting
-  const [playerFPG, setPlayerFPG] = useState<Map<string, number>>(new Map());
-  const [fpgLoading, setFpgLoading] = useState(false);
-
-  // Track player IDs for dependency
-  const playerIds = filteredPlayers.map(p => p.id).sort().join(',');
-
-  // Clear FPG when modal closes to avoid stale data
-  useEffect(() => {
-    if (!showPlayerSelection && playerFPG.size > 0) {
-      setPlayerFPG(new Map());
-    }
-  }, [showPlayerSelection]);
-
-  // Fetch FPG for all players when modal opens or player list changes
-  useEffect(() => {
-    if (!showPlayerSelection || filteredPlayers.length === 0) return;
-
-    const fetchFPG = async () => {
-      setFpgLoading(true);
-      try {
-        const ids = filteredPlayers.map(p => p.id).join(',');
-        const response = await fetch(`/api/players/fantasy-points?ids=${ids}`);
-        const data = await response.json();
-        
-        // Convert object to Map
-        const fpgMap = new Map<string, number>();
-        Object.keys(data).forEach(playerId => {
-          fpgMap.set(playerId, data[playerId]);
-        });
-        
-        setPlayerFPG(fpgMap);
-      } catch (error) {
-        console.error('Failed to fetch FPG data:', error);
-      } finally {
-        setFpgLoading(false);
-      }
-    };
-
-    fetchFPG();
-  }, [showPlayerSelection, playerIds]);
-
-  // Sort players based on selected criteria
-  const sortedPlayers = [...filteredPlayers].sort((a, b) => {
-    if (sortBy === 'value') {
-      // Sort by market value (lastTradePrice)
-      const aPrice = parseFloat(a.lastTradePrice || '0');
-      const bPrice = parseFloat(b.lastTradePrice || '0');
-      if (bPrice !== aPrice) return bPrice - aPrice; // Descending
-    } else if (sortBy === 'fpg') {
-      // Sort by fantasy points per game
-      const aFPG = playerFPG.get(a.id) || 0;
-      const bFPG = playerFPG.get(b.id) || 0;
-      if (bFPG !== aFPG) return bFPG - aFPG; // Descending
-    }
-    // Fallback: alphabetical by last name for stable ordering
-    return a.lastName.localeCompare(b.lastName);
-  });
 
   // Get unique teams for filter
   const { data: teams } = useQuery<string[]>({
@@ -920,60 +859,29 @@ export default function Dashboard() {
             </DialogDescription>
           </DialogHeader>
           
-          {/* Search, Filter, and Sort */}
-          <div className="flex flex-col gap-3 px-1">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search players..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                  data-testid="input-search-players"
-                />
-              </div>
-              <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-                <SelectTrigger className="w-full sm:w-40" data-testid="select-team-filter">
-                  <SelectValue placeholder="All Teams" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" data-testid="team-option-all">All Teams</SelectItem>
-                  {uniqueTeams.map((team) => (
-                    <SelectItem key={team} value={team} data-testid={`team-option-${team}`}>{team}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          {/* Search and Filter */}
+          <div className="flex flex-col sm:flex-row gap-3 px-1">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search players..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9"
+                data-testid="input-search-players"
+              />
             </div>
-            
-            {/* Sort Controls */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">Sort by:</span>
-              <div className="flex gap-1.5">
-                <Button
-                  size="sm"
-                  variant={sortBy === 'fpg' ? 'default' : 'outline'}
-                  onClick={() => setSortBy('fpg')}
-                  className="text-xs"
-                  data-testid="button-sort-fpg"
-                  disabled={fpgLoading}
-                >
-                  Fantasy Pts
-                </Button>
-                <Button
-                  size="sm"
-                  variant={sortBy === 'value' ? 'default' : 'outline'}
-                  onClick={() => setSortBy('value')}
-                  className="text-xs"
-                  data-testid="button-sort-value"
-                >
-                  Market Value
-                </Button>
-              </div>
-              {fpgLoading && (
-                <span className="text-xs text-muted-foreground ml-2">Loading...</span>
-              )}
-            </div>
+            <Select value={selectedTeam} onValueChange={setSelectedTeam}>
+              <SelectTrigger className="w-full sm:w-40" data-testid="select-team-filter">
+                <SelectValue placeholder="All Teams" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" data-testid="team-option-all">All Teams</SelectItem>
+                {uniqueTeams.map((team) => (
+                  <SelectItem key={team} value={team} data-testid={`team-option-${team}`}>{team}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Selected Players List */}
@@ -998,13 +906,12 @@ export default function Dashboard() {
 
           <div className="overflow-y-auto flex-1 px-1">
             <div className="space-y-2">
-              {sortedPlayers.flatMap((player, index) => {
+              {filteredPlayers.map((player) => {
                 const isSelected = selectedPlayers.some(p => p.id === player.id);
-                const playerCard = (
+                return (
                   <PlayerCard
                     key={player.id}
                     player={player}
-                    fpg={playerFPG.get(player.id)}
                     isExpanded={expandedPlayerId === player.id}
                     onToggleExpand={() => setExpandedPlayerId(
                       expandedPlayerId === player.id ? null : player.id
@@ -1026,21 +933,9 @@ export default function Dashboard() {
                     isSelected={isSelected}
                   />
                 );
-
-                // Insert ad after every 6 players (but not after the last player)
-                if ((index + 1) % 6 === 0 && index < sortedPlayers.length - 1) {
-                  return [
-                    playerCard,
-                    <div key={`ad-${index}`} className="w-full py-3">
-                      <AdSenseAd slot="2800193816" className="w-full" />
-                    </div>
-                  ];
-                }
-
-                return [playerCard];
               })}
             </div>
-            {sortedPlayers.length === 0 && (
+            {filteredPlayers.length === 0 && (
               <div className="text-center py-6 text-muted-foreground">
                 <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" />
                 <p>No players found matching your criteria</p>
@@ -1078,7 +973,6 @@ function PlayerCard({
   onSelect, 
   isPending,
   isSelected = false,
-  fpg,
 }: { 
   player: Player; 
   isExpanded: boolean; 
@@ -1086,9 +980,7 @@ function PlayerCard({
   onSelect: () => void; 
   isPending: boolean;
   isSelected?: boolean;
-  fpg?: number;
 }) {
-  // Load full stats only when expanded
   const { data: statsData, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/player", player.id, "stats"],
     enabled: isExpanded,
@@ -1117,19 +1009,25 @@ function PlayerCard({
                   <div className="font-medium truncate">{player.firstName} {player.lastName}</div>
                   <div className="text-sm text-muted-foreground">{player.team} · {player.position}</div>
                 </div>
+                <div className="text-right flex-shrink-0">
+                  <div className="text-lg font-mono font-bold">
+                    {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-sm">No value</span>}
+                  </div>
+                </div>
               </div>
               
-              {/* FPG and Market Value - Always Visible */}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px] sm:text-xs text-muted-foreground mt-2">
-                <div className="flex items-center gap-1">
-                  <span className="text-muted-foreground/70">FPG:</span>
-                  <span className="font-mono font-bold text-foreground">{fpg !== undefined ? fpg.toFixed(1) : '0.0'}</span>
+              {/* Season Averages */}
+              {stats && !statsLoading ? (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                  <span className="font-mono"><span className="font-bold">{stats.pointsPerGame || "0.0"}</span> PPG</span>
+                  <span className="font-mono"><span className="font-bold">{stats.reboundsPerGame || "0.0"}</span> RPG</span>
+                  <span className="font-mono"><span className="font-bold">{stats.assistsPerGame || "0.0"}</span> APG</span>
+                  <span className="text-muted-foreground/60">·</span>
+                  <span>{stats.gamesPlayed || 0} GP</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-muted-foreground/70">Value:</span>
-                  <span className="font-mono font-bold text-foreground">{player.lastTradePrice ? `$${player.lastTradePrice}` : '$0.00'}</span>
-                </div>
-              </div>
+              ) : isExpanded && statsLoading ? (
+                <div className="text-xs text-muted-foreground mt-2">Loading stats...</div>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-2 flex-shrink-0">
@@ -1162,31 +1060,13 @@ function PlayerCard({
           <CollapsibleContent>
             {isExpanded && (
               <div className="mt-4 pt-4 border-t space-y-3">
-                {/* Season Stats - Dropdown */}
-                {statsLoading ? (
-                  <div className="text-xs text-muted-foreground">Loading stats...</div>
-                ) : stats ? (
+                {/* Full Season Stats */}
+                {stats && (
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                      Season Averages
+                      Season Stats
                     </div>
-                    <div className="grid grid-cols-3 gap-3 mb-3">
-                      <div className="text-center p-2 rounded-md bg-muted/50">
-                        <div className="text-xs text-muted-foreground">PPG</div>
-                        <div className="font-mono font-bold">{stats.pointsPerGame || "0.0"}</div>
-                      </div>
-                      <div className="text-center p-2 rounded-md bg-muted/50">
-                        <div className="text-xs text-muted-foreground">RPG</div>
-                        <div className="font-mono font-bold">{stats.reboundsPerGame || "0.0"}</div>
-                      </div>
-                      <div className="text-center p-2 rounded-md bg-muted/50">
-                        <div className="text-xs text-muted-foreground">APG</div>
-                        <div className="font-mono font-bold">{stats.assistsPerGame || "0.0"}</div>
-                      </div>
-                      <div className="text-center p-2 rounded-md bg-muted/50">
-                        <div className="text-xs text-muted-foreground">GP</div>
-                        <div className="font-mono font-bold">{stats.gamesPlayed || 0}</div>
-                      </div>
+                    <div className="grid grid-cols-3 gap-3">
                       <div className="text-center p-2 rounded-md bg-muted/50">
                         <div className="text-xs text-muted-foreground">FG%</div>
                         <div className="font-mono font-bold">{stats.fieldGoalPct || "0.0"}%</div>
@@ -1213,7 +1093,7 @@ function PlayerCard({
                       </div>
                     </div>
                   </div>
-                ) : null}
+                )}
 
                 {/* Last 5 Games */}
                 {recentGames.length > 0 && (
