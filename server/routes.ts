@@ -721,21 +721,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const rebounds = stats.rebounds || {};
             const fieldGoals = stats.fieldGoals || {};
             
-            // Calculate FPG from season averages using fantasy points formula
-            // Formula: PTS*1.0 + 3PM*0.5 + REB*1.25 + AST*1.5 + STL*2.0 + BLK*2.0 + TO*-0.5
-            const fpg = 
-              (offense.ptsPerGame || 0) * 1.0 +
-              (fieldGoals.fg3PtMadePerGame || 0) * 0.5 +
-              (rebounds.rebPerGame || 0) * 1.25 +
-              (offense.astPerGame || 0) * 1.5 +
-              (defense.stlPerGame || 0) * 2.0 +
-              (defense.blkPerGame || 0) * 2.0 +
-              (offense.tovPerGame || 0) * -0.5;
-            
-            avgFantasyPointsPerGame = fpg.toFixed(1);
+            // Only calculate FPG if player has games played
+            if (stats.gamesPlayed && stats.gamesPlayed > 0) {
+              // Calculate FPG from season averages using fantasy points formula
+              // Formula: PTS*1.0 + 3PM*0.5 + REB*1.25 + AST*1.5 + STL*2.0 + BLK*2.0 + TO*-0.5
+              const fpg = 
+                (offense.ptsPerGame || 0) * 1.0 +
+                (fieldGoals.fg3PtMadePerGame || 0) * 0.5 +
+                (rebounds.rebPerGame || 0) * 1.25 +
+                (offense.astPerGame || 0) * 1.5 +
+                (defense.stlPerGame || 0) * 2.0 +
+                (defense.blkPerGame || 0) * 2.0 +
+                (offense.tovPerGame || 0) * -0.5;
+              
+              avgFantasyPointsPerGame = fpg.toFixed(1);
+            }
           }
         } catch (error: any) {
           // If season stats unavailable, keep default 0.0
+          // This is expected for players who haven't played yet this season
           console.error(`[API] Error fetching season stats for ${player.id}:`, error.message);
         }
         

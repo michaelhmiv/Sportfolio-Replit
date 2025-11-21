@@ -210,14 +210,15 @@ export default function Dashboard() {
     } else if (sortField === 'fantasyPoints') {
       const fpgA = parseFloat((a as any).avgFantasyPointsPerGame || '0');
       const fpgB = parseFloat((b as any).avgFantasyPointsPerGame || '0');
-      comparison = fpgB - fpgA; // Default descending for stats
+      comparison = fpgA - fpgB; // Ascending order (low to high)
     } else if (sortField === 'marketValue') {
       const mvA = parseFloat(a.lastTradePrice || '0');
       const mvB = parseFloat(b.lastTradePrice || '0');
-      comparison = mvB - mvA; // Default descending for price
+      comparison = mvA - mvB; // Ascending order (low to high)
     }
     
-    return sortDirection === 'asc' ? comparison : -comparison;
+    // For desc, reverse the comparison (high to low)
+    return sortDirection === 'desc' ? -comparison : comparison;
   });
 
   // Get unique teams for filter
