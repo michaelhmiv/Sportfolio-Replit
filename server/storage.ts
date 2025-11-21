@@ -1669,15 +1669,6 @@ export class DatabaseStorage implements IStorage {
 
   // Player game stats methods
   async upsertPlayerGameStats(stats: InsertPlayerGameStats): Promise<PlayerGameStats> {
-    // DETAILED DEBUG: Log Kevin Durant specifically
-    const isDurant = stats.playerId === '9386';
-    if (isDurant) {
-      console.log(`[STORAGE] 🔍 Upserting Durant game stats:`);
-      console.log(`[STORAGE]   Game ID: ${stats.gameId}`);
-      console.log(`[STORAGE]   Game Date: ${stats.gameDate}`);
-      console.log(`[STORAGE]   Points: ${stats.points}, Rebounds: ${stats.rebounds}, Assists: ${stats.assists}`);
-    }
-    
     const [existing] = await db
       .select()
       .from(playerGameStats)
@@ -1689,9 +1680,6 @@ export class DatabaseStorage implements IStorage {
       );
 
     if (existing) {
-      if (isDurant) {
-        console.log(`[STORAGE]   ✓ Updating existing Durant record (ID: ${existing.id})`);
-      }
       const [updated] = await db
         .update(playerGameStats)
         .set({ ...stats, lastFetchedAt: new Date() })
@@ -1699,9 +1687,6 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return updated;
     } else {
-      if (isDurant) {
-        console.log(`[STORAGE]   ✓ Creating new Durant record`);
-      }
       const [created] = await db
         .insert(playerGameStats)
         .values(stats)

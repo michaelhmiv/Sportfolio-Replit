@@ -192,24 +192,12 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
           continue;
         }
 
-        // DETAILED DEBUG: Log API response details
-        const playerIds = dayGameLogs.map(log => log.player?.id).filter(Boolean);
-        const uniquePlayers = new Set(playerIds);
-        const hasKevinDurant = playerIds.includes('9386');
-        
-        console.log(`[sync_player_game_logs] ====== DATE ${dateStr} API RESPONSE ======`);
-        console.log(`[sync_player_game_logs]   Total game logs: ${dayGameLogs.length}`);
-        console.log(`[sync_player_game_logs]   Unique players: ${uniquePlayers.size}`);
-        console.log(`[sync_player_game_logs]   Kevin Durant (9386) in response: ${hasKevinDurant ? 'YES' : 'NO'}`);
-        console.log(`[sync_player_game_logs]   Sample player IDs: ${Array.from(uniquePlayers).slice(0, 10).join(', ')}`);
-        
+        console.log(`[sync_player_game_logs] Found ${dayGameLogs.length} games on ${dateStr}`);
         progressCallback?.({
           type: 'info',
           timestamp: new Date().toISOString(),
-          message: `✓ Found ${dayGameLogs.length} games on ${dateStr} (${uniquePlayers.size} players, Durant: ${hasKevinDurant ? 'YES' : 'NO'})`,
+          message: `✓ Found ${dayGameLogs.length} games on ${dateStr}`,
         });
-        
-        let gamesInsertedForDate = 0;
 
         // Process and store each game log
         for (const gameLog of dayGameLogs) {
@@ -245,15 +233,6 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
               ? game.awayTeamAbbreviation 
               : game.homeTeamAbbreviation;
 
-            // DETAILED DEBUG: Log Kevin Durant specifically
-            if (player.id === '9386') {
-              console.log(`[sync_player_game_logs] 🔍 DURANT FOUND on ${dateStr}:`);
-              console.log(`[sync_player_game_logs]   Game ID: ${game.id}`);
-              console.log(`[sync_player_game_logs]   Game time: ${game.startTime}`);
-              console.log(`[sync_player_game_logs]   Points: ${offense.pts}, Rebounds: ${rebounds_stats.reb}, Assists: ${offense.ast}`);
-              console.log(`[sync_player_game_logs]   Fantasy points: ${fantasyPoints.toFixed(2)}`);
-            }
-            
             // Store in database (upsert handles duplicates)
             await storage.upsertPlayerGameStats({
               playerId: player.id,
@@ -283,7 +262,6 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
             });
 
             recordsProcessed++;
-            gamesInsertedForDate++;
           } catch (error: any) {
             console.error(`[sync_player_game_logs] Error storing game ${gameLog.game?.id}:`, error.message);
             progressCallback?.({
@@ -295,21 +273,6 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
             errorCount++;
           }
         }
-        
-        // DETAILED DEBUG: Summary for this date
-        console.log(`[sync_player_game_logs] ====== DATE ${dateStr} COMPLETE ======`);
-        console.log(`[sync_player_game_logs]   Games inserted: ${gamesInsertedForDate}/${dayGameLogs.length}`);
-        console.log(`[sync_player_game_logs]   Errors during insert: ${errorCount}`);
-        
-        if (gamesInsertedForDate === 0 && dayGameLogs.length > 0) {
-          console.warn(`[sync_player_game_logs] ⚠️  WARNING: API returned ${dayGameLogs.length} games but 0 were inserted!`);
-          progressCallback?.({
-            type: 'warning',
-            timestamp: new Date().toISOString(),
-            message: `⚠️ ${dateStr}: API returned ${dayGameLogs.length} games but 0 inserted - check errors`,
-          });
-        }
-        
       } catch (error: any) {
         console.error(`[sync_player_game_logs] Error syncing date ${dateStr}:`, error.message);
         progressCallback?.({
