@@ -919,7 +919,7 @@ export default function Dashboard() {
                     setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
                   } else {
                     setSortField('name');
-                    setSortDirection('asc');
+                    setSortDirection('desc');
                   }
                 }}
                 className="text-xs h-7"
@@ -1094,11 +1094,6 @@ function PlayerCard({
                     <span className="font-mono font-bold">
                       {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground">No value</span>}
                     </span>
-                  </div>
-                </div>
-                <div className="text-right flex-shrink-0">
-                  <div className="text-lg font-mono font-bold">
-                    {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-sm">No value</span>}
                   </div>
                 </div>
               </div>
