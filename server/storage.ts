@@ -143,6 +143,7 @@ export interface IStorage {
   // Player game stats methods
   upsertPlayerGameStats(stats: InsertPlayerGameStats): Promise<PlayerGameStats>;
   getPlayerGameStats(playerId: string, gameId: string): Promise<PlayerGameStats | undefined>;
+  getAllPlayerGameStats(playerId: string): Promise<PlayerGameStats[]>;
   getGameStatsByGameId(gameId: string): Promise<PlayerGameStats[]>;
 }
 
@@ -1646,6 +1647,14 @@ export class DatabaseStorage implements IStorage {
         )
       );
     return stats || undefined;
+  }
+
+  async getAllPlayerGameStats(playerId: string): Promise<PlayerGameStats[]> {
+    return await db
+      .select()
+      .from(playerGameStats)
+      .where(eq(playerGameStats.playerId, playerId))
+      .orderBy(desc(playerGameStats.gameDate));
   }
 
   async getGameStatsByGameId(gameId: string): Promise<PlayerGameStats[]> {

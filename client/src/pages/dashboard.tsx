@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar, Search, ChevronDown, BarChart3, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
+import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar, Search, ChevronDown, BarChart3, ChevronLeft, ChevronRight, ExternalLink, ArrowUpDown } from "lucide-react";
 import { Link } from "wouter";
 import type { Player, Mining, Contest, Trade, DailyGame } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -80,6 +80,8 @@ export default function Dashboard() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
+  const [sortField, setSortField] = useState<'name' | 'fantasyPoints' | 'marketValue'>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
   // Debounce search input (250ms delay)
   useEffect(() => {
@@ -194,7 +196,28 @@ export default function Dashboard() {
   const playersData = playersResponse?.players;
 
   // Filter only for mining eligibility (server-side handles search and team filter)
-  const filteredPlayers = playersData?.filter(p => p.isEligibleForMining) || [];
+  const eligiblePlayers = playersData?.filter(p => p.isEligibleForMining) || [];
+  
+  // Sort players based on selected criteria
+  const filteredPlayers = [...eligiblePlayers].sort((a, b) => {
+    let comparison = 0;
+    
+    if (sortField === 'name') {
+      const nameA = `${a.lastName} ${a.firstName}`.toLowerCase();
+      const nameB = `${b.lastName} ${b.firstName}`.toLowerCase();
+      comparison = nameA.localeCompare(nameB);
+    } else if (sortField === 'fantasyPoints') {
+      const fpgA = parseFloat((a as any).avgFantasyPointsPerGame || '0');
+      const fpgB = parseFloat((b as any).avgFantasyPointsPerGame || '0');
+      comparison = fpgB - fpgA; // Default descending for stats
+    } else if (sortField === 'marketValue') {
+      const mvA = parseFloat(a.lastTradePrice || '0');
+      const mvB = parseFloat(b.lastTradePrice || '0');
+      comparison = mvB - mvA; // Default descending for price
+    }
+    
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
 
   // Get unique teams for filter
   const { data: teams } = useQuery<string[]>({
@@ -884,6 +907,61 @@ export default function Dashboard() {
             </Select>
           </div>
 
+          {/* Sort Controls */}
+          <div className="px-1">
+            <div className="text-xs font-medium text-muted-foreground mb-1.5">Sort by:</div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant={sortField === 'name' ? 'default' : 'outline'}
+                onClick={() => {
+                  if (sortField === 'name') {
+                    setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+                  } else {
+                    setSortField('name');
+                    setSortDirection('asc');
+                  }
+                }}
+                className="text-xs h-7"
+                data-testid="button-sort-name"
+              >
+                Name {sortField === 'name' && <ArrowUpDown className="w-3 h-3 ml-1" />}
+              </Button>
+              <Button
+                size="sm"
+                variant={sortField === 'fantasyPoints' ? 'default' : 'outline'}
+                onClick={() => {
+                  if (sortField === 'fantasyPoints') {
+                    setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+                  } else {
+                    setSortField('fantasyPoints');
+                    setSortDirection('desc');
+                  }
+                }}
+                className="text-xs h-7"
+                data-testid="button-sort-fantasy-points"
+              >
+                Fantasy Pts/G {sortField === 'fantasyPoints' && <ArrowUpDown className="w-3 h-3 ml-1" />}
+              </Button>
+              <Button
+                size="sm"
+                variant={sortField === 'marketValue' ? 'default' : 'outline'}
+                onClick={() => {
+                  if (sortField === 'marketValue') {
+                    setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+                  } else {
+                    setSortField('marketValue');
+                    setSortDirection('desc');
+                  }
+                }}
+                className="text-xs h-7"
+                data-testid="button-sort-market-value"
+              >
+                Market Value {sortField === 'marketValue' && <ArrowUpDown className="w-3 h-3 ml-1" />}
+              </Button>
+            </div>
+          </div>
+
           {/* Selected Players List */}
           {selectedPlayers.length > 0 && (
             <div className="px-1 pb-2 border-b">
@@ -1008,6 +1086,15 @@ function PlayerCard({
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{player.firstName} {player.lastName}</div>
                   <div className="text-sm text-muted-foreground">{player.team} · {player.position}</div>
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                    <span className="font-mono">
+                      <span className="font-bold">{(player as any).avgFantasyPointsPerGame || "0.0"}</span> FPG
+                    </span>
+                    <span>·</span>
+                    <span className="font-mono font-bold">
+                      {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground">No value</span>}
+                    </span>
+                  </div>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <div className="text-lg font-mono font-bold">

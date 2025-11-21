@@ -685,7 +685,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         teamsPlayingOnDate: teamsPlayingFilter,
       });
       
-      // Enrich with market values and order book data (only for paginated results)
+      // Enrich with market values, order book data, and fantasy points average (only for paginated results)
       const players = await Promise.all(playersRaw.map(async (player) => {
         const enriched = enrichPlayerWithMarketValue(player);
         const orderBook = await storage.getOrderBook(player.id);
@@ -710,12 +710,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
               .reduce((sum, a) => sum + (a.quantity - a.filledQuantity), 0)
           : 0;
         
+        // Calculate average fantasy points per game from player stats
+        const gameStats = await storage.getAllPlayerGameStats(player.id);
+        let avgFantasyPointsPerGame = "0.0";
+        if (gameStats.length > 0) {
+          const totalFantasyPoints = gameStats.reduce((sum, stat) => sum + parseFloat(stat.fantasyPoints), 0);
+          avgFantasyPointsPerGame = (totalFantasyPoints / gameStats.length).toFixed(1);
+        }
+        
         return {
           ...enriched,
           bestBid,
           bestAsk,
           bidSize,
           askSize,
+          avgFantasyPointsPerGame,
         };
       }));
       
