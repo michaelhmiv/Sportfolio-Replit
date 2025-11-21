@@ -200,58 +200,85 @@ export default function Dashboard() {
 
   // Store stats for all players to enable sorting
   const [playerStats, setPlayerStats] = useState<Map<string, any>>(new Map());
+  const [statsLoading, setStatsLoading] = useState(false);
 
-  // Fetch stats for all filtered players when they change
+  // Track which players we need to fetch stats for based on actual IDs
+  // This dependency ensures we re-fetch when the player composition changes
+  const playerIds = filteredPlayers.map(p => p.id).sort().join(',');
+
+  // Fetch stats for all filtered players - incrementally loads missing stats
+  // Note: We intentionally don't include filteredPlayers or playerStats in deps
+  // - playerIds already captures all composition changes (what matters for fetching)
+  // - playerStats in deps would cause infinite loop (we update it here)
+  // - filteredPlayers is stable within each effect run via closure
   useEffect(() => {
     if (!showPlayerSelection || filteredPlayers.length === 0) return;
 
+    // Only fetch stats for players we don't have yet
+    const playersNeedingStats = filteredPlayers.filter(p => !playerStats.has(p.id));
+    
+    if (playersNeedingStats.length === 0) {
+      // All visible players already have stats
+      return;
+    }
+
     const fetchAllStats = async () => {
-      const statsMap = new Map();
-      
-      // Fetch stats for all players in parallel
-      await Promise.all(
-        filteredPlayers.map(async (player) => {
-          try {
-            const response = await fetch(`/api/player/${player.id}/stats`);
-            const data = await response.json();
-            if (data?.stats) {
-              statsMap.set(player.id, data.stats);
-            }
-          } catch (error) {
-            console.error(`Failed to fetch stats for player ${player.id}:`, error);
-          }
-        })
-      );
-      
-      setPlayerStats(statsMap);
+      setStatsLoading(true);
+      try {
+        const statsMap = new Map(playerStats); // Preserve existing stats
+        
+        // Batch fetch in chunks of 20 to avoid overwhelming the API
+        const chunkSize = 20;
+        for (let i = 0; i < playersNeedingStats.length; i += chunkSize) {
+          const chunk = playersNeedingStats.slice(i, i + chunkSize);
+          await Promise.all(
+            chunk.map(async (player) => {
+              try {
+                const response = await fetch(`/api/player/${player.id}/stats`);
+                const data = await response.json();
+                if (data?.stats) {
+                  statsMap.set(player.id, data.stats);
+                }
+              } catch (error) {
+                console.error(`Failed to fetch stats for player ${player.id}:`, error);
+              }
+            })
+          );
+        }
+        
+        setPlayerStats(statsMap);
+      } finally {
+        setStatsLoading(false);
+      }
     };
 
     fetchAllStats();
-  }, [filteredPlayers.length, showPlayerSelection]);
+  }, [showPlayerSelection, playerIds]);
 
   // Sort players based on selected criteria
   const sortedPlayers = [...filteredPlayers].sort((a, b) => {
     if (sortBy === 'value') {
-      // Sort by market value (lastTradePrice)
+      // Sort by market value (lastTradePrice) - always available
       const aPrice = parseFloat(a.lastTradePrice || '0');
       const bPrice = parseFloat(b.lastTradePrice || '0');
-      return bPrice - aPrice; // Descending
+      if (bPrice !== aPrice) return bPrice - aPrice; // Descending
     } else if (sortBy === 'ppg') {
-      // Sort by points per game
+      // Sort by points per game - requires stats
       const aStats = playerStats.get(a.id);
       const bStats = playerStats.get(b.id);
       const aPPG = parseFloat(aStats?.pointsPerGame || '0');
       const bPPG = parseFloat(bStats?.pointsPerGame || '0');
-      return bPPG - aPPG; // Descending
+      if (bPPG !== aPPG) return bPPG - aPPG; // Descending
     } else if (sortBy === 'fpg') {
-      // Sort by fantasy points per game
+      // Sort by fantasy points per game - requires stats
       const aStats = playerStats.get(a.id);
       const bStats = playerStats.get(b.id);
       const aFPG = parseFloat(aStats?.avgFantasyPointsPerGame || '0');
       const bFPG = parseFloat(bStats?.avgFantasyPointsPerGame || '0');
-      return bFPG - aFPG; // Descending
+      if (bFPG !== aFPG) return bFPG - aFPG; // Descending
     }
-    return 0;
+    // Fallback: alphabetical by last name for stable ordering
+    return a.lastName.localeCompare(b.lastName);
   });
 
   // Get unique teams for filter
@@ -975,6 +1002,9 @@ export default function Dashboard() {
                   Market Value
                 </Button>
               </div>
+              {statsLoading && (
+                <span className="text-xs text-muted-foreground ml-2">Loading stats...</span>
+              )}
             </div>
           </div>
 
@@ -1032,8 +1062,8 @@ export default function Dashboard() {
                 if ((index + 1) % 6 === 0 && index < sortedPlayers.length - 1) {
                   return [
                     playerCard,
-                    <div key={`ad-${index}`} className="py-2">
-                      <AdSenseAd slot="2800193816" />
+                    <div key={`ad-${index}`} className="w-full py-3">
+                      <AdSenseAd slot="2800193816" className="w-full" />
                     </div>
                   ];
                 }
