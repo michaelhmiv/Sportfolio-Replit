@@ -161,10 +161,12 @@ export async function syncStats(progressCallback?: ProgressCallback): Promise<Jo
         : `Stats sync completed successfully: ${recordsProcessed} player stats processed`,
       data: {
         success: errorCount === 0,
-        statsProcessed: recordsProcessed,
-        errors: errorCount,
-        apiCalls: requestCount,
-        gamesProcessed: relevantGames.length,
+        summary: {
+          statsProcessed: recordsProcessed,
+          errors: errorCount,
+          apiCalls: requestCount,
+          gamesProcessed: relevantGames.length,
+        },
       },
     });
     
@@ -179,6 +181,21 @@ export async function syncStats(progressCallback?: ProgressCallback): Promise<Jo
       data: { error: error.message, stack: error.stack },
     });
     
-    throw error;
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: `Stats sync failed: ${error.message}`,
+      data: {
+        success: false,
+        summary: {
+          error: error.message,
+          statsProcessed: recordsProcessed,
+          errors: errorCount + 1,
+          apiCalls: requestCount,
+        },
+      },
+    });
+    
+    return { requestCount, recordsProcessed, errorCount: errorCount + 1 };
   }
 }

@@ -45,6 +45,8 @@ Background jobs, managed by `node-cron` in development and an external cron serv
 
 The Contest Lifecycle & Settlement System automatically progresses contests through creation, status transition (open to live), and settlement stages. Settlement is contingent on both the contest `endsAt` time passing and all associated games being `completed` to ensure accurate prize distribution.
 
+**Universal Live Logging System:** All admin operations feature real-time streaming logs via Server-Sent Events (SSE). The system provides granular visibility into job execution with structured log events (info/warning/error/progress/complete). Each job emits detailed progress callbacks showing records processed, API calls, errors, and debug information. The admin UI displays logs in a terminal-style LiveLogViewer component with auto-scroll, progress indicators, and status tracking. All 8 background jobs are fully instrumented: `syncPlayerGameLogs` (backfill), `settle_contests`, `roster_sync`, `schedule_sync`, `update_contest_statuses`, `create_contests`, `sync_stats`, and `sync_stats_live`. The streaming architecture uses unique operation IDs for concurrent job tracking and ensures all jobs emit completion events for proper UI state management.
+
 ## Design Principles
 
 ### Compact & Information-Dense UI

@@ -41,9 +41,18 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
       console.log(`[stats_sync_live] No live games in progress, skipping`);
       
       progressCallback?.({
-        type: 'info',
+        type: 'complete',
         timestamp: new Date().toISOString(),
         message: 'No live games in progress, skipping',
+        data: {
+          success: true,
+          summary: {
+            statsProcessed: 0,
+            errors: 0,
+            apiCalls: 0,
+            gamesProcessed: 0,
+          },
+        },
       });
       
       return { requestCount: 0, recordsProcessed: 0, errorCount: 0 };
@@ -200,11 +209,13 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
         : `Live stats sync completed successfully: ${recordsProcessed} player stats from ${liveGames.length} games`,
       data: {
         success: errorCount === 0,
-        statsProcessed: recordsProcessed,
-        errors: errorCount,
-        apiCalls: requestCount,
-        gamesProcessed: liveGames.length,
-        broadcasts: processedGames.size,
+        summary: {
+          statsProcessed: recordsProcessed,
+          errors: errorCount,
+          apiCalls: requestCount,
+          gamesProcessed: liveGames.length,
+          broadcasts: processedGames.size,
+        },
       },
     });
     
@@ -217,6 +228,21 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
       timestamp: new Date().toISOString(),
       message: `Live stats sync failed: ${error.message}`,
       data: { error: error.message, stack: error.stack },
+    });
+    
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: `Live stats sync failed: ${error.message}`,
+      data: {
+        success: false,
+        summary: {
+          statsProcessed: recordsProcessed,
+          errors: errorCount + 1,
+          apiCalls: requestCount,
+          error: error.message,
+        },
+      },
     });
     
     // Degrade gracefully - log but don't throw hard

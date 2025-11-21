@@ -89,9 +89,11 @@ export async function updateContestStatuses(progressCallback?: ProgressCallback)
         : 'No contests ready to transition at this time',
       data: {
         success: true,
-        contestsTransitioned: contestsProcessed,
-        contestsChecked: openContests.length,
-        errors: errorCount,
+        summary: {
+          contestsTransitioned: contestsProcessed,
+          contestsChecked: openContests.length,
+          errors: errorCount,
+        },
       },
     });
     
@@ -110,6 +112,20 @@ export async function updateContestStatuses(progressCallback?: ProgressCallback)
       data: { error: error.message, stack: error.stack },
     });
     
-    throw error;
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: `Contest status update failed: ${error.message}`,
+      data: {
+        success: false,
+        summary: {
+          error: error.message,
+          contestsTransitioned: contestsProcessed,
+          errors: errorCount + 1,
+        },
+      },
+    });
+    
+    return { requestCount: 0, recordsProcessed: contestsProcessed, errorCount: errorCount + 1 };
   }
 }

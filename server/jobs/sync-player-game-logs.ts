@@ -339,6 +339,22 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
       data: { error: error.message, stack: error.stack },
     });
     
-    throw error;
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: `Game logs sync failed: ${error.message}`,
+      data: {
+        success: false,
+        summary: {
+          error: error.message,
+          recordsProcessed,
+          datesProcessed,
+          errors: errorCount + 1,
+          apiCalls: requestCount,
+        },
+      },
+    });
+    
+    return { requestCount, recordsProcessed, errorCount: errorCount + 1 };
   }
 }

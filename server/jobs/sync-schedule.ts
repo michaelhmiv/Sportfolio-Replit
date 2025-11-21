@@ -152,10 +152,12 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
         : `Schedule sync completed successfully: ${recordsProcessed} games processed`,
       data: {
         success: errorCount === 0,
-        gamesProcessed: recordsProcessed,
-        errors: errorCount,
-        apiCalls: requestCount,
-        broadcasts: gamesWithUpdates.size,
+        summary: {
+          gamesProcessed: recordsProcessed,
+          errors: errorCount,
+          apiCalls: requestCount,
+          broadcasts: gamesWithUpdates.size,
+        },
       },
     });
     
@@ -170,6 +172,21 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
       data: { error: error.message, stack: error.stack },
     });
     
-    throw error;
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: `Schedule sync failed: ${error.message}`,
+      data: {
+        success: false,
+        summary: {
+          error: error.message,
+          gamesProcessed: recordsProcessed,
+          errors: errorCount + 1,
+          apiCalls: requestCount,
+        },
+      },
+    });
+    
+    return { requestCount, recordsProcessed, errorCount: errorCount + 1 };
   }
 }

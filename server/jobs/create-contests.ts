@@ -88,9 +88,17 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
       console.log("[create_contests] No upcoming games found in next 7 days");
       
       progressCallback?.({
-        type: 'info',
+        type: 'complete',
         timestamp: new Date().toISOString(),
         message: 'No upcoming games found in next 7 days',
+        data: {
+          success: true,
+          summary: {
+            contestsCreated: 0,
+            errors: 0,
+            apiCalls: requestCount,
+          },
+        },
       });
       
       return { requestCount, recordsProcessed: 0, errorCount: 0 };
@@ -186,9 +194,11 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
         : `Contest creation completed successfully: ${contestsCreated} contests created`,
       data: {
         success: errorCount === 0,
-        contestsCreated,
-        errors: errorCount,
-        apiCalls: requestCount,
+        summary: {
+          contestsCreated,
+          errors: errorCount,
+          apiCalls: requestCount,
+        },
       },
     });
     
@@ -207,6 +217,21 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
       data: { error: error.message, stack: error.stack },
     });
     
-    throw error;
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: `Contest creation failed: ${error.message}`,
+      data: {
+        success: false,
+        summary: {
+          error: error.message,
+          contestsCreated: contestsCreated,
+          errors: errorCount + 1,
+          apiCalls: requestCount,
+        },
+      },
+    });
+    
+    return { requestCount, recordsProcessed: contestsCreated, errorCount: errorCount + 1 };
   }
 }

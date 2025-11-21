@@ -43,9 +43,16 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
     if (allContests.length === 0) {
       console.log("[settle_contests] No live contests to check for settlement");
       progressCallback?.({
-        type: 'info',
+        type: 'complete',
         timestamp: new Date().toISOString(),
         message: 'No live contests to settle',
+        data: {
+          success: true,
+          summary: {
+            contestsSettled: 0,
+            errors: 0,
+          },
+        },
       });
       return { requestCount: 0, recordsProcessed: 0, errorCount: 0 };
     }
@@ -129,10 +136,17 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
     if (contestsToSettle.length === 0) {
       console.log("[settle_contests] No contests ready for settlement (waiting for games to complete)");
       progressCallback?.({
-        type: 'info',
+        type: 'complete',
         timestamp: new Date().toISOString(),
         message: 'No contests ready for settlement (waiting for games to complete)',
-        data: { contestsChecked, contestsReady: 0 },
+        data: {
+          success: true,
+          summary: {
+            contestsChecked,
+            contestsSettled: 0,
+            errors: 0,
+          },
+        },
       });
       return { requestCount: 0, recordsProcessed: 0, errorCount: 0 };
     }
@@ -203,9 +217,11 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
         : `Settlement completed successfully: ${contestsProcessed} contests settled`,
       data: {
         success: errorCount === 0,
-        contestsSettled: contestsProcessed,
-        errors: errorCount,
-        total: contestsToSettle.length,
+        summary: {
+          contestsSettled: contestsProcessed,
+          errors: errorCount,
+          total: contestsToSettle.length,
+        },
       },
     });
     
@@ -216,6 +232,28 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
     };
   } catch (error: any) {
     console.error("[settle_contests] Failed:", error.message);
-    throw error;
+    
+    progressCallback?.({
+      type: 'error',
+      timestamp: new Date().toISOString(),
+      message: `Contest settlement failed: ${error.message}`,
+      data: { error: error.message, stack: error.stack },
+    });
+    
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: `Contest settlement failed: ${error.message}`,
+      data: {
+        success: false,
+        summary: {
+          error: error.message,
+          contestsSettled: contestsProcessed,
+          errors: errorCount + 1,
+        },
+      },
+    });
+    
+    return { requestCount: 0, recordsProcessed: contestsProcessed, errorCount: errorCount + 1 };
   }
 }

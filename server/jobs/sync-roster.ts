@@ -107,9 +107,11 @@ export async function syncRoster(progressCallback?: ProgressCallback): Promise<J
         : `Roster sync completed successfully: ${recordsProcessed} players updated`,
       data: {
         success: errorCount === 0,
-        playersUpdated: recordsProcessed,
-        errors: errorCount,
-        apiCalls: requestCount,
+        summary: {
+          playersUpdated: recordsProcessed,
+          errors: errorCount,
+          apiCalls: requestCount,
+        },
       },
     });
     
@@ -124,6 +126,21 @@ export async function syncRoster(progressCallback?: ProgressCallback): Promise<J
       data: { error: error.message, stack: error.stack },
     });
     
-    throw error;
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: `Roster sync failed: ${error.message}`,
+      data: {
+        success: false,
+        summary: {
+          error: error.message,
+          playersUpdated: recordsProcessed,
+          errors: errorCount + 1,
+          apiCalls: requestCount,
+        },
+      },
+    });
+    
+    return { requestCount, recordsProcessed, errorCount: errorCount + 1 };
   }
 }
