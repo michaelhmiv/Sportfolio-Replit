@@ -2937,17 +2937,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log(`[ADMIN] Backfill ${status} - ${result.recordsProcessed} game logs cached, ${result.errorCount} errors, ${result.requestCount} API requests`);
       
-      res.json({
-        success: status === 'success',
-        status,
-        result,
-        message: result.errorCount > 0 
-          ? `Backfill completed with ${result.errorCount} errors. Check logs for details.`
-          : 'Backfill completed successfully',
-      });
+      // Only send response if headers haven't been sent yet (streaming case)
+      if (!res.headersSent) {
+        res.json({
+          success: status === 'success',
+          status,
+          result,
+          message: result.errorCount > 0 
+            ? `Backfill completed with ${result.errorCount} errors. Check logs for details.`
+            : 'Backfill completed successfully',
+        });
+      }
     } catch (error: any) {
       console.error('[ADMIN] Backfill failed:', error.message);
-      res.status(500).json({ error: error.message });
+      if (!res.headersSent) {
+        res.status(500).json({ error: error.message });
+      }
     }
   });
 
