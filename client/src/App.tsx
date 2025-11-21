@@ -58,11 +58,9 @@ function Router() {
       <Route path="/contest/:id/leaderboard" component={ContestLeaderboard} />
       <Route path="/leaderboards" component={Leaderboards} />
       <Route path="/user/:id" component={UserProfile} />
+      <Route path="/marketplace" component={Marketplace} />
       
       {/* Protected routes - require authentication */}
-      <Route path="/marketplace">
-        {isAuthenticated ? <Marketplace /> : <Landing />}
-      </Route>
       <Route path="/player/:id">
         {isAuthenticated ? <PlayerPage /> : <Landing />}
       </Route>

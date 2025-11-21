@@ -42,6 +42,20 @@ export default function PlayerPage() {
     queryKey: ["/api/player", id],
   });
 
+  // Fetch contest performance data
+  const { data: contestData } = useQuery<{
+    contestPerformance: {
+      totalAppearances: number;
+      completedContests: number;
+      totalEarnings: string;
+      avgFantasyPoints: string;
+      winRate: string;
+    } | null;
+  }>({
+    queryKey: ["/api/player", id, "contest-earnings"],
+    enabled: !!id,
+  });
+
   // WebSocket listener for real-time player page updates
   useEffect(() => {
     if (!id) return;
@@ -332,6 +346,35 @@ export default function PlayerPage() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Contest Performance */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm font-medium uppercase tracking-wide">Contest Performance</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Appearances</div>
+                    <div className="text-xl font-bold" data-testid="text-contest-appearances">
+                      {contestData?.contestPerformance?.totalAppearances ?? 0}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Total Earnings</div>
+                    <div className="text-xl font-bold text-positive" data-testid="text-contest-earnings">
+                      ${contestData?.contestPerformance?.totalEarnings ?? "0.00"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Win Rate</div>
+                    <div className="text-xl font-bold" data-testid="text-contest-winrate">
+                      {contestData?.contestPerformance?.winRate ?? "0.0"}%
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Trading Panel */}
