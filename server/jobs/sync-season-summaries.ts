@@ -114,10 +114,10 @@ export async function syncSeasonSummaries(): Promise<JobResult> {
           tovPerGame: offense.tovPerGame || "0.00",
           fg3PerGame: fieldGoals.fg3PtMadePerGame || "0.00",
           minPerGame: miscellaneous.minSecondsPerGame ? (miscellaneous.minSecondsPerGame / 60).toFixed(2) : "0.00",
-          // MySportsFeeds returns percentages as 0-1 decimals, multiply by 100 for display
-          fgPct: fieldGoals.fgPct ? (parseFloat(fieldGoals.fgPct) * 100).toFixed(2) : "0.00",
-          fg3Pct: fieldGoals.fg3PtPct ? (parseFloat(fieldGoals.fg3PtPct) * 100).toFixed(2) : "0.00",
-          ftPct: freeThrows.ftPct ? (parseFloat(freeThrows.ftPct) * 100).toFixed(2) : "0.00",
+          // MySportsFeeds returns percentages already in percent form (0-100), no multiplication needed
+          fgPct: fieldGoals.fgPct || "0.00",
+          fg3Pct: fieldGoals.fg3PtPct || "0.00",
+          ftPct: freeThrows.ftPct || "0.00",
           fantasyPointsPerGame: Math.min(99.99, fantasyPointsPerGame).toFixed(2), // Cap at 99.99 to fit numeric(10,2)
         };
 
