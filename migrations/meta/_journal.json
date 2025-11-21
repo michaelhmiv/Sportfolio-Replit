@@ -8,6 +8,13 @@
       "when": 1763527462652,
       "tag": "0000_sloppy_dazzler",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1763727006774,
+      "tag": "0001_nosy_patriot",
+      "breakpoints": true
     }
   ]
 }

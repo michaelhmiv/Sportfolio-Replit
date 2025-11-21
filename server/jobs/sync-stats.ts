@@ -62,6 +62,8 @@ export async function syncStats(): Promise<JobResult> {
             const offense = gamelog.stats?.offense;
             const rebounds_stats = gamelog.stats?.rebounds;
             const defense = gamelog.stats?.defense;
+            const fieldGoals = gamelog.stats?.fieldGoals;
+            const freeThrows = gamelog.stats?.freeThrows;
             if (!offense) continue;
 
             const points = offense.pts || 0;
@@ -78,7 +80,7 @@ export async function syncStats(): Promise<JobResult> {
             
             const fantasyPoints = calculateFantasyPoints({
               points,
-              threePointersMade: offense.fg3PtMade || 0,
+              threePointersMade: fieldGoals?.fg3PtMade || 0,
               rebounds,
               assists,
               steals,
@@ -95,7 +97,12 @@ export async function syncStats(): Promise<JobResult> {
               homeAway: gamelog.team.abbreviation === game.homeTeam ? "home" : "away",
               minutes: offense.minSeconds ? Math.floor(offense.minSeconds / 60) : 0,
               points,
-              threePointersMade: offense.fg3PtMade || 0,
+              fieldGoalsMade: fieldGoals?.fgMade || 0,
+              fieldGoalsAttempted: fieldGoals?.fgAtt || 0,
+              threePointersMade: fieldGoals?.fg3PtMade || 0,
+              threePointersAttempted: fieldGoals?.fg3PtAtt || 0,
+              freeThrowsMade: freeThrows?.ftMade || 0,
+              freeThrowsAttempted: freeThrows?.ftAtt || 0,
               rebounds,
               assists,
               steals,
