@@ -11,7 +11,6 @@ import { syncRoster } from "./sync-roster";
 import { syncSchedule } from "./sync-schedule";
 import { syncStats } from "./sync-stats";
 import { syncStatsLive } from "./sync-stats-live";
-import { syncSeasonSummaries } from "./sync-season-summaries";
 import { settleContests } from "./settle-contests";
 import { createContests } from "./create-contests";
 import { updateContestStatuses } from "./update-contest-statuses";
@@ -70,12 +69,6 @@ export class JobScheduler {
         schedule: "* * * * *", // Every minute for live games
         enabled: true,
         handler: syncStatsLive,
-      },
-      {
-        name: "sync_season_summaries",
-        schedule: "0 6,14 * * *", // 2x daily at 6:00 AM and 2:00 PM ET
-        enabled: true,
-        handler: syncSeasonSummaries,
       },
       {
         name: "update_contest_statuses",
@@ -191,7 +184,6 @@ export class JobScheduler {
       schedule_sync: syncSchedule,
       stats_sync: syncStats,
       stats_sync_live: syncStatsLive,
-      sync_season_summaries: syncSeasonSummaries,
       create_contests: createContests,
       update_contest_statuses: updateContestStatuses,
       settle_contests: settleContests,
