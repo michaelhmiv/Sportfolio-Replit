@@ -18,6 +18,9 @@ export async function invalidatePortfolioQueries(): Promise<void> {
     queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] }),
     queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
     
+    // Activity feed (mining, orders, trades, contests)
+    queryClient.invalidateQueries({ queryKey: ["/api/activity"] }),
+    
     // Mining status (shows current holdings for selection)
     queryClient.invalidateQueries({ queryKey: ["/api/mining"] }),
     
