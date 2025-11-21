@@ -1196,7 +1196,7 @@ export class DatabaseStorage implements IStorage {
           occurredAt: entry.createdAt,
           category: 'contest',
           subtype: 'contest_entry',
-          cashDelta: `-${entry.entryFee}`,
+          cashDelta: '0.00', // Contests use shares, not cash
           sharesDelta: 0,
           metadata: {
             contestId: entry.contestId,
