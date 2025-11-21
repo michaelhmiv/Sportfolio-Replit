@@ -3,7 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { Trophy, Users, DollarSign, Clock, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
@@ -12,7 +11,7 @@ import { format } from "date-fns";
 import type { Contest, ContestEntry } from "@shared/schema";
 
 interface ContestsData {
-  openContests: Contest[];
+  contests: Contest[];
   myEntries: (ContestEntry & { contest: Contest; rank?: number })[];
 }
 
@@ -122,82 +121,77 @@ export default function Contests() {
           <p className="text-muted-foreground">Enter 50/50 contests and compete for prizes</p>
         </div>
 
-        <Tabs defaultValue="open" className="space-y-3 sm:space-y-3">
-          <TabsList>
-            <TabsTrigger value="open" data-testid="tab-open-contests">Open Contests</TabsTrigger>
-            <TabsTrigger value="my-entries" data-testid="tab-my-entries">My Entries</TabsTrigger>
-          </TabsList>
-
-          {/* Open Contests */}
-          <TabsContent value="open">
-            {isLoading ? (
-              <div className="text-center py-6 text-muted-foreground">Loading contests...</div>
-            ) : data?.openContests.length === 0 ? (
-              <Card>
-                <CardContent className="py-6 text-center text-muted-foreground">
-                  No open contests available
-                </CardContent>
-              </Card>
-            ) : (
-              <>
-                {/* Mobile: Card Layout */}
-                <div className="sm:hidden p-3 space-y-3">
-                  {data?.openContests.map((contest) => {
+        {isLoading ? (
+          <div className="text-center py-6 text-muted-foreground">Loading contests...</div>
+        ) : data?.contests.length === 0 ? (
+          <Card>
+            <CardContent className="py-6 text-center text-muted-foreground">
+              No contests available for this date
+            </CardContent>
+          </Card>
+        ) : (
+          <>
+            {/* Mobile: Card Layout */}
+            <div className="sm:hidden p-3 space-y-3">
+              {data?.contests.map((contest) => {
                     const isLocked = new Date() >= new Date(contest.startsAt);
                     return (
                       <Card key={contest.id} className="hover-elevate" data-testid={`card-contest-${contest.id}`}>
                         <CardContent className="p-4">
-                          <Link href={`/contest/${contest.id}/leaderboard`}>
-                            <div className="flex items-start justify-between gap-3 mb-3">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2 flex-wrap">
-                                  <Trophy className="w-4 h-4 text-primary" />
-                                  <h3 className="font-bold">{contest.name}</h3>
-                                </div>
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <Badge className="text-xs">{contest.sport}</Badge>
-                                  <Badge variant={isLocked ? "destructive" : "outline"} className="capitalize text-xs">
-                                    {isLocked ? "Locked" : contest.status}
+                          <div className="flex items-start justify-between gap-3 mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                <Trophy className="w-4 h-4 text-primary" />
+                                <h3 className="font-bold">{contest.name}</h3>
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <Badge className="text-xs">{contest.sport}</Badge>
+                                <Badge variant="outline" className="capitalize text-xs">
+                                  {contest.status}
+                                </Badge>
+                                {isLocked && (
+                                  <Badge variant="destructive" className="text-xs">
+                                    Locked
                                   </Badge>
-                                </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="grid grid-cols-2 gap-3 pb-3">
+                            <div>
+                              <div className="text-xs text-muted-foreground mb-1">Prize Pool</div>
+                              <div className="flex items-center gap-1">
+                                <DollarSign className="w-3 h-3 text-positive" />
+                                <span className="font-mono font-bold text-positive" data-testid={`text-prize-${contest.id}`}>
+                                  ${contest.totalPrizePool}
+                                </span>
                               </div>
                             </div>
                             
-                            <div className="grid grid-cols-2 gap-3 pb-3">
-                              <div>
-                                <div className="text-xs text-muted-foreground mb-1">Prize Pool</div>
-                                <div className="flex items-center gap-1">
-                                  <DollarSign className="w-3 h-3 text-positive" />
-                                  <span className="font-mono font-bold text-positive" data-testid={`text-prize-${contest.id}`}>
-                                    ${contest.totalPrizePool}
-                                  </span>
-                                </div>
-                              </div>
-                              
-                              <div>
-                                <div className="text-xs text-muted-foreground mb-1">Entries</div>
-                                <div className="flex items-center gap-1">
-                                  <Users className="w-3 h-3" />
-                                  <span className="text-sm font-semibold">{contest.entryCount}</span>
-                                </div>
-                              </div>
-                              
-                              <div className="col-span-2">
-                                <div className="text-xs text-muted-foreground mb-1">Starts</div>
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" />
-                                  <span className="text-xs">
-                                    {new Date(contest.startsAt).toLocaleString([], { 
-                                      month: 'short', 
-                                      day: 'numeric', 
-                                      hour: 'numeric', 
-                                      minute: '2-digit' 
-                                    })}
-                                  </span>
-                                </div>
+                            <div>
+                              <div className="text-xs text-muted-foreground mb-1">Entries</div>
+                              <div className="flex items-center gap-1">
+                                <Users className="w-3 h-3" />
+                                <span className="text-sm font-semibold">{contest.entryCount}</span>
                               </div>
                             </div>
-                          </Link>
+                            
+                            <div className="col-span-2">
+                              <div className="text-xs text-muted-foreground mb-1">Starts</div>
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-3 h-3" />
+                                <span className="text-xs">
+                                  {new Date(contest.startsAt).toLocaleString([], { 
+                                    month: 'short', 
+                                    day: 'numeric', 
+                                    hour: 'numeric', 
+                                    minute: '2-digit' 
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
                           
                           <div className="flex gap-2">
                             <Link href={`/contest/${contest.id}/leaderboard`} className="flex-1">
@@ -243,7 +237,7 @@ export default function Contests() {
                           </tr>
                         </thead>
                         <tbody>
-                          {data?.openContests.map((contest) => {
+                          {data?.contests.map((contest) => {
                             const isLocked = new Date() >= new Date(contest.startsAt);
                             return (
                               <tr 
@@ -252,18 +246,27 @@ export default function Contests() {
                                 data-testid={`card-contest-${contest.id}`}
                               >
                                 <td className="p-4">
-                                  <div className="flex items-center gap-2">
-                                    <Trophy className="w-4 h-4 text-primary" />
-                                    <span className="font-bold">{contest.name}</span>
-                                  </div>
+                                  <Link href={`/contest/${contest.id}/leaderboard`}>
+                                    <div className="flex items-center gap-2 hover-elevate active-elevate-2 rounded-md p-1 -m-1">
+                                      <Trophy className="w-4 h-4 text-primary" />
+                                      <span className="font-bold">{contest.name}</span>
+                                    </div>
+                                  </Link>
                                 </td>
                                 <td className="p-4">
                                   <Badge>{contest.sport}</Badge>
                                 </td>
                                 <td className="p-4">
-                                  <Badge variant={isLocked ? "destructive" : "outline"} className="capitalize">
-                                    {isLocked ? "Locked" : contest.status}
-                                  </Badge>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="capitalize">
+                                      {contest.status}
+                                    </Badge>
+                                    {isLocked && (
+                                      <Badge variant="destructive">
+                                        Locked
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="p-4 text-right">
                                   <div className="flex items-center justify-end gap-1">
@@ -293,17 +296,15 @@ export default function Contests() {
                                   </div>
                                 </td>
                                 <td className="p-4">
-                                  {isLocked ? (
-                                    <Button disabled data-testid={`button-enter-${contest.id}`}>
-                                      Contest Locked
-                                    </Button>
-                                  ) : (
-                                    <Link href={`/contest/${contest.id}/entry`}>
-                                      <Button data-testid={`button-enter-${contest.id}`}>
-                                        Enter Contest
-                                      </Button>
-                                    </Link>
-                                  )}
+                                  <div className="flex gap-2 justify-end">
+                                    {!isLocked && (
+                                      <Link href={`/contest/${contest.id}/entry`}>
+                                        <Button data-testid={`button-enter-${contest.id}`}>
+                                          Enter Contest
+                                        </Button>
+                                      </Link>
+                                    )}
+                                  </div>
                                 </td>
                               </tr>
                             );
@@ -313,25 +314,14 @@ export default function Contests() {
                     </CardContent>
                   </Card>
                 </div>
-              </>
-            )}
-          </TabsContent>
-
-          {/* My Entries */}
-          <TabsContent value="my-entries">
-            {isLoading ? (
-              <div className="text-center py-6 text-muted-foreground">Loading your entries...</div>
-            ) : data?.myEntries.length === 0 ? (
-              <Card>
-                <CardContent className="py-6 text-center">
-                  <p className="text-muted-foreground mb-4">You haven't entered any contests yet</p>
-                  <Button onClick={() => document.querySelector<HTMLButtonElement>('[data-testid="tab-open-contests"]')?.click()}>
-                    Browse Open Contests
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <>
+          </>
+        )}
+        
+        {/* My Entries */}
+        {data && data.myEntries.length > 0 && (
+          <div className="mt-6">
+            <h2 className="text-2xl font-bold mb-4">My Entries</h2>
+            <>
                 {/* Mobile: Card Layout */}
                 <div className="sm:hidden p-3 space-y-3">
                   {data?.myEntries.map((entry) => (
@@ -458,10 +448,9 @@ export default function Contests() {
                     </CardContent>
                   </Card>
                 </div>
-              </>
-            )}
-          </TabsContent>
-        </Tabs>
+            </>
+          </div>
+        )}
       </div>
     </div>
   );

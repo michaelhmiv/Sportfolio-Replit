@@ -1567,28 +1567,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Contests (public - anyone can view)
   app.get("/api/contests", async (req, res) => {
     try {
-      const allOpenContests = await storage.getContests("open");
-      
       const { date } = req.query;
+      
+      // Fetch ALL contests when date filter is provided, otherwise just open ones
+      const allContests = date ? await storage.getContests() : await storage.getContests("open");
       
       // Filter contests based on date
       const now = new Date();
-      let openContests = allOpenContests;
+      let filteredContests = allContests;
       
       if (date && typeof date === 'string') {
         // Filter by gameDate (the actual day of the games, not when contest starts)
-        // Parse the selected date: YYYY-MM-DD
-        const [year, month, day] = date.split('-').map(Number);
-        
         // Filter contests where gameDate matches the selected date
-        openContests = allOpenContests.filter(contest => {
+        filteredContests = allContests.filter(contest => {
           const gameDate = new Date(contest.gameDate);
           const gameDateStr = gameDate.toISOString().split('T')[0];
           return gameDateStr === date;
         });
       } else {
         // Default behavior: show all upcoming contests (haven't started yet)
-        openContests = allOpenContests.filter(contest => 
+        filteredContests = allContests.filter(contest => 
           new Date(contest.startsAt) > now
         );
       }
@@ -1615,7 +1613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       res.json({
-        openContests,
+        contests: filteredContests,
         myEntries: enrichedEntries,
       });
     } catch (error: any) {
