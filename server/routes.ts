@@ -2837,7 +2837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin endpoint: SSE stream for operation logs
-  app.get("/api/admin/stream/:operationId", adminAuth, (req, res) => {
+  app.get("/api/admin/stream/:operationId", adminAuth, async (req, res) => {
     const { operationId } = req.params;
     
     try {
@@ -2855,7 +2855,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       })}\n\n`);
       
       // Register this client with the stream manager
-      const { adminStreamManager } = require('./lib/admin-stream');
+      const { adminStreamManager } = await import('./lib/admin-stream');
       adminStreamManager.registerClient(operationId, res);
       
       console.log(`[SSE] Client connected to operation ${operationId}`);
