@@ -2676,7 +2676,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Admin endpoint: Manually trigger cron jobs
   app.post("/api/admin/jobs/trigger", adminAuth, async (req, res) => {
     try {
-      const { jobName } = req.body;
+      const { jobName, operationId } = req.body;
       const clientIp = req.ip || req.connection.remoteAddress;
       
       if (!jobName) {
@@ -2688,19 +2688,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: `Invalid jobName. Must be one of: ${validJobs.join(', ')}` });
       }
       
-      console.log(`[ADMIN] Job trigger requested by ${clientIp}: ${jobName}`);
+      console.log(`[ADMIN] Job trigger requested by ${clientIp}: ${jobName}${operationId ? ` (operation: ${operationId})` : ''}`);
       
-      const result = await jobScheduler.triggerJob(jobName);
+      // Create progress callback if operationId provided
+      let progressCallback;
+      if (operationId) {
+        const { createProgressCallback } = await import('./lib/admin-stream');
+        progressCallback = createProgressCallback(operationId);
+        
+        // Emit initial event
+        progressCallback({
+          type: 'info',
+          timestamp: new Date().toISOString(),
+          message: `Starting job: ${jobName}`,
+          data: { jobName },
+        });
+      }
+      
+      // Trigger job with optional progress callback
+      const result = await jobScheduler.triggerJob(jobName, progressCallback);
       
       console.log(`[ADMIN] Job ${jobName} completed - ${result.recordsProcessed} records, ${result.errorCount} errors, ${result.requestCount} requests`);
+      
+      // Emit completion event if callback exists
+      if (progressCallback) {
+        progressCallback({
+          type: 'complete',
+          timestamp: new Date().toISOString(),
+          message: result.errorCount > 0 
+            ? `Job ${jobName} completed with ${result.errorCount} errors`
+            : `Job ${jobName} completed successfully`,
+          data: {
+            success: result.errorCount === 0,
+            jobName,
+            recordsProcessed: result.recordsProcessed,
+            errorCount: result.errorCount,
+            requestCount: result.requestCount,
+          },
+        });
+      }
       
       res.json({
         success: true,
         jobName,
         result,
+        status: result.errorCount > 0 ? 'degraded' : 'success',
       });
     } catch (error: any) {
       console.error('[ADMIN] Job trigger failed:', error.message);
+      
+      // Emit error event if callback exists (create it from body if available)
+      const { operationId } = req.body;
+      if (operationId) {
+        try {
+          const { createProgressCallback } = await import('./lib/admin-stream');
+          const progressCallback = createProgressCallback(operationId);
+          progressCallback({
+            type: 'error',
+            timestamp: new Date().toISOString(),
+            message: `Job failed: ${error.message}`,
+            data: { error: error.message, stack: error.stack },
+          });
+          progressCallback({
+            type: 'complete',
+            timestamp: new Date().toISOString(),
+            message: 'Job failed',
+            data: { success: false },
+          });
+        } catch (streamError) {
+          console.error('[ADMIN] Failed to emit error event:', streamError);
+        }
+      }
+      
       res.status(500).json({ error: error.message });
     }
   });

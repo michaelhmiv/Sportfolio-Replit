@@ -15,6 +15,7 @@ import { syncPlayerGameLogs } from "./sync-player-game-logs";
 import { settleContests } from "./settle-contests";
 import { createContests } from "./create-contests";
 import { updateContestStatuses } from "./update-contest-statuses";
+import type { ProgressCallback } from "../lib/admin-stream";
 
 export interface JobResult {
   requestCount: number;
@@ -185,16 +186,17 @@ export class JobScheduler {
   /**
    * Manually trigger a job (for testing/admin purposes)
    */
-  async triggerJob(jobName: string): Promise<JobResult> {
-    const jobConfigs: Record<string, () => Promise<JobResult>> = {
-      roster_sync: syncRoster,
-      sync_player_game_logs: syncPlayerGameLogs,
-      schedule_sync: syncSchedule,
-      stats_sync: syncStats,
-      stats_sync_live: syncStatsLive,
-      create_contests: createContests,
-      update_contest_statuses: updateContestStatuses,
-      settle_contests: settleContests,
+  async triggerJob(jobName: string, progressCallback?: ProgressCallback): Promise<JobResult> {
+    // Job handlers with progress callback support
+    const jobConfigs: Record<string, (callback?: ProgressCallback) => Promise<JobResult>> = {
+      roster_sync: (callback) => syncRoster(callback),
+      sync_player_game_logs: (callback) => syncPlayerGameLogs({ progressCallback: callback }),
+      schedule_sync: () => syncSchedule(),
+      stats_sync: () => syncStats(),
+      stats_sync_live: () => syncStatsLive(),
+      create_contests: () => createContests(),
+      update_contest_statuses: () => updateContestStatuses(),
+      settle_contests: (callback) => settleContests(callback),
     };
 
     const handler = jobConfigs[jobName];
@@ -202,7 +204,7 @@ export class JobScheduler {
       throw new Error(`Unknown job: ${jobName}`);
     }
 
-    console.log(`[${jobName}] Manual trigger started...`);
+    console.log(`[${jobName}] Manual trigger started${progressCallback ? ' with live logging' : ''}...`);
     
     const jobLog = await storage.createJobLog({
       jobName,
@@ -211,7 +213,7 @@ export class JobScheduler {
     });
 
     try {
-      const result = await handler();
+      const result = await handler(progressCallback);
       
       // Determine job status: degraded if some records failed, success if all succeeded
       const status = result.errorCount > 0 ? "degraded" : "success";

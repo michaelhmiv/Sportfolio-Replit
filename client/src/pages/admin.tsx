@@ -75,6 +75,7 @@ export default function Admin() {
   const [backfillEndDate, setBackfillEndDate] = useState("2025-11-21");
   const [isBackfilling, setIsBackfilling] = useState(false);
   const [backfillOperationId, setBackfillOperationId] = useState<string | null>(null);
+  const [jobOperationIds, setJobOperationIds] = useState<Map<string, string>>(new Map());
   
   // Blog post state
   const [blogDialogOpen, setBlogDialogOpen] = useState(false);
@@ -91,28 +92,30 @@ export default function Admin() {
   });
 
   const triggerJobMutation = useMutation({
-    mutationFn: async (jobName: string) => {
-      const res = await apiRequest("POST", "/api/admin/jobs/trigger", { jobName });
+    mutationFn: async ({ jobName, operationId }: { jobName: string; operationId: string }) => {
+      const res = await apiRequest("POST", "/api/admin/jobs/trigger", { jobName, operationId });
       return await res.json();
     },
-    onMutate: (jobName) => {
+    onMutate: ({ jobName, operationId }) => {
       setRunningJobs(prev => new Set(prev).add(jobName));
+      setJobOperationIds(prev => new Map(prev).set(jobName, operationId));
     },
-    onSuccess: (data, jobName) => {
+    onSuccess: (data, { jobName }) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
       toast({
-        title: "Job completed",
+        title: data.status === 'degraded' ? "Job completed with errors" : "Job completed",
         description: `${jobName}: ${data.result.recordsProcessed} records processed, ${data.result.errorCount} errors`,
+        variant: data.status === 'degraded' ? 'destructive' : undefined,
       });
     },
-    onError: (error: any, jobName) => {
+    onError: (error: any, { jobName }) => {
       toast({
         title: "Job failed",
         description: error.message || `Failed to run ${jobName}`,
         variant: "destructive",
       });
     },
-    onSettled: (_, __, jobName) => {
+    onSettled: (_, __, { jobName }) => {
       setRunningJobs(prev => {
         const next = new Set(prev);
         next.delete(jobName);
@@ -122,7 +125,8 @@ export default function Admin() {
   });
 
   const handleTriggerJob = (jobName: string) => {
-    triggerJobMutation.mutate(jobName);
+    const operationId = `job-${jobName}-${Date.now()}`;
+    triggerJobMutation.mutate({ jobName, operationId });
   };
 
   const backfillMutation = useMutation({
@@ -518,6 +522,23 @@ export default function Admin() {
             ))}
           </CardContent>
         </Card>
+
+        {/* Live Log Viewers for Triggered Jobs */}
+        {Array.from(jobOperationIds.entries()).map(([jobName, operationId]) => (
+          <LiveLogViewer
+            key={operationId}
+            operationId={operationId}
+            title={`${jobName} - Live Status`}
+            description={`Real-time progress and logs from ${jobName} job`}
+            onComplete={() => {
+              setJobOperationIds(prev => {
+                const next = new Map(prev);
+                next.delete(jobName);
+                return next;
+              });
+            }}
+          />
+        ))}
 
         {/* Blog Posts Management */}
         <Card>

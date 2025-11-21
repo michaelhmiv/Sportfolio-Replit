@@ -11,10 +11,17 @@
 import { storage } from "../storage";
 import { settleContest } from "../contest-scoring";
 import type { JobResult } from "./scheduler";
+import type { ProgressCallback } from "../lib/admin-stream";
 import { fromZonedTime } from "date-fns-tz";
 
-export async function settleContests(): Promise<JobResult> {
+export async function settleContests(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[settle_contests] Starting contest settlement...");
+  
+  progressCallback?.({
+    type: 'info',
+    timestamp: new Date().toISOString(),
+    message: 'Starting contest settlement job',
+  });
   
   let contestsProcessed = 0;
   let errorCount = 0;
@@ -25,16 +32,44 @@ export async function settleContests(): Promise<JobResult> {
     const now = new Date();
     
     console.log(`[settle_contests] Found ${allContests.length} live contests to check`);
+    
+    progressCallback?.({
+      type: 'info',
+      timestamp: new Date().toISOString(),
+      message: `Found ${allContests.length} live contests to check for settlement`,
+      data: { totalContests: allContests.length },
+    });
 
     if (allContests.length === 0) {
       console.log("[settle_contests] No live contests to check for settlement");
+      progressCallback?.({
+        type: 'info',
+        timestamp: new Date().toISOString(),
+        message: 'No live contests to settle',
+      });
       return { requestCount: 0, recordsProcessed: 0, errorCount: 0 };
     }
 
     // For each live contest, check if it's ready to settle
     const contestsToSettle = [];
+    let contestsChecked = 0;
     
     for (const contest of allContests) {
+      contestsChecked++;
+      
+      // Progress update every 5 contests checked
+      if (contestsChecked % 5 === 0) {
+        progressCallback?.({
+          type: 'progress',
+          timestamp: new Date().toISOString(),
+          message: `Checked ${contestsChecked}/${allContests.length} contests`,
+          data: {
+            current: contestsChecked,
+            total: allContests.length,
+            percentage: Math.round((contestsChecked / allContests.length) * 100),
+          },
+        });
+      }
       console.log(`[settle_contests] Checking contest ${contest.id} (${contest.name})`);
       console.log(`[settle_contests]   - gameDate: ${contest.gameDate}`);
       console.log(`[settle_contests]   - endsAt: ${contest.endsAt}`);
@@ -93,24 +128,86 @@ export async function settleContests(): Promise<JobResult> {
 
     if (contestsToSettle.length === 0) {
       console.log("[settle_contests] No contests ready for settlement (waiting for games to complete)");
+      progressCallback?.({
+        type: 'info',
+        timestamp: new Date().toISOString(),
+        message: 'No contests ready for settlement (waiting for games to complete)',
+        data: { contestsChecked, contestsReady: 0 },
+      });
       return { requestCount: 0, recordsProcessed: 0, errorCount: 0 };
     }
 
     console.log(`[settle_contests] Settling ${contestsToSettle.length} contests...`);
+    
+    progressCallback?.({
+      type: 'info',
+      timestamp: new Date().toISOString(),
+      message: `Settling ${contestsToSettle.length} contests`,
+      data: { contestsToSettle: contestsToSettle.length },
+    });
 
     for (const contest of contestsToSettle) {
       try {
         console.log(`[settle_contests] Settling contest ${contest.id} (${contest.name})...`);
+        
+        progressCallback?.({
+          type: 'info',
+          timestamp: new Date().toISOString(),
+          message: `Settling contest: ${contest.name} (${contest.id})`,
+          data: { contestId: contest.id, contestName: contest.name },
+        });
+        
         await settleContest(contest.id);
         contestsProcessed++;
         console.log(`[settle_contests] ✓ Contest ${contest.id} settled successfully`);
+        
+        progressCallback?.({
+          type: 'info',
+          timestamp: new Date().toISOString(),
+          message: `✓ Settled: ${contest.name}`,
+          data: { contestId: contest.id, status: 'success' },
+        });
+        
+        // Progress update
+        progressCallback?.({
+          type: 'progress',
+          timestamp: new Date().toISOString(),
+          message: `Settled ${contestsProcessed}/${contestsToSettle.length} contests`,
+          data: {
+            current: contestsProcessed,
+            total: contestsToSettle.length,
+            percentage: Math.round((contestsProcessed / contestsToSettle.length) * 100),
+            stats: { settled: contestsProcessed, errors: errorCount },
+          },
+        });
       } catch (error: any) {
         console.error(`[settle_contests] Failed to settle contest ${contest.id}:`, error.message);
         errorCount++;
+        
+        progressCallback?.({
+          type: 'error',
+          timestamp: new Date().toISOString(),
+          message: `Failed to settle contest ${contest.name}: ${error.message}`,
+          data: { contestId: contest.id, error: error.message },
+        });
       }
     }
 
     console.log(`[settle_contests] Settled ${contestsProcessed} contests, ${errorCount} errors`);
+    
+    progressCallback?.({
+      type: 'complete',
+      timestamp: new Date().toISOString(),
+      message: errorCount > 0 
+        ? `Settlement completed with ${errorCount} errors: ${contestsProcessed}/${contestsToSettle.length} contests settled`
+        : `Settlement completed successfully: ${contestsProcessed} contests settled`,
+      data: {
+        success: errorCount === 0,
+        contestsSettled: contestsProcessed,
+        errors: errorCount,
+        total: contestsToSettle.length,
+      },
+    });
     
     return { 
       requestCount: 0, 
