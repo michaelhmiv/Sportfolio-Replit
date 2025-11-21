@@ -1004,12 +1004,11 @@ export class DatabaseStorage implements IStorage {
 
   // Activity methods
   async getUserActivity(userId: string, filters?: { types?: string[]; limit?: number; offset?: number }): Promise<any[]> {
-    const requestLimit = filters?.limit || 50;
-    const requestOffset = filters?.offset || 0;
+    const limit = filters?.limit || 50;
+    const offset = filters?.offset || 0;
     const types = filters?.types || ['mining', 'market', 'contest'];
     
-    // Build SQL UNION ALL query
-    const unionParts: any[] = [];
+    const activities: any[] = [];
 
     // 1. Mining claims
     if (types.includes('mining')) {
