@@ -85,10 +85,9 @@ export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) 
 
   const isLoading = statsLoading || gamesLoading || sharesLoading;
   
-  // Show most recent games first
-  const reversedGames = [...recentGames].reverse();
-  const displayedGames = reversedGames.slice(0, gamesToShow);
-  const hasMoreGames = reversedGames.length > gamesToShow;
+  // Backend already returns most recent games first (desc order)
+  const displayedGames = recentGames.slice(0, gamesToShow);
+  const hasMoreGames = recentGames.length > gamesToShow;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
