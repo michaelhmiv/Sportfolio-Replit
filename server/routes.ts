@@ -1305,6 +1305,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Activity feed - user transactions and activity timeline
+  app.get("/api/activity", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { types, limit, offset } = req.query;
+      
+      // Parse types filter (comma-separated string to array)
+      let typesArray: string[] | undefined;
+      if (types && typeof types === 'string') {
+        typesArray = types.split(',').filter(t => ['mining', 'market', 'contest'].includes(t));
+      }
+
+      const filters = {
+        types: typesArray,
+        limit: limit ? parseInt(limit as string) : 50,
+        offset: offset ? parseInt(offset as string) : 0,
+      };
+
+      const activities = await storage.getUserActivity(userId, filters);
+
+      res.json({
+        activities,
+        total: activities.length,
+        limit: filters.limit,
+        offset: filters.offset,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Start/select mining for player(s)
   app.post("/api/mining/start", isAuthenticated, async (req, res) => {
     try {
@@ -1426,6 +1457,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Increment total shares mined counter
         await storage.incrementTotalSharesMined(user.id, miningData.sharesAccumulated);
 
+        // Record mining claim for activity timeline
+        await storage.createMiningClaim({
+          userId: user.id,
+          playerId: miningData.playerId,
+          sharesClaimed: miningData.sharesAccumulated,
+        });
+
         // Reset mining
         const now = new Date();
         await storage.updateMining(user.id, {
@@ -1483,6 +1521,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } else {
           await storage.updateHolding(user.id, "player", dist.playerId, dist.shares, "0.0000");
         }
+
+        // Record mining claim for activity timeline
+        await storage.createMiningClaim({
+          userId: user.id,
+          playerId: dist.playerId,
+          sharesClaimed: dist.shares,
+        });
 
         claimedPlayers.push({
           playerId: dist.playerId,

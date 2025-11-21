@@ -5,8 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, DollarSign, Crown } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Crown, Pickaxe, ShoppingCart, Trophy, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Link } from "wouter";
+import { formatDistanceToNow } from "date-fns";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
@@ -22,6 +23,39 @@ interface PortfolioData {
   premiumShares: number;
   isPremium: boolean;
   premiumExpiresAt?: string;
+}
+
+interface UserActivity {
+  id: string;
+  timestamp: string;
+  category: 'mining' | 'market' | 'contest';
+  type: string;
+  description: string;
+  cashDelta?: string;
+  shareDelta?: number;
+  balanceAfter?: string;
+  metadata: {
+    playerName?: string;
+    playerId?: number;
+    contestId?: string;
+    contestName?: string;
+    tradePrice?: string;
+    orderType?: string;
+    side?: string;
+    quantity?: number;
+    shares?: number;
+    entryFee?: string;
+    payout?: string;
+    rank?: number;
+    totalEntries?: number;
+  };
+}
+
+interface ActivityResponse {
+  activities: UserActivity[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export default function Portfolio() {
@@ -167,6 +201,7 @@ export default function Portfolio() {
           <TabsList>
             <TabsTrigger value="holdings" data-testid="tab-holdings">Holdings</TabsTrigger>
             <TabsTrigger value="orders" data-testid="tab-open-orders">Open Orders</TabsTrigger>
+            <TabsTrigger value="activity" data-testid="tab-activity">Activity</TabsTrigger>
           </TabsList>
 
           {/* Holdings */}
@@ -397,8 +432,165 @@ export default function Portfolio() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Activity Feed */}
+          <TabsContent value="activity">
+            <ActivityFeed />
+          </TabsContent>
         </Tabs>
       </div>
     </div>
+  );
+}
+
+function ActivityFeed() {
+  const { data: activityData, isLoading } = useQuery<ActivityResponse>({
+    queryKey: ['/api/activity'],
+  });
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-12 text-center text-muted-foreground">
+          Loading activity...
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!activityData || activityData.activities.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium uppercase tracking-wide">Activity History</CardTitle>
+        </CardHeader>
+        <CardContent className="p-12 text-center text-muted-foreground" data-testid="text-no-activity">
+          No activity yet. Start trading, mining, or entering contests!
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const getActivityIcon = (category: string, type: string) => {
+    if (category === 'mining') return <Pickaxe className="w-4 h-4" />;
+    if (category === 'market') return <ShoppingCart className="w-4 h-4" />;
+    if (category === 'contest') return <Trophy className="w-4 h-4" />;
+    return null;
+  };
+
+  const getCategoryColor = (category: string) => {
+    if (category === 'mining') return 'text-yellow-500';
+    if (category === 'market') return 'text-blue-500';
+    if (category === 'contest') return 'text-purple-500';
+    return 'text-muted-foreground';
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm font-medium uppercase tracking-wide">Activity History</CardTitle>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="divide-y">
+          {activityData.activities.map((activity) => {
+            const cashDelta = activity.cashDelta ? parseFloat(activity.cashDelta) : null;
+            const isPositive = cashDelta && cashDelta > 0;
+            const isNegative = cashDelta && cashDelta < 0;
+
+            return (
+              <div
+                key={activity.id}
+                className="p-3 sm:p-4 hover-elevate flex items-start gap-3"
+                data-testid={`activity-${activity.id}`}
+              >
+                {/* Icon */}
+                <div className={`flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center ${getCategoryColor(activity.category)}`}>
+                  {getActivityIcon(activity.category, activity.type)}
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 min-w-0">
+                  {/* Description with player link */}
+                  <div className="text-sm font-medium mb-1">
+                    {activity.metadata.playerId ? (
+                      <Link href={`/player/${activity.metadata.playerId}`} className="hover:underline">
+                        {activity.description}
+                      </Link>
+                    ) : activity.metadata.contestId ? (
+                      <Link href={`/contest/${activity.metadata.contestId}`} className="hover:underline">
+                        {activity.description}
+                      </Link>
+                    ) : (
+                      activity.description
+                    )}
+                  </div>
+
+                  {/* Metadata */}
+                  <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                    <span className="capitalize">{activity.category}</span>
+                    <span>•</span>
+                    <span>{formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}</span>
+                    
+                    {/* Show shares for mining */}
+                    {activity.shareDelta && activity.shareDelta > 0 && (
+                      <>
+                        <span>•</span>
+                        <span className="font-mono text-green-500">
+                          +{activity.shareDelta} {activity.shareDelta === 1 ? 'share' : 'shares'}
+                        </span>
+                      </>
+                    )}
+
+                    {/* Show order details for market */}
+                    {activity.metadata.orderType && (
+                      <>
+                        <span>•</span>
+                        <span className="capitalize">{activity.metadata.orderType}</span>
+                      </>
+                    )}
+
+                    {/* Show trade price for market */}
+                    {activity.metadata.tradePrice && (
+                      <>
+                        <span>•</span>
+                        <span className="font-mono">${activity.metadata.tradePrice}</span>
+                      </>
+                    )}
+
+                    {/* Show rank for contest payouts */}
+                    {activity.metadata.rank && activity.metadata.totalEntries && (
+                      <>
+                        <span>•</span>
+                        <span>
+                          Rank {activity.metadata.rank} of {activity.metadata.totalEntries}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Cash Delta */}
+                {cashDelta !== null && cashDelta !== 0 && (
+                  <div className="flex-shrink-0 text-right">
+                    <div className={`flex items-center gap-1 font-mono font-bold text-sm ${isPositive ? 'text-green-500' : isNegative ? 'text-red-500' : 'text-muted-foreground'}`}>
+                      {isPositive && <ArrowUpRight className="w-3 h-3" />}
+                      {isNegative && <ArrowDownRight className="w-3 h-3" />}
+                      <span data-testid={`cash-delta-${activity.id}`}>
+                        {isPositive ? '+' : ''}${activity.cashDelta}
+                      </span>
+                    </div>
+                    {activity.balanceAfter && (
+                      <div className="text-xs text-muted-foreground mt-0.5">
+                        Bal: ${activity.balanceAfter}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

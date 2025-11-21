@@ -8,6 +8,7 @@ import {
   trades,
   mining,
   miningSplits,
+  miningClaims,
   contests,
   contestEntries,
   contestLineups,
@@ -29,6 +30,8 @@ import {
   type Mining,
   type MiningSplit,
   type InsertMiningSplit,
+  type MiningClaim,
+  type InsertMiningClaim,
   type Contest,
   type InsertContest,
   type ContestEntry,
@@ -107,6 +110,10 @@ export interface IStorage {
   updateMining(userId: string, updates: Partial<Mining>): Promise<void>;
   getMiningSplits(userId: string): Promise<MiningSplit[]>;
   setMiningSplits(userId: string, splits: InsertMiningSplit[]): Promise<void>;
+  createMiningClaim(claim: InsertMiningClaim): Promise<MiningClaim>;
+  
+  // Activity methods
+  getUserActivity(userId: string, filters?: { types?: string[]; limit?: number; offset?: number }): Promise<any[]>;
   
   // Contest methods
   getContests(status?: string): Promise<Contest[]>;
@@ -985,6 +992,296 @@ export class DatabaseStorage implements IStorage {
     if (splits.length > 0) {
       await db.insert(miningSplits).values(splits);
     }
+  }
+
+  async createMiningClaim(claim: InsertMiningClaim): Promise<MiningClaim> {
+    const [created] = await db
+      .insert(miningClaims)
+      .values(claim)
+      .returning();
+    return created;
+  }
+
+  // Activity methods
+  async getUserActivity(userId: string, filters?: { types?: string[]; limit?: number; offset?: number }): Promise<any[]> {
+    const requestLimit = filters?.limit || 50;
+    const requestOffset = filters?.offset || 0;
+    const types = filters?.types || ['mining', 'market', 'contest'];
+    
+    // Build SQL UNION ALL query
+    const unionParts: any[] = [];
+
+    // 1. Mining claims
+    if (types.includes('mining')) {
+      const claims = await db
+        .select({
+          id: miningClaims.id,
+          occurredAt: miningClaims.claimedAt,
+          playerId: miningClaims.playerId,
+          playerFirstName: players.firstName,
+          playerLastName: players.lastName,
+          playerTeam: players.team,
+          sharesClaimed: miningClaims.sharesClaimed,
+        })
+        .from(miningClaims)
+        .leftJoin(players, eq(miningClaims.playerId, players.id))
+        .where(eq(miningClaims.userId, userId))
+        .orderBy(desc(miningClaims.claimedAt))
+        .limit(limit);
+      
+      claims.forEach(claim => {
+        activities.push({
+          id: `mining-${claim.id}`,
+          userId,
+          occurredAt: claim.occurredAt,
+          category: 'mining',
+          subtype: 'claim',
+          cashDelta: '0.00',
+          sharesDelta: claim.sharesClaimed,
+          metadata: {
+            playerId: claim.playerId,
+            playerName: claim.playerId ? `${claim.playerFirstName} ${claim.playerLastName}` : 'Multiple Players',
+            playerTeam: claim.playerTeam,
+            sharesClaimed: claim.sharesClaimed,
+          },
+        });
+      });
+    }
+
+    // 2. Orders (placed/cancelled)
+    if (types.includes('market')) {
+      const userOrders = await db
+        .select({
+          id: orders.id,
+          occurredAt: orders.createdAt,
+          playerId: orders.playerId,
+          playerFirstName: players.firstName,
+          playerLastName: players.lastName,
+          playerTeam: players.team,
+          side: orders.side,
+          orderType: orders.orderType,
+          quantity: orders.quantity,
+          limitPrice: orders.limitPrice,
+          status: orders.status,
+        })
+        .from(orders)
+        .innerJoin(players, eq(orders.playerId, players.id))
+        .where(eq(orders.userId, userId))
+        .orderBy(desc(orders.createdAt))
+        .limit(limit);
+      
+      userOrders.forEach(order => {
+        activities.push({
+          id: `order-${order.id}`,
+          userId,
+          occurredAt: order.occurredAt,
+          category: 'market',
+          subtype: order.status === 'cancelled' ? 'order_cancelled' : 'order_placed',
+          cashDelta: '0.00', // Orders don't change cash until trades execute
+          sharesDelta: 0,
+          metadata: {
+            playerId: order.playerId,
+            playerName: `${order.playerFirstName} ${order.playerLastName}`,
+            playerTeam: order.playerTeam,
+            side: order.side,
+            orderType: order.orderType,
+            quantity: order.quantity,
+            limitPrice: order.limitPrice,
+            status: order.status,
+          },
+        });
+      });
+
+      // 3. Trades (executed)
+      const userBuyTrades = await db
+        .select({
+          id: trades.id,
+          occurredAt: trades.executedAt,
+          playerId: trades.playerId,
+          playerFirstName: players.firstName,
+          playerLastName: players.lastName,
+          playerTeam: players.team,
+          quantity: trades.quantity,
+          price: trades.price,
+        })
+        .from(trades)
+        .innerJoin(players, eq(trades.playerId, players.id))
+        .where(eq(trades.buyerId, userId))
+        .orderBy(desc(trades.executedAt))
+        .limit(limit);
+      
+      userBuyTrades.forEach(trade => {
+        const totalCost = parseFloat(trade.price) * trade.quantity;
+        activities.push({
+          id: `trade-buy-${trade.id}`,
+          userId,
+          occurredAt: trade.occurredAt,
+          category: 'market',
+          subtype: 'trade_buy',
+          cashDelta: `-${totalCost.toFixed(2)}`,
+          sharesDelta: trade.quantity,
+          metadata: {
+            playerId: trade.playerId,
+            playerName: `${trade.playerFirstName} ${trade.playerLastName}`,
+            playerTeam: trade.playerTeam,
+            quantity: trade.quantity,
+            price: trade.price,
+          },
+        });
+      });
+
+      const userSellTrades = await db
+        .select({
+          id: trades.id,
+          occurredAt: trades.executedAt,
+          playerId: trades.playerId,
+          playerFirstName: players.firstName,
+          playerLastName: players.lastName,
+          playerTeam: players.team,
+          quantity: trades.quantity,
+          price: trades.price,
+        })
+        .from(trades)
+        .innerJoin(players, eq(trades.playerId, players.id))
+        .where(eq(trades.sellerId, userId))
+        .orderBy(desc(trades.executedAt))
+        .limit(limit);
+      
+      userSellTrades.forEach(trade => {
+        const totalRevenue = parseFloat(trade.price) * trade.quantity;
+        activities.push({
+          id: `trade-sell-${trade.id}`,
+          userId,
+          occurredAt: trade.occurredAt,
+          category: 'market',
+          subtype: 'trade_sell',
+          cashDelta: `${totalRevenue.toFixed(2)}`,
+          sharesDelta: -trade.quantity,
+          metadata: {
+            playerId: trade.playerId,
+            playerName: `${trade.playerFirstName} ${trade.playerLastName}`,
+            playerTeam: trade.playerTeam,
+            quantity: trade.quantity,
+            price: trade.price,
+          },
+        });
+      });
+    }
+
+    // 4. Contest entries (entry fee + payout)
+    if (types.includes('contest')) {
+      const userEntries = await db
+        .select({
+          id: contestEntries.id,
+          contestId: contestEntries.contestId,
+          contestName: contests.name,
+          contestStatus: contests.status,
+          entryFee: contests.entryFee,
+          totalSharesEntered: contestEntries.totalSharesEntered,
+          totalScore: contestEntries.totalScore,
+          rank: contestEntries.rank,
+          payout: contestEntries.payout,
+          createdAt: contestEntries.createdAt,
+        })
+        .from(contestEntries)
+        .innerJoin(contests, eq(contestEntries.contestId, contests.id))
+        .where(eq(contestEntries.userId, userId))
+        .orderBy(desc(contestEntries.createdAt))
+        .limit(limit);
+      
+      userEntries.forEach(entry => {
+        // Entry creation (fee charged)
+        activities.push({
+          id: `contest-entry-${entry.id}`,
+          userId,
+          occurredAt: entry.createdAt,
+          category: 'contest',
+          subtype: 'contest_entry',
+          cashDelta: `-${entry.entryFee}`,
+          sharesDelta: 0,
+          metadata: {
+            contestId: entry.contestId,
+            contestName: entry.contestName,
+            entryFee: entry.entryFee,
+            totalSharesEntered: entry.totalSharesEntered,
+          },
+        });
+
+        // Contest completion (payout received) - only if contest is completed and payout > 0
+        if (entry.contestStatus === 'completed' && parseFloat(entry.payout) > 0) {
+          activities.push({
+            id: `contest-payout-${entry.id}`,
+            userId,
+            occurredAt: entry.createdAt, // Use entry creation date as proxy for completion
+            category: 'contest',
+            subtype: 'contest_payout',
+            cashDelta: `${entry.payout}`,
+            sharesDelta: 0,
+            metadata: {
+              contestId: entry.contestId,
+              contestName: entry.contestName,
+              rank: entry.rank,
+              payout: entry.payout,
+              totalScore: entry.totalScore,
+            },
+          });
+        }
+      });
+    }
+
+    // Sort all activities by timestamp (most recent first) and apply pagination
+    const sorted = activities.sort((a, b) => 
+      new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
+    );
+
+    // Get current user balance for balance-after calculations
+    const user = await this.getUser(userId);
+    if (!user) return [];
+    
+    let currentBalance = parseFloat(user.balance);
+    
+    // Process activities from most recent to oldest, adding descriptions and balance-after
+    const enrichedActivities = sorted.slice(offset, offset + limit).map((activity: any) => {
+      const cashDelta = activity.cashDelta ? parseFloat(activity.cashDelta) : 0;
+      const balanceAfter = currentBalance;
+      
+      // Move backwards through history (we're going DESC)
+      currentBalance -= cashDelta;
+      
+      // Build description
+      let description = '';
+      const meta = activity.metadata;
+      
+      if (activity.category === 'mining') {
+        description = `Claimed ${meta.sharesClaimed} shares${meta.playerName ? ` of ${meta.playerName}` : ''}`;
+      } else if (activity.category === 'market') {
+        if (activity.subtype === 'trade_buy') {
+          description = `Bought ${meta.quantity} shares of ${meta.playerName} @ $${meta.price}`;
+        } else if (activity.subtype === 'trade_sell') {
+          description = `Sold ${meta.quantity} shares of ${meta.playerName} @ $${meta.price}`;
+        }
+      } else if (activity.category === 'contest') {
+        if (activity.subtype === 'contest_entry') {
+          description = `Entered ${meta.contestName}`;
+        } else if (activity.subtype === 'contest_payout') {
+          description = `${meta.contestName} - Rank ${meta.rank} Payout`;
+        }
+      }
+      
+      return {
+        id: activity.id,
+        timestamp: activity.occurredAt,
+        category: activity.category,
+        type: activity.subtype,
+        description,
+        cashDelta: cashDelta !== 0 ? activity.cashDelta : undefined,
+        shareDelta: activity.sharesDelta || undefined,
+        balanceAfter: balanceAfter.toFixed(2),
+        metadata: meta,
+      };
+    });
+
+    return enrichedActivities;
   }
 
   // Contest methods

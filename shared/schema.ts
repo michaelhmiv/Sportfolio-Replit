@@ -163,6 +163,18 @@ export const miningSplits = pgTable("mining_splits", {
   userIdx: index("user_split_idx").on(table.userId),
 }));
 
+// Mining claims table - immutable log of individual claim events
+export const miningClaims = pgTable("mining_claims", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  playerId: varchar("player_id").references(() => players.id), // null for premium split mining
+  sharesClaimed: integer("shares_claimed").notNull(),
+  claimedAt: timestamp("claimed_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("mining_claims_user_idx").on(table.userId),
+  claimedAtIdx: index("mining_claims_claimed_at_idx").on(table.claimedAt),
+}));
+
 // Contests table
 export const contests = pgTable("contests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -398,6 +410,11 @@ export const insertPlayerGameStatsSchema = createInsertSchema(playerGameStats).o
   lastFetchedAt: true,
 });
 
+export const insertMiningClaimSchema = createInsertSchema(miningClaims).omit({
+  id: true,
+  claimedAt: true,
+});
+
 // Select types
 export type User = typeof users.$inferSelect;
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -423,6 +440,9 @@ export type Mining = typeof mining.$inferSelect;
 
 export type MiningSplit = typeof miningSplits.$inferSelect;
 export type InsertMiningSplit = typeof miningSplits.$inferInsert;
+
+export type MiningClaim = typeof miningClaims.$inferSelect;
+export type InsertMiningClaim = z.infer<typeof insertMiningClaimSchema>;
 
 export type DailyGame = typeof dailyGames.$inferSelect;
 export type InsertDailyGame = z.infer<typeof insertDailyGameSchema>;
