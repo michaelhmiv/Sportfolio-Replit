@@ -32,15 +32,20 @@ Share and cash locking systems (`holdings_locks` and `balance_locks` tables) imp
 A persistent stats caching layer dramatically reduces MySportsFeeds API calls by ~95%, ensuring scalability and instant page loads:
 
 **Caching Tables:**
-- `player_season_summaries`: Stores season averages (PPG, RPG, APG, etc.), shooting percentages, and pre-calculated fantasy points per game. Updated 2x daily via background job.
+- `player_season_summaries`: Stores season averages (PPG, RPG, APG, etc.), shooting percentages, and pre-calculated fantasy points per game. **Auto-recalculated via SQL aggregation** from `player_game_stats` after each stats sync (hourly + real-time during live games).
 - `player_game_stats`: Stores individual game statistics, updated hourly and in real-time during live games.
+
+**Database Aggregation Approach:**
+- Season summaries are calculated by aggregating `player_game_stats` locally using SQL reduce operations, eliminating MySportsFeeds API dependency for season stats.
+- Recalculation is automatic: `stats_sync` (hourly) and `stats_sync_live` (every minute during games) trigger `recalculatePlayerSeasonSummary()` for affected players.
+- MySportsFeeds throttling (30-second backoff for Seasonal Player Gamelogs) made API-based sync impractical (3.9 hours for all players). Database aggregation is instant and scalable.
 
 **API Optimization:**
 - `GET /api/players`: Reads FPG from `player_season_summaries` instead of calling MySportsFeeds API for each player (reduces ~500 API calls per marketplace page load to 0).
 - `GET /api/player/:id/stats`: Reads season averages from `player_season_summaries` instead of live API calls.
 - `GET /api/player/:id/recent-games`: Reads from `player_game_stats` instead of calling MySportsFeeds game logs API.
 
-Performance optimizations include SQL JOINs to prevent N+1 queries, marketplace pagination, batch player fetches, React Query caching, and persistent database-backed stats caching.
+Performance optimizations include SQL JOINs to prevent N+1 queries, marketplace pagination, batch player fetches, React Query caching, and persistent database-backed stats caching with automatic aggregation.
 
 The `GET /api/players` endpoint supports comprehensive server-side search, filter, and sort operations for the player database, with optimized database indexes for performance. Contest entry pages dynamically filter players based on games scheduled for the contest date.
 
@@ -50,9 +55,8 @@ Background jobs, managed by `node-cron` in development and an external cron serv
 **Data Sync Jobs:**
 - `roster_sync` (daily 5am ET): Updates player rosters, team assignments, and mining eligibility
 - `schedule_sync` (every minute): Fetches daily game schedules and live scores
-- `stats_sync` (hourly): Syncs completed game statistics to `player_game_stats`
-- `stats_sync_live` (every minute): Real-time stats updates during live games
-- `sync_season_summaries` (2x daily at 6am and 2pm ET): **NEW** - Fetches season stats for all active players from MySportsFeeds, calculates fantasy points per game, and updates `player_season_summaries` cache
+- `stats_sync` (hourly): Syncs completed game statistics to `player_game_stats`, then auto-recalculates season summaries for affected players
+- `stats_sync_live` (every minute): Real-time stats updates during live games, then auto-recalculates season summaries for affected players
 
 **Contest Jobs:**
 - `create_contests` (daily midnight): Creates 50/50 contests for upcoming games
