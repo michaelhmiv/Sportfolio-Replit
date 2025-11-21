@@ -49,6 +49,18 @@ import { eq, and, desc, asc, sql, inArray, or } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "crypto";
 
+// Season helper: Get current competitive season patterns (regular + playoffs, exclude preseason)
+// Returns array of season strings to include in queries
+function getCurrentCompetitiveSeasons(): string[] {
+  const currentYear = new Date().getFullYear();
+  // NBA season spans two calendar years (e.g., 2025-2026)
+  // Include both regular season and playoffs for rolling competitive average
+  return [
+    `${currentYear}-${currentYear + 1}-regular`,
+    `${currentYear}-${currentYear + 1}-playoff`,
+  ];
+}
+
 export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
@@ -1691,10 +1703,18 @@ export class DatabaseStorage implements IStorage {
     blocks: number;
     minutesPerGame: string;
   } | null> {
+    // Filter by current competitive season (regular + playoffs combined for rolling average)
+    const currentSeasons = getCurrentCompetitiveSeasons();
+    
     const gameLogs = await db
       .select()
       .from(playerGameStats)
-      .where(eq(playerGameStats.playerId, playerId))
+      .where(
+        and(
+          eq(playerGameStats.playerId, playerId),
+          inArray(playerGameStats.season, currentSeasons)
+        )
+      )
       .orderBy(desc(playerGameStats.gameDate));
 
     if (gameLogs.length === 0) {
