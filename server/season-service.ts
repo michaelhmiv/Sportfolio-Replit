@@ -5,22 +5,11 @@
  * Uses the authoritative current_season endpoint to ensure accurate season tracking.
  */
 
-import axios from "axios";
 import { CURRENT_SEASON } from "../shared/schema";
 
 const API_BASE = "https://api.mysportsfeeds.com/v2.1/pull/nba";
-
-const apiClient = axios.create({
-  baseURL: API_BASE,
-  auth: {
-    username: process.env.MYSPORTSFEEDS_API_KEY || "mock",
-    password: "MYSPORTSFEEDS",
-  },
-  headers: {
-    "Accept-Encoding": "gzip",
-  },
-  timeout: 10000,
-});
+const API_KEY = process.env.MYSPORTSFEEDS_API_KEY || "mock";
+const AUTH_HEADER = `Basic ${Buffer.from(`${API_KEY}:MYSPORTSFEEDS`).toString('base64')}`;
 
 interface SeasonCache {
   slug: string;
@@ -31,16 +20,28 @@ let seasonCache: SeasonCache | null = null;
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 /**
- * Fetches the current season from MySportsFeeds API
+ * Fetches the current season from MySportsFeeds API using native fetch
  * Returns season slug in format "YYYY-YYYY-regular" or "YYYY-YYYY-playoff"
  */
 async function fetchCurrentSeasonFromAPI(): Promise<string> {
   try {
-    const response = await apiClient.get("/current_season.json");
+    const response = await fetch(`${API_BASE}/current_season.json`, {
+      headers: {
+        'Authorization': AUTH_HEADER,
+        'Accept-Encoding': 'gzip',
+      },
+      signal: AbortSignal.timeout(10000), // 10 second timeout
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const data = await response.json();
     
     // Extract season slug from response
     // Expected format: { currentseason: { season: [{ details: { slug: "2024-2025-regular", intervalType: "regular", ... } }] } }
-    const seasonData = response.data?.currentseason?.season?.[0];
+    const seasonData = data?.currentseason?.season?.[0];
     if (seasonData?.details?.slug) {
       return seasonData.details.slug;
     }
