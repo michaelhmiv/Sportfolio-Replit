@@ -1730,85 +1730,104 @@ export class DatabaseStorage implements IStorage {
   }
 
   /**
-   * Recalculate a single player's season summary by aggregating their game stats
+   * Recalculate a single player's season summaries by aggregating their game stats
+   * Processes all seasons for the given player, or a specific season if provided
    * This eliminates the need to call MySportsFeeds API for season stats
    */
-  async recalculatePlayerSeasonSummary(playerId: string, season: string = "2024-2025-regular"): Promise<PlayerSeasonSummary | null> {
-    // Aggregate stats from player_game_stats table
+  async recalculatePlayerSeasonSummary(playerId: string, season?: string): Promise<PlayerSeasonSummary | null> {
+    // Fetch all game stats for this player (optionally filtered by season)
+    const conditions = [eq(playerGameStats.playerId, playerId)];
+    if (season) {
+      conditions.push(eq(playerGameStats.season, season));
+    }
+
     const gameStats = await db
       .select()
       .from(playerGameStats)
-      .where(
-        and(
-          eq(playerGameStats.playerId, playerId),
-          eq(playerGameStats.season, season)
-        )
-      );
+      .where(and(...conditions));
 
     if (gameStats.length === 0) {
-      // No game stats available, delete any existing summary
+      // No game stats available, delete any existing summaries for this player/season
+      const deleteConditions = [eq(playerSeasonSummaries.playerId, playerId)];
+      if (season) {
+        deleteConditions.push(eq(playerSeasonSummaries.season, season));
+      }
       await db
         .delete(playerSeasonSummaries)
-        .where(
-          and(
-            eq(playerSeasonSummaries.playerId, playerId),
-            eq(playerSeasonSummaries.season, season)
-          )
-        );
+        .where(and(...deleteConditions));
       return null;
     }
 
-    const gamesPlayed = gameStats.length;
+    // Group game stats by season
+    const statsBySeason = gameStats.reduce((acc, stat) => {
+      if (!acc[stat.season]) {
+        acc[stat.season] = [];
+      }
+      acc[stat.season].push(stat);
+      return acc;
+    }, {} as Record<string, typeof gameStats>);
 
-    // Calculate per-game averages
-    const totals = gameStats.reduce(
-      (acc, game) => ({
-        points: acc.points + game.points,
-        rebounds: acc.rebounds + game.rebounds,
-        assists: acc.assists + game.assists,
-        steals: acc.steals + game.steals,
-        blocks: acc.blocks + game.blocks,
-        turnovers: acc.turnovers + game.turnovers,
-        threePointersMade: acc.threePointersMade + game.threePointersMade,
-        minutes: acc.minutes + game.minutes,
-        fantasyPoints: acc.fantasyPoints + parseFloat(game.fantasyPoints),
-      }),
-      { points: 0, rebounds: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0, threePointersMade: 0, minutes: 0, fantasyPoints: 0 }
-    );
+    let lastSummary: PlayerSeasonSummary | null = null;
 
-    const summary = {
-      playerId,
-      season,
-      gamesPlayed,
-      ptsPerGame: (totals.points / gamesPlayed).toFixed(2),
-      rebPerGame: (totals.rebounds / gamesPlayed).toFixed(2),
-      astPerGame: (totals.assists / gamesPlayed).toFixed(2),
-      stlPerGame: (totals.steals / gamesPlayed).toFixed(2),
-      blkPerGame: (totals.blocks / gamesPlayed).toFixed(2),
-      tovPerGame: (totals.turnovers / gamesPlayed).toFixed(2),
-      fg3PerGame: (totals.threePointersMade / gamesPlayed).toFixed(2),
-      minPerGame: (totals.minutes / gamesPlayed).toFixed(2),
-      // Shooting percentages - set to 0 for now as we don't track makes/attempts in game stats
-      fgPct: "0.00",
-      fg3Pct: "0.00",
-      ftPct: "0.00",
-      // Fantasy points per game - average of all game fantasy points
-      fantasyPointsPerGame: (totals.fantasyPoints / gamesPlayed).toFixed(2),
-    };
+    // Calculate summary for each season
+    for (const [seasonKey, seasonStats] of Object.entries(statsBySeason)) {
+      const gamesPlayed = seasonStats.length;
 
-    return await this.upsertPlayerSeasonSummary(summary);
+      // Calculate per-game averages
+      const totals = seasonStats.reduce(
+        (acc, game) => ({
+          points: acc.points + game.points,
+          rebounds: acc.rebounds + game.rebounds,
+          assists: acc.assists + game.assists,
+          steals: acc.steals + game.steals,
+          blocks: acc.blocks + game.blocks,
+          turnovers: acc.turnovers + game.turnovers,
+          threePointersMade: acc.threePointersMade + game.threePointersMade,
+          minutes: acc.minutes + game.minutes,
+          fantasyPoints: acc.fantasyPoints + parseFloat(game.fantasyPoints),
+        }),
+        { points: 0, rebounds: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0, threePointersMade: 0, minutes: 0, fantasyPoints: 0 }
+      );
+
+      const summary = {
+        playerId,
+        season: seasonKey,
+        gamesPlayed,
+        ptsPerGame: (totals.points / gamesPlayed).toFixed(2),
+        rebPerGame: (totals.rebounds / gamesPlayed).toFixed(2),
+        astPerGame: (totals.assists / gamesPlayed).toFixed(2),
+        stlPerGame: (totals.steals / gamesPlayed).toFixed(2),
+        blkPerGame: (totals.blocks / gamesPlayed).toFixed(2),
+        tovPerGame: (totals.turnovers / gamesPlayed).toFixed(2),
+        fg3PerGame: (totals.threePointersMade / gamesPlayed).toFixed(2),
+        minPerGame: (totals.minutes / gamesPlayed).toFixed(2),
+        // Shooting percentages - set to 0 for now as we don't track makes/attempts in game stats
+        fgPct: "0.00",
+        fg3Pct: "0.00",
+        ftPct: "0.00",
+        // Fantasy points per game - average of all game fantasy points
+        fantasyPointsPerGame: (totals.fantasyPoints / gamesPlayed).toFixed(2),
+      };
+
+      lastSummary = await this.upsertPlayerSeasonSummary(summary);
+    }
+
+    return lastSummary;
   }
 
   /**
    * Recalculate season summaries for all players with game stats
-   * Returns count of players recalculated
+   * Optionally filter by season, otherwise processes all seasons
+   * Returns count of summaries recalculated
    */
-  async recalculateAllPlayerSeasonSummaries(season: string = "2024-2025-regular"): Promise<number> {
-    // Get all unique player IDs who have game stats this season
+  async recalculateAllPlayerSeasonSummaries(season?: string): Promise<number> {
+    // Get all unique player IDs who have game stats (optionally filtered by season)
+    const conditions = season ? [eq(playerGameStats.season, season)] : [];
+    
     const playerIds = await db
       .selectDistinct({ playerId: playerGameStats.playerId })
       .from(playerGameStats)
-      .where(eq(playerGameStats.season, season));
+      .where(conditions.length > 0 ? and(...conditions) : undefined);
 
     let recalculated = 0;
     for (const { playerId } of playerIds) {
