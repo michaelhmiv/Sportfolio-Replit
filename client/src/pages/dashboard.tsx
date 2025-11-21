@@ -407,20 +407,24 @@ export default function Dashboard() {
         <div className="h-12 overflow-hidden relative">
           <div className="flex gap-3 animate-slide-left absolute whitespace-nowrap py-3 px-4">
             {data?.hotPlayers?.concat(data.hotPlayers).map((player, idx) => (
-              <Link key={`${player.id}-${idx}`} href={`/player/${player.id}`}>
-                <div className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md">
-                  <span className="font-medium">{player.firstName} {player.lastName}</span>
-                  <span className="font-mono font-bold">
-                    {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-sm">No value</span>}
+              <div key={`${player.id}-${idx}`} className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md">
+                <span className="font-medium">
+                  <PlayerName 
+                    playerId={player.id} 
+                    firstName={player.firstName} 
+                    lastName={player.lastName}
+                  />
+                </span>
+                <span className="font-mono font-bold">
+                  {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-sm">No value</span>}
+                </span>
+                {player.lastTradePrice && (
+                  <span className={`flex items-center text-sm ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                    {parseFloat(player.priceChange24h) >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
+                    {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
                   </span>
-                  {player.lastTradePrice && (
-                    <span className={`flex items-center text-sm ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
-                      {parseFloat(player.priceChange24h) >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-                      {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
-                    </span>
-                  )}
-                </div>
-              </Link>
+                )}
+              </div>
             ))}
           </div>
           </div>

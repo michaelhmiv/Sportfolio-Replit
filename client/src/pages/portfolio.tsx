@@ -299,7 +299,16 @@ export default function Portfolio() {
                                   <span className="font-bold text-xs">{holding.player?.firstName[0]}{holding.player?.lastName[0]}</span>
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className="font-medium text-sm">{holding.player?.firstName} {holding.player?.lastName}</div>
+                                  <div className="font-medium text-sm">
+                                    {holding.player && (
+                                      <PlayerName 
+                                        playerId={holding.player.id} 
+                                        firstName={holding.player.firstName} 
+                                        lastName={holding.player.lastName}
+                                        className="text-sm"
+                                      />
+                                    )}
+                                  </div>
                                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground flex-wrap">
                                     <span>{holding.player?.team}</span>
                                     <span>•</span>
@@ -337,7 +346,16 @@ export default function Portfolio() {
                                 <span className="font-bold text-xs">{holding.player?.firstName[0]}{holding.player?.lastName[0]}</span>
                               </div>
                               <div>
-                                <div className="font-medium text-sm">{holding.player?.firstName} {holding.player?.lastName}</div>
+                                <div className="font-medium text-sm">
+                                  {holding.player && (
+                                    <PlayerName 
+                                      playerId={holding.player.id} 
+                                      firstName={holding.player.firstName} 
+                                      lastName={holding.player.lastName}
+                                      className="text-sm"
+                                    />
+                                  )}
+                                </div>
                                 <div className="text-xs text-muted-foreground md:hidden">{holding.player?.team} • {holding.player?.position}</div>
                                 <div className="text-xs text-muted-foreground hidden md:inline">{holding.player?.team} • {holding.player?.position}</div>
                               </div>

@@ -11,6 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { TrendingUp, Trophy, DollarSign, Award, Percent } from "lucide-react";
+import { PlayerName } from "@/components/player-name";
+import { UserName } from "@/components/user-name";
 
 interface ContestEntryDrawerProps {
   contestId: string;
@@ -76,7 +78,9 @@ export function ContestEntryDrawer({
       <SheetContent className="sm:max-w-2xl overflow-y-auto" data-testid="sheet-entry-details">
         <SheetHeader>
           <SheetTitle data-testid="text-entry-username">
-            @{entryDetails?.entry.username}'s Entry
+            {entryDetails && (
+              <UserName userId={entryDetails.entry.userId} username={entryDetails.entry.username} />
+            )}'s Entry
           </SheetTitle>
           <SheetDescription>{entryDetails?.contest.name}</SheetDescription>
         </SheetHeader>
@@ -162,7 +166,11 @@ export function ContestEntryDrawer({
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className="font-semibold" data-testid={`text-player-name-${player.playerId}`}>
-                              {player.playerFirstName} {player.playerLastName}
+                              <PlayerName 
+                                playerId={player.playerId} 
+                                firstName={player.playerFirstName} 
+                                lastName={player.playerLastName}
+                              />
                             </span>
                             <Badge variant="outline" className="text-xs">
                               {player.playerTeam}

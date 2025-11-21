@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Trophy, TrendingUp, User } from "lucide-react";
 import { ContestEntryDrawer } from "@/components/contest-entry-drawer";
 import { Button } from "@/components/ui/button";
+import { PlayerName } from "@/components/player-name";
+import { UserName } from "@/components/user-name";
 
 interface PlayerLineupStats {
   entryId: string;
@@ -143,7 +145,13 @@ export default function ContestLeaderboard() {
                           {player.playerName.split(' ').map(n => n[0]).join('')}
                         </span>
                       </div>
-                      <span className="font-medium">{player.playerName}</span>
+                      <span className="font-medium">
+                        <PlayerName 
+                          playerId={player.playerId} 
+                          firstName={player.playerName.split(' ')[0]} 
+                          lastName={player.playerName.split(' ').slice(1).join(' ')}
+                        />
+                      </span>
                       <Badge variant="outline" className="text-xs">{player.sharesEntered} shares</Badge>
                     </div>
                     <div className="text-right">
@@ -205,13 +213,8 @@ export default function ContestLeaderboard() {
                               className="text-sm font-medium hover:text-primary hover:underline cursor-pointer text-left truncate max-w-[120px]"
                               data-testid={`button-view-entry-${entry.userId}`}
                             >
-                              @{entry.username}
+                              <UserName userId={entry.userId} username={entry.username} className="text-sm" />
                             </button>
-                            <Link href={`/user/${entry.userId}`}>
-                              <Button variant="ghost" size="icon" className="h-5 w-5" data-testid={`link-profile-${entry.userId}`}>
-                                <User className="w-3 h-3" />
-                              </Button>
-                            </Link>
                             {isMyEntry && <Badge variant="outline" className="text-[10px] px-1">You</Badge>}
                           </div>
                         </td>

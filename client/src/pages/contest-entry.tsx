@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { invalidatePortfolioQueries, invalidateContestQueries } from "@/lib/cache-invalidation";
 import type { Player, Holding, DailyGame } from "@shared/schema";
 import { format } from "date-fns";
+import { PlayerName } from "@/components/player-name";
 
 interface ContestEntryData {
   contest: {
@@ -292,7 +293,13 @@ export default function ContestEntry() {
                         </span>
                       </div>
                       <div>
-                        <div className="font-medium">{holding.player.firstName} {holding.player.lastName}</div>
+                        <div className="font-medium">
+                          <PlayerName 
+                            playerId={holding.player.id} 
+                            firstName={holding.player.firstName} 
+                            lastName={holding.player.lastName}
+                          />
+                        </div>
                         <div className="text-xs text-muted-foreground">
                           {holding.player.team} · {holding.player.position} · {holding.quantity} shares
                         </div>
@@ -337,7 +344,13 @@ export default function ContestEntry() {
                     >
                       <div className="flex items-start justify-between mb-3">
                         <div>
-                          <div className="font-medium">{entry.playerName}</div>
+                          <div className="font-medium">
+                            <PlayerName 
+                              playerId={entry.playerId} 
+                              firstName={entry.playerName.split(' ')[0]} 
+                              lastName={entry.playerName.split(' ').slice(1).join(' ')}
+                            />
+                          </div>
                           <div className="text-xs text-muted-foreground">
                             {entry.team} · {entry.position}
                           </div>

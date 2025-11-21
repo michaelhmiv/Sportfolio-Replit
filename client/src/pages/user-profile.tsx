@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Player } from "@shared/schema";
+import { PlayerName } from "@/components/player-name";
 
 interface UserProfile {
   user: {
@@ -317,7 +318,11 @@ export default function UserProfile() {
                         <div className="flex items-center gap-3">
                           <div>
                             <div className="font-semibold">
-                              {player.firstName} {player.lastName}
+                              <PlayerName 
+                                playerId={player.id} 
+                                firstName={player.firstName} 
+                                lastName={player.lastName}
+                              />
                             </div>
                             <div className="text-sm text-muted-foreground">
                               {player.team} • {player.position}

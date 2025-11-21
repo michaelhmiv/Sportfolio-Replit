@@ -8,6 +8,8 @@ import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { useWebSocket } from "@/lib/websocket";
 import { queryClient } from "@/lib/queryClient";
+import { PlayerName } from "@/components/player-name";
+import { UserName } from "@/components/user-name";
 
 interface MarketActivity {
   activityType: "trade" | "order_placed" | "order_cancelled";
@@ -65,16 +67,28 @@ export function MarketActivityWidget() {
       return (
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-muted-foreground text-xs">Trade:</span>
-          <span className="font-medium text-xs">{item.buyerUsername}</span>
+          {item.buyerId && item.buyerUsername && (
+            <span className="font-medium text-xs">
+              <UserName userId={item.buyerId} username={item.buyerUsername} className="text-xs" />
+            </span>
+          )}
           <span className="text-muted-foreground text-xs">bought from</span>
-          <span className="font-medium text-xs">{item.sellerUsername}</span>
+          {item.sellerId && item.sellerUsername && (
+            <span className="font-medium text-xs">
+              <UserName userId={item.sellerId} username={item.sellerUsername} className="text-xs" />
+            </span>
+          )}
         </div>
       );
     }
     if (item.activityType === "order_placed") {
       return (
         <div className="flex items-center gap-1 flex-wrap">
-          <span className="font-medium text-xs">{item.username}</span>
+          {item.userId && item.username && (
+            <span className="font-medium text-xs">
+              <UserName userId={item.userId} username={item.username} className="text-xs" />
+            </span>
+          )}
           <Badge variant="outline" className="text-xs">
             {item.side} {item.orderType}
           </Badge>
@@ -84,7 +98,11 @@ export function MarketActivityWidget() {
     if (item.activityType === "order_cancelled") {
       return (
         <div className="flex items-center gap-1 flex-wrap">
-          <span className="font-medium text-xs">{item.username}</span>
+          {item.userId && item.username && (
+            <span className="font-medium text-xs">
+              <UserName userId={item.userId} username={item.username} className="text-xs" />
+            </span>
+          )}
           <Badge variant="outline" className="text-xs">cancelled</Badge>
         </div>
       );
@@ -126,7 +144,12 @@ export function MarketActivityWidget() {
                     <div className="flex-shrink-0">{getActivityIcon(item)}</div>
                     <div className="min-w-0 flex-1">
                       <div className="font-medium text-sm truncate">
-                        {item.playerFirstName} {item.playerLastName}
+                        <PlayerName 
+                          playerId={item.playerId} 
+                          firstName={item.playerFirstName} 
+                          lastName={item.playerLastName}
+                          className="text-sm"
+                        />
                       </div>
                       <div className="text-xs text-muted-foreground truncate">{item.playerTeam}</div>
                       {getActivityText(item)}
