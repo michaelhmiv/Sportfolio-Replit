@@ -5,8 +5,8 @@ import { z } from "zod";
 
 // Current NBA season
 // MySportsFeeds API uses "latest" keyword to automatically fetch current season data
-// This constant is used for data storage and aggregation
-export const CURRENT_SEASON = "2024-2025-regular";
+// This constant is used as fallback for data storage and aggregation
+export const CURRENT_SEASON = "2025-2026-regular";
 
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
