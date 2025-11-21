@@ -1047,51 +1047,8 @@ export class DatabaseStorage implements IStorage {
       });
     }
 
-    // 2. Orders (placed/cancelled)
+    // 2. Trades (executed transactions only - not pending orders)
     if (types.includes('market')) {
-      const userOrders = await db
-        .select({
-          id: orders.id,
-          occurredAt: orders.createdAt,
-          playerId: orders.playerId,
-          playerFirstName: players.firstName,
-          playerLastName: players.lastName,
-          playerTeam: players.team,
-          side: orders.side,
-          orderType: orders.orderType,
-          quantity: orders.quantity,
-          limitPrice: orders.limitPrice,
-          status: orders.status,
-        })
-        .from(orders)
-        .innerJoin(players, eq(orders.playerId, players.id))
-        .where(eq(orders.userId, userId))
-        .orderBy(desc(orders.createdAt))
-        .limit(limit);
-      
-      userOrders.forEach(order => {
-        activities.push({
-          id: `order-${order.id}`,
-          userId,
-          occurredAt: order.occurredAt,
-          category: 'market',
-          subtype: order.status === 'cancelled' ? 'order_cancelled' : 'order_placed',
-          cashDelta: '0.00', // Orders don't change cash until trades execute
-          sharesDelta: 0,
-          metadata: {
-            playerId: order.playerId,
-            playerName: `${order.playerFirstName} ${order.playerLastName}`,
-            playerTeam: order.playerTeam,
-            side: order.side,
-            orderType: order.orderType,
-            quantity: order.quantity,
-            limitPrice: order.limitPrice,
-            status: order.status,
-          },
-        });
-      });
-
-      // 3. Trades (executed)
       const userBuyTrades = await db
         .select({
           id: trades.id,
