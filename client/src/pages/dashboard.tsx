@@ -337,12 +337,14 @@ export default function Dashboard() {
     mutationFn: async (playerIds: string[]) => {
       const res = await apiRequest("POST", "/api/mining/start", { playerIds });
       const data = await res.json();
-      // Invalidate and wait for refetch BEFORE returning
-      await invalidatePortfolioQueries();
+      // Don't await cache invalidation - let it run in background for instant UI response
       return data;
     },
     onSuccess: (data: any) => {
-      // Cache already invalidated in mutationFn, queries will auto-refetch
+      // Invalidate cache in background (non-blocking)
+      invalidatePortfolioQueries();
+      
+      // Close dialog immediately for responsive UX
       setShowPlayerSelection(false);
       setSelectedPlayers([]);
       
@@ -395,12 +397,12 @@ export default function Dashboard() {
     mutationFn: async () => {
       const res = await apiRequest("POST", "/api/mining/claim");
       const data = await res.json();
-      // Invalidate and wait for refetch BEFORE returning
-      await invalidatePortfolioQueries();
+      // Don't await cache invalidation - let it run in background for instant UI response
       return data;
     },
     onSuccess: (data: any) => {
-      // Cache already invalidated in mutationFn, queries will auto-refetch
+      // Invalidate cache in background (non-blocking)
+      invalidatePortfolioQueries();
       
       // Multi-player mining response
       if (data?.players && data.players.length > 0) {

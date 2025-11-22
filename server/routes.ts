@@ -1549,18 +1549,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Maximum 10 players allowed" });
       }
 
+      // PERFORMANCE OPTIMIZATION: Batch fetch all players in ONE query instead of N queries
+      const playersArray = await storage.getPlayersByIds(playerIds);
+      
       // Validate all players exist and are eligible
-      const players = [];
-      for (const playerId of playerIds) {
-        const player = await storage.getPlayer(playerId);
-        if (!player) {
-          return res.status(404).json({ error: `Player ${playerId} not found` });
-        }
+      if (playersArray.length !== playerIds.length) {
+        const foundIds = new Set(playersArray.map(p => p.id));
+        const missingId = playerIds.find(id => !foundIds.has(id));
+        return res.status(404).json({ error: `Player ${missingId} not found` });
+      }
+      
+      for (const player of playersArray) {
         if (!player.isEligibleForMining) {
           return res.status(400).json({ error: `${player.firstName} ${player.lastName} is not eligible for mining` });
         }
-        players.push(player);
       }
+      
+      const players = playersArray;
 
       // AUTO-CLAIM: Check if user has unclaimed shares and claim them automatically
       await accrueMiningShares(user.id);
@@ -1591,14 +1596,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sortedByRate[i].shares += 1;
           }
 
+          // PERFORMANCE OPTIMIZATION: Batch fetch players and holdings in parallel
+          const playerIdsForClaim = distributions.filter(d => d.shares > 0).map(d => d.playerId);
+          const [claimPlayers, claimHoldings] = await Promise.all([
+            storage.getPlayersByIds(playerIdsForClaim),
+            storage.getBatchHoldings(user.id, "player", playerIdsForClaim),
+          ]);
+          
+          // Create lookup maps for fast access
+          const playersMap = new Map(claimPlayers.map(p => [p.id, p]));
+
           // Add shares to holdings for each player
           for (const dist of distributions) {
             if (dist.shares === 0) continue;
 
-            const player = await storage.getPlayer(dist.playerId);
+            const player = playersMap.get(dist.playerId);
             if (!player) continue;
 
-            const holding = await storage.getHolding(user.id, "player", dist.playerId);
+            const holding = claimHoldings.get(dist.playerId);
             if (holding) {
               const newQuantity = holding.quantity + dist.shares;
               const newTotalCost = parseFloat(holding.totalCostBasis);
@@ -1792,14 +1807,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sortedByRate[i].shares += 1;
       }
 
+      // PERFORMANCE OPTIMIZATION: Batch fetch players and holdings in parallel
+      const playerIdsForClaim = distributions.filter(d => d.shares > 0).map(d => d.playerId);
+      const [claimPlayers, claimHoldings] = await Promise.all([
+        storage.getPlayersByIds(playerIdsForClaim),
+        storage.getBatchHoldings(user.id, "player", playerIdsForClaim),
+      ]);
+      
+      // Create lookup maps for fast access
+      const playersMap = new Map(claimPlayers.map(p => [p.id, p]));
+
       // Add shares to holdings for each player
       for (const dist of distributions) {
         if (dist.shares === 0) continue;
 
-        const player = await storage.getPlayer(dist.playerId);
+        const player = playersMap.get(dist.playerId);
         if (!player) continue;
 
-        const holding = await storage.getHolding(user.id, "player", dist.playerId);
+        const holding = claimHoldings.get(dist.playerId);
         if (holding) {
           const newQuantity = holding.quantity + dist.shares;
           const newTotalCost = parseFloat(holding.totalCostBasis); // Mined shares have $0 cost

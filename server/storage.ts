@@ -537,6 +537,30 @@ export class DatabaseStorage implements IStorage {
       .where(eq(holdings.userId, userId));
   }
 
+  // Batched version: fetch multiple holdings for specific assets in ONE query
+  async getBatchHoldings(userId: string, assetType: string, assetIds: string[]): Promise<Map<string, Holding>> {
+    if (assetIds.length === 0) {
+      return new Map();
+    }
+
+    const holdingsArray = await db
+      .select()
+      .from(holdings)
+      .where(
+        and(
+          eq(holdings.userId, userId),
+          eq(holdings.assetType, assetType),
+          inArray(holdings.assetId, assetIds)
+        )
+      );
+
+    const holdingsMap = new Map();
+    for (const holding of holdingsArray) {
+      holdingsMap.set(holding.assetId, holding);
+    }
+    return holdingsMap;
+  }
+
   async getUserHoldingsWithPlayers(userId: string): Promise<any[]> {
     const result = await db
       .select({
