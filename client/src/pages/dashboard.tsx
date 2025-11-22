@@ -782,6 +782,9 @@ export default function Dashboard() {
             </CardContent>
           </Card>
 
+          {/* Market Activity */}
+          <MarketActivityWidget />
+
           {/* Contest Summary */}
           <Card className="lg:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -850,9 +853,6 @@ export default function Dashboard() {
               </Link>
             </CardContent>
           </Card>
-
-          {/* Market Activity */}
-          <MarketActivityWidget />
         </div>
       </div>
       </div>
