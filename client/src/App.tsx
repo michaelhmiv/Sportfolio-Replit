@@ -64,10 +64,8 @@ function Router() {
   // Public routes (accessible without authentication)
   return (
     <Switch>
-      {/* Landing page for unauthenticated users at root */}
-      <Route path="/">
-        {isAuthenticated ? <Dashboard /> : <Landing />}
-      </Route>
+      {/* Dashboard is now public - shows live data with login CTAs for non-authenticated users */}
+      <Route path="/" component={Dashboard} />
       
       {/* Public routes - contests and leaderboards */}
       <Route path="/contests" component={Contests} />
@@ -83,21 +81,21 @@ function Router() {
       <Route path="/contact" component={Contact} />
       <Route path="/how-it-works" component={HowItWorks} />
       
-      {/* Protected routes - require authentication */}
+      {/* Protected routes - require authentication, redirect to dashboard if not logged in */}
       <Route path="/player/:id">
-        {isAuthenticated ? <PlayerPage /> : <Landing />}
+        {isAuthenticated ? <PlayerPage /> : <Dashboard />}
       </Route>
       <Route path="/contest/:id/entry">
-        {isAuthenticated ? <ContestEntry /> : <Landing />}
+        {isAuthenticated ? <ContestEntry /> : <Dashboard />}
       </Route>
       <Route path="/contest/:id/entry/:entryId">
-        {isAuthenticated ? <ContestEntry /> : <Landing />}
+        {isAuthenticated ? <ContestEntry /> : <Dashboard />}
       </Route>
       <Route path="/portfolio">
-        {isAuthenticated ? <Portfolio /> : <Landing />}
+        {isAuthenticated ? <Portfolio /> : <Dashboard />}
       </Route>
       <Route path="/admin">
-        {isAuthenticated ? <Admin /> : <Landing />}
+        {isAuthenticated ? <Admin /> : <Dashboard />}
       </Route>
       
       {/* Auth error page - public, always accessible */}
