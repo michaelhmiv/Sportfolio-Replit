@@ -1254,9 +1254,15 @@ function getPlainTextSportsUrl(game: DailyGame): string {
     const day = String(gameDate.getDate()).padStart(2, '0');
     const formattedDate = `${year}-${month}-${day}`;
     
-    // Plain Text Sports uses lowercase team codes
-    const awayTeam = game.awayTeam.toLowerCase();
-    const homeTeam = game.homeTeam.toLowerCase();
+    // Team code mapping for Plain Text Sports URLs only
+    // MySportsFeeds uses BRO but Plain Text Sports uses BKN for Brooklyn
+    const teamCodeMapping: Record<string, string> = {
+      'BRO': 'BKN'
+    };
+    
+    // Apply mapping and lowercase for URL
+    const awayTeam = (teamCodeMapping[game.awayTeam] || game.awayTeam).toLowerCase();
+    const homeTeam = (teamCodeMapping[game.homeTeam] || game.homeTeam).toLowerCase();
     
     return `https://plaintextsports.com/nba/${formattedDate}/${awayTeam}-${homeTeam}`;
   } catch (error) {
