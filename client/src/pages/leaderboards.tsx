@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Trophy, TrendingUp, ShoppingCart, DollarSign } from "lucide-react";
+import { Trophy, TrendingUp, ShoppingCart, DollarSign, Wallet, PieChart } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useWebSocket } from "@/lib/websocket";
 import { queryClient } from "@/lib/queryClient";
@@ -30,7 +30,7 @@ export default function Leaderboards() {
   // Get initial category from URL hash
   const getHashCategory = () => {
     const hash = window.location.hash.replace("#", "") || "netWorth";
-    return ["netWorth", "sharesMined", "marketOrders"].includes(hash) ? hash : "netWorth";
+    return ["netWorth", "cashBalance", "portfolioValue", "sharesMined", "marketOrders"].includes(hash) ? hash : "netWorth";
   };
   
   // Track active category in state
@@ -53,14 +53,19 @@ export default function Leaderboards() {
       queryClient.invalidateQueries({ queryKey: ["/api/leaderboards?category=sharesMined"] });
     });
 
-    // Portfolio events → update net worth leaderboard
+    // Portfolio events → update net worth, cash balance, and portfolio value leaderboards
     const unsubPortfolio = subscribe('portfolio', () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leaderboards?category=netWorth"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leaderboards?category=cashBalance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leaderboards?category=portfolioValue"] });
     });
 
-    // Trade events → update market orders leaderboard
+    // Trade events → update all money-related leaderboards
     const unsubTrade = subscribe('trade', () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leaderboards?category=marketOrders"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leaderboards?category=netWorth"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leaderboards?category=cashBalance"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/leaderboards?category=portfolioValue"] });
     });
 
     return () => {
@@ -73,6 +78,16 @@ export default function Leaderboards() {
   const { data: netWorthData, isLoading: netWorthLoading } = useQuery<LeaderboardData>({
     queryKey: ["/api/leaderboards?category=netWorth"],
     enabled: category === "netWorth",
+  });
+
+  const { data: cashBalanceData, isLoading: cashBalanceLoading } = useQuery<LeaderboardData>({
+    queryKey: ["/api/leaderboards?category=cashBalance"],
+    enabled: category === "cashBalance",
+  });
+
+  const { data: portfolioValueData, isLoading: portfolioValueLoading } = useQuery<LeaderboardData>({
+    queryKey: ["/api/leaderboards?category=portfolioValue"],
+    enabled: category === "portfolioValue",
   });
 
   const { data: sharesMinedData, isLoading: sharesMinedLoading } = useQuery<LeaderboardData>({
@@ -236,26 +251,44 @@ export default function Leaderboards() {
         </div>
 
         <Tabs value={category} onValueChange={handleTabChange} className="space-y-3 sm:space-y-3">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="netWorth" data-testid="tab-net-worth">
-              <DollarSign className="w-4 h-4 mr-2" />
+              <DollarSign className="w-4 h-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Net Worth</span>
-              <span className="sm:hidden">Worth</span>
+              <span className="sm:hidden text-xs">Worth</span>
+            </TabsTrigger>
+            <TabsTrigger value="cashBalance" data-testid="tab-cash-balance">
+              <Wallet className="w-4 h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Cash</span>
+              <span className="sm:hidden text-xs">Cash</span>
+            </TabsTrigger>
+            <TabsTrigger value="portfolioValue" data-testid="tab-portfolio-value">
+              <PieChart className="w-4 h-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Portfolio</span>
+              <span className="sm:hidden text-xs">Port</span>
             </TabsTrigger>
             <TabsTrigger value="sharesMined" data-testid="tab-shares-mined">
-              <TrendingUp className="w-4 h-4 mr-2" />
+              <TrendingUp className="w-4 h-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Shares Mined</span>
-              <span className="sm:hidden">Mined</span>
+              <span className="sm:hidden text-xs">Mine</span>
             </TabsTrigger>
             <TabsTrigger value="marketOrders" data-testid="tab-market-orders">
-              <ShoppingCart className="w-4 h-4 mr-2" />
+              <ShoppingCart className="w-4 h-4 mr-1 sm:mr-2" />
               <span className="hidden sm:inline">Market Orders</span>
-              <span className="sm:hidden">Orders</span>
+              <span className="sm:hidden text-xs">Ords</span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="netWorth">
             {renderLeaderboard(netWorthData, netWorthLoading, (value) => `$${typeof value === 'string' ? value : value.toFixed(2)}`)}
+          </TabsContent>
+
+          <TabsContent value="cashBalance">
+            {renderLeaderboard(cashBalanceData, cashBalanceLoading, (value) => `$${typeof value === 'string' ? value : value.toFixed(2)}`)}
+          </TabsContent>
+
+          <TabsContent value="portfolioValue">
+            {renderLeaderboard(portfolioValueData, portfolioValueLoading, (value) => `$${typeof value === 'string' ? value : value.toFixed(2)}`)}
           </TabsContent>
 
           <TabsContent value="sharesMined">
