@@ -598,15 +598,19 @@ export default function Admin() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="blog-content">Content</Label>
+                      <Label htmlFor="blog-content">Content (Markdown supported)</Label>
                       <Textarea
                         id="blog-content"
-                        placeholder="Full blog post content"
+                        placeholder="Full blog post content - supports markdown formatting (headings, lists, links, bold, italic, code blocks, etc.)"
                         value={blogContent}
                         onChange={(e) => setBlogContent(e.target.value)}
-                        rows={10}
+                        rows={15}
+                        className="font-mono text-sm"
                         data-testid="textarea-blog-content"
                       />
+                      <p className="text-xs text-muted-foreground">
+                        Use markdown syntax: **bold**, *italic*, # Headings, - Lists, [links](url), ```code blocks```, etc.
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
                       <input

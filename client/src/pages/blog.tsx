@@ -3,6 +3,7 @@ import { Link } from "wouter";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, User, ArrowRight } from "lucide-react";
+import { useEffect } from "react";
 
 interface BlogPost {
   id: string;
@@ -17,6 +18,20 @@ export default function Blog() {
   const { data, isLoading } = useQuery<{ posts: BlogPost[]; total: number }>({
     queryKey: ["/api/blog"],
   });
+
+  // Update page meta tags for SEO
+  useEffect(() => {
+    document.title = 'Blog - Fantasy Sports Insights & NBA Trading Strategies | Sportfolio';
+    
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute('content', 'Latest insights on fantasy sports, NBA player trading strategies, contest tips, and Sportfolio platform updates. Expert analysis for fantasy basketball enthusiasts.');
+    }
+    
+    return () => {
+      document.title = 'Sportfolio - Fantasy Sports Stock Market';
+    };
+  }, []);
 
   if (isLoading) {
     return (
