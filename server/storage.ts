@@ -1937,7 +1937,7 @@ export class DatabaseStorage implements IStorage {
             SUM(
               CASE 
                 WHEN ${holdings.assetType} = 'player' AND ${players.lastTradePrice} IS NOT NULL
-                THEN COALESCE(${holdings.quantity}, 0) * COALESCE(${players.lastTradePrice}::numeric, 0)
+                THEN COALESCE(${holdings.quantity}, 0) * COALESCE(${players.lastTradePrice}, 0)
                 ELSE 0
               END
             ),
