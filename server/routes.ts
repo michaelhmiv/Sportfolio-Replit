@@ -1640,11 +1640,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.incrementTotalSharesMined(user.id, totalDistributed);
           claimedData = { players: claimedPlayers, totalSharesClaimed: totalDistributed };
         } else {
-          // Legacy single-player mining
+          // Legacy single-player mining - use batched queries for consistency
           if (currentMining.playerId) {
-            const player = await storage.getPlayer(currentMining.playerId);
+            const [players, holdings] = await Promise.all([
+              storage.getPlayersByIds([currentMining.playerId]),
+              storage.getBatchHoldings(user.id, "player", [currentMining.playerId]),
+            ]);
+            
+            const player = players[0];
             if (player) {
-              const holding = await storage.getHolding(user.id, "player", currentMining.playerId);
+              const holding = holdings.get(currentMining.playerId);
               if (holding) {
                 const newQuantity = holding.quantity + currentMining.sharesAccumulated;
                 const newTotalCost = parseFloat(holding.totalCostBasis);
@@ -1735,18 +1740,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const usingSplits = splits.length > 0;
 
       if (!usingSplits) {
-        // Legacy single-player mining
+        // Legacy single-player mining - use batched queries for consistency
         if (!miningData.playerId) {
           return res.status(400).json({ error: "No player selected for mining" });
         }
 
-        const player = await storage.getPlayer(miningData.playerId);
+        const [players, holdings] = await Promise.all([
+          storage.getPlayersByIds([miningData.playerId]),
+          storage.getBatchHoldings(user.id, "player", [miningData.playerId]),
+        ]);
+        
+        const player = players[0];
         if (!player) {
           return res.status(400).json({ error: "Player not found" });
         }
 
         // Add shares to holdings (cost basis $0)
-        const holding = await storage.getHolding(user.id, "player", miningData.playerId);
+        const holding = holdings.get(miningData.playerId);
         if (holding) {
           const newQuantity = holding.quantity + miningData.sharesAccumulated;
           const newTotalCost = parseFloat(holding.totalCostBasis); // Mined shares have $0 cost
