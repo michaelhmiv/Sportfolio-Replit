@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Calendar, ArrowLeft } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
 import { useEffect } from "react";
 
 interface BlogPost {
@@ -33,6 +32,13 @@ export default function BlogPost() {
   const { data, isLoading, error } = useQuery<{ post: BlogPost; author: Author | null }>({
     queryKey: ["/api/blog", slug],
     enabled: !!slug,
+    queryFn: async () => {
+      const response = await fetch(`/api/blog/${slug}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch blog post');
+      }
+      return response.json();
+    },
   });
 
   if (isLoading) {
@@ -152,10 +158,9 @@ export default function BlogPost() {
           </header>
 
           <Card>
-            <CardContent className="p-8 prose prose-gray dark:prose-invert max-w-none">
+            <CardContent className="p-8 prose prose-gray dark:prose-invert max-w-none text-foreground">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
-                rehypePlugins={[rehypeRaw]}
                 data-testid="content-blog-post"
               >
                 {post.content}
