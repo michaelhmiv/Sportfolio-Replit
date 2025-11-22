@@ -116,6 +116,11 @@ export default function Dashboard() {
 
     const calculateProjectedShares = () => {
       const mining = data.mining;
+      if (!mining) {
+        setProjectedShares(0);
+        return;
+      }
+
       const usingSplits = mining.players && mining.players.length > 0;
       
       // If using splits or single player mode, check if configured
@@ -124,19 +129,29 @@ export default function Dashboard() {
         return;
       }
 
+      // Calculate total shares per hour (from splits or single player)
+      let totalSharesPerHour = 0;
+      if (usingSplits && mining.players) {
+        // Sum individual player rates for multi-player mining
+        totalSharesPerHour = mining.players.reduce((sum, p) => sum + (p.sharesPerHour || 0), 0);
+      } else {
+        // Use single player rate for legacy mining
+        totalSharesPerHour = mining.sharesPerHour || 0;
+      }
+
       // Guard against missing required fields
-      if (!mining.sharesPerHour || mining.sharesPerHour === 0 || !mining.lastAccruedAt) {
+      if (!totalSharesPerHour || totalSharesPerHour === 0 || !mining.lastAccruedAt) {
         setProjectedShares(mining.sharesAccumulated || 0);
         return;
       }
 
       // Use shared utility to ensure frontend matches backend calculation exactly
       const result = calculateMiningShares({
-        sharesAccumulated: mining.sharesAccumulated,
+        sharesAccumulated: mining.sharesAccumulated || 0,
         residualMs: mining.residualMs || 0,
         lastAccruedAt: mining.lastAccruedAt,
-        sharesPerHour: mining.sharesPerHour,
-        capLimit: mining.capLimit,
+        sharesPerHour: totalSharesPerHour,
+        capLimit: mining.capLimit || 2400,
       });
 
       setProjectedShares(result.projectedShares);
@@ -154,6 +169,7 @@ export default function Dashboard() {
     data?.mining?.sharesAccumulated,
     data?.mining?.sharesPerHour,
     data?.mining?.capLimit,
+    data?.mining?.players,
   ]);
 
   // Handle Escape key and click-outside to close flipped card
