@@ -1570,13 +1570,100 @@ export async function registerRoutes(app: Express): Promise<Server> {
         players.push(player);
       }
 
-      // Check if user has unclaimed shares
+      // AUTO-CLAIM: Check if user has unclaimed shares and claim them automatically
+      await accrueMiningShares(user.id);
       const currentMining = await storage.getMining(user.id);
+      let claimedData = null;
+
       if (currentMining && currentMining.sharesAccumulated > 0) {
-        return res.status(400).json({ 
-          error: "Must claim accumulated shares before changing player selection",
-          sharesAccumulated: currentMining.sharesAccumulated,
-        });
+        const totalAccumulated = currentMining.sharesAccumulated;
+        const splits = await storage.getMiningSplits(user.id);
+        const usingSplits = splits.length > 0;
+
+        if (usingSplits) {
+          // Multi-player mining: distribute shares proportionally
+          const totalRate = 100;
+          const claimedPlayers = [];
+          let totalDistributed = 0;
+
+          const distributions = splits.map(split => {
+            const proportion = split.sharesPerHour / totalRate;
+            const shares = Math.floor(proportion * totalAccumulated);
+            return { ...split, shares };
+          });
+
+          // Distribute remainder deterministically
+          const remainder = totalAccumulated - distributions.reduce((sum, d) => sum + d.shares, 0);
+          const sortedByRate = [...distributions].sort((a, b) => b.sharesPerHour - a.sharesPerHour);
+          for (let i = 0; i < remainder; i++) {
+            sortedByRate[i].shares += 1;
+          }
+
+          // Add shares to holdings for each player
+          for (const dist of distributions) {
+            if (dist.shares === 0) continue;
+
+            const player = await storage.getPlayer(dist.playerId);
+            if (!player) continue;
+
+            const holding = await storage.getHolding(user.id, "player", dist.playerId);
+            if (holding) {
+              const newQuantity = holding.quantity + dist.shares;
+              const newTotalCost = parseFloat(holding.totalCostBasis);
+              const newAvgCost = newTotalCost / newQuantity;
+              await storage.updateHolding(user.id, "player", dist.playerId, newQuantity, newAvgCost.toFixed(4));
+            } else {
+              await storage.updateHolding(user.id, "player", dist.playerId, dist.shares, "0.0000");
+            }
+
+            await storage.createMiningClaim({
+              userId: user.id,
+              playerId: dist.playerId,
+              sharesClaimed: dist.shares,
+            });
+
+            claimedPlayers.push({
+              playerId: dist.playerId,
+              playerName: `${player.firstName} ${player.lastName}`,
+              sharesClaimed: dist.shares,
+            });
+            totalDistributed += dist.shares;
+          }
+
+          await storage.incrementTotalSharesMined(user.id, totalDistributed);
+          claimedData = { players: claimedPlayers, totalSharesClaimed: totalDistributed };
+        } else {
+          // Legacy single-player mining
+          if (currentMining.playerId) {
+            const player = await storage.getPlayer(currentMining.playerId);
+            if (player) {
+              const holding = await storage.getHolding(user.id, "player", currentMining.playerId);
+              if (holding) {
+                const newQuantity = holding.quantity + currentMining.sharesAccumulated;
+                const newTotalCost = parseFloat(holding.totalCostBasis);
+                const newAvgCost = newTotalCost / newQuantity;
+                await storage.updateHolding(user.id, "player", currentMining.playerId, newQuantity, newAvgCost.toFixed(4));
+              } else {
+                await storage.updateHolding(user.id, "player", currentMining.playerId, currentMining.sharesAccumulated, "0.0000");
+              }
+
+              await storage.incrementTotalSharesMined(user.id, currentMining.sharesAccumulated);
+              await storage.createMiningClaim({
+                userId: user.id,
+                playerId: currentMining.playerId,
+                sharesClaimed: currentMining.sharesAccumulated,
+              });
+
+              claimedData = { 
+                sharesClaimed: currentMining.sharesAccumulated,
+                player,
+              };
+            }
+          }
+        }
+
+        broadcast({ type: "portfolio", userId: user.id });
+        broadcast({ type: "mining", userId: user.id, claimed: totalAccumulated });
       }
 
       // Calculate shares per hour for each player (equal distribution)
@@ -1607,7 +1694,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       broadcast({ type: "mining", userId: user.id, playerIds });
 
-      res.json({ success: true, players, splits: newSplits });
+      res.json({ 
+        success: true, 
+        players, 
+        splits: newSplits,
+        claimed: claimedData, // Include auto-claim data if shares were claimed
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

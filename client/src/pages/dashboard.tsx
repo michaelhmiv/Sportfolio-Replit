@@ -319,54 +319,47 @@ export default function Dashboard() {
 
   const startMiningMutation = useMutation({
     mutationFn: async (playerIds: string[]) => {
-      // Auto-claim any unclaimed shares before starting new mining session
-      const unclaimedShares = data?.mining?.sharesAccumulated || 0;
-      let claimResult = null;
-      let claimError = null;
-      
-      if (unclaimedShares > 0) {
-        try {
-          const claimRes = await apiRequest("POST", "/api/mining/claim");
-          claimResult = await claimRes.json();
-          await invalidatePortfolioQueries();
-        } catch (error: any) {
-          // Store claim error but continue with mining start
-          // apiRequest throws Error objects with format: "status: message"
-          claimError = error?.message || "Failed to claim shares";
-        }
-      }
-      
       const res = await apiRequest("POST", "/api/mining/start", { playerIds });
-      const miningData = await res.json();
+      const data = await res.json();
       // Invalidate and wait for refetch BEFORE returning
       await invalidatePortfolioQueries();
-      return { miningData, claimResult, unclaimedShares, claimError };
+      return data;
     },
-    onSuccess: (result: any) => {
+    onSuccess: (data: any) => {
       // Cache already invalidated in mutationFn, queries will auto-refetch
       setShowPlayerSelection(false);
       setSelectedPlayers([]);
       
-      const playerCount = result?.miningData?.players?.length || 0;
-      const wasAutoClaimed = result?.unclaimedShares > 0;
+      const playerCount = data?.players?.length || 0;
+      const claimed = data?.claimed;
       
-      if (wasAutoClaimed) {
-        if (result?.claimError) {
-          // Auto-claim failed but mining started successfully
+      if (claimed) {
+        // Shares were auto-claimed during switch
+        if (claimed.players && claimed.players.length > 0) {
+          // Multi-player claim
+          const playerBreakdown = claimed.players
+            .map((p: any) => `${p.playerName} (${p.sharesClaimed})`)
+            .join(", ");
           toast({
-            title: "Mining Started (Claim Failed)",
-            description: `Started mining ${playerCount} player${playerCount !== 1 ? 's' : ''}, but couldn't auto-claim ${result.unclaimedShares} shares. Please claim manually.`,
-            variant: "destructive",
+            title: "Mining Switched!",
+            description: `Auto-claimed ${claimed.totalSharesClaimed} shares (${playerBreakdown}). Now mining ${playerCount} player${playerCount !== 1 ? 's' : ''}.`,
+          });
+        } else if (claimed.player) {
+          // Single-player claim
+          const playerName = `${claimed.player.firstName} ${claimed.player.lastName}`;
+          toast({
+            title: "Mining Switched!",
+            description: `Auto-claimed ${claimed.sharesClaimed} shares of ${playerName}. Now mining ${playerCount} player${playerCount !== 1 ? 's' : ''}.`,
           });
         } else {
-          // Show combined message about successful auto-claim and new mining
-          const claimedCount = result?.claimResult?.totalSharesClaimed || result?.unclaimedShares;
+          // Generic auto-claim message
           toast({
-            title: "Mining Started!",
-            description: `Auto-claimed ${claimedCount} shares and started mining ${playerCount} player${playerCount !== 1 ? 's' : ''}`,
+            title: "Mining Switched!",
+            description: `Auto-claimed pending shares and started mining ${playerCount} player${playerCount !== 1 ? 's' : ''}.`,
           });
         }
       } else {
+        // No auto-claim needed
         toast({
           title: "Mining Started!",
           description: `Now mining shares of ${playerCount} player${playerCount !== 1 ? 's' : ''}`,
