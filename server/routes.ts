@@ -2056,6 +2056,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Lineup cannot be empty" });
       }
 
+      // VALIDATE: Ensure all player IDs are numeric (MySportsFeeds IDs)
+      // Reject any slug-style IDs to prevent data corruption
+      for (const item of lineup) {
+        if (!/^\d+$/.test(item.playerId)) {
+          return res.status(400).json({ 
+            error: `Invalid player ID: ${item.playerId}. Player IDs must be numeric MySportsFeeds IDs, not slugs.` 
+          });
+        }
+      }
+
       // VALIDATE: Check user has enough available shares BEFORE creating entry
       // Available shares = total - locked (in orders, other contests, mining)
       for (const item of lineup) {
@@ -2220,6 +2230,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!lineup || lineup.length === 0) {
         return res.status(400).json({ error: "Lineup cannot be empty" });
+      }
+
+      // VALIDATE: Ensure all player IDs are numeric (MySportsFeeds IDs)
+      // Reject any slug-style IDs to prevent data corruption
+      for (const item of lineup) {
+        if (!/^\d+$/.test(item.playerId)) {
+          return res.status(400).json({ 
+            error: `Invalid player ID: ${item.playerId}. Player IDs must be numeric MySportsFeeds IDs, not slugs.` 
+          });
+        }
       }
 
       // Get existing entry
