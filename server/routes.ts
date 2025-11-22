@@ -12,7 +12,7 @@ import { addClient, removeClient, broadcast } from "./websocket";
 import { calculateAccrualUpdate } from "@shared/mining-utils";
 import { createContests } from "./jobs/create-contests";
 import { calculateContestLeaderboard } from "./contest-scoring";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated, optionalAuth } from "./replitAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication middleware
@@ -275,7 +275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard - Now public for unauthenticated users (with limited data)
-  app.get("/api/dashboard", async (req, res) => {
+  app.get("/api/dashboard", optionalAuth, async (req, res) => {
     try {
       // Check if user is authenticated
       const isUserAuthenticated = !!req.user;

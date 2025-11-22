@@ -533,3 +533,35 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
     return res.status(401).json({ message: "Unauthorized" });
   }
 };
+
+// Optional authentication middleware - populates req.user if authenticated but doesn't reject
+export const optionalAuth: RequestHandler = async (req, res, next) => {
+  const isDev = process.env.NODE_ENV === 'development';
+  const bypassAuth = process.env.DEV_BYPASS_AUTH !== 'false';
+  
+  // In dev mode, populate mock user
+  if (isDev && bypassAuth && !req.user) {
+    const mockUser = {
+      claims: {
+        sub: 'dev-user-12345678',
+        email: 'dev@example.com',
+        first_name: 'Dev',
+        last_name: 'User',
+      },
+      expires_at: Math.floor(Date.now() / 1000) + 86400,
+      access_token: 'dev-mock-token',
+      refresh_token: 'dev-mock-refresh',
+    };
+    
+    req.user = mockUser;
+    
+    try {
+      await upsertUser(mockUser.claims);
+    } catch (error) {
+      console.error('[DEV_BYPASS] Failed to create dev user:', error);
+    }
+  }
+  
+  // Continue regardless of authentication status
+  next();
+};
