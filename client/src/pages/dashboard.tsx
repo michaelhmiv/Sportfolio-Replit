@@ -12,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar, Search, ChevronDown, BarChart3, ChevronLeft, ChevronRight, ExternalLink, ArrowUpDown } from "lucide-react";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import type { Player, Mining, Contest, Trade, DailyGame } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -76,6 +76,7 @@ const getEffectiveGameStatus = (game: DailyGame): string => {
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
   const [showPlayerSelection, setShowPlayerSelection] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
@@ -469,7 +470,12 @@ export default function Dashboard() {
               <div className="flex items-center gap-2">
                 <div className="text-2xl font-mono font-bold" data-testid="text-balance">${data?.user.balance || "0.00"}</div>
                 {data?.user.cashRank && data.user.cashRank > 0 && (
-                  <Badge variant="outline" className="text-xs gap-1" data-testid="badge-cash-rank">
+                  <button
+                    onClick={() => setLocation("/leaderboards#cashBalance")}
+                    className="inline-flex items-center gap-1 border border-border px-2 py-0.5 rounded-md text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
+                    data-testid="badge-cash-rank"
+                    aria-label={`Cash balance rank #${data.user.cashRank}, click to view leaderboard`}
+                  >
                     #{data.user.cashRank}
                     {data.user.cashRankChange !== null && data.user.cashRankChange !== 0 && (
                       <span className={data.user.cashRankChange > 0 ? "text-positive" : "text-negative"}>
@@ -480,7 +486,7 @@ export default function Dashboard() {
                         )}
                       </span>
                     )}
-                  </Badge>
+                  </button>
                 )}
               </div>
             </div>
@@ -488,7 +494,12 @@ export default function Dashboard() {
               <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Portfolio Value</div>
               <div className="flex items-center gap-2 justify-end">
                 {data?.user.portfolioRank && data.user.portfolioRank > 0 && (
-                  <Badge variant="outline" className="text-xs gap-1" data-testid="badge-portfolio-rank">
+                  <button
+                    onClick={() => setLocation("/leaderboards#portfolioValue")}
+                    className="inline-flex items-center gap-1 border border-border px-2 py-0.5 rounded-md text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
+                    data-testid="badge-portfolio-rank"
+                    aria-label={`Portfolio value rank #${data.user.portfolioRank}, click to view leaderboard`}
+                  >
                     #{data.user.portfolioRank}
                     {data.user.portfolioRankChange !== null && data.user.portfolioRankChange !== 0 && (
                       <span className={data.user.portfolioRankChange > 0 ? "text-positive" : "text-negative"}>
@@ -499,7 +510,7 @@ export default function Dashboard() {
                         )}
                       </span>
                     )}
-                  </Badge>
+                  </button>
                 )}
                 <div className="text-2xl font-mono font-bold" data-testid="text-portfolio-value">${data?.user.portfolioValue || "0.00"}</div>
               </div>
