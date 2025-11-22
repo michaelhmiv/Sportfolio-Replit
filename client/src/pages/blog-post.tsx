@@ -41,6 +41,50 @@ export default function BlogPost() {
     },
   });
 
+  // Update page meta tags for SEO - MUST be before any early returns to follow Rules of Hooks
+  useEffect(() => {
+    if (!data?.post) return;
+    
+    // Update title
+    document.title = `${data.post.title} | Sportfolio Blog`;
+    
+    // Update meta description
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute('content', data.post.excerpt);
+    }
+    
+    // Add Open Graph tags for social sharing
+    const ogTags = [
+      { property: 'og:title', content: data.post.title },
+      { property: 'og:description', content: data.post.excerpt },
+      { property: 'og:type', content: 'article' },
+      { property: 'og:url', content: `${window.location.origin}/blog/${data.post.slug}` },
+      { property: 'article:published_time', content: data.post.publishedAt },
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:title', content: data.post.title },
+      { name: 'twitter:description', content: data.post.excerpt },
+    ];
+    
+    ogTags.forEach(tag => {
+      const property = (tag.property || tag.name) as string;
+      const attr = tag.property ? 'property' : 'name';
+      let meta = document.querySelector(`meta[${attr}="${property}"]`);
+      
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute(attr, property);
+        document.head.appendChild(meta);
+      }
+      meta.setAttribute('content', tag.content);
+    });
+    
+    // Cleanup - reset to default on unmount
+    return () => {
+      document.title = 'Sportfolio - Fantasy Sports Stock Market';
+    };
+  }, [data?.post?.id, data?.post?.title, data?.post?.excerpt, data?.post?.slug, data?.post?.publishedAt]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-6 md:p-12">
@@ -75,50 +119,6 @@ export default function BlogPost() {
   }
 
   const { post, author } = data;
-
-  // Update page meta tags for SEO
-  useEffect(() => {
-    if (!post) return;
-    
-    // Update title
-    document.title = `${post.title} | Sportfolio Blog`;
-    
-    // Update meta description
-    const metaDescription = document.querySelector('meta[name="description"]');
-    if (metaDescription) {
-      metaDescription.setAttribute('content', post.excerpt);
-    }
-    
-    // Add Open Graph tags for social sharing
-    const ogTags = [
-      { property: 'og:title', content: post.title },
-      { property: 'og:description', content: post.excerpt },
-      { property: 'og:type', content: 'article' },
-      { property: 'og:url', content: `${window.location.origin}/blog/${post.slug}` },
-      { property: 'article:published_time', content: post.publishedAt },
-      { name: 'twitter:card', content: 'summary_large_image' },
-      { name: 'twitter:title', content: post.title },
-      { name: 'twitter:description', content: post.excerpt },
-    ];
-    
-    ogTags.forEach(tag => {
-      const property = (tag.property || tag.name) as string;
-      const attr = tag.property ? 'property' : 'name';
-      let meta = document.querySelector(`meta[${attr}="${property}"]`);
-      
-      if (!meta) {
-        meta = document.createElement('meta');
-        meta.setAttribute(attr, property);
-        document.head.appendChild(meta);
-      }
-      meta.setAttribute('content', tag.content);
-    });
-    
-    // Cleanup - reset to default on unmount
-    return () => {
-      document.title = 'Sportfolio - Fantasy Sports Stock Market';
-    };
-  }, [post?.id, post?.title, post?.excerpt, post?.slug, post?.publishedAt]);
 
   return (
     <div className="min-h-screen bg-background">
