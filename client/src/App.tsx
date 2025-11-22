@@ -42,6 +42,14 @@ import { SiDiscord } from "react-icons/si";
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
 
+  // Ensure viewport is properly set after OAuth redirect on mobile
+  useEffect(() => {
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport && viewport.getAttribute('content') !== 'width=device-width, initial-scale=1.0, maximum-scale=1') {
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1');
+    }
+  }, [isAuthenticated]);
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
