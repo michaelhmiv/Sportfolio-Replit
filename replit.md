@@ -16,7 +16,7 @@ The platform has been optimized to achieve sub-500ms response times for all majo
 2. **Batched Order Book Queries**: Created `getBatchOrderBooks()` method to fetch order books for all players in ONE query instead of N individual queries (50+ queries → 1 query)
 3. **Batched Season Stats Queries**: Created `getBatchPlayerSeasonStatsFromLogs()` method to fetch season stats for all players in ONE query (50+ queries → 1 query)
 4. **Batched Mining Queries**: Created `getBatchHoldings()` method to fetch holdings for multiple players in ONE query. Mining endpoints use `getPlayersByIds()` and `getBatchHoldings()` for validation and claiming, eliminating N+1 patterns in both multi-player and legacy single-player flows
-5. **Database Indexing**: Added pg_trgm GIN index on player names for optimized ILIKE pattern matching in text search
+5. **Database Indexing**: Btree indexes on player names, team, position, and price fields for optimized queries
 6. **Parallel Batch Fetching**: Batch queries run in parallel using Promise.all for maximum efficiency
 7. **Non-blocking Mining UI**: Mining dialog closes immediately with cache invalidation running in background for instant user feedback
 
