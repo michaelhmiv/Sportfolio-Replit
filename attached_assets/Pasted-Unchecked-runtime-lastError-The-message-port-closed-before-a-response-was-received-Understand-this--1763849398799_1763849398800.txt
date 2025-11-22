@@ -1,0 +1,86 @@
+Unchecked runtime.lastError: The message port closed before a response was received.Understand this error
+ads?client=ca-pub-3663304837019777&output=html&adk=1812271804&adf=3025194257&lmt=1763839352&plat=3%…:1 Unchecked runtime.lastError: The message port closed before a response was received.Understand this error
+sportfolio-at-its-core:1 Unchecked runtime.lastError: The message port closed before a response was received.Understand this error
+index-CBp6qykz.js:40 Error: Minified React error #310; visit https://reactjs.org/docs/error-decoder.html?invariant=310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at Br (index-CBp6qykz.js:38:17615)
+    at Ug (index-CBp6qykz.js:38:20561)
+    at Object.bE [as useEffect] (index-CBp6qykz.js:38:20819)
+    at Ge.useEffect (index-CBp6qykz.js:9:5880)
+    at gIe (index-CBp6qykz.js:521:176238)
+    at vE (index-CBp6qykz.js:38:17018)
+    at Kx (index-CBp6qykz.js:40:3139)
+    at T3 (index-CBp6qykz.js:40:44833)
+    at b3 (index-CBp6qykz.js:40:39790)
+    at x7 (index-CBp6qykz.js:40:39718)
+Yx @ index-CBp6qykz.js:40
+n.callback @ index-CBp6qykz.js:40
+x2 @ index-CBp6qykz.js:38
+M2 @ index-CBp6qykz.js:40
+g3 @ index-CBp6qykz.js:40
+g7 @ index-CBp6qykz.js:40
+w7 @ index-CBp6qykz.js:40
+qs @ index-CBp6qykz.js:40
+$2 @ index-CBp6qykz.js:40
+Cs @ index-CBp6qykz.js:38
+(anonymous) @ index-CBp6qykz.js:40
+setTimeout
+a @ index-CBp6qykz.js:48
+s @ index-CBp6qykz.js:48
+batch @ index-CBp6qykz.js:48
+Za @ index-CBp6qykz.js:48
+setData @ index-CBp6qykz.js:48
+onSuccess @ index-CBp6qykz.js:48
+f @ index-CBp6qykz.js:48
+Promise.then
+g @ index-CBp6qykz.js:48
+start @ index-CBp6qykz.js:48
+fetch @ index-CBp6qykz.js:48
+td @ index-CBp6qykz.js:48
+onSubscribe @ index-CBp6qykz.js:48
+subscribe @ index-CBp6qykz.js:48
+(anonymous) @ index-CBp6qykz.js:48
+FI @ index-CBp6qykz.js:38
+zg @ index-CBp6qykz.js:40
+Il @ index-CBp6qykz.js:40
+w7 @ index-CBp6qykz.js:40
+qs @ index-CBp6qykz.js:40
+$2 @ index-CBp6qykz.js:40
+Cs @ index-CBp6qykz.js:38
+(anonymous) @ index-CBp6qykz.js:40
+setTimeout
+a @ index-CBp6qykz.js:48
+s @ index-CBp6qykz.js:48
+batch @ index-CBp6qykz.js:48
+Za @ index-CBp6qykz.js:48
+setData @ index-CBp6qykz.js:48
+onSuccess @ index-CBp6qykz.js:48
+f @ index-CBp6qykz.js:48
+Promise.then
+g @ index-CBp6qykz.js:48
+start @ index-CBp6qykz.js:48
+fetch @ index-CBp6qykz.js:48
+td @ index-CBp6qykz.js:48
+onSubscribe @ index-CBp6qykz.js:48
+subscribe @ index-CBp6qykz.js:48
+(anonymous) @ index-CBp6qykz.js:48
+FI @ index-CBp6qykz.js:38
+zg @ index-CBp6qykz.js:40
+Il @ index-CBp6qykz.js:40
+$2 @ index-CBp6qykz.js:40
+Cs @ index-CBp6qykz.js:38
+w7 @ index-CBp6qykz.js:40
+qs @ index-CBp6qykz.js:40
+y3 @ index-CBp6qykz.js:40
+T @ index-CBp6qykz.js:25
+I @ index-CBp6qykz.js:25Understand this error
+index-CBp6qykz.js:38 Uncaught Error: Minified React error #310; visit https://reactjs.org/docs/error-decoder.html?invariant=310 for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+    at Br (index-CBp6qykz.js:38:17615)
+    at Ug (index-CBp6qykz.js:38:20561)
+    at Object.bE [as useEffect] (index-CBp6qykz.js:38:20819)
+    at Ge.useEffect (index-CBp6qykz.js:9:5880)
+    at gIe (index-CBp6qykz.js:521:176238)
+    at vE (index-CBp6qykz.js:38:17018)
+    at Kx (index-CBp6qykz.js:40:3139)
+    at T3 (index-CBp6qykz.js:40:44833)
+    at b3 (index-CBp6qykz.js:40:39790)
+    at x7 (index-CBp6qykz.js:40:39718)
