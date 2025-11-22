@@ -2252,10 +2252,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/leaderboards", async (req, res) => {
     try {
       const category = req.query.category as string || "netWorth";
-      const allUsers = await storage.getUsers();
 
       if (category === "sharesMined") {
         // Sort by total shares mined
+        const allUsers = await storage.getUsers();
         const ranked = allUsers
           .sort((a: User, b: User) => b.totalSharesMined - a.totalSharesMined)
           .map((u: User, index: number) => ({
@@ -2271,6 +2271,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (category === "marketOrders") {
         // Sort by total market orders
+        const allUsers = await storage.getUsers();
         const ranked = allUsers
           .sort((a: User, b: User) => b.totalMarketOrders - a.totalMarketOrders)
           .map((u: User, index: number) => ({
@@ -2284,43 +2285,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({ category: "marketOrders", leaderboard: ranked });
       }
 
-      if (category === "netWorth") {
-        // Calculate net worth for all users
-        const usersWithNetWorth = await Promise.all(
-          allUsers.map(async (u: User) => {
-            const holdings = await storage.getUserHoldings(u.id);
-            const holdingsVal = await Promise.all(
-              holdings.map(async (h: Holding) => {
-                if (h.assetType === "player") {
-                  const p = await storage.getPlayer(h.assetId);
-                  if (p?.lastTradePrice) {
-                    return parseFloat(p.lastTradePrice) * h.quantity;
-                  }
-                }
-                return 0;
-              })
-            );
-            const totalHoldingsVal = holdingsVal.reduce((sum: number, v: number) => sum + v, 0);
-            return {
-              userId: u.id,
-              username: u.username,
-              profileImageUrl: u.profileImageUrl,
-              netWorth: parseFloat(u.balance) + totalHoldingsVal,
-            };
-          })
-        );
+      if (category === "cashBalance" || category === "portfolioValue" || category === "netWorth") {
+        // Use optimized method to get all users with rankings in one query
+        const usersWithPortfolio = await storage.getAllUsersForRanking();
+        
+        // Get user details for profile images and usernames
+        const allUsers = await storage.getUsers();
+        const userMap = new Map(allUsers.map(u => [u.id, u]));
 
-        const ranked = usersWithNetWorth
-          .sort((a, b) => b.netWorth - a.netWorth)
-          .map((u, index) => ({
-            rank: index + 1,
-            userId: u.userId,
-            username: u.username,
-            profileImageUrl: u.profileImageUrl,
-            value: u.netWorth.toFixed(2),
-          }));
+        let sortedUsers: any[];
+        
+        if (category === "cashBalance") {
+          sortedUsers = usersWithPortfolio
+            .sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance))
+            .map((data, index) => {
+              const user = userMap.get(data.userId);
+              return {
+                rank: index + 1,
+                userId: data.userId,
+                username: user?.username || "Unknown",
+                profileImageUrl: user?.profileImageUrl || null,
+                value: parseFloat(data.balance).toFixed(2),
+              };
+            });
+        } else if (category === "portfolioValue") {
+          sortedUsers = usersWithPortfolio
+            .sort((a, b) => b.portfolioValue - a.portfolioValue)
+            .map((data, index) => {
+              const user = userMap.get(data.userId);
+              return {
+                rank: index + 1,
+                userId: data.userId,
+                username: user?.username || "Unknown",
+                profileImageUrl: user?.profileImageUrl || null,
+                value: data.portfolioValue.toFixed(2),
+              };
+            });
+        } else {
+          // netWorth
+          sortedUsers = usersWithPortfolio
+            .map(data => ({
+              ...data,
+              netWorth: parseFloat(data.balance) + data.portfolioValue,
+            }))
+            .sort((a, b) => b.netWorth - a.netWorth)
+            .map((data, index) => {
+              const user = userMap.get(data.userId);
+              return {
+                rank: index + 1,
+                userId: data.userId,
+                username: user?.username || "Unknown",
+                profileImageUrl: user?.profileImageUrl || null,
+                value: data.netWorth.toFixed(2),
+              };
+            });
+        }
 
-        return res.json({ category: "netWorth", leaderboard: ranked });
+        return res.json({ category, leaderboard: sortedUsers });
       }
 
       res.status(400).json({ error: "Invalid category" });
