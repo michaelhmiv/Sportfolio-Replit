@@ -464,7 +464,7 @@ export default function Dashboard() {
         <div className="border-b bg-card overflow-x-hidden">
         <div className="h-12 overflow-hidden relative">
           <div className="flex gap-3 animate-slide-left absolute whitespace-nowrap py-3 px-4">
-            {data?.hotPlayers?.concat(data.hotPlayers).map((player, idx) => (
+            {(data?.hotPlayers ?? []).concat(data?.hotPlayers ?? []).map((player, idx) => (
               <div key={`${player.id}-${idx}`} className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md">
                 <span className="font-medium">
                   <PlayerName 
@@ -497,18 +497,18 @@ export default function Dashboard() {
               <div>
                 <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Cash Balance</div>
                 <div className="flex items-center gap-2">
-                  <div className="text-2xl font-mono font-bold" data-testid="text-balance">${data.user.balance || "0.00"}</div>
-                  {data.user.cashRank && data.user.cashRank > 0 && (
+                  <div className="text-2xl font-mono font-bold" data-testid="text-balance">${data?.user?.balance || "0.00"}</div>
+                  {data?.user?.cashRank && data?.user.cashRank > 0 && (
                     <button
                       onClick={() => setLocation("/leaderboards#cashBalance")}
                       className="inline-flex items-center gap-1 border border-border px-2 py-0.5 rounded-md text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
                       data-testid="badge-cash-rank"
-                      aria-label={`Cash balance rank #${data.user.cashRank}, click to view leaderboard`}
+                      aria-label={`Cash balance rank #${data?.user.cashRank}, click to view leaderboard`}
                     >
-                      #{data.user.cashRank}
-                      {data.user.cashRankChange !== null && data.user.cashRankChange !== 0 && (
-                        <span className={data.user.cashRankChange > 0 ? "text-positive" : "text-negative"}>
-                          {data.user.cashRankChange > 0 ? (
+                      #{data?.user.cashRank}
+                      {data?.user.cashRankChange !== null && data?.user.cashRankChange !== 0 && (
+                        <span className={data?.user.cashRankChange > 0 ? "text-positive" : "text-negative"}>
+                          {data?.user.cashRankChange > 0 ? (
                             <TrendingUp className="w-3 h-3 inline" />
                           ) : (
                             <TrendingDown className="w-3 h-3 inline" />
@@ -522,17 +522,17 @@ export default function Dashboard() {
               <div className="text-right">
                 <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Portfolio Value</div>
                 <div className="flex items-center gap-2 justify-end">
-                  {data.user.portfolioRank && data.user.portfolioRank > 0 && (
+                  {data?.user?.portfolioRank && data?.user.portfolioRank > 0 && (
                     <button
                       onClick={() => setLocation("/leaderboards#portfolioValue")}
                       className="inline-flex items-center gap-1 border border-border px-2 py-0.5 rounded-md text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
                       data-testid="badge-portfolio-rank"
-                      aria-label={`Portfolio value rank #${data.user.portfolioRank}, click to view leaderboard`}
+                      aria-label={`Portfolio value rank #${data?.user.portfolioRank}, click to view leaderboard`}
                     >
-                      #{data.user.portfolioRank}
-                      {data.user.portfolioRankChange !== null && data.user.portfolioRankChange !== 0 && (
-                        <span className={data.user.portfolioRankChange > 0 ? "text-positive" : "text-negative"}>
-                          {data.user.portfolioRankChange > 0 ? (
+                      #{data?.user.portfolioRank}
+                      {data?.user.portfolioRankChange !== null && data?.user.portfolioRankChange !== 0 && (
+                        <span className={data?.user.portfolioRankChange > 0 ? "text-positive" : "text-negative"}>
+                          {data?.user.portfolioRankChange > 0 ? (
                             <TrendingUp className="w-3 h-3 inline" />
                           ) : (
                             <TrendingDown className="w-3 h-3 inline" />
@@ -541,7 +541,7 @@ export default function Dashboard() {
                       )}
                     </button>
                   )}
-                  <div className="text-2xl font-mono font-bold" data-testid="text-portfolio-value">${data.user.portfolioValue || "0.00"}</div>
+                  <div className="text-2xl font-mono font-bold" data-testid="text-portfolio-value">${data?.user?.portfolioValue || "0.00"}</div>
                 </div>
               </div>
             </div>
