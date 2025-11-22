@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { TrendingUp, TrendingDown, DollarSign, Crown, Pickaxe, ShoppingCart, Trophy, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
@@ -65,9 +66,21 @@ export default function Portfolio() {
   const { subscribe } = useWebSocket();
   const { clearUnread } = useNotifications();
   const [activeTab, setActiveTab] = useState("holdings");
+  const [chartTimeRange, setChartTimeRange] = useState("1M");
 
   const { data, isLoading } = useQuery<PortfolioData>({
     queryKey: ["/api/portfolio"],
+  });
+
+  const { data: chartData } = useQuery<{ history: Array<{ date: string; cashBalance: number; portfolioValue: number; netWorth: number }>; timeRange: string }>({
+    queryKey: ["/api/user/portfolio-history", chartTimeRange],
+    queryFn: async () => {
+      const res = await fetch(`/api/user/portfolio-history?timeRange=${chartTimeRange}`, {
+        credentials: 'include'
+      });
+      if (!res.ok) throw new Error('Failed to fetch portfolio history');
+      return res.json();
+    },
   });
 
   // Clear notifications when viewing Activity tab
@@ -207,6 +220,74 @@ export default function Portfolio() {
             </div>
           </div>
         </div>
+
+        {/* Portfolio Value Chart */}
+        <Card className="mb-4 sm:mb-4">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium uppercase tracking-wide">Portfolio Value</CardTitle>
+            <div className="flex gap-1">
+              {["1D", "7D", "1M", "1Y", "ALL"].map((range) => (
+                <Button
+                  key={range}
+                  variant={chartTimeRange === range ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setChartTimeRange(range)}
+                  className="h-7 px-2 text-xs"
+                  data-testid={`button-chart-${range.toLowerCase()}`}
+                >
+                  {range}
+                </Button>
+              ))}
+            </div>
+          </CardHeader>
+          <CardContent className="pt-2">
+            {chartData && chartData.history.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={chartData.history}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={10}
+                    tickFormatter={(value) => {
+                      const date = new Date(value);
+                      return `${date.getMonth() + 1}/${date.getDate()}`;
+                    }}
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))"
+                    fontSize={10}
+                    tickFormatter={(value) => `$${value.toFixed(0)}`}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px',
+                      fontSize: '12px'
+                    }}
+                    formatter={(value: any) => [`$${parseFloat(value).toFixed(2)}`, 'Portfolio Value']}
+                    labelFormatter={(value) => {
+                      const date = new Date(value);
+                      return date.toLocaleDateString();
+                    }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="portfolioValue" 
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[200px] flex items-center justify-center text-sm text-muted-foreground" data-testid="text-no-chart-data">
+                No historical data available yet. Portfolio snapshots are created daily.
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-3">
           <TabsList>

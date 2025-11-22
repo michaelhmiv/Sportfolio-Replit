@@ -17,6 +17,7 @@ import {
   dailyGames,
   jobExecutionLogs,
   blogPosts,
+  portfolioSnapshots,
   type User,
   type InsertUser,
   type UpsertUser,
@@ -46,6 +47,8 @@ import {
   type InsertPlayerGameStats,
   type BlogPost,
   type InsertBlogPost,
+  type PortfolioSnapshot,
+  type InsertPortfolioSnapshot,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, or, gte, lte, isNotNull, count } from "drizzle-orm";
@@ -204,6 +207,13 @@ export interface IStorage {
   createBlogPost(post: InsertBlogPost): Promise<BlogPost>;
   updateBlogPost(id: string, updates: Partial<BlogPost>): Promise<BlogPost | undefined>;
   deleteBlogPost(id: string): Promise<void>;
+  
+  // Portfolio snapshot methods
+  getAllUsersForRanking(): Promise<Array<{ userId: string; balance: string; portfolioValue: number }>>;
+  getPortfolioSnapshot(userId: string, date: Date): Promise<PortfolioSnapshot | undefined>;
+  getLatestSnapshotRanks(): Promise<Map<string, { cashRank: number; portfolioRank: number }>>;
+  getPortfolioSnapshotsInRange(userId: string, startDate: Date, endDate: Date): Promise<PortfolioSnapshot[]>;
+  createPortfolioSnapshot(snapshot: InsertPortfolioSnapshot): Promise<PortfolioSnapshot>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1913,6 +1923,116 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBlogPost(id: string): Promise<void> {
     await db.delete(blogPosts).where(eq(blogPosts.id, id));
+  }
+
+  // Portfolio snapshot methods
+  async getAllUsersForRanking(): Promise<Array<{ userId: string; balance: string; portfolioValue: number }>> {
+    // Optimized: Single SQL query with JOIN and aggregation instead of N+1 queries
+    const result = await db
+      .select({
+        userId: users.id,
+        balance: users.balance,
+        portfolioValue: sql<string>`
+          COALESCE(
+            SUM(
+              CASE 
+                WHEN ${holdings.assetType} = 'player' AND ${players.lastTradePrice} IS NOT NULL
+                THEN COALESCE(${holdings.quantity}, 0) * COALESCE(${players.lastTradePrice}::numeric, 0)
+                ELSE 0
+              END
+            ),
+            0
+          )
+        `.as('portfolio_value')
+      })
+      .from(users)
+      .leftJoin(holdings, eq(users.id, holdings.userId))
+      .leftJoin(
+        players,
+        and(
+          eq(holdings.assetType, sql`'player'`),
+          eq(holdings.assetId, players.id)
+        )
+      )
+      .groupBy(users.id, users.balance);
+    
+    return result.map(row => ({
+      userId: row.userId,
+      balance: row.balance,
+      portfolioValue: parseFloat(row.portfolioValue || "0"),
+    }));
+  }
+
+  async getPortfolioSnapshot(userId: string, date: Date): Promise<PortfolioSnapshot | undefined> {
+    // Normalize to start of day to handle timezone differences
+    const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
+    
+    const [snapshot] = await db
+      .select()
+      .from(portfolioSnapshots)
+      .where(
+        and(
+          eq(portfolioSnapshots.userId, userId),
+          gte(portfolioSnapshots.snapshotDate, startOfDay),
+          lte(portfolioSnapshots.snapshotDate, endOfDay)
+        )
+      )
+      .orderBy(desc(portfolioSnapshots.snapshotDate))
+      .limit(1);
+    return snapshot || undefined;
+  }
+
+  async getLatestSnapshotRanks(): Promise<Map<string, { cashRank: number; portfolioRank: number }>> {
+    // Get the most recent snapshot date
+    const [latestSnapshot] = await db
+      .select({ date: portfolioSnapshots.snapshotDate })
+      .from(portfolioSnapshots)
+      .orderBy(desc(portfolioSnapshots.snapshotDate))
+      .limit(1);
+    
+    if (!latestSnapshot) {
+      return new Map();
+    }
+    
+    // Get all snapshots from that date
+    const snapshots = await db
+      .select()
+      .from(portfolioSnapshots)
+      .where(eq(portfolioSnapshots.snapshotDate, latestSnapshot.date));
+    
+    const rankMap = new Map();
+    for (const snapshot of snapshots) {
+      rankMap.set(snapshot.userId, {
+        cashRank: snapshot.cashRank,
+        portfolioRank: snapshot.portfolioRank,
+      });
+    }
+    
+    return rankMap;
+  }
+
+  async getPortfolioSnapshotsInRange(userId: string, startDate: Date, endDate: Date): Promise<PortfolioSnapshot[]> {
+    const snapshots = await db
+      .select()
+      .from(portfolioSnapshots)
+      .where(
+        and(
+          eq(portfolioSnapshots.userId, userId),
+          gte(portfolioSnapshots.snapshotDate, startDate),
+          lte(portfolioSnapshots.snapshotDate, endDate)
+        )
+      )
+      .orderBy(asc(portfolioSnapshots.snapshotDate));
+    return snapshots;
+  }
+
+  async createPortfolioSnapshot(snapshot: InsertPortfolioSnapshot): Promise<PortfolioSnapshot> {
+    const [created] = await db
+      .insert(portfolioSnapshots)
+      .values(snapshot)
+      .returning();
+    return created;
   }
 }
 

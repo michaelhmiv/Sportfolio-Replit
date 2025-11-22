@@ -314,17 +314,42 @@ export const blogPosts = pgTable("blog_posts", {
   authorIdx: index("blog_author_idx").on(table.authorId),
 }));
 
+// Portfolio snapshots table - daily snapshots of user portfolio metrics for historical tracking and rank changes
+export const portfolioSnapshots = pgTable("portfolio_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  snapshotDate: timestamp("snapshot_date").notNull(), // Date this snapshot was taken (UTC midnight)
+  cashBalance: decimal("cash_balance", { precision: 20, scale: 2 }).notNull(),
+  portfolioValue: decimal("portfolio_value", { precision: 20, scale: 2 }).notNull(),
+  totalNetWorth: decimal("total_net_worth", { precision: 20, scale: 2 }).notNull(), // cashBalance + portfolioValue
+  cashRank: integer("cash_rank"), // User's rank on cash balance leaderboard
+  portfolioRank: integer("portfolio_rank"), // User's rank on portfolio value leaderboard
+  netWorthRank: integer("net_worth_rank"), // User's rank on total net worth leaderboard
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userDateIdx: index("portfolio_snapshots_user_date_idx").on(table.userId, table.snapshotDate),
+  dateIdx: index("portfolio_snapshots_date_idx").on(table.snapshotDate),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   holdings: many(holdings),
   orders: many(orders),
   contestEntries: many(contestEntries),
   blogPosts: many(blogPosts),
+  portfolioSnapshots: many(portfolioSnapshots),
 }));
 
 export const blogPostsRelations = relations(blogPosts, ({ one }) => ({
   author: one(users, {
     fields: [blogPosts.authorId],
+    references: [users.id],
+  }),
+}));
+
+export const portfolioSnapshotsRelations = relations(portfolioSnapshots, ({ one }) => ({
+  user: one(users, {
+    fields: [portfolioSnapshots.userId],
     references: [users.id],
   }),
 }));
@@ -500,3 +525,11 @@ export const insertBlogPostSchema = createInsertSchema(blogPosts).omit({
 
 export type BlogPost = typeof blogPosts.$inferSelect;
 export type InsertBlogPost = z.infer<typeof insertBlogPostSchema>;
+
+export const insertPortfolioSnapshotSchema = createInsertSchema(portfolioSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type PortfolioSnapshot = typeof portfolioSnapshots.$inferSelect;
+export type InsertPortfolioSnapshot = z.infer<typeof insertPortfolioSnapshotSchema>;

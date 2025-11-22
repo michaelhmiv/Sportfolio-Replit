@@ -26,6 +26,10 @@ interface DashboardData {
   user: {
     balance: string;
     portfolioValue: string;
+    cashRank: number;
+    portfolioRank: number;
+    cashRankChange: number | null;
+    portfolioRankChange: number | null;
   };
   hotPlayers: Player[];
   mining: Mining & { 
@@ -459,14 +463,46 @@ export default function Dashboard() {
         <div className="p-3 sm:p-4 max-w-full overflow-x-hidden">
         {/* Balance Header */}
         <div className="mb-4 sm:mb-4">
-          <div className="flex flex-row gap-2 sm:gap-3">
+          <div className="flex flex-row justify-between gap-3">
             <div>
               <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Cash Balance</div>
-              <div className="text-2xl font-mono font-bold" data-testid="text-balance">${data?.user.balance || "0.00"}</div>
+              <div className="flex items-center gap-2">
+                <div className="text-2xl font-mono font-bold" data-testid="text-balance">${data?.user.balance || "0.00"}</div>
+                {data?.user.cashRank && data.user.cashRank > 0 && (
+                  <Badge variant="outline" className="text-xs gap-1" data-testid="badge-cash-rank">
+                    #{data.user.cashRank}
+                    {data.user.cashRankChange !== null && data.user.cashRankChange !== 0 && (
+                      <span className={data.user.cashRankChange > 0 ? "text-positive" : "text-negative"}>
+                        {data.user.cashRankChange > 0 ? (
+                          <TrendingUp className="w-3 h-3 inline" />
+                        ) : (
+                          <TrendingDown className="w-3 h-3 inline" />
+                        )}
+                      </span>
+                    )}
+                  </Badge>
+                )}
+              </div>
             </div>
-            <div>
+            <div className="text-right">
               <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Portfolio Value</div>
-              <div className="text-2xl font-mono font-bold" data-testid="text-portfolio-value">${data?.user.portfolioValue || "0.00"}</div>
+              <div className="flex items-center gap-2 justify-end">
+                {data?.user.portfolioRank && data.user.portfolioRank > 0 && (
+                  <Badge variant="outline" className="text-xs gap-1" data-testid="badge-portfolio-rank">
+                    #{data.user.portfolioRank}
+                    {data.user.portfolioRankChange !== null && data.user.portfolioRankChange !== 0 && (
+                      <span className={data.user.portfolioRankChange > 0 ? "text-positive" : "text-negative"}>
+                        {data.user.portfolioRankChange > 0 ? (
+                          <TrendingUp className="w-3 h-3 inline" />
+                        ) : (
+                          <TrendingDown className="w-3 h-3 inline" />
+                        )}
+                      </span>
+                    )}
+                  </Badge>
+                )}
+                <div className="text-2xl font-mono font-bold" data-testid="text-portfolio-value">${data?.user.portfolioValue || "0.00"}</div>
+              </div>
             </div>
           </div>
         </div>

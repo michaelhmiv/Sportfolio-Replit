@@ -375,10 +375,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
         miningPlayer = playerMap.get(miningData.playerId);
       }
 
+      // Try to get ranks from latest snapshot for performance
+      const latestRanks = await storage.getLatestSnapshotRanks();
+      const cachedRank = latestRanks.get(user.id);
+      
+      let currentCashRank = cachedRank?.cashRank || 1;
+      let currentPortfolioRank = cachedRank?.portfolioRank || 1;
+      
+      // If no cached ranks, fallback to real-time calculation
+      if (!cachedRank) {
+        const allUsersRankData = await storage.getAllUsersForRanking();
+        
+        const cashSorted = [...allUsersRankData].sort((a, b) => 
+          parseFloat(b.balance) - parseFloat(a.balance)
+        );
+        currentCashRank = cashSorted.findIndex(u => u.userId === user.id) + 1;
+        
+        const portfolioSorted = [...allUsersRankData].sort((a, b) => 
+          b.portfolioValue - a.portfolioValue
+        );
+        currentPortfolioRank = portfolioSorted.findIndex(u => u.userId === user.id) + 1;
+      }
+      
+      // Get yesterday's snapshot to calculate rank changes
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const yesterdaySnapshot = await storage.getPortfolioSnapshot(user.id, yesterday);
+      
+      const cashRankChange = yesterdaySnapshot?.cashRank 
+        ? yesterdaySnapshot.cashRank - currentCashRank 
+        : null;
+      const portfolioRankChange = yesterdaySnapshot?.portfolioRank 
+        ? yesterdaySnapshot.portfolioRank - currentPortfolioRank 
+        : null;
+
       res.json({
         user: {
           balance: user.balance,
           portfolioValue: portfolioValue.toFixed(2),
+          cashRank: currentCashRank,
+          portfolioRank: currentPortfolioRank,
+          cashRankChange,
+          portfolioRankChange,
         },
         hotPlayers,
         mining: miningData ? {
@@ -2481,6 +2520,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ success: true });
     } catch (error: any) {
       console.error("[admin/blog] Error deleting post:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Portfolio history with time range support
+  app.get("/api/user/portfolio-history", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const timeRange = (req.query.timeRange as string) || "1M";
+      
+      // Calculate date range based on timeRange parameter
+      const now = new Date();
+      let startDate = new Date();
+      
+      switch (timeRange) {
+        case "1D":
+          startDate.setDate(now.getDate() - 1);
+          break;
+        case "7D":
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case "1M":
+          startDate.setMonth(now.getMonth() - 1);
+          break;
+        case "1Y":
+          startDate.setFullYear(now.getFullYear() - 1);
+          break;
+        case "ALL":
+          // Set to a very early date to get all snapshots
+          startDate = new Date(2020, 0, 1);
+          break;
+        default:
+          return res.status(400).json({ error: "Invalid timeRange. Use: 1D, 7D, 1M, 1Y, or ALL" });
+      }
+      
+      // Query snapshots from the database
+      const snapshots = await storage.getPortfolioSnapshotsInRange(userId, startDate, now);
+      
+      // Transform snapshots into chart-friendly format with ISO string dates
+      const history = snapshots.map(snapshot => ({
+        date: snapshot.snapshotDate.toISOString(),
+        cashBalance: parseFloat(snapshot.cashBalance),
+        portfolioValue: parseFloat(snapshot.portfolioValue),
+        netWorth: parseFloat(snapshot.totalNetWorth),
+        cashRank: snapshot.cashRank,
+        portfolioRank: snapshot.portfolioRank,
+      }));
+      
+      res.json({ history, timeRange });
+    } catch (error: any) {
+      console.error("[portfolio-history] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });

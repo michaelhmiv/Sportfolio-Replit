@@ -15,6 +15,7 @@ import { syncPlayerGameLogs } from "./sync-player-game-logs";
 import { settleContests } from "./settle-contests";
 import { createContests } from "./create-contests";
 import { updateContestStatuses } from "./update-contest-statuses";
+import { dailySnapshot } from "./daily-snapshot";
 import type { ProgressCallback } from "../lib/admin-stream";
 
 export interface JobResult {
@@ -95,6 +96,12 @@ export class JobScheduler {
         schedule: "0 0 * * *", // Daily at midnight - create contests for upcoming games
         enabled: true,
         handler: createContests,
+      },
+      {
+        name: "daily_snapshot",
+        schedule: "0 1 * * *", // Daily at 1:00 AM ET - after contests are created
+        enabled: true,
+        handler: dailySnapshot,
       },
     ];
 
@@ -197,6 +204,7 @@ export class JobScheduler {
       create_contests: (callback) => createContests(callback),
       update_contest_statuses: (callback) => updateContestStatuses(callback),
       settle_contests: (callback) => settleContests(callback),
+      daily_snapshot: (callback) => dailySnapshot(callback),
     };
 
     const handler = jobConfigs[jobName];
