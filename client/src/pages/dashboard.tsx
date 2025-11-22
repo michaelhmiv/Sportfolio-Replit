@@ -11,11 +11,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar, Search, ChevronDown, BarChart3, ChevronLeft, ChevronRight, ExternalLink, ArrowUpDown } from "lucide-react";
+import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar, Search, ChevronDown, BarChart3, ChevronLeft, ChevronRight, ExternalLink, ArrowUpDown, LogIn } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { Player, Mining, Contest, Trade, DailyGame } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { calculateMiningShares } from "@shared/mining-utils";
 import { MarketActivityWidget } from "@/components/market-activity-widget";
@@ -30,14 +31,14 @@ interface DashboardData {
     portfolioRank: number;
     cashRankChange: number | null;
     portfolioRankChange: number | null;
-  };
+  } | null; // Null for non-authenticated users
   hotPlayers: Player[];
-  mining: Mining & { 
+  mining: (Mining & { 
     player?: Player; 
     players?: Array<{ player: Player | undefined; sharesPerHour: number }>;
     capLimit: number; 
     sharesPerHour: number; 
-  };
+  }) | null; // Null for non-authenticated users
   contests: Contest[];
   recentTrades: (Trade & { player: Player })[];
   portfolioHistory: { date: string; value: number }[];
@@ -76,6 +77,7 @@ const getEffectiveGameStatus = (game: DailyGame): string => {
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
   const [showPlayerSelection, setShowPlayerSelection] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -432,6 +434,32 @@ export default function Dashboard() {
   return (
     <>
       <div className="min-h-screen bg-background overflow-x-hidden max-w-full">
+        {/* Login Banner for Non-Authenticated Users */}
+        {!isAuthenticated && (
+          <div className="bg-primary text-primary-foreground border-b border-primary/20">
+            <div className="container mx-auto px-4 py-3 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2 text-sm sm:text-base">
+                <LogIn className="w-4 h-4 flex-shrink-0" />
+                <span className="font-medium">
+                  See live NBA trading in action. <span className="hidden sm:inline">Sign in to start trading, mining, and competing.</span>
+                </span>
+              </div>
+              <Button 
+                variant="secondary" 
+                size="sm" 
+                asChild 
+                className="flex-shrink-0"
+                data-testid="button-banner-login"
+              >
+                <a href="/api/login" className="flex items-center gap-2">
+                  Sign In
+                  <LogIn className="w-3 h-3" />
+                </a>
+              </Button>
+            </div>
+          </div>
+        )}
+        
         {/* Market Ticker */}
         <div className="border-b bg-card overflow-x-hidden">
         <div className="h-12 overflow-hidden relative">
@@ -462,61 +490,63 @@ export default function Dashboard() {
 
         {/* Main Dashboard Grid */}
         <div className="p-3 sm:p-4 max-w-full overflow-x-hidden">
-        {/* Balance Header */}
-        <div className="mb-4 sm:mb-4">
-          <div className="flex flex-row justify-between gap-3">
-            <div>
-              <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Cash Balance</div>
-              <div className="flex items-center gap-2">
-                <div className="text-2xl font-mono font-bold" data-testid="text-balance">${data?.user.balance || "0.00"}</div>
-                {data?.user.cashRank && data.user.cashRank > 0 && (
-                  <button
-                    onClick={() => setLocation("/leaderboards#cashBalance")}
-                    className="inline-flex items-center gap-1 border border-border px-2 py-0.5 rounded-md text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
-                    data-testid="badge-cash-rank"
-                    aria-label={`Cash balance rank #${data.user.cashRank}, click to view leaderboard`}
-                  >
-                    #{data.user.cashRank}
-                    {data.user.cashRankChange !== null && data.user.cashRankChange !== 0 && (
-                      <span className={data.user.cashRankChange > 0 ? "text-positive" : "text-negative"}>
-                        {data.user.cashRankChange > 0 ? (
-                          <TrendingUp className="w-3 h-3 inline" />
-                        ) : (
-                          <TrendingDown className="w-3 h-3 inline" />
-                        )}
-                      </span>
-                    )}
-                  </button>
-                )}
+        {/* Balance Header - Only show for authenticated users */}
+        {isAuthenticated && data?.user && (
+          <div className="mb-4 sm:mb-4">
+            <div className="flex flex-row justify-between gap-3">
+              <div>
+                <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Cash Balance</div>
+                <div className="flex items-center gap-2">
+                  <div className="text-2xl font-mono font-bold" data-testid="text-balance">${data.user.balance || "0.00"}</div>
+                  {data.user.cashRank && data.user.cashRank > 0 && (
+                    <button
+                      onClick={() => setLocation("/leaderboards#cashBalance")}
+                      className="inline-flex items-center gap-1 border border-border px-2 py-0.5 rounded-md text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
+                      data-testid="badge-cash-rank"
+                      aria-label={`Cash balance rank #${data.user.cashRank}, click to view leaderboard`}
+                    >
+                      #{data.user.cashRank}
+                      {data.user.cashRankChange !== null && data.user.cashRankChange !== 0 && (
+                        <span className={data.user.cashRankChange > 0 ? "text-positive" : "text-negative"}>
+                          {data.user.cashRankChange > 0 ? (
+                            <TrendingUp className="w-3 h-3 inline" />
+                          ) : (
+                            <TrendingDown className="w-3 h-3 inline" />
+                          )}
+                        </span>
+                      )}
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="text-right">
-              <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Portfolio Value</div>
-              <div className="flex items-center gap-2 justify-end">
-                {data?.user.portfolioRank && data.user.portfolioRank > 0 && (
-                  <button
-                    onClick={() => setLocation("/leaderboards#portfolioValue")}
-                    className="inline-flex items-center gap-1 border border-border px-2 py-0.5 rounded-md text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
-                    data-testid="badge-portfolio-rank"
-                    aria-label={`Portfolio value rank #${data.user.portfolioRank}, click to view leaderboard`}
-                  >
-                    #{data.user.portfolioRank}
-                    {data.user.portfolioRankChange !== null && data.user.portfolioRankChange !== 0 && (
-                      <span className={data.user.portfolioRankChange > 0 ? "text-positive" : "text-negative"}>
-                        {data.user.portfolioRankChange > 0 ? (
-                          <TrendingUp className="w-3 h-3 inline" />
-                        ) : (
-                          <TrendingDown className="w-3 h-3 inline" />
-                        )}
-                      </span>
-                    )}
-                  </button>
-                )}
-                <div className="text-2xl font-mono font-bold" data-testid="text-portfolio-value">${data?.user.portfolioValue || "0.00"}</div>
+              <div className="text-right">
+                <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Portfolio Value</div>
+                <div className="flex items-center gap-2 justify-end">
+                  {data.user.portfolioRank && data.user.portfolioRank > 0 && (
+                    <button
+                      onClick={() => setLocation("/leaderboards#portfolioValue")}
+                      className="inline-flex items-center gap-1 border border-border px-2 py-0.5 rounded-md text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
+                      data-testid="badge-portfolio-rank"
+                      aria-label={`Portfolio value rank #${data.user.portfolioRank}, click to view leaderboard`}
+                    >
+                      #{data.user.portfolioRank}
+                      {data.user.portfolioRankChange !== null && data.user.portfolioRankChange !== 0 && (
+                        <span className={data.user.portfolioRankChange > 0 ? "text-positive" : "text-negative"}>
+                          {data.user.portfolioRankChange > 0 ? (
+                            <TrendingUp className="w-3 h-3 inline" />
+                          ) : (
+                            <TrendingDown className="w-3 h-3 inline" />
+                          )}
+                        </span>
+                      )}
+                    </button>
+                  )}
+                  <div className="text-2xl font-mono font-bold" data-testid="text-portfolio-value">${data.user.portfolioValue || "0.00"}</div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Games */}
         {todayGames && todayGames.length > 0 && (
@@ -719,112 +749,132 @@ export default function Dashboard() {
               <Clock className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="space-y-3 sm:space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">Rate: {data?.mining?.sharesPerHour || 100} sh/hr</span>
-                  <span className="text-xs text-muted-foreground font-mono">
-                    {projectedShares} / {data?.mining?.capLimit || 2400}
-                  </span>
+              {!isAuthenticated ? (
+                <div className="text-center py-6">
+                  <Pickaxe className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground mb-4">Generate shares automatically over time</p>
+                  <Button 
+                    className="w-full" 
+                    size="lg"
+                    asChild
+                    data-testid="button-login-mining"
+                  >
+                    <a href="/api/login" className="flex items-center justify-center gap-2">
+                      <LogIn className="w-4 h-4" />
+                      Sign In to Start Mining
+                    </a>
+                  </Button>
                 </div>
-                <Progress 
-                  value={(projectedShares / (data?.mining?.capLimit || 2400)) * 100} 
-                  className={`h-2 transition-all ${
-                    data?.mining?.player && projectedShares < (data?.mining?.capLimit || 2400)
-                      ? 'animate-pulse shadow-[0_0_8px_hsl(var(--primary)_/_0.4)]'
-                      : ''
-                  }`}
-                  data-testid="progress-mining"
-                />
-              </div>
-              
-              {data?.mining?.players && data.mining.players.length > 0 ? (
+              ) : (
                 <>
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                    {data.mining.players.map((entry, idx) => entry.player && (
-                      <div key={entry.player.id} className="flex items-center gap-2 p-1.5 rounded-md bg-muted text-xs">
-                        <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                          <span className="text-[10px] font-bold">{entry.player.firstName[0]}{entry.player.lastName[0]}</span>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Rate: {data?.mining?.sharesPerHour || 100} sh/hr</span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {projectedShares} / {data?.mining?.capLimit || 2400}
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(projectedShares / (data?.mining?.capLimit || 2400)) * 100} 
+                      className={`h-2 transition-all ${
+                        data?.mining?.player && projectedShares < (data?.mining?.capLimit || 2400)
+                          ? 'animate-pulse shadow-[0_0_8px_hsl(var(--primary)_/_0.4)]'
+                          : ''
+                      }`}
+                      data-testid="progress-mining"
+                    />
+                  </div>
+                  
+                  {data?.mining?.players && data.mining.players.length > 0 ? (
+                    <>
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                        {data.mining.players.map((entry, idx) => entry.player && (
+                          <div key={entry.player.id} className="flex items-center gap-2 p-1.5 rounded-md bg-muted text-xs">
+                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <span className="text-[10px] font-bold">{entry.player.firstName[0]}{entry.player.lastName[0]}</span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-medium truncate">
+                                <PlayerName 
+                                  playerId={entry.player.id} 
+                                  firstName={entry.player.firstName} 
+                                  lastName={entry.player.lastName}
+                                  className="text-xs"
+                                />
+                              </div>
+                              <div className="text-[10px] text-muted-foreground">{entry.sharesPerHour} sh/hr</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setShowPlayerSelection(true)}
+                          data-testid="button-change-mining-players"
+                          className="flex-1"
+                        >
+                          Change
+                        </Button>
+                        <Button 
+                          className="flex-1" 
+                          size="sm"
+                          disabled={!projectedShares || claimMiningMutation.isPending}
+                          onClick={() => claimMiningMutation.mutate()}
+                          data-testid="button-claim-mining"
+                        >
+                          {claimMiningMutation.isPending ? "Claiming..." : `Claim ${projectedShares}`}
+                        </Button>
+                      </div>
+                    </>
+                  ) : data?.mining?.player ? (
+                    <>
+                      <div className="flex items-center gap-2 p-2 rounded-md bg-muted">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                          <span className="text-xs font-bold">{data.mining.player.firstName[0]}{data.mining.player.lastName[0]}</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <div className="font-medium truncate">
-                            <PlayerName 
-                              playerId={entry.player.id} 
-                              firstName={entry.player.firstName} 
-                              lastName={entry.player.lastName}
-                              className="text-xs"
-                            />
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">{entry.sharesPerHour} sh/hr</div>
+                          <div className="text-sm font-medium truncate">{data.mining.player.firstName} {data.mining.player.lastName}</div>
+                          <div className="text-xs text-muted-foreground">{data.mining.player.team} · {data.mining.player.position}</div>
                         </div>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setShowPlayerSelection(true)}
+                          data-testid="button-change-mining-player"
+                          className="flex-shrink-0"
+                        >
+                          Change
+                        </Button>
                       </div>
-                    ))}
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => setShowPlayerSelection(true)}
-                      data-testid="button-change-mining-players"
-                      className="flex-1"
-                    >
-                      Change
-                    </Button>
-                    <Button 
-                      className="flex-1" 
-                      size="sm"
-                      disabled={!projectedShares || claimMiningMutation.isPending}
-                      onClick={() => claimMiningMutation.mutate()}
-                      data-testid="button-claim-mining"
-                    >
-                      {claimMiningMutation.isPending ? "Claiming..." : `Claim ${projectedShares}`}
-                    </Button>
-                  </div>
-                </>
-              ) : data?.mining?.player ? (
-                <>
-                  <div className="flex items-center gap-2 p-2 rounded-md bg-muted">
-                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                      <span className="text-xs font-bold">{data.mining.player.firstName[0]}{data.mining.player.lastName[0]}</span>
+                      
+                      <Button 
+                        className="w-full" 
+                        size="lg"
+                        disabled={!projectedShares || claimMiningMutation.isPending}
+                        onClick={() => claimMiningMutation.mutate()}
+                        data-testid="button-claim-mining"
+                      >
+                        {claimMiningMutation.isPending ? "Claiming..." : `Claim ${projectedShares} Shares`}
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="text-center py-4">
+                      <Pickaxe className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground mb-4">No player selected for mining</p>
+                      <Button 
+                        className="w-full" 
+                        size="lg"
+                        onClick={() => setShowPlayerSelection(true)}
+                        data-testid="button-select-mining-player"
+                      >
+                        Select Player to Mine
+                      </Button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-sm font-medium truncate">{data.mining.player.firstName} {data.mining.player.lastName}</div>
-                      <div className="text-xs text-muted-foreground">{data.mining.player.team} · {data.mining.player.position}</div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setShowPlayerSelection(true)}
-                      data-testid="button-change-mining-player"
-                      className="flex-shrink-0"
-                    >
-                      Change
-                    </Button>
-                  </div>
-                  
-                  <Button 
-                    className="w-full" 
-                    size="lg"
-                    disabled={!projectedShares || claimMiningMutation.isPending}
-                    onClick={() => claimMiningMutation.mutate()}
-                    data-testid="button-claim-mining"
-                  >
-                    {claimMiningMutation.isPending ? "Claiming..." : `Claim ${projectedShares} Shares`}
-                  </Button>
+                  )}
                 </>
-              ) : (
-                <div className="text-center py-4">
-                  <Pickaxe className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mb-4">No player selected for mining</p>
-                  <Button 
-                    className="w-full" 
-                    size="lg"
-                    onClick={() => setShowPlayerSelection(true)}
-                    data-testid="button-select-mining-player"
-                  >
-                    Select Player to Mine
-                  </Button>
-                </div>
               )}
             </CardContent>
           </Card>
@@ -854,52 +904,63 @@ export default function Dashboard() {
                   <div className="text-xs text-muted-foreground">{contest.totalSharesEntered} shares entered</div>
                 </div>
               ))}
-              <Link href="/contests">
-                <Button variant="outline" className="w-full" data-testid="button-view-contests">
-                  View All Contests
+              {!isAuthenticated ? (
+                <Button className="w-full" asChild data-testid="button-login-contests">
+                  <a href="/api/login" className="flex items-center justify-center gap-2">
+                    <LogIn className="w-4 h-4" />
+                    Sign In to Enter
+                  </a>
                 </Button>
-              </Link>
+              ) : (
+                <Link href="/contests">
+                  <Button variant="outline" className="w-full" data-testid="button-view-contests">
+                    View All Contests
+                  </Button>
+                </Link>
+              )}
             </CardContent>
           </Card>
 
-          {/* Portfolio Summary */}
-          <Card className="lg:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium uppercase tracking-wide">Top Holdings</CardTitle>
-              <DollarSign className="w-4 h-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="space-y-2 sm:space-y-3">
-              {data?.topHoldings?.slice(0, 3).map((holding) => (
-                <Link key={holding.player.id} href={`/player/${holding.player.id}`}>
-                  <div className="p-2 rounded-md hover-elevate">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-medium text-sm">{holding.player.firstName} {holding.player.lastName}</span>
-                      {holding.value !== null ? (
-                        <span className="font-mono font-bold text-sm">${holding.value}</span>
-                      ) : (
-                        <span className="text-muted-foreground text-xs">No value</span>
-                      )}
+          {/* Portfolio Summary - Only show for authenticated users */}
+          {isAuthenticated && data?.topHoldings && data.topHoldings.length > 0 && (
+            <Card className="lg:col-span-1">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium uppercase tracking-wide">Top Holdings</CardTitle>
+                <DollarSign className="w-4 h-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent className="space-y-2 sm:space-y-3">
+                {data.topHoldings.slice(0, 3).map((holding) => (
+                  <Link key={holding.player.id} href={`/player/${holding.player.id}`}>
+                    <div className="p-2 rounded-md hover-elevate">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-medium text-sm">{holding.player.firstName} {holding.player.lastName}</span>
+                        {holding.value !== null ? (
+                          <span className="font-mono font-bold text-sm">${holding.value}</span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">No value</span>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">{holding.quantity} shares</span>
+                        {holding.pnl !== null ? (
+                          <span className={parseFloat(holding.pnl) >= 0 ? 'text-positive' : 'text-negative'}>
+                            {parseFloat(holding.pnl) >= 0 ? '+' : ''}${holding.pnl} ({holding.pnlPercent}%)
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">{holding.quantity} shares</span>
-                      {holding.pnl !== null ? (
-                        <span className={parseFloat(holding.pnl) >= 0 ? 'text-positive' : 'text-negative'}>
-                          {parseFloat(holding.pnl) >= 0 ? '+' : ''}${holding.pnl} ({holding.pnlPercent}%)
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </div>
-                  </div>
+                  </Link>
+                ))}
+                <Link href="/portfolio">
+                  <Button variant="outline" className="w-full" data-testid="button-view-portfolio">
+                    View Full Portfolio
+                  </Button>
                 </Link>
-              ))}
-              <Link href="/portfolio">
-                <Button variant="outline" className="w-full" data-testid="button-view-portfolio">
-                  View Full Portfolio
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
       </div>
