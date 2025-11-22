@@ -100,12 +100,16 @@ export default function Dashboard() {
     return () => clearTimeout(timer);
   }, [searchTerm]);
   
-  const { data, isLoading, isError, error, refetch } = useQuery<DashboardData>({
+  const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
     queryFn: async () => {
-      // Add 10-second timeout to prevent infinite loading
+      // Add 10-second timeout to prevent infinite loading + debug logging
+      console.log('[DASHBOARD] Starting fetch...');
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => {
+        console.log('[DASHBOARD] Request timed out after 10s');
+        controller.abort();
+      }, 10000);
       
       try {
         const res = await fetch("/api/dashboard", {
@@ -113,24 +117,25 @@ export default function Dashboard() {
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
+        console.log('[DASHBOARD] Fetch completed:', res.status);
         
         if (!res.ok) {
           throw new Error(`${res.status}: ${res.statusText}`);
         }
         
-        return await res.json();
+        const data = await res.json();
+        console.log('[DASHBOARD] Data received:', Object.keys(data));
+        return data;
       } catch (err) {
         clearTimeout(timeoutId);
+        console.error('[DASHBOARD] Fetch error:', err);
         if (err instanceof Error && err.name === 'AbortError') {
           throw new Error('Dashboard request timed out after 10 seconds');
         }
         throw err;
       }
     },
-    refetchInterval: 10000, // Poll every 10 seconds to keep mining data fresh
-    retry: 2, // Retry failed requests twice
-    retryDelay: 1000, // Wait 1 second between retries
-    staleTime: 5000, // Consider data fresh for 5 seconds
+    refetchInterval: 10000,
   });
 
   // Real-time mining share projection
@@ -466,27 +471,6 @@ export default function Dashboard() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-muted-foreground">Loading...</div>
-      </div>
-    );
-  }
-
-  // Error state with retry button
-  if (isError) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen gap-4 p-4">
-        <div className="text-center max-w-md">
-          <h2 className="text-lg font-semibold mb-2">Unable to Load Dashboard</h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            We're having trouble connecting to the server. This might be a temporary issue.
-          </p>
-          <Button 
-            onClick={() => refetch()} 
-            variant="default"
-            data-testid="button-retry-dashboard"
-          >
-            Try Again
-          </Button>
-        </div>
       </div>
     );
   }
