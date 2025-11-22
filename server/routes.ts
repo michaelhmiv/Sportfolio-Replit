@@ -277,36 +277,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard - Now public for unauthenticated users (with limited data)
   app.get("/api/dashboard", optionalAuth, async (req, res) => {
     try {
-      console.log('[DASHBOARD API] Request received, auth:', !!req.user);
       // Check if user is authenticated
       const isUserAuthenticated = !!req.user;
       const userId = isUserAuthenticated ? getUserId(req) : null;
       
-      console.log('[DASHBOARD API] Fetching public data...');
       // Fetch public data (always available)
       const [allContests, recentTrades, hotPlayersRaw] = await Promise.all([
         storage.getContests("open"),
         storage.getRecentTrades(undefined, 10),
         storage.getTopPlayersByVolume(5), // Get top 5 players by 24h volume directly from DB
       ]);
-      console.log('[DASHBOARD API] Public data fetched - contests:', allContests.length, 'trades:', recentTrades.length, 'hotPlayers:', hotPlayersRaw.length);
       
       // If not authenticated, return public data only
       if (!isUserAuthenticated || !userId) {
-        console.log('[DASHBOARD API] Unauthenticated path - processing public data...');
         // Collect player IDs from public data
         const playerIds = new Set<string>();
         recentTrades.forEach(t => playerIds.add(t.playerId));
-        console.log('[DASHBOARD API] Fetching', playerIds.size, 'players...');
         
         // Batch fetch needed players
         const players = await storage.getPlayersByIds(Array.from(playerIds));
         const playerMap = new Map(players.map(p => [p.id, p]));
-        console.log('[DASHBOARD API] Players fetched, enriching hot players...');
         
         // Enrich hot players
         const hotPlayers = await Promise.all(hotPlayersRaw.map(enrichPlayerWithMarketValue));
-        console.log('[DASHBOARD API] Hot players enriched, sending response...');
         
         return res.json({
           user: null, // No user data for anonymous visitors

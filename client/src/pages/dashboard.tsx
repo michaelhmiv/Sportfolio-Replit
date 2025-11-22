@@ -103,11 +103,9 @@ export default function Dashboard() {
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
     queryFn: async () => {
-      // Add 10-second timeout to prevent infinite loading + debug logging
-      console.log('[DASHBOARD] Starting fetch...');
+      // Add 10-second timeout to prevent infinite loading
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        console.log('[DASHBOARD] Request timed out after 10s');
         controller.abort();
       }, 10000);
       
@@ -117,18 +115,15 @@ export default function Dashboard() {
           signal: controller.signal,
         });
         clearTimeout(timeoutId);
-        console.log('[DASHBOARD] Fetch completed:', res.status);
         
         if (!res.ok) {
           throw new Error(`${res.status}: ${res.statusText}`);
         }
         
         const data = await res.json();
-        console.log('[DASHBOARD] Data received:', Object.keys(data));
         return data;
       } catch (err) {
         clearTimeout(timeoutId);
-        console.error('[DASHBOARD] Fetch error:', err);
         if (err instanceof Error && err.name === 'AbortError') {
           throw new Error('Dashboard request timed out after 10 seconds');
         }
