@@ -31,6 +31,8 @@ The platform has been optimized to achieve sub-500ms response times for all majo
 ### Frontend
 The frontend uses React, TypeScript, Vite, Wouter for routing, and TanStack Query for server state management. Shadcn/ui (Radix UI, Tailwind CSS) provides components, following a custom design system inspired by Robinhood/Bloomberg with Inter typography. It features a sidebar navigation, real-time market ticker, card-based responsive layouts, a mining widget, and optimistic UI updates. Mobile experience is prioritized with bottom navigation.
 
+**Authentication & Public Access:** The `useAuth()` hook uses `getQueryFn({ on401: "returnNull" })` to gracefully handle unauthenticated sessions. When `/api/auth/user` returns 401, the hook returns `null` instead of throwing, preventing component crashes. This enables the dashboard to serve public content to unauthenticated visitors while maintaining full functionality for authenticated users. The dashboard, marketplace, and other public pages are accessible without sign-in.
+
 A centralized cache invalidation utility (`client/src/lib/cache-invalidation.ts`) ensures instant synchronization of portfolio data across all pages.
 A centralized WebSocket provider (`client/src/lib/websocket.tsx`) manages a single WebSocket connection for real-time updates across the application, with automatic reconnection and event broadcasting.
 
