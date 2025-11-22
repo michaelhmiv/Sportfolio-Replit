@@ -459,7 +459,6 @@ export default function Dashboard() {
         <div className="p-3 sm:p-4 max-w-full overflow-x-hidden">
         {/* Balance Header */}
         <div className="mb-4 sm:mb-4">
-          <h1 className="text-3xl font-bold mb-3">Dashboard</h1>
           <div className="flex flex-row gap-2 sm:gap-3">
             <div>
               <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Cash Balance</div>
