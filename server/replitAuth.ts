@@ -442,14 +442,17 @@ export const isAuthenticated: RequestHandler = async (req, res, next) => {
       
       req.user = mockUser;
       
-      // Ensure the dev user exists in the database
-      try {
-        await upsertUser(mockUser.claims);
-      } catch (error) {
-        console.error('[DEV_BYPASS] Failed to create dev user:', error);
+      // Only upsert user once per session using a session flag
+      // This prevents 200-400ms overhead on EVERY request
+      if (!(req.session as any).userHydrated) {
+        try {
+          await upsertUser(mockUser.claims);
+          (req.session as any).userHydrated = true;
+        } catch (error) {
+          console.error('[DEV_BYPASS] Failed to create dev user:', error);
+        }
+        console.log('[DEV_BYPASS] Dev mode auth bypass active - using mock user');
       }
-      
-      console.log('[DEV_BYPASS] Dev mode auth bypass active - using mock user');
     }
     return next();
   }
@@ -555,10 +558,15 @@ export const optionalAuth: RequestHandler = async (req, res, next) => {
     
     req.user = mockUser;
     
-    try {
-      await upsertUser(mockUser.claims);
-    } catch (error) {
-      console.error('[DEV_BYPASS] Failed to create dev user:', error);
+    // Only upsert user once per session using a session flag
+    // This prevents 200-400ms overhead on EVERY request
+    if (!(req.session as any).userHydrated) {
+      try {
+        await upsertUser(mockUser.claims);
+        (req.session as any).userHydrated = true;
+      } catch (error) {
+        console.error('[DEV_BYPASS] Failed to create dev user:', error);
+      }
     }
   }
   

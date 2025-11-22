@@ -760,53 +760,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         teamsPlayingOnDate: teamsPlayingFilter,
       });
       
+      // PERFORMANCE OPTIMIZATION: Batch fetch order books and season stats for ALL players in parallel
+      // This eliminates N+1 query problems:
+      // - 50 players × 2 order book queries = 100 queries → 1 query
+      // - 50 players × 1 season stats query = 50 queries → 1 query
+      const playerIds = playersRaw.map(p => p.id);
+      const [orderBooksMap, seasonStatsMap] = await Promise.all([
+        storage.getBatchOrderBooks(playerIds),
+        storage.getBatchPlayerSeasonStatsFromLogs(playerIds),
+      ]);
+      
       // Enrich with market values, order book data, and fantasy points average (only for paginated results)
-      const players = await Promise.all(playersRaw.map(async (player) => {
+      const players = playersRaw.map((player) => {
         const enriched = enrichPlayerWithMarketValue(player);
-        const orderBook = await storage.getOrderBook(player.id);
         
-        // Get best bid (highest buy price) and best ask (lowest sell price)
-        const bestBid = orderBook.bids.length > 0 && orderBook.bids[0].limitPrice 
-          ? orderBook.bids[0].limitPrice 
-          : null;
-        const bestAsk = orderBook.asks.length > 0 && orderBook.asks[0].limitPrice 
-          ? orderBook.asks[0].limitPrice 
-          : null;
+        // Look up pre-fetched order book data from map (no additional query!)
+        const orderBookData = orderBooksMap.get(player.id) || {
+          bids: [],
+          asks: [],
+          bestBid: null,
+          bestAsk: null,
+          bidSize: 0,
+          askSize: 0,
+        };
         
-        // Calculate total size at best bid and best ask
-        const bidSize = orderBook.bids.length > 0 && orderBook.bids[0].limitPrice
-          ? orderBook.bids
-              .filter(b => b.limitPrice === orderBook.bids[0].limitPrice)
-              .reduce((sum, b) => sum + (b.quantity - b.filledQuantity), 0)
-          : 0;
-        const askSize = orderBook.asks.length > 0 && orderBook.asks[0].limitPrice
-          ? orderBook.asks
-              .filter(a => a.limitPrice === orderBook.asks[0].limitPrice)
-              .reduce((sum, a) => sum + (a.quantity - a.filledQuantity), 0)
-          : 0;
-        
-        // Calculate average fantasy points per game from cached game logs
-        let avgFantasyPointsPerGame = "0.0";
-        try {
-          const seasonStats = await storage.getPlayerSeasonStatsFromLogs(player.id);
-          if (seasonStats) {
-            avgFantasyPointsPerGame = seasonStats.avgFantasyPointsPerGame;
-          }
-        } catch (error: any) {
-          // If season stats unavailable, keep default 0.0
-          // This is expected for players who haven't played yet this season
-          console.error(`[API] Error fetching season stats from cache for ${player.id}:`, error.message);
-        }
+        // Look up pre-fetched season stats from map (no additional query!)
+        const seasonStats = seasonStatsMap.get(player.id) || {
+          gamesPlayed: 0,
+          avgFantasyPointsPerGame: "0.0",
+        };
         
         return {
           ...enriched,
-          bestBid,
-          bestAsk,
-          bidSize,
-          askSize,
-          avgFantasyPointsPerGame,
+          bestBid: orderBookData.bestBid,
+          bestAsk: orderBookData.bestAsk,
+          bidSize: orderBookData.bidSize,
+          askSize: orderBookData.askSize,
+          avgFantasyPointsPerGame: seasonStats.avgFantasyPointsPerGame,
         };
-      }));
+      });
       
       res.json({ players, total });
     } catch (error: any) {

@@ -877,6 +877,63 @@ export class DatabaseStorage implements IStorage {
     return { bids, asks };
   }
 
+  // Batched version: fetch order books for multiple players in ONE query
+  // This eliminates N+1 query problem (50 players = 1 query instead of 50 queries)
+  async getBatchOrderBooks(playerIds: string[]): Promise<Map<string, { bids: Order[]; asks: Order[]; bestBid: string | null; bestAsk: string | null; bidSize: number; askSize: number }>> {
+    if (playerIds.length === 0) {
+      return new Map();
+    }
+
+    // Fetch all open orders for ALL players in one query
+    const allOrders = await db
+      .select()
+      .from(orders)
+      .where(and(
+        inArray(orders.playerId, playerIds),
+        eq(orders.status, "open")
+      ));
+
+    // Group orders by player and calculate order book data
+    const orderBookMap = new Map();
+    
+    for (const playerId of playerIds) {
+      const playerOrders = allOrders.filter(o => o.playerId === playerId);
+      
+      const bids = playerOrders
+        .filter(o => o.side === "buy" && o.orderType === "limit")
+        .sort((a, b) => parseFloat(b.limitPrice || "0") - parseFloat(a.limitPrice || "0"));
+      
+      const asks = playerOrders
+        .filter(o => o.side === "sell" && o.orderType === "limit")
+        .sort((a, b) => parseFloat(a.limitPrice || "0") - parseFloat(b.limitPrice || "0"));
+
+      // Calculate best bid, best ask, and sizes (same logic as /api/players endpoint)
+      const bestBid = bids.length > 0 && bids[0].limitPrice ? bids[0].limitPrice : null;
+      const bestAsk = asks.length > 0 && asks[0].limitPrice ? asks[0].limitPrice : null;
+      
+      const bidSize = bids.length > 0 && bids[0].limitPrice
+        ? bids.filter(b => b.limitPrice === bids[0].limitPrice)
+            .reduce((sum, b) => sum + (b.quantity - b.filledQuantity), 0)
+        : 0;
+      
+      const askSize = asks.length > 0 && asks[0].limitPrice
+        ? asks.filter(a => a.limitPrice === asks[0].limitPrice)
+            .reduce((sum, a) => sum + (a.quantity - a.filledQuantity), 0)
+        : 0;
+
+      orderBookMap.set(playerId, {
+        bids,
+        asks,
+        bestBid,
+        bestAsk,
+        bidSize,
+        askSize,
+      });
+    }
+
+    return orderBookMap;
+  }
+
   async updateOrder(orderId: string, updates: Partial<Order>): Promise<void> {
     await db
       .update(orders)
@@ -1840,6 +1897,59 @@ export class DatabaseStorage implements IStorage {
       blocks: totalBlocks,
       minutesPerGame: (totalMinutes / gamesPlayed).toFixed(1),
     };
+  }
+
+  // Batched version: fetch season stats for multiple players in ONE query
+  // This eliminates N+1 query problem (50 players = 1 query instead of 50 queries)
+  async getBatchPlayerSeasonStatsFromLogs(playerIds: string[]): Promise<Map<string, {
+    gamesPlayed: number;
+    avgFantasyPointsPerGame: string;
+  }>> {
+    if (playerIds.length === 0) {
+      return new Map();
+    }
+
+    const currentSeasons = getCurrentCompetitiveSeasons();
+    
+    // Fetch game logs for ALL players in one query
+    const allGameLogs = await db
+      .select()
+      .from(playerGameStats)
+      .where(
+        and(
+          inArray(playerGameStats.playerId, playerIds),
+          inArray(playerGameStats.season, currentSeasons)
+        )
+      );
+
+    // Group logs by player and compute stats
+    const statsMap = new Map();
+    
+    for (const playerId of playerIds) {
+      const playerLogs = allGameLogs.filter(log => log.playerId === playerId);
+      
+      if (playerLogs.length === 0) {
+        statsMap.set(playerId, {
+          gamesPlayed: 0,
+          avgFantasyPointsPerGame: "0.0",
+        });
+        continue;
+      }
+
+      const gamesPlayed = playerLogs.length;
+      let totalFantasyPoints = 0;
+
+      for (const log of playerLogs) {
+        totalFantasyPoints += parseFloat(log.fantasyPoints);
+      }
+
+      statsMap.set(playerId, {
+        gamesPlayed,
+        avgFantasyPointsPerGame: (totalFantasyPoints / gamesPlayed).toFixed(2),
+      });
+    }
+
+    return statsMap;
   }
 
   async getPlayerRecentGamesFromLogs(playerId: string, limit: number = 10): Promise<any[]> {
