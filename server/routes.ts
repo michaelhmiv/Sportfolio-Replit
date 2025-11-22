@@ -274,10 +274,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Dashboard
-  app.get("/api/dashboard", isAuthenticated, async (req, res) => {
+  // Dashboard - Now public for unauthenticated users (with limited data)
+  app.get("/api/dashboard", async (req, res) => {
     try {
-      const userId = getUserId(req);
+      // Check if user is authenticated
+      const isUserAuthenticated = !!req.user;
+      const userId = isUserAuthenticated ? getUserId(req) : null;
+      
+      // Fetch public data (always available)
+      const [allContests, recentTrades, hotPlayersRaw] = await Promise.all([
+        storage.getContests("open"),
+        storage.getRecentTrades(undefined, 10),
+        storage.getTopPlayersByVolume(5), // Get top 5 players by 24h volume directly from DB
+      ]);
+      
+      // If not authenticated, return public data only
+      if (!isUserAuthenticated || !userId) {
+        // Collect player IDs from public data
+        const playerIds = new Set<string>();
+        recentTrades.forEach(t => playerIds.add(t.playerId));
+        
+        // Batch fetch needed players
+        const players = await storage.getPlayersByIds(Array.from(playerIds));
+        const playerMap = new Map(players.map(p => [p.id, p]));
+        
+        // Enrich hot players
+        const hotPlayers = await Promise.all(hotPlayersRaw.map(enrichPlayerWithMarketValue));
+        
+        return res.json({
+          user: null, // No user data for anonymous visitors
+          hotPlayers,
+          mining: null,
+          contests: allContests.slice(0, 5),
+          recentTrades: recentTrades.map(trade => ({
+            ...trade,
+            player: playerMap.get(trade.playerId),
+          })),
+          topHoldings: [],
+          portfolioHistory: [],
+        });
+      }
+      
+      // Authenticated user - fetch full dashboard data
       const user = await storage.getUser(userId);
       if (!user) {
         return res.status(404).json({ error: "User not found" });
@@ -286,14 +324,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Accrue mining shares based on elapsed time
       await accrueMiningShares(user.id);
       
-      // Fetch data in parallel
-      const [userHoldings, allContests, recentTrades, miningData, miningSplits, hotPlayersRaw] = await Promise.all([
+      // Fetch user-specific data in parallel
+      const [userHoldings, miningData, miningSplits] = await Promise.all([
         storage.getUserHoldings(user.id),
-        storage.getContests("open"),
-        storage.getRecentTrades(undefined, 10),
         storage.getMining(user.id),
         storage.getMiningSplits(user.id),
-        storage.getTopPlayersByVolume(5), // Get top 5 players by 24h volume directly from DB
       ]);
 
       // Collect all unique player IDs we need to fetch
