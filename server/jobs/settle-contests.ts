@@ -12,6 +12,7 @@ import { storage } from "../storage";
 import { settleContest } from "../contest-scoring";
 import type { JobResult } from "./scheduler";
 import type { ProgressCallback } from "../lib/admin-stream";
+import { getGameDay, getETDayBoundaries } from "../lib/time";
 
 export async function settleContests(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[settle_contests] Starting contest settlement...");
@@ -96,15 +97,11 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
       console.log(`[settle_contests]   ✓ Contest endsAt has passed`);
       
       // Check 2: Are all games for this contest date completed?
-      // NOTE: The `date` field in daily_games stores the game's "day" in Eastern Time
-      // (as midnight UTC), so we can query directly without timezone conversion
+      // Query games by start_time using Eastern Time day boundaries
       const contestDate = new Date(contest.gameDate);
       const dateStr = contestDate.toISOString().split('T')[0]; // YYYY-MM-DD
       
-      // Query for games with date matching the contest date (stored as midnight UTC)
-      const startOfDay = new Date(`${dateStr}T00:00:00Z`);
-      const endOfDay = new Date(`${dateStr}T23:59:59Z`);
-      
+      const { startOfDay, endOfDay } = getETDayBoundaries(dateStr);
       const games = await storage.getDailyGames(startOfDay, endOfDay);
       
       console.log(`[settle_contests]   - Found ${games.length} games for contest date`);
