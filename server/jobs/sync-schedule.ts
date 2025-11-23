@@ -12,7 +12,7 @@ import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
 import type { ProgressCallback } from "../lib/admin-stream";
 import { broadcast } from "../websocket";
-import { toZonedTime } from "date-fns-tz";
+import { getGameDay, getETDayBoundaries } from "../lib/time";
 
 export async function syncSchedule(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[schedule_sync] Starting game schedule sync...");
@@ -78,10 +78,10 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
             const gameId = game.schedule.id.toString();
             const startTime = new Date(game.schedule.startTime);
             
-            // Calculate game date in Eastern Time (NBA games are scheduled in ET)
-            // This ensures games at 9pm ET on 11/22 are stored with date = 11/22, not 11/23
-            const startTimeET = toZonedTime(startTime, 'America/New_York');
-            const gameDateET = new Date(startTimeET.toISOString().split('T')[0]); // YYYY-MM-DD in ET
+            // Calculate game day in Eastern Time for the date field
+            // NOTE: All queries should use start_time, not this date field
+            const gameDay = getGameDay(startTime); // e.g., "2025-11-22"
+            const { startOfDay } = getETDayBoundaries(gameDay);
             
             // Extract scores for completed/in-progress games
             const homeScore = game.score?.homeScoreTotal != null ? parseInt(game.score.homeScoreTotal) : null;
@@ -92,12 +92,12 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
             
             await storage.upsertDailyGame({
               gameId,
-              date: gameDateET, // Store the game's "day" in Eastern Time
+              date: startOfDay, // Store midnight UTC on the game's ET day (for auditing only)
               homeTeam: game.schedule?.homeTeam?.abbreviation || "UNK",
               awayTeam: game.schedule?.awayTeam?.abbreviation || "UNK",
               venue: game.schedule?.venue?.name,
               status: normalizedStatus,
-              startTime, // Keep actual UTC start time
+              startTime, // SINGLE SOURCE OF TRUTH - use this for all queries
               homeScore,
               awayScore,
             });
