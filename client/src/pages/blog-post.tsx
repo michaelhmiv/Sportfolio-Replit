@@ -6,6 +6,7 @@ import { Calendar, ArrowLeft } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { useEffect } from "react";
+import { SchemaOrg, schemas } from "@/components/schema-org";
 
 interface BlogPost {
   id: string;
@@ -122,6 +123,14 @@ export default function BlogPost() {
 
   return (
     <div className="min-h-screen bg-background">
+      <SchemaOrg schema={schemas.createArticle({
+        title: post.title,
+        excerpt: post.excerpt,
+        content: post.content,
+        publishedAt: post.publishedAt,
+        slug: post.slug,
+        authorId: author?.id
+      })} />
       <div className="max-w-3xl mx-auto p-6 md:p-12">
         {/* Back Button */}
         <Link href="/blog">
@@ -135,9 +144,9 @@ export default function BlogPost() {
         <article data-testid="article-blog-post">
           <header className="mb-6">
             <h1 className="text-2xl font-bold mb-3" data-testid="heading-blog-post-title">{post.title}</h1>
-            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+            <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-1">
-                <Calendar className="w-3 h-3" />
+                <Calendar className="w-4 h-4" />
                 {new Date(post.publishedAt).toLocaleDateString("en-US", {
                   year: "numeric",
                   month: "long",

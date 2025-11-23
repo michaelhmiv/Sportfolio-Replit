@@ -13,6 +13,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import type { Player, Order, Trade, PriceHistory } from "@shared/schema";
+import { SchemaOrg, schemas } from "@/components/schema-org";
 
 interface PlayerPageData {
   player: Player;
@@ -85,6 +86,70 @@ export default function PlayerPage() {
       unsubPortfolio();
     };
   }, [id, subscribe]);
+
+  // SEO: Update meta tags when player data loads
+  useEffect(() => {
+    if (!data?.player) return;
+    
+    const player = data.player;
+    const playerName = `${player.firstName} ${player.lastName}`;
+    const price = player.currentPrice || player.lastTradePrice;
+    
+    // Sanitize price for meta tags - only use $ for valid numeric values
+    let priceText = 'No market value yet';
+    if (price && price !== 'N/A' && !isNaN(parseFloat(price))) {
+      priceText = `Current price: $${price}`;
+    }
+    
+    const title = `${playerName} - ${player.team} ${player.position} | Trade Shares on Sportfolio`;
+    const description = `Trade ${playerName} shares on Sportfolio. ${priceText}. View stats, order book, and recent trades for ${player.team} ${player.position}.`;
+    
+    // Store original values for cleanup
+    const originalTitle = document.title;
+    const originalDescription = document.querySelector('meta[name="description"]')?.getAttribute('content');
+    
+    document.title = title;
+    
+    const metaDescription = document.querySelector('meta[name="description"]');
+    if (metaDescription) {
+      metaDescription.setAttribute('content', description);
+    }
+    
+    // Open Graph tags - track which ones we create
+    const createdMetaTags: HTMLMetaElement[] = [];
+    const ogTags = [
+      { property: 'og:title', content: title },
+      { property: 'og:description', content: description },
+      { property: 'og:type', content: 'profile' },
+      { property: 'og:url', content: `${window.location.origin}/player/${player.id}` },
+      { name: 'twitter:card', content: 'summary' },
+      { name: 'twitter:title', content: title },
+      { name: 'twitter:description', content: description },
+    ];
+    
+    ogTags.forEach(tag => {
+      const property = (tag.property || tag.name) as string;
+      const attr = tag.property ? 'property' : 'name';
+      let meta = document.querySelector(`meta[${attr}="${property}"]`) as HTMLMetaElement;
+      
+      if (!meta) {
+        meta = document.createElement('meta');
+        meta.setAttribute(attr, property);
+        document.head.appendChild(meta);
+        createdMetaTags.push(meta);
+      }
+      meta.setAttribute('content', tag.content);
+    });
+    
+    return () => {
+      document.title = originalTitle || 'Sportfolio - Fantasy Sports Stock Market';
+      if (originalDescription && metaDescription) {
+        metaDescription.setAttribute('content', originalDescription);
+      }
+      // Remove any meta tags we created
+      createdMetaTags.forEach(meta => meta.remove());
+    };
+  }, [data?.player]);
 
   const placeOrderMutation = useMutation({
     mutationFn: async (orderData: { orderType: string; side: string; quantity: number; limitPrice?: string }) => {
@@ -188,9 +253,16 @@ export default function PlayerPage() {
   }
 
   const { player, priceHistory, orderBook, recentTrades } = data;
+  const playerName = `${player.firstName} ${player.lastName}`;
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+      <SchemaOrg schema={schemas.createPlayer({
+        name: playerName,
+        team: player.team,
+        position: player.position,
+        id: player.id
+      })} />
       <div className="max-w-7xl mx-auto">
         {/* Player Header */}
         <div className="mb-4">

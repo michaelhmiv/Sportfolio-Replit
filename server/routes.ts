@@ -260,6 +260,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
+  // SEO: Dynamic Sitemap XML
+  app.get("/sitemap.xml", async (_req, res) => {
+    try {
+      const baseUrl = "https://sportfolio.replit.app";
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      
+      // Fetch limited dynamic content for performance
+      const [topPlayersByVolume, activeContests, blogPosts] = await Promise.all([
+        storage.getTopPlayersByVolume(200), // Top 200 players only
+        storage.getContests(), // Active contests
+        storage.getBlogPosts({ limit: 100, offset: 0, publishedOnly: true }),
+      ]);
+
+      // Static pages with realistic lastmod dates
+      const staticPages = [
+        { url: "", lastmod: today, changefreq: "daily", priority: "1.0" },
+        { url: "marketplace", lastmod: today, changefreq: "hourly", priority: "0.9" },
+        { url: "contests", lastmod: today, changefreq: "daily", priority: "0.9" },
+        { url: "leaderboards", lastmod: today, changefreq: "daily", priority: "0.8" },
+        { url: "blog", lastmod: today, changefreq: "weekly", priority: "0.8" },
+        { url: "how-it-works", lastmod: "2025-11-23", changefreq: "monthly", priority: "0.7" },
+        { url: "about", lastmod: "2025-11-23", changefreq: "monthly", priority: "0.6" },
+        { url: "contact", lastmod: "2025-11-23", changefreq: "monthly", priority: "0.6" },
+        { url: "privacy", lastmod: "2025-11-23", changefreq: "yearly", priority: "0.4" },
+        { url: "terms", lastmod: "2025-11-23", changefreq: "yearly", priority: "0.4" },
+      ];
+
+      // Build sitemap XML
+      let xml = '<?xml version="1.0" encoding="UTF-8"?>\n';
+      xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n';
+
+      // Add static pages
+      staticPages.forEach(page => {
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/${page.url}</loc>\n`;
+        xml += `    <lastmod>${page.lastmod}</lastmod>\n`;
+        xml += `    <changefreq>${page.changefreq}</changefreq>\n`;
+        xml += `    <priority>${page.priority}</priority>\n`;
+        xml += `  </url>\n`;
+      });
+
+      // Add player pages (already sorted by volume from storage)
+      topPlayersByVolume.forEach((player: Player) => {
+        const playerLastMod = player.lastUpdated ? new Date(player.lastUpdated).toISOString().split('T')[0] : today;
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/player/${player.id}</loc>\n`;
+        xml += `    <lastmod>${playerLastMod}</lastmod>\n`;
+        xml += `    <changefreq>daily</changefreq>\n`;
+        xml += `    <priority>0.7</priority>\n`;
+        xml += `  </url>\n`;
+      });
+
+      // Add contest detail and leaderboard pages
+      activeContests.forEach((contest: typeof activeContests[0]) => {
+        // Main contest detail page
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/contest/${contest.id}</loc>\n`;
+        xml += `    <lastmod>${today}</lastmod>\n`;
+        xml += `    <changefreq>hourly</changefreq>\n`;
+        xml += `    <priority>0.6</priority>\n`;
+        xml += `  </url>\n`;
+        
+        // Contest leaderboard page
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/contest/${contest.id}/leaderboard</loc>\n`;
+        xml += `    <lastmod>${today}</lastmod>\n`;
+        xml += `    <changefreq>hourly</changefreq>\n`;
+        xml += `    <priority>0.6</priority>\n`;
+        xml += `  </url>\n`;
+      });
+
+      // Add blog posts with actual update dates
+      blogPosts.posts.forEach((post: typeof blogPosts.posts[0]) => {
+        const postLastMod = post.updatedAt || post.publishedAt;
+        const formattedDate = new Date(postLastMod).toISOString().split('T')[0];
+        xml += `  <url>\n`;
+        xml += `    <loc>${baseUrl}/blog/${post.slug}</loc>\n`;
+        xml += `    <lastmod>${formattedDate}</lastmod>\n`;
+        xml += `    <changefreq>weekly</changefreq>\n`;
+        xml += `    <priority>0.7</priority>\n`;
+        xml += `  </url>\n`;
+      });
+
+      xml += '</urlset>';
+
+      res.header('Content-Type', 'application/xml');
+      res.send(xml);
+    } catch (error) {
+      console.error("Error generating sitemap:", error);
+      res.status(500).send("Error generating sitemap");
+    }
+  });
+
   // API ROUTES
 
   // Auth endpoints

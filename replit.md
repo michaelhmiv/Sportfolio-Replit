@@ -31,6 +31,49 @@ The UI prioritizes information density and compact layouts inspired by professio
 ### Content & SEO
 A blog system (`/blog`) provides admin-controlled content for SEO and user engagement, supporting draft and published states. Static pages for legal information (`/privacy`, `/terms`), platform information (`/about`, `/contact`, `/how-it-works`) ensure AdSense compliance and comprehensive user guidance. A site footer provides consistent navigation.
 
+#### SEO Implementation (Updated: 2025-11-23)
+**CRITICAL: Always keep SEO implementations updated when making significant changes to the platform.**
+
+The platform implements comprehensive SEO optimizations for both traditional search engines (Google, Bing) and AI-powered search (ChatGPT, Perplexity, Claude):
+
+**Core SEO Files:**
+- `client/public/robots.txt` - Guides search engine crawlers, allows all public pages, disallows admin/auth/api routes
+- `/sitemap.xml` (dynamic endpoint in `server/routes.ts`) - Auto-generates sitemap including:
+  - All static pages (homepage, marketplace, contests, blog, legal pages)
+  - Top 200 player pages by trading volume
+  - All contest leaderboard pages
+  - All published blog posts
+  - **MAINTENANCE:** Sitemap automatically updates when new players, contests, or blog posts are added
+
+**JSON-LD Structured Data:**
+- Global schemas added to `App.tsx`: Organization, WebSite, WebApplication
+- Article schema on blog post pages (`blog-post.tsx`)
+- Person schema on player pages (`player.tsx`)
+- FAQPage schema on How It Works page (`how-it-works.tsx`)
+- Schema component: `client/src/components/schema-org.tsx`
+- **MAINTENANCE:** When adding new page types (e.g., team pages, contest detail pages), add appropriate schema markup using the `SchemaOrg` component
+
+**Dynamic Meta Tags:**
+- Blog posts: Unique title, description, Open Graph, Twitter Cards (auto-generated from post data)
+- Player pages: Dynamic title/description including player name, team, position, current price
+- **MAINTENANCE:** When adding new dynamic pages, implement SEO meta tags using useEffect pattern (see blog-post.tsx and player.tsx examples)
+
+**SEO Best Practices:**
+- All images should have descriptive alt text
+- Proper heading hierarchy (H1 → H2 → H3)
+- Semantic HTML (`<article>`, `<section>`, `<nav>`)
+- Mobile-responsive design
+- Fast page load times
+- Internal linking between related pages
+
+**Future SEO Enhancements to Consider:**
+- Breadcrumb navigation with schema markup
+- Image sitemap for player photos
+- Video schema if adding video content
+- Review/Rating schema for contests
+- LocalBusiness schema if expanding to physical locations
+- Additional FAQ pages for common queries
+
 ## External Dependencies
 
 -   **MySportsFeeds API:** Provides NBA player rosters, game schedules, and statistics.

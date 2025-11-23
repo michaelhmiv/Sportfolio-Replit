@@ -38,6 +38,7 @@ import HowItWorks from "@/pages/how-it-works";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
 import { LogOut, User } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
+import { SchemaOrg, schemas } from "@/components/schema-org";
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -256,6 +257,7 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
+      <SchemaOrg schema={[schemas.organization, schemas.website, schemas.webApplication]} />
       <WebSocketProvider>
         <NotificationProvider>
           <TooltipProvider>

@@ -1,9 +1,34 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Trophy, Pickaxe, BarChart3, Users, CheckCircle2 } from "lucide-react";
+import { SchemaOrg, schemas } from "@/components/schema-org";
+
+const faqs = [
+  {
+    question: "How does trading player shares work on Sportfolio?",
+    answer: "NBA players on Sportfolio are represented as tradable shares, similar to stocks. Each player has a market price that changes based on trading activity. You can place market orders to buy or sell immediately, or use limit orders to specify exact prices."
+  },
+  {
+    question: "What is the mining system and how do I earn free shares?",
+    answer: "Mining rewards active users with free player shares. By participating on the platform - trading, entering contests, and engaging with the community - you accumulate mining points that convert into tradable player shares. Check the mining widget on your dashboard to claim shares."
+  },
+  {
+    question: "How do fantasy contests work?",
+    answer: "Compete in daily 50/50 contests by creating lineups of NBA players. Your lineup earns fantasy points based on real player performance. The top half of contestants win prizes, doubling their entry fee. Prizes are automatically distributed when games complete."
+  },
+  {
+    question: "How are fantasy points calculated in contests?",
+    answer: "Fantasy points are based on real NBA player statistics including points scored, rebounds, assists, steals, blocks, and other performance metrics from actual NBA games."
+  },
+  {
+    question: "What happens to my shares when I enter a contest?",
+    answer: "When you enter a contest, you draft players from a specific game date. Your existing portfolio shares are separate from contest lineups - entering contests doesn't affect your trading portfolio."
+  }
+];
 
 export default function HowItWorks() {
   return (
     <div className="min-h-screen bg-background">
+      <SchemaOrg schema={schemas.faqPage(faqs)} />
       <div className="max-w-4xl mx-auto p-6 md:p-12">
         <h1 className="text-4xl font-bold mb-4" data-testid="heading-how-it-works">How Sportfolio Works</h1>
         <p className="text-lg text-muted-foreground mb-12">
