@@ -50,16 +50,13 @@ export function getETDayBoundaries(gameDay: string): {
   startOfDay: Date;
   endOfDay: Date;
 } {
-  // Parse YYYY-MM-DD and create midnight ET on that day
-  const [year, month, day] = gameDay.split('-').map(Number);
-  const etMidnight = new Date(year, month - 1, day, 0, 0, 0, 0);
+  // Create midnight and end-of-day timestamps in ET, then convert to UTC
+  const startOfDayETString = `${gameDay}T00:00:00`;
+  const endOfDayETString = `${gameDay}T23:59:59`;
   
-  // Convert ET midnight to UTC
-  const utcStartOfDay = fromZonedTime(etMidnight, ET_TIMEZONE);
-  
-  // Create 11:59:59 PM ET on the same day
-  const etEndOfDay = new Date(year, month - 1, day, 23, 59, 59, 999);
-  const utcEndOfDay = fromZonedTime(etEndOfDay, ET_TIMEZONE);
+  // fromZonedTime treats these strings as ET times and converts to UTC
+  const utcStartOfDay = fromZonedTime(startOfDayETString, ET_TIMEZONE);
+  const utcEndOfDay = fromZonedTime(endOfDayETString, ET_TIMEZONE);
   
   return {
     startOfDay: utcStartOfDay,
