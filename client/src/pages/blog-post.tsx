@@ -133,11 +133,11 @@ export default function BlogPost() {
 
         {/* Article */}
         <article data-testid="article-blog-post">
-          <header className="mb-8">
-            <h1 className="text-4xl font-bold mb-4" data-testid="heading-blog-post-title">{post.title}</h1>
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <header className="mb-6">
+            <h1 className="text-2xl font-bold mb-3" data-testid="heading-blog-post-title">{post.title}</h1>
+            <div className="flex items-center gap-4 text-xs text-muted-foreground">
               <div className="flex items-center gap-1">
-                <Calendar className="w-4 h-4" />
+                <Calendar className="w-3 h-3" />
                 {new Date(post.publishedAt).toLocaleDateString("en-US", {
                   year: "numeric",
                   month: "long",
@@ -158,7 +158,7 @@ export default function BlogPost() {
           </header>
 
           <Card>
-            <CardContent className="p-8 prose dark:prose-invert max-w-none">
+            <CardContent className="p-6 prose-sm dark:prose-invert max-w-none">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 data-testid="content-blog-post"
