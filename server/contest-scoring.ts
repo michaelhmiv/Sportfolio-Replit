@@ -239,7 +239,8 @@ export async function settleContest(contestId: string): Promise<void> {
   const leaderboard = await calculateContestLeaderboard(contestId);
   
   if (leaderboard.length === 0) {
-    console.log(`[settleContest] No entries in contest ${contestId}, nothing to settle`);
+    console.log(`[settleContest] No entries in contest ${contestId}, marking as completed`);
+    await storage.updateContest(contestId, { status: "completed" });
     return;
   }
 

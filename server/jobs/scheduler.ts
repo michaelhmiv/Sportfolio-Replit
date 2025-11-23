@@ -38,17 +38,98 @@ export class JobScheduler {
   constructor() {}
 
   /**
-   * Initialize and start all cron jobs
+   * Helper method to schedule a job
    */
-  async initialize() {
-    if (this.isInitialized) {
-      console.log("Job scheduler already initialized");
+  private scheduleJob(jobConfig: JobConfig) {
+    if (!jobConfig.enabled) {
+      console.log(`Job ${jobConfig.name} is disabled, skipping...`);
       return;
     }
 
-    console.log("Initializing job scheduler...");
+    const task = cron.schedule(
+      jobConfig.schedule,
+      async () => {
+        console.log(`[${jobConfig.name}] Starting scheduled run...`);
+        
+        const jobLog = await storage.createJobLog({
+          jobName: jobConfig.name,
+          scheduledFor: new Date(),
+          status: "running",
+        });
 
-    const jobs: JobConfig[] = [
+        try {
+          const result = await jobConfig.handler();
+          
+          // Determine job status: degraded if some records failed, success if all succeeded
+          const status = result.errorCount > 0 ? "degraded" : "success";
+          
+          await storage.updateJobLog(jobLog.id, {
+            status,
+            finishedAt: new Date(),
+            requestCount: result.requestCount || 0,
+            recordsProcessed: result.recordsProcessed || 0,
+            errorCount: result.errorCount || 0,
+          });
+          
+          if (status === "degraded") {
+            console.warn(`[${jobConfig.name}] Completed with errors - ${result.recordsProcessed} records processed, ${result.errorCount} failed, ${result.requestCount} requests`);
+          } else {
+            console.log(`[${jobConfig.name}] Completed successfully - ${result.recordsProcessed} records, ${result.requestCount} requests`);
+          }
+        } catch (error: any) {
+          console.error(`[${jobConfig.name}] Failed:`, error.message);
+          
+          await storage.updateJobLog(jobLog.id, {
+            status: "failed",
+            errorMessage: error.message,
+            finishedAt: new Date(),
+          });
+        }
+      },
+      {
+        timezone: "America/New_York", // ET timezone
+      }
+    );
+
+    this.jobs.set(jobConfig.name, task);
+    console.log(`Job ${jobConfig.name} scheduled: ${jobConfig.schedule}`);
+  }
+
+  /**
+   * Initialize contest-related jobs (database-only, no API required)
+   */
+  async initializeContestJobs() {
+    console.log("Initializing contest jobs...");
+
+    const contestJobs: JobConfig[] = [
+      {
+        name: "update_contest_statuses",
+        schedule: "* * * * *", // Every minute - transition contests from open to live
+        enabled: true,
+        handler: updateContestStatuses,
+      },
+      {
+        name: "settle_contests",
+        schedule: "*/5 * * * *", // Every 5 minutes - check for contests to settle
+        enabled: true,
+        handler: settleContests,
+      },
+    ];
+
+    for (const jobConfig of contestJobs) {
+      this.scheduleJob(jobConfig);
+    }
+
+    console.log("Contest jobs initialized successfully");
+  }
+
+  /**
+   * Initialize API-dependent jobs (requires MYSPORTSFEEDS_API_KEY)
+   */
+  async initializeApiJobs() {
+    console.log("Initializing API-dependent jobs...");
+
+    const apiJobs: JobConfig[] = [
       {
         name: "roster_sync",
         schedule: "0 5 * * *", // Daily at 5:00 AM ET
@@ -80,18 +161,6 @@ export class JobScheduler {
         handler: syncStatsLive,
       },
       {
-        name: "update_contest_statuses",
-        schedule: "* * * * *", // Every minute - transition contests from open to live
-        enabled: true,
-        handler: updateContestStatuses,
-      },
-      {
-        name: "settle_contests",
-        schedule: "*/5 * * * *", // Every 5 minutes - check for contests to settle
-        enabled: true,
-        handler: settleContests,
-      },
-      {
         name: "create_contests",
         schedule: "0 0 * * *", // Daily at midnight - create contests for upcoming games
         enabled: true,
@@ -105,60 +174,26 @@ export class JobScheduler {
       },
     ];
 
-    for (const jobConfig of jobs) {
-      if (!jobConfig.enabled) {
-        console.log(`Job ${jobConfig.name} is disabled, skipping...`);
-        continue;
-      }
-
-      const task = cron.schedule(
-        jobConfig.schedule,
-        async () => {
-          console.log(`[${jobConfig.name}] Starting scheduled run...`);
-          
-          const jobLog = await storage.createJobLog({
-            jobName: jobConfig.name,
-            scheduledFor: new Date(),
-            status: "running",
-          });
-
-          try {
-            const result = await jobConfig.handler();
-            
-            // Determine job status: degraded if some records failed, success if all succeeded
-            const status = result.errorCount > 0 ? "degraded" : "success";
-            
-            await storage.updateJobLog(jobLog.id, {
-              status,
-              finishedAt: new Date(),
-              requestCount: result.requestCount || 0,
-              recordsProcessed: result.recordsProcessed || 0,
-              errorCount: result.errorCount || 0,
-            });
-            
-            if (status === "degraded") {
-              console.warn(`[${jobConfig.name}] Completed with errors - ${result.recordsProcessed} records processed, ${result.errorCount} failed, ${result.requestCount} requests`);
-            } else {
-              console.log(`[${jobConfig.name}] Completed successfully - ${result.recordsProcessed} records, ${result.requestCount} requests`);
-            }
-          } catch (error: any) {
-            console.error(`[${jobConfig.name}] Failed:`, error.message);
-            
-            await storage.updateJobLog(jobLog.id, {
-              status: "failed",
-              errorMessage: error.message,
-              finishedAt: new Date(),
-            });
-          }
-        },
-        {
-          timezone: "America/New_York", // ET timezone
-        }
-      );
-
-      this.jobs.set(jobConfig.name, task);
-      console.log(`Job ${jobConfig.name} scheduled: ${jobConfig.schedule}`);
+    for (const jobConfig of apiJobs) {
+      this.scheduleJob(jobConfig);
     }
+
+    console.log("API-dependent jobs initialized successfully");
+  }
+
+  /**
+   * Initialize all cron jobs (convenience method)
+   */
+  async initialize() {
+    if (this.isInitialized) {
+      console.log("Job scheduler already initialized");
+      return;
+    }
+
+    console.log("Initializing job scheduler...");
+
+    await this.initializeContestJobs();
+    await this.initializeApiJobs();
 
     this.isInitialized = true;
     console.log("Job scheduler initialized successfully");
@@ -168,8 +203,9 @@ export class JobScheduler {
    * Start all scheduled jobs
    */
   start() {
-    if (!this.isInitialized) {
-      throw new Error("Job scheduler not initialized. Call initialize() first.");
+    if (this.jobs.size === 0) {
+      console.log("No jobs to start - initialize jobs first");
+      return;
     }
 
     console.log("Starting all cron jobs...");

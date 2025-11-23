@@ -79,17 +79,26 @@ app.use((req, res, next) => {
   }, async () => {
     log(`serving on port ${port}`);
     
-    // Initialize and start cron jobs (only if API key is available)
+    // Always initialize contest jobs (database-only, no API required)
+    try {
+      await jobScheduler.initializeContestJobs();
+      jobScheduler.start();
+      log("Contest jobs initialized and started");
+    } catch (error: any) {
+      console.error("Failed to initialize contest jobs:", error.message);
+    }
+    
+    // Initialize API-dependent jobs only if API key is available
     if (process.env.MYSPORTSFEEDS_API_KEY) {
       try {
-        await jobScheduler.initialize();
-        jobScheduler.start();
-        log("Cron jobs initialized and started");
+        await jobScheduler.initializeApiJobs();
+        log("API-dependent jobs initialized and started");
       } catch (error: any) {
-        console.error("Failed to initialize cron jobs:", error.message);
+        console.error("Failed to initialize API jobs:", error.message);
       }
     } else {
-      log("Skipping cron jobs - MYSPORTSFEEDS_API_KEY not set");
+      log("Skipping API-dependent jobs - MYSPORTSFEEDS_API_KEY not set");
+      log("Contest jobs will still process data from the database when available");
     }
   });
 })();
