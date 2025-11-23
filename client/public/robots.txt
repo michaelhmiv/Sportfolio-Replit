@@ -1,0 +1,30 @@
+# Sportfolio - Robots.txt
+# Updated: 2025-11-23
+
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://sportfolio.replit.app/sitemap.xml
+
+# Allow search engines to crawl all public pages
+Allow: /blog
+Allow: /blog/*
+Allow: /marketplace
+Allow: /contests
+Allow: /player/*
+Allow: /leaderboards
+Allow: /about
+Allow: /contact
+Allow: /how-it-works
+Allow: /privacy
+Allow: /terms
+
+# Disallow admin and auth pages
+Disallow: /admin
+Disallow: /admin/*
+Disallow: /auth/*
+Disallow: /api/*
+
+# Crawl-delay for respectful crawling
+Crawl-delay: 1
