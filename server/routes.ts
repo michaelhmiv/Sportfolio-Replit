@@ -13,6 +13,7 @@ import { calculateAccrualUpdate } from "@shared/mining-utils";
 import { createContests } from "./jobs/create-contests";
 import { calculateContestLeaderboard } from "./contest-scoring";
 import { setupAuth, isAuthenticated, optionalAuth } from "./replitAuth";
+import { getGameDay, getETDayBoundaries, getTodayETBoundaries } from "./lib/time";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication middleware
@@ -571,50 +572,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Today's games (in ET timezone where NBA games are scheduled)
   app.get("/api/games/today", async (req, res) => {
     try {
-      // Get current time in ET timezone
-      const now = new Date();
-      const etOffset = -5; // ET is UTC-5 (EST) or UTC-4 (EDT), using -5 for simplicity
-      const nowET = new Date(now.getTime() + (etOffset * 60 * 60 * 1000));
+      const { startOfDay, endOfDay } = getTodayETBoundaries();
+      const games = await storage.getDailyGames(startOfDay, endOfDay);
       
-      // Get start and end of day in ET, then convert back to UTC for database query
-      const startOfDayET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 0, 0, 0);
-      const endOfDayET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 23, 59, 59);
+      // Add gameDay to each game for frontend display
+      const gamesWithDay = games.map(game => ({
+        ...game,
+        gameDay: getGameDay(game.startTime),
+      }));
       
-      // Convert ET boundaries to UTC for database query
-      const startOfDayUTC = new Date(startOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
-      const endOfDayUTC = new Date(endOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
-      
-      const games = await storage.getDailyGames(startOfDayUTC, endOfDayUTC);
-      res.json(games);
+      res.json(gamesWithDay);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
 
-  // Games for a specific date (YYYY-MM-DD format)
+  // Games for a specific date (YYYY-MM-DD format in Eastern Time)
   app.get("/api/games/date/:date", async (req, res) => {
     try {
       const { date } = req.params;
       
-      // Parse the date string (expected format: YYYY-MM-DD)
+      // Validate date format (YYYY-MM-DD)
       const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
       if (!dateMatch) {
         return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
       }
       
-      const [, year, month, day] = dateMatch;
-      const etOffset = -5; // ET is UTC-5 (EST) or UTC-4 (EDT), using -5 for simplicity
+      const { startOfDay, endOfDay } = getETDayBoundaries(date);
+      const games = await storage.getDailyGames(startOfDay, endOfDay);
       
-      // Create date in ET timezone
-      const startOfDayET = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 0, 0, 0);
-      const endOfDayET = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), 23, 59, 59);
+      // Add gameDay to each game for frontend display
+      const gamesWithDay = games.map(game => ({
+        ...game,
+        gameDay: getGameDay(game.startTime),
+      }));
       
-      // Convert ET boundaries to UTC for database query
-      const startOfDayUTC = new Date(startOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
-      const endOfDayUTC = new Date(endOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
-      
-      const games = await storage.getDailyGames(startOfDayUTC, endOfDayUTC);
-      res.json(games);
+      res.json(gamesWithDay);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
