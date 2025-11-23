@@ -40,19 +40,30 @@ export function getGameDay(startTime: Date | string): string {
  * 
  * @param gameDay - YYYY-MM-DD string in Eastern Time
  * @returns Object with startOfDay and endOfDay as UTC Date objects
+ *          Note: endOfDay is the exclusive upper bound (start of next day)
  * 
  * @example
  * const { startOfDay, endOfDay } = getETDayBoundaries('2025-11-22');
  * // startOfDay: 2025-11-22T05:00:00Z (midnight ET on Nov 22)
- * // endOfDay: 2025-11-23T04:59:59Z (11:59:59 PM ET on Nov 22)
+ * // endOfDay: 2025-11-23T05:00:00Z (midnight ET on Nov 23 - exclusive)
+ * // Query: WHERE start_time >= startOfDay AND start_time < endOfDay
  */
 export function getETDayBoundaries(gameDay: string): {
   startOfDay: Date;
   endOfDay: Date;
 } {
-  // Create midnight and end-of-day timestamps in ET, then convert to UTC
+  // Parse the date components
+  const [year, month, day] = gameDay.split('-').map(Number);
+  
+  // Create midnight ET for this day and next day
   const startOfDayETString = `${gameDay}T00:00:00`;
-  const endOfDayETString = `${gameDay}T23:59:59`;
+  
+  // Calculate next day for exclusive upper bound
+  const nextDay = new Date(year, month - 1, day + 1);
+  const nextYear = nextDay.getFullYear();
+  const nextMonth = String(nextDay.getMonth() + 1).padStart(2, '0');
+  const nextDayNum = String(nextDay.getDate()).padStart(2, '0');
+  const endOfDayETString = `${nextYear}-${nextMonth}-${nextDayNum}T00:00:00`;
   
   // fromZonedTime treats these strings as ET times and converts to UTC
   const utcStartOfDay = fromZonedTime(startOfDayETString, ET_TIMEZONE);

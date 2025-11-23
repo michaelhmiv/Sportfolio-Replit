@@ -22,6 +22,23 @@ Player IDs are numeric from MySportsFeeds API, ensuring consistency. A season fi
 
 The database schema includes tables for `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `mining_claims`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, `price_history`, `holdings_locks`, `balance_locks`, and `blog_posts`. Indexing is optimized for user-asset relationships, player filtering, and order book queries. Share and cash locking systems prevent double-spending. The `/api/players` endpoint supports comprehensive server-side search, filter, and sort.
 
+#### Timezone Handling (Updated: 2025-11-23)
+**CRITICAL: All game scheduling must be based on Eastern Time (ET), not UTC or local timezone.**
+
+The platform uses a centralized time utility library (`server/lib/time.ts`) to ensure all game-related queries and displays are based on the game's start time in Eastern Time:
+
+- **Single Source of Truth**: All queries use `start_time` field (stored as UTC in database) and convert to ET for determining which "day" a game belongs to
+- **getGameDay()**: Converts any UTC timestamp to a YYYY-MM-DD string in Eastern Time
+- **getETDayBoundaries()**: Converts a YYYY-MM-DD string to UTC Date boundaries (midnight ET to 11:59pm ET)
+- **Backend returns `gameDay`**: All game API endpoints include a normalized `gameDay` field so frontend doesn't need timezone logic
+- **Database queries**: `getDailyGames()` and related methods query by `start_time` using ET boundaries, NOT by the `date` field
+
+This ensures that:
+- A game at 7pm ET on Nov 22 (midnight UTC on Nov 23) appears on Nov 22 calendar
+- A game at 1pm ET on Nov 22 (6pm UTC on Nov 22) appears on Nov 22 calendar
+- Contest settlement finds games by their start_time in ET boundaries
+- Dashboard and calendar displays are consistent across timezones
+
 ### Background Jobs
 Background jobs, managed by `node-cron`, handle tasks like `roster_sync`, `schedule_sync`, `stats_sync`, `stats_sync_live`, `update_contest_statuses`, `settle_contests`, and `create_contests`. A Contest Lifecycle & Settlement System automatically progresses contests. A Universal Live Logging System provides real-time streaming logs via Server-Sent Events (SSE) for all admin operations, offering granular visibility into job execution.
 

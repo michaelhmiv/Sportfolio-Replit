@@ -1702,8 +1702,8 @@ export class DatabaseStorage implements IStorage {
       .from(dailyGames)
       .where(
         and(
-          sql`${dailyGames.date} >= ${startDate}`,
-          sql`${dailyGames.date} <= ${endDate}`
+          sql`${dailyGames.startTime} >= ${startDate}`,
+          sql`${dailyGames.startTime} < ${endDate}`
         )
       )
       .orderBy(asc(dailyGames.startTime));
@@ -1722,8 +1722,8 @@ export class DatabaseStorage implements IStorage {
       .from(dailyGames)
       .where(
         and(
-          sql`${dailyGames.date} >= ${startDate}`,
-          sql`${dailyGames.date} <= ${endDate}`,
+          sql`${dailyGames.startTime} >= ${startDate}`,
+          sql`${dailyGames.startTime} < ${endDate}`,
           sql`(${dailyGames.homeTeam} = ${teamAbbreviation} OR ${dailyGames.awayTeam} = ${teamAbbreviation})`
         )
       )
