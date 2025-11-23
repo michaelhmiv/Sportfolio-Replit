@@ -158,7 +158,7 @@ export default function BlogPost() {
           </header>
 
           <Card>
-            <CardContent className="p-8 prose prose-gray dark:prose-invert max-w-none text-foreground">
+            <CardContent className="p-8 prose dark:prose-invert max-w-none">
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 data-testid="content-blog-post"
