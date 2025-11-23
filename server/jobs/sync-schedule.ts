@@ -12,6 +12,7 @@ import { mysportsfeedsRateLimiter } from "./rate-limiter";
 import type { JobResult } from "./scheduler";
 import type { ProgressCallback } from "../lib/admin-stream";
 import { broadcast } from "../websocket";
+import { toZonedTime } from "date-fns-tz";
 
 export async function syncSchedule(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[schedule_sync] Starting game schedule sync...");
@@ -77,6 +78,11 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
             const gameId = game.schedule.id.toString();
             const startTime = new Date(game.schedule.startTime);
             
+            // Calculate game date in Eastern Time (NBA games are scheduled in ET)
+            // This ensures games at 9pm ET on 11/22 are stored with date = 11/22, not 11/23
+            const startTimeET = toZonedTime(startTime, 'America/New_York');
+            const gameDateET = new Date(startTimeET.toISOString().split('T')[0]); // YYYY-MM-DD in ET
+            
             // Extract scores for completed/in-progress games
             const homeScore = game.score?.homeScoreTotal != null ? parseInt(game.score.homeScoreTotal) : null;
             const awayScore = game.score?.awayScoreTotal != null ? parseInt(game.score.awayScoreTotal) : null;
@@ -86,12 +92,12 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
             
             await storage.upsertDailyGame({
               gameId,
-              date: startTime,
+              date: gameDateET, // Store the game's "day" in Eastern Time
               homeTeam: game.schedule?.homeTeam?.abbreviation || "UNK",
               awayTeam: game.schedule?.awayTeam?.abbreviation || "UNK",
               venue: game.schedule?.venue?.name,
               status: normalizedStatus,
-              startTime,
+              startTime, // Keep actual UTC start time
               homeScore,
               awayScore,
             });
