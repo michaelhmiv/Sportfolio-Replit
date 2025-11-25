@@ -16,6 +16,7 @@ import { settleContests } from "./settle-contests";
 import { createContests } from "./create-contests";
 import { updateContestStatuses } from "./update-contest-statuses";
 import { dailySnapshot } from "./daily-snapshot";
+import { backfillContestStats } from "./backfill-contest-stats";
 import type { ProgressCallback } from "../lib/admin-stream";
 
 export interface JobResult {
@@ -241,6 +242,7 @@ export class JobScheduler {
       update_contest_statuses: (callback) => updateContestStatuses(callback),
       settle_contests: (callback) => settleContests(callback),
       daily_snapshot: (callback) => dailySnapshot(callback),
+      backfill_contest_stats: (callback) => backfillContestStats(callback),
     };
 
     const handler = jobConfigs[jobName];

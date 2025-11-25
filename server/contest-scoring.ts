@@ -8,6 +8,7 @@
 
 import { storage } from "./storage";
 import type { ContestEntry, PlayerGameStats } from "@shared/schema";
+import { getETDayBoundaries, getGameDay } from "./lib/time";
 
 export interface PlayerSharesInContest {
   playerId: string;
@@ -110,13 +111,13 @@ export async function calculateContestLeaderboard(contestId: string): Promise<Le
   console.log(`[calculateContestLeaderboard] Contest ${contestId}: Calculating leaderboard for ${entries.length} entries`);
 
   // Get game IDs for this contest (based on gameDate)
-  const contestDate = new Date(contest.gameDate);
-  const startOfDay = new Date(contestDate.getFullYear(), contestDate.getMonth(), contestDate.getDate(), 0, 0, 0);
-  const endOfDay = new Date(contestDate.getFullYear(), contestDate.getMonth(), contestDate.getDate(), 23, 59, 59);
+  // IMPORTANT: Use ET boundaries to correctly match games to contest dates
+  const dateStr = getGameDay(new Date(contest.gameDate)); // Get proper ET game day
+  const { startOfDay, endOfDay } = getETDayBoundaries(dateStr);
   const games = await storage.getDailyGames(startOfDay, endOfDay);
   const gameIds = games.map(g => g.gameId);
 
-  console.log(`[calculateContestLeaderboard] Contest date: ${contestDate.toISOString()}`);
+  console.log(`[calculateContestLeaderboard] Contest date: ${dateStr} (ET boundaries: ${startOfDay.toISOString()} to ${endOfDay.toISOString()})`);
   console.log(`[calculateContestLeaderboard] Found ${games.length} games for this contest date`);
   games.forEach(g => {
     console.log(`[calculateContestLeaderboard]   - Game ${g.gameId}: ${g.awayTeam} @ ${g.homeTeam} (${g.status})`);

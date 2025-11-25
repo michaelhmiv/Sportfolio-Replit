@@ -2,6 +2,7 @@
  * Contest Settlement Job
  * 
  * Automatically settles contests after they end:
+ * - First backfills any missing player stats for games in pending contests
  * - Calculates final rankings with proportional scoring
  * - Determines winners (top 50% for 50/50 contests)
  * - Distributes prize pool
@@ -13,6 +14,7 @@ import { settleContest } from "../contest-scoring";
 import type { JobResult } from "./scheduler";
 import type { ProgressCallback } from "../lib/admin-stream";
 import { getGameDay, getETDayBoundaries } from "../lib/time";
+import { backfillContestStats } from "./backfill-contest-stats";
 
 export async function settleContests(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[settle_contests] Starting contest settlement...");
@@ -25,8 +27,35 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
   
   let contestsProcessed = 0;
   let errorCount = 0;
+  let requestCount = 0;
 
   try {
+    // Step 1: First backfill any missing stats for games in live contests
+    console.log("[settle_contests] Step 1: Checking for missing player stats...");
+    progressCallback?.({
+      type: 'info',
+      timestamp: new Date().toISOString(),
+      message: 'Checking for missing player stats in pending contests...',
+    });
+    
+    try {
+      const backfillResult = await backfillContestStats(progressCallback);
+      requestCount += backfillResult.requestCount;
+      
+      if (backfillResult.recordsProcessed > 0) {
+        console.log(`[settle_contests] Backfilled ${backfillResult.recordsProcessed} player stats`);
+        progressCallback?.({
+          type: 'info',
+          timestamp: new Date().toISOString(),
+          message: `Backfilled ${backfillResult.recordsProcessed} missing player stats`,
+        });
+      }
+    } catch (backfillError: any) {
+      console.warn(`[settle_contests] Stats backfill warning: ${backfillError.message}`);
+      // Continue with settlement even if backfill fails - stats may already exist
+    }
+    
+    console.log("[settle_contests] Step 2: Finding contests to settle...");
     // Find all "live" contests that might be ready to settle
     const allContests = await storage.getContests("live");
     const now = new Date();
@@ -220,7 +249,7 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
     });
     
     return { 
-      requestCount: 0, 
+      requestCount, 
       recordsProcessed: contestsProcessed, 
       errorCount 
     };
@@ -248,6 +277,6 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
       },
     });
     
-    return { requestCount: 0, recordsProcessed: contestsProcessed, errorCount: errorCount + 1 };
+    return { requestCount, recordsProcessed: contestsProcessed, errorCount: errorCount + 1 };
   }
 }
