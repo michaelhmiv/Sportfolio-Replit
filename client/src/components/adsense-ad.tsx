@@ -1,5 +1,11 @@
 import { useEffect } from "react";
 
+declare global {
+  interface Window {
+    adsbygoogle?: any[];
+  }
+}
+
 interface AdSenseAdProps {
   slot: string;
   format?: string;
@@ -39,11 +45,4 @@ export function AdSenseAd({
       />
     </div>
   );
-}
-
-// Extend the Window interface to include adsbygoogle
-declare global {
-  interface Window {
-    adsbygoogle?: any[];
-  }
 }
