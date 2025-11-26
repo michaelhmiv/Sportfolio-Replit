@@ -2154,11 +2154,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // VALIDATE: Check user has enough available shares BEFORE creating entry
       // Available shares = total - locked (in orders, other contests, mining)
+      const playerIds = lineup.map((item: any) => item.playerId);
+      const players = await storage.getPlayersByIds(playerIds);
+      const playerMap = new Map(players.map(p => [p.id, p]));
+      
       for (const item of lineup) {
         const availableShares = await storage.getAvailableShares(user.id, "player", item.playerId);
         if (availableShares < item.sharesEntered) {
+          const player = playerMap.get(item.playerId);
+          const playerName = player ? `${player.firstName} ${player.lastName}` : item.playerId;
           return res.status(400).json({ 
-            error: `Insufficient available shares for player ${item.playerId}. Required: ${item.sharesEntered}, Available: ${availableShares}` 
+            error: `Insufficient available shares for ${playerName}. Required: ${item.sharesEntered}, Available: ${availableShares}` 
           });
         }
       }
@@ -2346,6 +2352,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const oldLineupMap = new Map<string, number>(existing.lineup.map((item: any) => [item.playerId, item.sharesEntered]));
       const newLineupMap = new Map<string, number>(lineup.map((item: any) => [item.playerId, item.sharesEntered]));
 
+      // Fetch player data for error messages
+      const allPlayerIds = Array.from(newLineupMap.keys());
+      const playersForUpdate = await storage.getPlayersByIds(allPlayerIds);
+      const playerMapForUpdate = new Map(playersForUpdate.map(p => [p.id, p]));
+
       // Validate that user has sufficient shares for the new lineup
       for (const [playerId, newShares] of Array.from(newLineupMap.entries())) {
         const oldShares = oldLineupMap.get(playerId) || 0;
@@ -2353,8 +2364,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const availableShares = Number(currentHolding) + Number(oldShares); // Current holdings + shares currently in lineup
         
         if (newShares > availableShares) {
+          const player = playerMapForUpdate.get(playerId);
+          const playerName = player ? `${player.firstName} ${player.lastName}` : playerId;
           return res.status(400).json({ 
-            error: `Insufficient shares for player ${playerId}. Available: ${availableShares}, Requested: ${newShares}` 
+            error: `Insufficient shares for ${playerName}. Available: ${availableShares}, Requested: ${newShares}` 
           });
         }
       }
