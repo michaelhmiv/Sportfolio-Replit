@@ -49,6 +49,7 @@ import {
   type InsertBlogPost,
   type PortfolioSnapshot,
   type InsertPortfolioSnapshot,
+  type PriceHistory,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, or, gte, lte, isNotNull, count } from "drizzle-orm";
@@ -217,6 +218,38 @@ export interface IStorage {
   getLatestSnapshotRanks(): Promise<Map<string, { cashRank: number; portfolioRank: number }>>;
   getPortfolioSnapshotsInRange(userId: string, startDate: Date, endDate: Date): Promise<PortfolioSnapshot[]>;
   createPortfolioSnapshot(snapshot: InsertPortfolioSnapshot): Promise<PortfolioSnapshot>;
+  
+  // Analytics methods
+  getMarketHealthStats(startDate: Date, endDate: Date): Promise<{
+    transactionCount: number;
+    totalVolume: number;
+    totalMarketCap: number;
+    prevTransactionCount: number;
+    prevTotalVolume: number;
+    prevTotalMarketCap: number;
+  }>;
+  getMarketHealthTimeSeries(startDate: Date, endDate: Date): Promise<Array<{
+    date: string;
+    transactions: number;
+    volume: number;
+    marketCap: number;
+  }>>;
+  getPlayerSharesOutstanding(playerIds?: string[]): Promise<Map<string, number>>;
+  getContestUsageStats(playerIds?: string[]): Promise<Map<string, { timesUsed: number; totalEntries: number; usagePercent: number }>>;
+  getPriceHistoryRange(playerIds: string[], startDate: Date, endDate: Date): Promise<Map<string, Array<{ timestamp: Date; price: number }>>>;
+  getHotColdPlayers(limit: number): Promise<{ hot: Player[]; cold: Player[] }>;
+  getHeatmapData(): Promise<Array<{ team: string; position: string; avgPriceChange: number; playerCount: number; topPlayer: string }>>;
+  getPowerRankings(limit?: number): Promise<Array<{
+    playerId: string;
+    name: string;
+    team: string;
+    position: string;
+    price: number;
+    priceChange7d: number;
+    volume: number;
+    avgFantasyPoints: number;
+    compositeScore: number;
+  }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2187,6 +2220,338 @@ export class DatabaseStorage implements IStorage {
       .values(snapshot)
       .returning();
     return created;
+  }
+
+  // Analytics methods
+  async getMarketHealthStats(startDate: Date, endDate: Date): Promise<{
+    transactionCount: number;
+    totalVolume: number;
+    totalMarketCap: number;
+    prevTransactionCount: number;
+    prevTotalVolume: number;
+    prevTotalMarketCap: number;
+  }> {
+    // Calculate the previous period (same length as current period)
+    const periodMs = endDate.getTime() - startDate.getTime();
+    const prevStartDate = new Date(startDate.getTime() - periodMs);
+    const prevEndDate = startDate;
+
+    // Current period trades
+    const currentTrades = await db
+      .select({
+        count: count(),
+        volume: sql<string>`COALESCE(SUM(${trades.quantity} * ${trades.price}), 0)`.as('volume'),
+      })
+      .from(trades)
+      .where(and(
+        gte(trades.executedAt, startDate),
+        lte(trades.executedAt, endDate)
+      ));
+
+    // Previous period trades
+    const prevTrades = await db
+      .select({
+        count: count(),
+        volume: sql<string>`COALESCE(SUM(${trades.quantity} * ${trades.price}), 0)`.as('volume'),
+      })
+      .from(trades)
+      .where(and(
+        gte(trades.executedAt, prevStartDate),
+        lte(trades.executedAt, prevEndDate)
+      ));
+
+    // Total market cap = sum of (all shares held * last trade price)
+    const marketCapResult = await db
+      .select({
+        marketCap: sql<string>`COALESCE(SUM(${holdings.quantity} * COALESCE(${players.lastTradePrice}, ${players.currentPrice})), 0)`.as('market_cap'),
+      })
+      .from(holdings)
+      .innerJoin(players, eq(holdings.assetId, players.id))
+      .where(eq(holdings.assetType, 'player'));
+
+    return {
+      transactionCount: currentTrades[0]?.count || 0,
+      totalVolume: parseFloat(currentTrades[0]?.volume || "0"),
+      totalMarketCap: parseFloat(marketCapResult[0]?.marketCap || "0"),
+      prevTransactionCount: prevTrades[0]?.count || 0,
+      prevTotalVolume: parseFloat(prevTrades[0]?.volume || "0"),
+      prevTotalMarketCap: parseFloat(marketCapResult[0]?.marketCap || "0"), // Same as current (no historical tracking)
+    };
+  }
+
+  async getMarketHealthTimeSeries(startDate: Date, endDate: Date): Promise<Array<{
+    date: string;
+    transactions: number;
+    volume: number;
+    marketCap: number;
+  }>> {
+    // Group trades by day
+    const dailyStats = await db
+      .select({
+        date: sql<string>`DATE(${trades.executedAt})`.as('date'),
+        transactions: count(),
+        volume: sql<string>`COALESCE(SUM(${trades.quantity} * ${trades.price}), 0)`.as('volume'),
+      })
+      .from(trades)
+      .where(and(
+        gte(trades.executedAt, startDate),
+        lte(trades.executedAt, endDate)
+      ))
+      .groupBy(sql`DATE(${trades.executedAt})`)
+      .orderBy(sql`DATE(${trades.executedAt})`);
+
+    // Get current market cap (we don't have historical snapshots yet)
+    const marketCapResult = await db
+      .select({
+        marketCap: sql<string>`COALESCE(SUM(${holdings.quantity} * COALESCE(${players.lastTradePrice}, ${players.currentPrice})), 0)`.as('market_cap'),
+      })
+      .from(holdings)
+      .innerJoin(players, eq(holdings.assetId, players.id))
+      .where(eq(holdings.assetType, 'player'));
+    
+    const currentMarketCap = parseFloat(marketCapResult[0]?.marketCap || "0");
+
+    return dailyStats.map(row => ({
+      date: row.date,
+      transactions: row.transactions,
+      volume: parseFloat(row.volume || "0"),
+      marketCap: currentMarketCap, // Same for all days (no historical tracking)
+    }));
+  }
+
+  async getPlayerSharesOutstanding(playerIds?: string[]): Promise<Map<string, number>> {
+    let query = db
+      .select({
+        playerId: holdings.assetId,
+        totalShares: sql<string>`COALESCE(SUM(${holdings.quantity}), 0)`.as('total_shares'),
+      })
+      .from(holdings)
+      .where(eq(holdings.assetType, 'player'))
+      .groupBy(holdings.assetId);
+
+    if (playerIds && playerIds.length > 0) {
+      query = db
+        .select({
+          playerId: holdings.assetId,
+          totalShares: sql<string>`COALESCE(SUM(${holdings.quantity}), 0)`.as('total_shares'),
+        })
+        .from(holdings)
+        .where(and(
+          eq(holdings.assetType, 'player'),
+          inArray(holdings.assetId, playerIds)
+        ))
+        .groupBy(holdings.assetId);
+    }
+
+    const results = await query;
+    const sharesMap = new Map<string, number>();
+    for (const row of results) {
+      sharesMap.set(row.playerId, parseInt(row.totalShares) || 0);
+    }
+    return sharesMap;
+  }
+
+  async getContestUsageStats(playerIds?: string[]): Promise<Map<string, { timesUsed: number; totalEntries: number; usagePercent: number }>> {
+    // Get total contest entries
+    const totalEntriesResult = await db
+      .select({ count: count() })
+      .from(contestEntries);
+    const totalEntries = totalEntriesResult[0]?.count || 0;
+
+    // Get player usage counts
+    let usageQuery = db
+      .select({
+        playerId: contestLineups.playerId,
+        timesUsed: count(),
+      })
+      .from(contestLineups)
+      .groupBy(contestLineups.playerId);
+
+    if (playerIds && playerIds.length > 0) {
+      usageQuery = db
+        .select({
+          playerId: contestLineups.playerId,
+          timesUsed: count(),
+        })
+        .from(contestLineups)
+        .where(inArray(contestLineups.playerId, playerIds))
+        .groupBy(contestLineups.playerId);
+    }
+
+    const usageResults = await usageQuery;
+    const usageMap = new Map<string, { timesUsed: number; totalEntries: number; usagePercent: number }>();
+    
+    for (const row of usageResults) {
+      const usagePercent = totalEntries > 0 ? (row.timesUsed / totalEntries) * 100 : 0;
+      usageMap.set(row.playerId, {
+        timesUsed: row.timesUsed,
+        totalEntries,
+        usagePercent,
+      });
+    }
+    
+    return usageMap;
+  }
+
+  async getPriceHistoryRange(playerIds: string[], startDate: Date, endDate: Date): Promise<Map<string, Array<{ timestamp: Date; price: number }>>> {
+    if (playerIds.length === 0) {
+      return new Map();
+    }
+
+    const history = await db
+      .select({
+        playerId: priceHistory.playerId,
+        timestamp: priceHistory.timestamp,
+        price: priceHistory.price,
+      })
+      .from(priceHistory)
+      .where(and(
+        inArray(priceHistory.playerId, playerIds),
+        gte(priceHistory.timestamp, startDate),
+        lte(priceHistory.timestamp, endDate)
+      ))
+      .orderBy(priceHistory.playerId, priceHistory.timestamp);
+
+    const historyMap = new Map<string, Array<{ timestamp: Date; price: number }>>();
+    
+    for (const row of history) {
+      if (!historyMap.has(row.playerId)) {
+        historyMap.set(row.playerId, []);
+      }
+      historyMap.get(row.playerId)!.push({
+        timestamp: row.timestamp,
+        price: parseFloat(row.price),
+      });
+    }
+    
+    return historyMap;
+  }
+
+  async getHotColdPlayers(limit: number): Promise<{ hot: Player[]; cold: Player[] }> {
+    // Hot players: biggest positive price change
+    const hotPlayers = await db
+      .select()
+      .from(players)
+      .where(and(
+        eq(players.isActive, true),
+        sql`${players.priceChange24h} > 0`
+      ))
+      .orderBy(desc(players.priceChange24h))
+      .limit(limit);
+
+    // Cold players: biggest negative price change
+    const coldPlayers = await db
+      .select()
+      .from(players)
+      .where(and(
+        eq(players.isActive, true),
+        sql`${players.priceChange24h} < 0`
+      ))
+      .orderBy(asc(players.priceChange24h))
+      .limit(limit);
+
+    return { hot: hotPlayers, cold: coldPlayers };
+  }
+
+  async getHeatmapData(): Promise<Array<{ team: string; position: string; avgPriceChange: number; playerCount: number; topPlayer: string }>> {
+    // Aggregate price changes by team and position
+    const heatmapData = await db
+      .select({
+        team: players.team,
+        position: players.position,
+        avgPriceChange: sql<string>`AVG(${players.priceChange24h})`.as('avg_price_change'),
+        playerCount: count(),
+        topPlayer: sql<string>`(
+          SELECT CONCAT(p2.first_name, ' ', p2.last_name)
+          FROM players p2
+          WHERE p2.team = ${players.team} AND p2.position = ${players.position} AND p2.is_active = true
+          ORDER BY p2.price_change_24h DESC
+          LIMIT 1
+        )`.as('top_player'),
+      })
+      .from(players)
+      .where(eq(players.isActive, true))
+      .groupBy(players.team, players.position)
+      .orderBy(players.team, players.position);
+
+    return heatmapData.map(row => ({
+      team: row.team,
+      position: row.position,
+      avgPriceChange: parseFloat(row.avgPriceChange || "0"),
+      playerCount: row.playerCount,
+      topPlayer: row.topPlayer || "N/A",
+    }));
+  }
+
+  async getPowerRankings(limit: number = 50): Promise<Array<{
+    playerId: string;
+    name: string;
+    team: string;
+    position: string;
+    price: number;
+    priceChange7d: number;
+    volume: number;
+    avgFantasyPoints: number;
+    compositeScore: number;
+  }>> {
+    // Get active players with their stats
+    const activePlayers = await db
+      .select()
+      .from(players)
+      .where(eq(players.isActive, true));
+
+    // Get fantasy points averages for each player
+    const fantasyStats = await db
+      .select({
+        playerId: playerGameStats.playerId,
+        avgFantasyPoints: sql<string>`AVG(${playerGameStats.fantasyPoints})`.as('avg_fantasy'),
+        gamesPlayed: count(),
+      })
+      .from(playerGameStats)
+      .groupBy(playerGameStats.playerId);
+
+    const fantasyMap = new Map<string, { avgFantasy: number; gamesPlayed: number }>();
+    for (const stat of fantasyStats) {
+      fantasyMap.set(stat.playerId, {
+        avgFantasy: parseFloat(stat.avgFantasyPoints || "0"),
+        gamesPlayed: stat.gamesPlayed,
+      });
+    }
+
+    // Calculate composite scores
+    // Weights: 40% price momentum, 30% volume, 30% fantasy points
+    const rankings = activePlayers.map(player => {
+      const fantasyData = fantasyMap.get(player.id) || { avgFantasy: 0, gamesPlayed: 0 };
+      
+      // Normalize values (0-100 scale)
+      const priceChange = parseFloat(player.priceChange24h || "0");
+      const volume = player.volume24h || 0;
+      const avgFantasy = fantasyData.avgFantasy;
+
+      // Simple normalization (can be improved with z-scores)
+      const priceMomentumScore = Math.min(Math.max((priceChange + 20) / 40 * 100, 0), 100); // -20% to +20% mapped to 0-100
+      const volumeScore = Math.min(volume / 100 * 100, 100); // 0-100+ shares mapped to 0-100
+      const fantasyScore = Math.min(avgFantasy / 50 * 100, 100); // 0-50 fantasy pts mapped to 0-100
+
+      const compositeScore = (priceMomentumScore * 0.4) + (volumeScore * 0.3) + (fantasyScore * 0.3);
+
+      return {
+        playerId: player.id,
+        name: `${player.firstName} ${player.lastName}`,
+        team: player.team,
+        position: player.position,
+        price: parseFloat(player.lastTradePrice || player.currentPrice || "0"),
+        priceChange7d: priceChange, // Using 24h as proxy for now
+        volume,
+        avgFantasyPoints: avgFantasy,
+        compositeScore,
+      };
+    });
+
+    // Sort by composite score and return top N
+    return rankings
+      .sort((a, b) => b.compositeScore - a.compositeScore)
+      .slice(0, limit);
   }
 }
 

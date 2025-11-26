@@ -5,25 +5,30 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar, Cell, ScatterChart, Scatter, ZAxis } from "recharts";
-import { TrendingUp, TrendingDown, Flame, Snowflake, BarChart3, Users, Target, ArrowUpDown, GitCompare, Grid3X3 } from "lucide-react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar, AreaChart, Area } from "recharts";
+import { TrendingUp, TrendingDown, Flame, Snowflake, BarChart3, Users, Target, GitCompare, Grid3X3, Activity, DollarSign, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Link } from "wouter";
-import type { Player, PriceHistory } from "@shared/schema";
+import type { Player } from "@shared/schema";
 
 interface PlayerWithStats extends Player {
-  fantasyPointsAvg?: number;
-  gamesPlayed?: number;
   priceChangePercent?: number;
 }
 
 interface PowerRanking {
   rank: number;
-  player: Player;
+  player: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    team: string;
+    position: string;
+    lastTradePrice: string;
+    volume24h: number;
+    priceChange24h: string;
+  };
   compositeScore: number;
-  marketScore: number;
-  performanceScore: number;
-  volumeScore: number;
   priceChange7d: number;
+  avgFantasyPoints: number;
 }
 
 interface HeatmapCell {
@@ -38,56 +43,88 @@ interface PositionRanking {
   position: string;
   players: {
     rank: number;
-    player: Player;
+    player: {
+      id: string;
+      firstName: string;
+      lastName: string;
+      team: string;
+      position: string;
+      lastTradePrice: string;
+      volume24h: number;
+      priceChange24h: string;
+    };
     avgFantasyPoints: number;
     priceChange7d: number;
   }[];
 }
 
-interface CorrelationData {
-  player1: string;
-  player2: string;
-  correlation: number;
+interface MarketHealth {
+  transactions: number;
+  transactionChange: number;
+  volume: number;
+  volumeChange: number;
+  marketCap: number;
+  marketCapChange: number;
+  timeSeries: {
+    date: string;
+    transactions: number;
+    volume: number;
+    marketCap: number;
+  }[];
 }
 
-type TimeRange = "1D" | "7D" | "1M" | "3M";
+interface ComparisonPlayer {
+  id: string;
+  name: string;
+  team: string;
+  position: string;
+  shares: number;
+  marketCap: number;
+  price: number;
+  volume: number;
+  priceChange24h: number;
+  contestUsagePercent: number;
+  timesUsedInContests: number;
+  priceHistory: { timestamp: string; price: number }[];
+}
+
+interface AnalyticsData {
+  marketHealth: MarketHealth;
+  hotPlayers: PlayerWithStats[];
+  coldPlayers: PlayerWithStats[];
+  powerRankings: PowerRanking[];
+  heatmapData: HeatmapCell[];
+  positionRankings: PositionRanking[];
+  marketStats: {
+    totalVolume24h: number;
+    totalTrades24h: number;
+    avgPriceChange: number;
+    mostActiveTeam: string;
+  };
+}
+
+type TimeRange = "24H" | "7D" | "30D" | "3M" | "1Y" | "All";
 
 export default function Analytics() {
-  const [timeRange, setTimeRange] = useState<TimeRange>("7D");
+  const [timeRange, setTimeRange] = useState<TimeRange>("24H");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
 
-  const { data: analyticsData, isLoading } = useQuery<{
-    hotPlayers: PlayerWithStats[];
-    coldPlayers: PlayerWithStats[];
-    powerRankings: PowerRanking[];
-    heatmapData: HeatmapCell[];
-    positionRankings: PositionRanking[];
-    marketStats: {
-      totalVolume24h: number;
-      totalTrades24h: number;
-      avgPriceChange: number;
-      mostActiveTeam: string;
-    };
-  }>({
+  const { data: analyticsData, isLoading } = useQuery<AnalyticsData>({
     queryKey: [`/api/analytics?timeRange=${timeRange}`],
   });
 
   const { data: comparisonData, isLoading: comparisonLoading } = useQuery<{
-    players: { id: string; name: string; priceHistory: { timestamp: string; price: number }[] }[];
+    players: ComparisonPlayer[];
   }>({
-    queryKey: [`/api/analytics/compare?playerIds=${selectedPlayers.join(",")}`],
-    enabled: selectedPlayers.length >= 2,
+    queryKey: [`/api/analytics/compare?playerIds=${selectedPlayers.join(",")}&timeRange=${timeRange}`],
+    enabled: selectedPlayers.length >= 1,
   });
 
   const { data: playersData } = useQuery<{ players: Player[] }>({
     queryKey: ["/api/players"],
   });
   const allPlayers = playersData?.players;
-
-  const { data: correlationData } = useQuery<CorrelationData[]>({
-    queryKey: [`/api/analytics/correlations?timeRange=${timeRange}`],
-  });
 
   const handlePlayerSelect = (playerId: string) => {
     if (selectedPlayers.includes(playerId)) {
@@ -122,6 +159,17 @@ export default function Analytics() {
     return "bg-red-600";
   };
 
+  const formatLargeNumber = (num: number) => {
+    if (num >= 1000000) return `$${(num / 1000000).toFixed(2)}M`;
+    if (num >= 1000) return `$${(num / 1000).toFixed(1)}K`;
+    return `$${num.toFixed(2)}`;
+  };
+
+  const formatPercent = (num: number) => {
+    const prefix = num >= 0 ? "+" : "";
+    return `${prefix}${num.toFixed(1)}%`;
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-3 sm:p-4">
@@ -144,48 +192,125 @@ export default function Analytics() {
           </div>
           <div className="flex items-center gap-2">
             <Select value={timeRange} onValueChange={(v) => setTimeRange(v as TimeRange)}>
-              <SelectTrigger className="w-24" data-testid="select-timerange">
+              <SelectTrigger className="w-28" data-testid="select-timerange">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="1D">1 Day</SelectItem>
+                <SelectItem value="24H">24 Hours</SelectItem>
                 <SelectItem value="7D">7 Days</SelectItem>
-                <SelectItem value="1M">1 Month</SelectItem>
+                <SelectItem value="30D">30 Days</SelectItem>
                 <SelectItem value="3M">3 Months</SelectItem>
+                <SelectItem value="1Y">1 Year</SelectItem>
+                <SelectItem value="All">All Time</SelectItem>
               </SelectContent>
             </Select>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <Card data-testid="card-total-volume">
+        {/* Market Health Dashboard */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Card data-testid="card-transactions">
             <CardContent className="p-4">
-              <div className="text-xs text-muted-foreground uppercase tracking-wide">24h Volume</div>
-              <div className="text-xl sm:text-2xl font-mono font-bold">{analyticsData?.marketStats?.totalVolume24h?.toLocaleString() || 0}</div>
-            </CardContent>
-          </Card>
-          <Card data-testid="card-total-trades">
-            <CardContent className="p-4">
-              <div className="text-xs text-muted-foreground uppercase tracking-wide">24h Trades</div>
-              <div className="text-xl sm:text-2xl font-mono font-bold">{analyticsData?.marketStats?.totalTrades24h || 0}</div>
-            </CardContent>
-          </Card>
-          <Card data-testid="card-avg-change">
-            <CardContent className="p-4">
-              <div className="text-xs text-muted-foreground uppercase tracking-wide">Avg Price Change</div>
-              <div className={`text-xl sm:text-2xl font-mono font-bold ${getPriceChangeColor(analyticsData?.marketStats?.avgPriceChange || 0)}`}>
-                {(analyticsData?.marketStats?.avgPriceChange || 0) >= 0 ? "+" : ""}
-                {(analyticsData?.marketStats?.avgPriceChange || 0).toFixed(2)}%
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                    <Activity className="w-3 h-3" />
+                    Transactions
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-mono font-bold">
+                    {analyticsData?.marketHealth?.transactions?.toLocaleString() || 0}
+                  </div>
+                </div>
+                <div className={`flex items-center gap-1 text-sm ${(analyticsData?.marketHealth?.transactionChange || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {(analyticsData?.marketHealth?.transactionChange || 0) >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                  {formatPercent(analyticsData?.marketHealth?.transactionChange || 0)}
+                </div>
               </div>
             </CardContent>
           </Card>
-          <Card data-testid="card-most-active">
+          
+          <Card data-testid="card-volume">
             <CardContent className="p-4">
-              <div className="text-xs text-muted-foreground uppercase tracking-wide">Most Active Team</div>
-              <div className="text-xl sm:text-2xl font-mono font-bold">{analyticsData?.marketStats?.mostActiveTeam || "N/A"}</div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                    <DollarSign className="w-3 h-3" />
+                    Volume
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-mono font-bold">
+                    {formatLargeNumber(analyticsData?.marketHealth?.volume || 0)}
+                  </div>
+                </div>
+                <div className={`flex items-center gap-1 text-sm ${(analyticsData?.marketHealth?.volumeChange || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {(analyticsData?.marketHealth?.volumeChange || 0) >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                  {formatPercent(analyticsData?.marketHealth?.volumeChange || 0)}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card data-testid="card-market-cap">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                    <BarChart3 className="w-3 h-3" />
+                    Market Cap
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-mono font-bold">
+                    {formatLargeNumber(analyticsData?.marketHealth?.marketCap || 0)}
+                  </div>
+                </div>
+                <div className={`flex items-center gap-1 text-sm ${(analyticsData?.marketHealth?.marketCapChange || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {(analyticsData?.marketHealth?.marketCapChange || 0) >= 0 ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                  {formatPercent(analyticsData?.marketHealth?.marketCapChange || 0)}
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Time Series Chart */}
+        {analyticsData?.marketHealth?.timeSeries && analyticsData.marketHealth.timeSeries.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium flex items-center gap-2">
+                <Activity className="w-4 h-4" />
+                Market Activity Over Time
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={200}>
+                <AreaChart data={analyticsData.marketHealth.timeSeries}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="hsl(var(--muted-foreground))" 
+                    fontSize={10}
+                    tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  />
+                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px',
+                      fontSize: '12px'
+                    }}
+                    labelFormatter={(v) => new Date(v).toLocaleDateString()}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="volume" 
+                    stroke="hsl(var(--primary))" 
+                    fill="hsl(var(--primary) / 0.2)" 
+                    name="Volume"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="w-full grid grid-cols-3 sm:grid-cols-6 h-auto">
@@ -392,10 +517,10 @@ export default function Analytics() {
                       <tr className="text-xs text-muted-foreground uppercase tracking-wide">
                         <th className="text-left py-2 px-2">Rank</th>
                         <th className="text-left py-2 px-2">Player</th>
-                        <th className="text-right py-2 px-2 hidden sm:table-cell">Market</th>
-                        <th className="text-right py-2 px-2 hidden sm:table-cell">Performance</th>
+                        <th className="text-right py-2 px-2 hidden sm:table-cell">Price</th>
                         <th className="text-right py-2 px-2 hidden sm:table-cell">Volume</th>
-                        <th className="text-right py-2 px-2">Total</th>
+                        <th className="text-right py-2 px-2 hidden sm:table-cell">Avg Fantasy</th>
+                        <th className="text-right py-2 px-2">Score</th>
                         <th className="text-right py-2 px-2">7d Change</th>
                       </tr>
                     </thead>
@@ -417,9 +542,9 @@ export default function Analytics() {
                               </div>
                             </Link>
                           </td>
-                          <td className="py-3 px-2 text-right font-mono hidden sm:table-cell">{ranking.marketScore.toFixed(1)}</td>
-                          <td className="py-3 px-2 text-right font-mono hidden sm:table-cell">{ranking.performanceScore.toFixed(1)}</td>
-                          <td className="py-3 px-2 text-right font-mono hidden sm:table-cell">{ranking.volumeScore.toFixed(1)}</td>
+                          <td className="py-3 px-2 text-right font-mono hidden sm:table-cell">${ranking.player.lastTradePrice}</td>
+                          <td className="py-3 px-2 text-right font-mono hidden sm:table-cell">{ranking.player.volume24h}</td>
+                          <td className="py-3 px-2 text-right font-mono hidden sm:table-cell">{ranking.avgFantasyPoints.toFixed(1)}</td>
                           <td className="py-3 px-2 text-right font-mono font-bold">{ranking.compositeScore.toFixed(1)}</td>
                           <td className={`py-3 px-2 text-right font-mono ${getPriceChangeColor(ranking.priceChange7d)}`}>
                             {ranking.priceChange7d >= 0 ? "+" : ""}{ranking.priceChange7d.toFixed(1)}%
@@ -491,10 +616,6 @@ export default function Analytics() {
                     <span>-5%</span>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className="w-4 h-4 bg-muted rounded"></div>
-                    <span>0%</span>
-                  </div>
-                  <div className="flex items-center gap-1">
                     <div className="w-4 h-4 bg-green-400/70 rounded"></div>
                     <span>+5%</span>
                   </div>
@@ -512,38 +633,40 @@ export default function Analytics() {
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
                   <GitCompare className="w-4 h-4" />
-                  Player Comparison Tool
-                  <Badge variant="outline" className="ml-2 text-xs">Select 2-5 players</Badge>
+                  Player Comparison
+                  <Badge variant="outline" className="ml-2 text-xs">Up to 5 players</Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex flex-wrap gap-2">
-                  {selectedPlayers.map((playerId, idx) => {
-                    const player = allPlayers?.find(p => p.id === playerId);
-                    return player ? (
-                      <Badge 
-                        key={playerId}
-                        variant="secondary"
-                        className="cursor-pointer"
-                        style={{ borderColor: chartColors[idx] }}
-                        onClick={() => handlePlayerSelect(playerId)}
-                        data-testid={`badge-selected-player-${idx}`}
-                      >
-                        {player.firstName} {player.lastName}
-                        <span className="ml-1 text-xs">x</span>
-                      </Badge>
-                    ) : null;
-                  })}
+                <div>
+                  <p className="text-sm text-muted-foreground mb-2">Select players to compare:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedPlayers.map((id) => {
+                      const player = allPlayers?.find(p => p.id === id);
+                      return player ? (
+                        <Badge 
+                          key={id} 
+                          variant="secondary" 
+                          className="cursor-pointer"
+                          onClick={() => handlePlayerSelect(id)}
+                          data-testid={`badge-selected-${id}`}
+                        >
+                          {player.firstName} {player.lastName}
+                          <span className="ml-1 text-xs">x</span>
+                        </Badge>
+                      ) : null;
+                    })}
+                  </div>
                 </div>
-                
+
                 <Select onValueChange={handlePlayerSelect}>
-                  <SelectTrigger className="w-full sm:w-64" data-testid="select-add-player">
+                  <SelectTrigger data-testid="select-player-compare">
                     <SelectValue placeholder="Add player to compare..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {allPlayers?.filter(p => !selectedPlayers.includes(p.id))
+                    {allPlayers?.filter(p => p.isActive && !selectedPlayers.includes(p.id))
                       .slice(0, 50)
-                      .map((player) => (
+                      .map(player => (
                         <SelectItem key={player.id} value={player.id}>
                           {player.firstName} {player.lastName} ({player.team})
                         </SelectItem>
@@ -551,137 +674,151 @@ export default function Analytics() {
                   </SelectContent>
                 </Select>
 
-                {selectedPlayers.length >= 2 && comparisonData && (
-                  <div className="mt-4">
-                    <ResponsiveContainer width="100%" height={300}>
-                      <LineChart>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis 
-                          dataKey="timestamp" 
-                          stroke="hsl(var(--muted-foreground))"
-                          fontSize={10}
-                          tickFormatter={(value) => {
-                            const date = new Date(value);
-                            return `${date.getMonth() + 1}/${date.getDate()}`;
-                          }}
-                        />
-                        <YAxis 
-                          stroke="hsl(var(--muted-foreground))"
-                          fontSize={10}
-                          tickFormatter={(value) => `$${value}`}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--card))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '6px',
-                            fontSize: '12px'
-                          }}
-                        />
-                        <Legend />
-                        {comparisonData.players.map((player, idx) => (
-                          <Line 
-                            key={player.id}
-                            type="monotone" 
-                            data={player.priceHistory}
-                            dataKey="price" 
-                            name={player.name}
-                            stroke={chartColors[idx]} 
-                            strokeWidth={2}
-                            dot={false}
-                          />
-                        ))}
-                      </LineChart>
-                    </ResponsiveContainer>
+                {comparisonLoading && (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                   </div>
                 )}
 
-                {selectedPlayers.length < 2 && (
-                  <div className="h-[300px] flex items-center justify-center border border-dashed rounded-lg">
-                    <div className="text-center text-muted-foreground">
-                      <GitCompare className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                      <p>Select at least 2 players to compare their price history</p>
+                {comparisonData?.players && comparisonData.players.length > 0 && (
+                  <>
+                    {/* Enhanced Comparison Table */}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="border-b">
+                          <tr className="text-xs text-muted-foreground uppercase tracking-wide">
+                            <th className="text-left py-2 px-2">Player</th>
+                            <th className="text-right py-2 px-2">Price</th>
+                            <th className="text-right py-2 px-2">Shares</th>
+                            <th className="text-right py-2 px-2">Market Cap</th>
+                            <th className="text-right py-2 px-2">Volume</th>
+                            <th className="text-right py-2 px-2">Contest Usage</th>
+                            <th className="text-right py-2 px-2">24h Change</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {comparisonData.players.map((player, idx) => (
+                            <tr key={player.id} className="border-b">
+                              <td className="py-3 px-2">
+                                <Link href={`/player/${player.id}`}>
+                                  <div className="hover:text-primary">
+                                    <div className="font-medium flex items-center gap-2">
+                                      <div 
+                                        className="w-3 h-3 rounded-full" 
+                                        style={{ backgroundColor: chartColors[idx % chartColors.length] }}
+                                      ></div>
+                                      {player.name}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">{player.team} - {player.position}</div>
+                                  </div>
+                                </Link>
+                              </td>
+                              <td className="py-3 px-2 text-right font-mono">${player.price.toFixed(2)}</td>
+                              <td className="py-3 px-2 text-right font-mono">{player.shares.toLocaleString()}</td>
+                              <td className="py-3 px-2 text-right font-mono">{formatLargeNumber(player.marketCap)}</td>
+                              <td className="py-3 px-2 text-right font-mono">{player.volume}</td>
+                              <td className="py-3 px-2 text-right font-mono">{player.contestUsagePercent.toFixed(1)}%</td>
+                              <td className={`py-3 px-2 text-right font-mono ${getPriceChangeColor(player.priceChange24h)}`}>
+                                {player.priceChange24h >= 0 ? "+" : ""}{player.priceChange24h.toFixed(1)}%
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
+
+                    {/* Price History Chart */}
+                    {comparisonData.players.some(p => p.priceHistory.length > 0) && (
+                      <div className="mt-4">
+                        <h4 className="text-sm font-medium mb-2">Price History Comparison</h4>
+                        <ResponsiveContainer width="100%" height={300}>
+                          <LineChart>
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                            <XAxis 
+                              dataKey="timestamp"
+                              stroke="hsl(var(--muted-foreground))" 
+                              fontSize={10}
+                              tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              type="category"
+                              allowDuplicatedCategory={false}
+                            />
+                            <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} domain={['auto', 'auto']} />
+                            <Tooltip
+                              contentStyle={{
+                                backgroundColor: 'hsl(var(--card))',
+                                border: '1px solid hsl(var(--border))',
+                                borderRadius: '6px',
+                                fontSize: '12px'
+                              }}
+                              labelFormatter={(v) => new Date(v).toLocaleDateString()}
+                            />
+                            <Legend />
+                            {comparisonData.players.map((player, idx) => (
+                              <Line
+                                key={player.id}
+                                data={player.priceHistory}
+                                type="monotone"
+                                dataKey="price"
+                                name={player.name}
+                                stroke={chartColors[idx % chartColors.length]}
+                                strokeWidth={2}
+                                dot={false}
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {!comparisonLoading && selectedPlayers.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Select at least one player to view comparison data
                   </div>
                 )}
               </CardContent>
             </Card>
-
-            {correlationData && correlationData.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <ArrowUpDown className="w-4 h-4" />
-                    Price Correlation Matrix
-                    <Badge variant="outline" className="ml-2 text-xs">Top correlations</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {correlationData.slice(0, 10).map((corr, idx) => (
-                      <div 
-                        key={idx}
-                        className="flex items-center justify-between p-2 rounded-md bg-muted/50"
-                        data-testid={`row-correlation-${idx}`}
-                      >
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="font-medium">{corr.player1}</span>
-                          <span className="text-muted-foreground">&</span>
-                          <span className="font-medium">{corr.player2}</span>
-                        </div>
-                        <Badge variant={corr.correlation > 0.7 ? "default" : corr.correlation > 0.4 ? "secondary" : "outline"}>
-                          {(corr.correlation * 100).toFixed(0)}%
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
           <TabsContent value="positions" className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {analyticsData?.positionRankings?.map((posRank) => (
-                <Card key={posRank.position} data-testid={`card-position-${posRank.position}`}>
+              {analyticsData?.positionRankings?.map((posRanking) => (
+                <Card key={posRanking.position}>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <Badge>{posRank.position}</Badge>
-                      Position Leaders
+                      <Users className="w-4 h-4" />
+                      {posRanking.position} Rankings
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-2">
-                      {posRank.players.slice(0, 5).map((player) => (
-                        <Link key={player.player.id} href={`/player/${player.player.id}`}>
+                      {posRanking.players.slice(0, 5).map((item, idx) => (
+                        <Link key={item.player.id} href={`/player/${item.player.id}`}>
                           <div 
                             className="flex items-center justify-between p-2 rounded-md hover-elevate"
-                            data-testid={`row-position-player-${player.rank}`}
+                            data-testid={`row-${posRanking.position}-${idx + 1}`}
                           >
                             <div className="flex items-center gap-2">
-                              <span className="font-mono font-bold w-5 text-right text-sm">{player.rank}</span>
+                              <span className="font-mono font-bold w-4">{item.rank}</span>
                               <div>
-                                <div className="font-medium text-sm">{player.player.firstName} {player.player.lastName}</div>
-                                <div className="text-xs text-muted-foreground">{player.player.team}</div>
+                                <div className="font-medium text-sm">{item.player.firstName} {item.player.lastName}</div>
+                                <div className="text-xs text-muted-foreground">{item.player.team}</div>
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="font-mono text-sm">{player.avgFantasyPoints.toFixed(1)} FP</div>
-                              <div className={`text-xs ${getPriceChangeColor(player.priceChange7d)}`}>
-                                {player.priceChange7d >= 0 ? "+" : ""}{player.priceChange7d.toFixed(1)}%
+                              <div className="font-mono text-sm">{item.avgFantasyPoints.toFixed(1)} FP</div>
+                              <div className={`text-xs ${getPriceChangeColor(item.priceChange7d)}`}>
+                                {item.priceChange7d >= 0 ? "+" : ""}{item.priceChange7d.toFixed(1)}%
                               </div>
                             </div>
                           </div>
                         </Link>
-                      ))}
+                      )) || <div className="text-sm text-muted-foreground text-center py-2">No players</div>}
                     </div>
                   </CardContent>
                 </Card>
-              )) || (
-                <div className="col-span-full text-center py-8 text-muted-foreground">
-                  No position data available
-                </div>
-              )}
+              ))}
             </div>
           </TabsContent>
         </Tabs>

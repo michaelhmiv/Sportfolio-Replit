@@ -49,12 +49,30 @@ The UI prioritizes information density and compact layouts inspired by professio
 The platform provides comprehensive data analysis features to meet AdSense requirements for original content:
 
 **Analytics Page (`/analytics`):**
-- Overview tab: Market stats (24h volume, trades, avg price change), Power Rankings with composite scoring
-- Hot/Cold Players: Biggest gainers and losers with price change visualization
-- Rankings: Power rankings with composite score (market strength + volume + momentum)
-- Heatmap: Team/position matrix showing average price changes and top players
-- Compare: Multi-player price history comparison with overlaid charts (up to 5 players)
-- Positions: Position-based player rankings (PG, SG, SF, PF, C)
+
+*Market Health Dashboard:*
+- Three metric cards showing Transactions, Volume, and Market Cap with percentage changes vs previous period
+- Timeframe selector: 24H, 7D, 30D, 3M, 1Y, All Time
+- Time series chart showing market activity over time (volume trend)
+- All metrics calculated from real trades and holdings tables
+
+*Tabs:*
+- Overview tab: Power Rankings top 10 with composite scores, Volume by Position bar chart
+- Hot/Cold Players: Biggest gainers (positive price change) and losers (negative price change)
+- Rankings: Full power rankings table with Price, Volume, Avg Fantasy Points, Score, 7d Change
+- Heatmap: Team/position matrix showing average price changes and top players per cell
+- Compare: Enhanced multi-player comparison (up to 5 players) with:
+  - Shares Outstanding (from holdings table)
+  - Market Cap (shares × price)
+  - Price, Volume, 24h Change
+  - Contest Usage % (from contest_lineups table)
+  - Overlaid price history chart
+- Positions: Position-based player rankings (PG, SG, SF, PF, C) with fantasy points averages
+
+*Power Rankings Scoring (40/30/30 weights):*
+- 40% Price Momentum: -20% to +20% mapped to 0-100
+- 30% Volume: 0-100+ shares mapped to 0-100
+- 30% Fantasy Points: Average from player_game_stats (0-50 FP mapped to 0-100)
 
 **Leaderboards (`/leaderboards`):**
 - Net Worth rankings
@@ -70,10 +88,20 @@ The platform provides comprehensive data analysis features to meet AdSense requi
 - Creates SEO-optimized content with markdown formatting and tables
 - Stored in blog system for admin review and publishing
 
-**API Endpoints:**
-- `/api/analytics?timeRange=<1D|7D|1M|3M>` - Market analytics data
-- `/api/analytics/compare?playerIds=<comma-separated>` - Player price history comparison
+**Analytics API Endpoints:**
+- `/api/analytics?timeRange=<24H|7D|30D|3M|1Y|All>` - Market health, hot/cold players, power rankings, heatmap, positions
+- `/api/analytics/compare?playerIds=<comma-separated>&timeRange=<timeRange>` - Enhanced player comparison with shares, market cap, contest usage
 - `/api/analytics/correlations?timeRange=<timeRange>` - Price correlation analysis
+
+**Storage Methods (in server/storage.ts):**
+- `getMarketHealthStats(startDate, endDate)` - Transaction count, volume, market cap with period comparison
+- `getMarketHealthTimeSeries(startDate, endDate)` - Daily aggregates for charts
+- `getPlayerSharesOutstanding(playerIds?)` - Total shares held per player from holdings
+- `getContestUsageStats(playerIds?)` - Times used in contests, usage percentage
+- `getPriceHistoryRange(playerIds, startDate, endDate)` - Historical prices for comparison charts
+- `getHotColdPlayers(limit)` - Players with biggest positive/negative price changes
+- `getHeatmapData()` - Aggregated by team and position
+- `getPowerRankings(limit)` - Composite score calculations with fantasy stats
 
 ### Content & SEO
 A blog system (`/blog`) provides admin-controlled content for SEO and user engagement, supporting draft and published states. Static pages for legal information (`/privacy`, `/terms`), platform information (`/about`, `/contact`, `/how-it-works`) ensure AdSense compliance and comprehensive user guidance. A site footer provides consistent navigation.
