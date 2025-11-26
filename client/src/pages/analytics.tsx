@@ -80,9 +80,10 @@ export default function Analytics() {
     enabled: selectedPlayers.length >= 2,
   });
 
-  const { data: allPlayers } = useQuery<Player[]>({
+  const { data: playersData } = useQuery<{ players: Player[] }>({
     queryKey: ["/api/players"],
   });
+  const allPlayers = playersData?.players;
 
   const { data: correlationData } = useQuery<CorrelationData[]>({
     queryKey: [`/api/analytics/correlations?timeRange=${timeRange}`],
