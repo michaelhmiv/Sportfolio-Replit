@@ -35,6 +35,7 @@ import Terms from "@/pages/terms";
 import About from "@/pages/about";
 import Contact from "@/pages/contact";
 import HowItWorks from "@/pages/how-it-works";
+import Analytics from "@/pages/analytics";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
 import { LogOut, User } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
@@ -81,6 +82,7 @@ function Router() {
       <Route path="/about" component={About} />
       <Route path="/contact" component={Contact} />
       <Route path="/how-it-works" component={HowItWorks} />
+      <Route path="/analytics" component={Analytics} />
       
       {/* Protected routes - require authentication, redirect to dashboard if not logged in */}
       <Route path="/player/:id">

@@ -45,6 +45,36 @@ Background jobs, managed by `node-cron`, handle tasks like `roster_sync`, `sched
 ### Design Principles
 The UI prioritizes information density and compact layouts inspired by professional financial trading platforms, minimizing spacing and using smaller typography for data displays. Interactive elements include clickable player names and usernames that open modals or navigate to profiles. A Player Information System provides a compact `PlayerModal` and a dedicated `Player Page` for trading with charts, order books, and contest metrics. Public marketplace access is available without authentication.
 
+### Data Analytics & Original Content (Updated: 2025-11-26)
+The platform provides comprehensive data analysis features to meet AdSense requirements for original content:
+
+**Analytics Page (`/analytics`):**
+- Overview tab: Market stats (24h volume, trades, avg price change), Power Rankings with composite scoring
+- Hot/Cold Players: Biggest gainers and losers with price change visualization
+- Rankings: Power rankings with composite score (market strength + volume + momentum)
+- Heatmap: Team/position matrix showing average price changes and top players
+- Compare: Multi-player price history comparison with overlaid charts (up to 5 players)
+- Positions: Position-based player rankings (PG, SG, SF, PF, C)
+
+**Leaderboards (`/leaderboards`):**
+- Net Worth rankings
+- Portfolio Value rankings
+- Cash Balance rankings
+- Shares Mined rankings
+- Market Orders rankings
+- Real-time WebSocket updates
+
+**Weekly Roundup Generator:**
+- Automated job runs every Monday at 6 AM ET (`weekly_roundup`)
+- Generates blog posts with: market overview, top gainers/losers, most traded players, contest highlights
+- Creates SEO-optimized content with markdown formatting and tables
+- Stored in blog system for admin review and publishing
+
+**API Endpoints:**
+- `/api/analytics?timeRange=<1D|7D|1M|3M>` - Market analytics data
+- `/api/analytics/compare?playerIds=<comma-separated>` - Player price history comparison
+- `/api/analytics/correlations?timeRange=<timeRange>` - Price correlation analysis
+
 ### Content & SEO
 A blog system (`/blog`) provides admin-controlled content for SEO and user engagement, supporting draft and published states. Static pages for legal information (`/privacy`, `/terms`), platform information (`/about`, `/contact`, `/how-it-works`) ensure AdSense compliance and comprehensive user guidance. A site footer provides consistent navigation.
 

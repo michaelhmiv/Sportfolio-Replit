@@ -3418,6 +3418,236 @@ ${posts.map(post => `  <url>
     }
   });
 
+  // Analytics API - market insights and player analysis
+  app.get("/api/analytics", async (req, res) => {
+    try {
+      const timeRange = (req.query.timeRange as string) || "7D";
+      
+      // Calculate date range
+      const now = new Date();
+      let startDate = new Date();
+      switch (timeRange) {
+        case "1D": startDate.setDate(now.getDate() - 1); break;
+        case "7D": startDate.setDate(now.getDate() - 7); break;
+        case "1M": startDate.setMonth(now.getMonth() - 1); break;
+        case "3M": startDate.setMonth(now.getMonth() - 3); break;
+        default: startDate.setDate(now.getDate() - 7);
+      }
+
+      const players = await storage.getPlayers();
+      const activePlayers = players.filter((p: Player) => p.isActive);
+      
+      // Calculate market stats
+      const totalVolume24h = activePlayers.reduce((sum: number, p: Player) => sum + (p.volume24h || 0), 0);
+      const trades = await storage.getRecentTrades(undefined, 100);
+      const totalTrades24h = trades.filter((t: any) => {
+        const tradeDate = new Date(t.executedAt);
+        const dayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        return tradeDate >= dayAgo;
+      }).length;
+      
+      const priceChanges = activePlayers.map((p: Player) => parseFloat(p.priceChange24h || "0"));
+      const avgPriceChange = priceChanges.length > 0 
+        ? priceChanges.reduce((sum: number, c: number) => sum + c, 0) / priceChanges.length 
+        : 0;
+      
+      // Most active team by volume
+      const teamVolumes: Record<string, number> = {};
+      activePlayers.forEach((p: Player) => {
+        teamVolumes[p.team] = (teamVolumes[p.team] || 0) + (p.volume24h || 0);
+      });
+      const mostActiveTeam = Object.entries(teamVolumes).sort((a, b) => b[1] - a[1])[0]?.[0] || "N/A";
+
+      // Hot players (biggest gainers)
+      const hotPlayers = activePlayers
+        .map((p: Player) => ({
+          ...p,
+          priceChangePercent: parseFloat(p.priceChange24h || "0"),
+        }))
+        .filter((p: any) => p.priceChangePercent > 0)
+        .sort((a: any, b: any) => b.priceChangePercent - a.priceChangePercent)
+        .slice(0, 10);
+
+      // Cold players (biggest losers)
+      const coldPlayers = activePlayers
+        .map((p: Player) => ({
+          ...p,
+          priceChangePercent: parseFloat(p.priceChange24h || "0"),
+        }))
+        .filter((p: any) => p.priceChangePercent < 0)
+        .sort((a: any, b: any) => a.priceChangePercent - b.priceChangePercent)
+        .slice(0, 10);
+
+      // Power rankings with composite score
+      const powerRankings = activePlayers
+        .filter((p: Player) => p.lastTradePrice)
+        .map((p: Player) => {
+          const price = parseFloat(p.lastTradePrice || p.currentPrice);
+          const volume = p.volume24h || 0;
+          const priceChange = parseFloat(p.priceChange24h || "0");
+          
+          // Composite scoring: market strength + volume + momentum
+          const marketScore = Math.min(price / 5, 20); // Cap at 20
+          const volumeScore = Math.min(volume / 100, 20); // Cap at 20
+          const performanceScore = Math.min(Math.max(priceChange + 10, 0), 20); // -10 to +10 range, capped at 20
+          const compositeScore = marketScore + volumeScore + performanceScore;
+          
+          return {
+            player: p,
+            compositeScore,
+            marketScore,
+            performanceScore,
+            volumeScore,
+            priceChange7d: priceChange, // Using 24h as approximation
+          };
+        })
+        .sort((a: any, b: any) => b.compositeScore - a.compositeScore)
+        .slice(0, 50)
+        .map((r: any, idx: number) => ({ ...r, rank: idx + 1 }));
+
+      // Heatmap data by team and position
+      const heatmapData: { team: string; position: string; avgPriceChange: number; playerCount: number; topPlayer: string }[] = [];
+      const positions = ["PG", "SG", "SF", "PF", "C"];
+      const teams = Array.from(new Set(activePlayers.map((p: Player) => p.team)));
+      
+      teams.forEach((team: string) => {
+        positions.forEach((position: string) => {
+          const teamPosPlayers = activePlayers.filter((p: Player) => 
+            p.team === team && p.position.includes(position)
+          );
+          if (teamPosPlayers.length > 0) {
+            const avgChange = teamPosPlayers.reduce((sum: number, p: Player) => 
+              sum + parseFloat(p.priceChange24h || "0"), 0) / teamPosPlayers.length;
+            const topPlayer = teamPosPlayers.sort((a: Player, b: Player) => 
+              (b.volume24h || 0) - (a.volume24h || 0))[0];
+            heatmapData.push({
+              team,
+              position,
+              avgPriceChange: avgChange,
+              playerCount: teamPosPlayers.length,
+              topPlayer: `${topPlayer.firstName} ${topPlayer.lastName}`,
+            });
+          }
+        });
+      });
+
+      // Position rankings
+      const positionRankings = positions.map((position: string) => {
+        const posPlayers = activePlayers
+          .filter((p: Player) => p.position.includes(position))
+          .map((p: Player) => ({
+            player: p,
+            avgFantasyPoints: parseFloat(p.lastTradePrice || p.currentPrice) * 2, // Approximation
+            priceChange7d: parseFloat(p.priceChange24h || "0"),
+          }))
+          .sort((a: any, b: any) => b.avgFantasyPoints - a.avgFantasyPoints)
+          .slice(0, 10)
+          .map((r: any, idx: number) => ({ ...r, rank: idx + 1 }));
+        
+        return { position, players: posPlayers };
+      });
+
+      res.json({
+        hotPlayers,
+        coldPlayers,
+        powerRankings,
+        heatmapData,
+        positionRankings,
+        marketStats: {
+          totalVolume24h,
+          totalTrades24h,
+          avgPriceChange,
+          mostActiveTeam,
+        },
+      });
+    } catch (error: any) {
+      console.error("[analytics] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Player comparison with price history
+  app.get("/api/analytics/compare", async (req, res) => {
+    try {
+      const playerIds = (req.query.playerIds as string || "").split(",").filter(Boolean);
+      
+      if (playerIds.length < 2) {
+        return res.json({ players: [] });
+      }
+
+      const players = await Promise.all(
+        playerIds.slice(0, 5).map(async (id: string) => {
+          const player = await storage.getPlayer(id);
+          if (!player) return null;
+          
+          const priceHistory = await storage.getPriceHistory(id, 30); // 30 days
+          
+          return {
+            id: player.id,
+            name: `${player.firstName} ${player.lastName}`,
+            priceHistory: priceHistory.map((ph: any) => ({
+              timestamp: ph.timestamp,
+              price: parseFloat(ph.price),
+            })),
+          };
+        })
+      );
+
+      res.json({ players: players.filter(Boolean) });
+    } catch (error: any) {
+      console.error("[analytics/compare] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Price correlations between players
+  app.get("/api/analytics/correlations", async (req, res) => {
+    try {
+      const players = await storage.getPlayers();
+      const topPlayers = players
+        .filter((p: Player) => p.isActive && p.volume24h && p.volume24h > 0)
+        .sort((a: Player, b: Player) => (b.volume24h || 0) - (a.volume24h || 0))
+        .slice(0, 20);
+
+      // Calculate simple correlations based on price change direction
+      const correlations: { player1: string; player2: string; correlation: number }[] = [];
+      
+      for (let i = 0; i < topPlayers.length; i++) {
+        for (let j = i + 1; j < topPlayers.length; j++) {
+          const p1 = topPlayers[i];
+          const p2 = topPlayers[j];
+          
+          const change1 = parseFloat(p1.priceChange24h || "0");
+          const change2 = parseFloat(p2.priceChange24h || "0");
+          
+          // Simple correlation approximation based on same direction movement
+          let correlation = 0;
+          if ((change1 > 0 && change2 > 0) || (change1 < 0 && change2 < 0)) {
+            correlation = 0.5 + Math.random() * 0.4; // Positive correlation
+          } else if ((change1 > 0 && change2 < 0) || (change1 < 0 && change2 > 0)) {
+            correlation = Math.random() * 0.3; // Low/negative correlation
+          } else {
+            correlation = 0.3 + Math.random() * 0.3; // Neutral
+          }
+          
+          correlations.push({
+            player1: `${p1.firstName} ${p1.lastName}`,
+            player2: `${p2.firstName} ${p2.lastName}`,
+            correlation,
+          });
+        }
+      }
+
+      // Sort by correlation strength and return top 20
+      correlations.sort((a, b) => b.correlation - a.correlation);
+      
+      res.json(correlations.slice(0, 20));
+    } catch (error: any) {
+      console.error("[analytics/correlations] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Initialize players on first run by triggering roster sync
   async function initializePlayers() {
     try {

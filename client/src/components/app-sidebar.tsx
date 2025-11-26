@@ -1,4 +1,4 @@
-import { Home, TrendingUp, Trophy, User, Settings } from "lucide-react";
+import { Home, TrendingUp, Trophy, User, Settings, BarChart3 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -25,6 +25,11 @@ const menuItems = [
     title: "Marketplace",
     url: "/marketplace",
     icon: TrendingUp,
+  },
+  {
+    title: "Analytics",
+    url: "/analytics",
+    icon: BarChart3,
   },
   {
     title: "Contests",

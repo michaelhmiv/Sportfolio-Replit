@@ -145,6 +145,9 @@ export interface IStorage {
   getRecentTrades(playerId?: string, limit?: number): Promise<Trade[]>;
   getMarketActivity(filters?: { playerId?: string; userId?: string; limit?: number }): Promise<any[]>;
   
+  // Price history methods
+  getPriceHistory(playerId: string, days?: number): Promise<PriceHistory[]>;
+  
   // Mining methods
   getMining(userId: string): Promise<Mining | undefined>;
   updateMining(userId: string, updates: Partial<Mining>): Promise<void>;
@@ -1110,6 +1113,23 @@ export class DatabaseStorage implements IStorage {
       .slice(0, limit); // Apply final limit after sorting
     
     return combined;
+  }
+
+  // Price history methods
+  async getPriceHistory(playerId: string, days: number = 30): Promise<PriceHistory[]> {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    
+    return await db
+      .select()
+      .from(priceHistory)
+      .where(
+        and(
+          eq(priceHistory.playerId, playerId),
+          sql`${priceHistory.timestamp} >= ${startDate}`
+        )
+      )
+      .orderBy(priceHistory.timestamp);
   }
 
   // Mining methods

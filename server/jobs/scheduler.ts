@@ -17,6 +17,7 @@ import { createContests } from "./create-contests";
 import { updateContestStatuses } from "./update-contest-statuses";
 import { dailySnapshot } from "./daily-snapshot";
 import { backfillContestStats } from "./backfill-contest-stats";
+import { generateWeeklyRoundup } from "./weekly-roundup";
 import type { ProgressCallback } from "../lib/admin-stream";
 
 export interface JobResult {
@@ -173,6 +174,12 @@ export class JobScheduler {
         enabled: true,
         handler: dailySnapshot,
       },
+      {
+        name: "weekly_roundup",
+        schedule: "0 6 * * 1", // Weekly on Monday at 6:00 AM ET
+        enabled: true,
+        handler: generateWeeklyRoundup,
+      },
     ];
 
     for (const jobConfig of apiJobs) {
@@ -243,6 +250,7 @@ export class JobScheduler {
       settle_contests: (callback) => settleContests(callback),
       daily_snapshot: (callback) => dailySnapshot(callback),
       backfill_contest_stats: (callback) => backfillContestStats(callback),
+      weekly_roundup: (callback) => generateWeeklyRoundup(callback),
     };
 
     const handler = jobConfigs[jobName];
