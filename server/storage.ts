@@ -2553,6 +2553,76 @@ export class DatabaseStorage implements IStorage {
       .sort((a, b) => b.compositeScore - a.compositeScore)
       .slice(0, limit);
   }
+
+  async getShareEconomyStats(startDate?: Date, endDate?: Date): Promise<{
+    totalSharesMined: number;
+    totalSharesBurned: number;
+    totalSharesInEconomy: number;
+    periodSharesMined: number;
+    periodSharesBurned: number;
+  }> {
+    // Total shares mined all time
+    const totalMinedResult = await db
+      .select({
+        total: sql<string>`COALESCE(SUM(${miningClaims.sharesClaimed}), 0)`.as('total'),
+      })
+      .from(miningClaims);
+    const totalSharesMined = parseInt(totalMinedResult[0]?.total || "0");
+
+    // Total shares in economy (all holdings)
+    const totalHoldingsResult = await db
+      .select({
+        total: sql<string>`COALESCE(SUM(${holdings.quantity}), 0)`.as('total'),
+      })
+      .from(holdings)
+      .where(eq(holdings.assetType, 'player'));
+    const totalSharesInEconomy = parseInt(totalHoldingsResult[0]?.total || "0");
+
+    // Total shares burned = shares used in contest entries (removed from circulation)
+    const totalBurnedResult = await db
+      .select({
+        total: sql<string>`COALESCE(SUM(${contestEntries.totalSharesEntered}), 0)`.as('total'),
+      })
+      .from(contestEntries);
+    const totalSharesBurned = parseInt(totalBurnedResult[0]?.total || "0");
+
+    // Period stats (if dates provided)
+    let periodSharesMined = 0;
+    let periodSharesBurned = 0;
+
+    if (startDate && endDate) {
+      const periodMinedResult = await db
+        .select({
+          total: sql<string>`COALESCE(SUM(${miningClaims.sharesClaimed}), 0)`.as('total'),
+        })
+        .from(miningClaims)
+        .where(and(
+          gte(miningClaims.claimedAt, startDate),
+          lte(miningClaims.claimedAt, endDate)
+        ));
+      periodSharesMined = parseInt(periodMinedResult[0]?.total || "0");
+
+      const periodBurnedResult = await db
+        .select({
+          total: sql<string>`COALESCE(SUM(${contestEntries.totalSharesEntered}), 0)`.as('total'),
+        })
+        .from(contestEntries)
+        .innerJoin(contests, eq(contestEntries.contestId, contests.id))
+        .where(and(
+          gte(contests.startsAt, startDate),
+          lte(contests.startsAt, endDate)
+        ));
+      periodSharesBurned = parseInt(periodBurnedResult[0]?.total || "0");
+    }
+
+    return {
+      totalSharesMined,
+      totalSharesBurned,
+      totalSharesInEconomy,
+      periodSharesMined,
+      periodSharesBurned,
+    };
+  }
 }
 
 export const storage = new DatabaseStorage();

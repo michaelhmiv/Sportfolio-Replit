@@ -3436,8 +3436,12 @@ ${posts.map(post => `  <url>
         default: startDate.setDate(now.getDate() - 1);
       }
 
-      // Get market health stats from storage
-      const marketHealth = await storage.getMarketHealthStats(startDate, now);
+      // Get market health stats and share economy stats from storage
+      const [marketHealth, shareEconomy, timeSeries] = await Promise.all([
+        storage.getMarketHealthStats(startDate, now),
+        storage.getShareEconomyStats(startDate, now),
+        storage.getMarketHealthTimeSeries(startDate, now),
+      ]);
       
       // Calculate percentage changes
       const transactionChange = marketHealth.prevTransactionCount > 0 
@@ -3449,12 +3453,6 @@ ${posts.map(post => `  <url>
       const marketCapChange = marketHealth.prevTotalMarketCap > 0 
         ? ((marketHealth.totalMarketCap - marketHealth.prevTotalMarketCap) / marketHealth.prevTotalMarketCap) * 100 
         : 0;
-
-      // Get time series data for charts
-      const timeSeries = await storage.getMarketHealthTimeSeries(startDate, now);
-
-      // Get hot/cold players
-      const { hot: hotPlayers, cold: coldPlayers } = await storage.getHotColdPlayers(10);
 
       // Get power rankings
       const powerRankingsData = await storage.getPowerRankings(50);
@@ -3474,9 +3472,6 @@ ${posts.map(post => `  <url>
         priceChange7d: r.priceChange7d,
         avgFantasyPoints: r.avgFantasyPoints,
       }));
-
-      // Get heatmap data
-      const heatmapData = await storage.getHeatmapData();
 
       // Get position rankings using power rankings data
       const positions = ["PG", "SG", "SF", "PF", "C"];
@@ -3526,18 +3521,14 @@ ${posts.map(post => `  <url>
           volumeChange,
           marketCap: marketHealth.totalMarketCap,
           marketCapChange,
+          sharesMined: shareEconomy.totalSharesMined,
+          sharesBurned: shareEconomy.totalSharesBurned,
+          totalShares: shareEconomy.totalSharesInEconomy,
+          periodSharesMined: shareEconomy.periodSharesMined,
+          periodSharesBurned: shareEconomy.periodSharesBurned,
           timeSeries,
         },
-        hotPlayers: hotPlayers.map((p: Player) => ({
-          ...p,
-          priceChangePercent: parseFloat(p.priceChange24h || "0"),
-        })),
-        coldPlayers: coldPlayers.map((p: Player) => ({
-          ...p,
-          priceChangePercent: parseFloat(p.priceChange24h || "0"),
-        })),
         powerRankings,
-        heatmapData,
         positionRankings,
         marketStats: {
           totalVolume24h: marketHealth.totalVolume,
