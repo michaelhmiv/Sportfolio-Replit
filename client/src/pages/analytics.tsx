@@ -270,48 +270,6 @@ export default function Analytics() {
           </Card>
         </div>
 
-        {/* Time Series Chart */}
-        {analyticsData?.marketHealth?.timeSeries && analyticsData.marketHealth.timeSeries.length > 0 && (
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Activity className="w-4 h-4" />
-                Market Activity Over Time
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={analyticsData.marketHealth.timeSeries}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="hsl(var(--muted-foreground))" 
-                    fontSize={10}
-                    tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  />
-                  <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'hsl(var(--card))',
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '6px',
-                      fontSize: '12px'
-                    }}
-                    labelFormatter={(v) => new Date(v).toLocaleDateString()}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="volume" 
-                    stroke="hsl(var(--primary))" 
-                    fill="hsl(var(--primary) / 0.2)" 
-                    name="Volume"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        )}
-
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
           <TabsList className="w-full grid grid-cols-3 sm:grid-cols-6 h-auto">
             <TabsTrigger value="overview" className="text-xs sm:text-sm py-2" data-testid="tab-overview">
@@ -341,78 +299,94 @@ export default function Analytics() {
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Target className="w-4 h-4" />
-                    Power Rankings - Top 10
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {analyticsData?.powerRankings?.slice(0, 10).map((ranking, idx) => (
-                      <Link key={ranking.player.id} href={`/player/${ranking.player.id}`}>
-                        <div 
-                          className="flex items-center justify-between p-2 rounded-md hover-elevate"
-                          data-testid={`row-power-ranking-${idx + 1}`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <span className="font-mono font-bold text-lg w-6 text-right">{ranking.rank}</span>
-                            <div>
-                              <div className="font-medium text-sm">{ranking.player.firstName} {ranking.player.lastName}</div>
-                              <div className="text-xs text-muted-foreground">{ranking.player.team} - {ranking.player.position}</div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-mono font-bold">{ranking.compositeScore.toFixed(1)}</div>
-                            <div className={`text-xs ${getPriceChangeColor(ranking.priceChange7d)}`}>
-                              {ranking.priceChange7d >= 0 ? "+" : ""}{ranking.priceChange7d.toFixed(1)}%
-                            </div>
-                          </div>
-                        </div>
-                      </Link>
-                    )) || <div className="text-sm text-muted-foreground text-center py-4">No data available</div>}
+            {/* Market Activity Time Series Chart */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Activity className="w-4 h-4" />
+                  Market Activity Over Time
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {analyticsData?.marketHealth?.timeSeries && analyticsData.marketHealth.timeSeries.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <AreaChart data={analyticsData.marketHealth.timeSeries}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="hsl(var(--muted-foreground))" 
+                        fontSize={10}
+                        tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      />
+                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '6px',
+                          fontSize: '12px'
+                        }}
+                        labelFormatter={(v) => new Date(v).toLocaleDateString()}
+                        formatter={(value: number) => [`$${value.toLocaleString()}`, 'Volume']}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="volume" 
+                        stroke="hsl(var(--primary))" 
+                        fill="hsl(var(--primary) / 0.2)" 
+                        name="Volume"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-[250px] text-muted-foreground text-sm">
+                    No trading activity in selected time period
                   </div>
-                </CardContent>
-              </Card>
+                )}
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4" />
-                    Volume by Position
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {analyticsData?.positionRankings && (
-                    <ResponsiveContainer width="100%" height={280}>
-                      <BarChart
-                        data={analyticsData.positionRankings.map(pr => ({
-                          position: pr.position,
-                          players: pr.players.length,
-                          avgPoints: pr.players.reduce((sum, p) => sum + p.avgFantasyPoints, 0) / pr.players.length || 0,
-                        }))}
-                        layout="vertical"
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                        <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                        <YAxis dataKey="position" type="category" stroke="hsl(var(--muted-foreground))" fontSize={10} width={40} />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'hsl(var(--card))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '6px',
-                            fontSize: '12px'
-                          }}
-                        />
-                        <Bar dataKey="avgPoints" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+            {/* Volume by Position Chart */}
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  Average Fantasy Points by Position
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {analyticsData?.positionRankings && analyticsData.positionRankings.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={220}>
+                    <BarChart
+                      data={analyticsData.positionRankings.map(pr => ({
+                        position: pr.position,
+                        players: pr.players.length,
+                        avgPoints: pr.players.reduce((sum, p) => sum + p.avgFantasyPoints, 0) / pr.players.length || 0,
+                      }))}
+                      layout="vertical"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis type="number" stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                      <YAxis dataKey="position" type="category" stroke="hsl(var(--muted-foreground))" fontSize={10} width={40} />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '6px',
+                          fontSize: '12px'
+                        }}
+                        formatter={(value: number) => [value.toFixed(1), 'Avg Fantasy Points']}
+                      />
+                      <Bar dataKey="avgPoints" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-[220px] text-muted-foreground text-sm">
+                    No position data available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="hot-cold" className="space-y-4">
