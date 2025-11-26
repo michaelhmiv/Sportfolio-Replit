@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Trophy, TrendingUp, Activity, Award, DollarSign, Clock, Edit2, Settings } from "lucide-react";
+import { Trophy, TrendingUp, Activity, Award, DollarSign, Clock, Edit2, Settings, Moon, Sun } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -57,6 +57,21 @@ export default function UserProfile() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [newUsername, setNewUsername] = useState("");
   const { subscribe } = useWebSocket();
+  const [theme, setTheme] = useState<"light" | "dark">("dark");
+
+  useEffect(() => {
+    const stored = localStorage.getItem("theme") as "light" | "dark" | null;
+    const initialTheme = stored || "dark";
+    setTheme(initialTheme);
+    document.documentElement.classList.toggle("dark", initialTheme === "dark");
+  }, []);
+
+  const toggleTheme = () => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    setTheme(newTheme);
+    localStorage.setItem("theme", newTheme);
+    document.documentElement.classList.toggle("dark", newTheme === "dark");
+  };
 
   const { data: profile, isLoading } = useQuery<UserProfile>({
     queryKey: [`/api/user/${userId}/profile`],
@@ -207,6 +222,20 @@ export default function UserProfile() {
                           </DialogFooter>
                         </DialogContent>
                       </Dialog>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="gap-2" 
+                        onClick={toggleTheme}
+                        data-testid="button-theme-toggle"
+                      >
+                        {theme === "light" ? (
+                          <Moon className="w-3 h-3" />
+                        ) : (
+                          <Sun className="w-3 h-3" />
+                        )}
+                        {theme === "light" ? "Dark Mode" : "Light Mode"}
+                      </Button>
                       {profile.user.isAdmin && (
                         <Link href="/admin">
                           <Button variant="outline" size="sm" className="gap-2" data-testid="button-admin">

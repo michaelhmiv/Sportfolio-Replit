@@ -1,7 +1,6 @@
-import { Home, TrendingUp, Trophy, Briefcase, User } from "lucide-react";
+import { Home, TrendingUp, Trophy, Briefcase, BarChart3 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { useNotifications } from "@/lib/notification-context";
 
@@ -26,27 +25,22 @@ const navItems = [
     url: "/portfolio",
     icon: Briefcase,
   },
+  {
+    title: "Analytics",
+    url: "/analytics",
+    icon: BarChart3,
+  },
 ];
 
 export function BottomNav() {
   const [location] = useLocation();
-  const { user } = useAuth();
   const { unreadCount } = useNotifications();
-
-  // Add Profile item dynamically based on authenticated user
-  const profileItem = {
-    title: "Profile",
-    url: user?.id ? `/user/${user.id}` : "/profile",
-    icon: User,
-  };
-
-  const allItems = [...navItems, profileItem];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t sm:hidden">
       <div className="grid grid-cols-5 h-16 max-w-md mx-auto">
-        {allItems.map((item) => {
-          const isActive = location === item.url || (item.title === "Profile" && location.startsWith("/user/"));
+        {navItems.map((item) => {
+          const isActive = location === item.url;
           return (
             <Link
               key={item.title}

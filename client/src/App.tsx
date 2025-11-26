@@ -7,7 +7,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { BottomNav } from "@/components/bottom-nav";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { HelpDialog } from "@/components/help-dialog";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
@@ -204,7 +203,7 @@ function Header() {
               asChild
               data-testid="button-profile"
               title="Profile"
-              className="hidden sm:flex"
+              className="flex"
             >
               <Link href={user?.id ? `/user/${user.id}` : "/profile"}>
                 <User className="h-4 w-4" />
@@ -245,7 +244,6 @@ function Header() {
           <SiDiscord className="w-5 h-5" />
         </Button>
         <HelpDialog />
-        <ThemeToggle />
       </div>
     </header>
   );
