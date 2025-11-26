@@ -135,21 +135,8 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
       console.log(`[settle_contests]   - endsAt: ${contest.endsAt}`);
       console.log(`[settle_contests]   - Current time: ${now.toISOString()}`);
       
-      // Check 1: Has endsAt time passed?
-      if (!contest.endsAt) {
-        console.log(`[settle_contests]   ✗ Contest has no endsAt time, skipping`);
-        continue;
-      }
-      
-      const endsAt = new Date(contest.endsAt);
-      if (now < endsAt) {
-        console.log(`[settle_contests]   ✗ Contest endsAt (${endsAt.toISOString()}) has not passed yet`);
-        continue;
-      }
-      
-      console.log(`[settle_contests]   ✓ Contest endsAt has passed`);
-      
-      // Check 2: Are all games for this contest date completed?
+      // PRIMARY CHECK: Are all games for this contest date completed?
+      // This is the main criteria - if all games have final scores, we can settle
       // Query games by start_time using Eastern Time day boundaries
       const contestDate = new Date(contest.gameDate);
       const dateStr = contestDate.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -157,14 +144,14 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
       const { startOfDay, endOfDay } = getETDayBoundaries(dateStr);
       const games = await storage.getDailyGames(startOfDay, endOfDay);
       
-      console.log(`[settle_contests]   - Found ${games.length} games for contest date`);
+      console.log(`[settle_contests]   - Found ${games.length} games for contest date (${dateStr})`);
       
       if (games.length === 0) {
         console.log(`[settle_contests]   ✗ No games found for contest date, cannot settle`);
         continue;
       }
       
-      // Check if all games are completed
+      // Check if all games are completed (have final scores)
       const incompleteGames = games.filter(g => g.status !== "completed");
       
       if (incompleteGames.length > 0) {
@@ -175,7 +162,17 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
         continue;
       }
       
-      console.log(`[settle_contests]   ✓ All ${games.length} games are completed`);
+      console.log(`[settle_contests]   ✓ All ${games.length} games are completed with final scores`);
+      
+      // Note: We no longer wait for endsAt - if all games are done, we settle immediately
+      // The endsAt time is just informational now
+      if (contest.endsAt) {
+        const endsAt = new Date(contest.endsAt);
+        if (now < endsAt) {
+          console.log(`[settle_contests]   ℹ Note: Settling early (endsAt was ${endsAt.toISOString()}, but all games are finished)`);
+        }
+      }
+      
       console.log(`[settle_contests]   ✓ Contest ${contest.id} is ready to settle!`);
       contestsToSettle.push(contest);
     }
