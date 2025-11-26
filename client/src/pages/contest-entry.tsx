@@ -23,7 +23,7 @@ interface ContestEntryData {
     startsAt: string;
     gameDate: string;
   };
-  eligiblePlayers: (Holding & { player: Player; isEligible: boolean })[];
+  eligiblePlayers: (Holding & { player: Player; isEligible: boolean; availableShares: number })[];
 }
 
 interface LineupEntry {
@@ -114,14 +114,14 @@ export default function ContestEntry() {
     },
   });
 
-  const addToLineup = (holding: Holding & { player: Player }) => {
+  const addToLineup = (holding: Holding & { player: Player; availableShares: number }) => {
     const entry: LineupEntry = {
       playerId: holding.player.id,
       playerName: `${holding.player.firstName} ${holding.player.lastName}`,
       team: holding.player.team,
       position: holding.player.position,
       sharesEntered: 1,
-      maxShares: holding.quantity,
+      maxShares: holding.availableShares,
     };
     setLineup(new Map(lineup.set(holding.player.id, entry)));
   };
@@ -280,7 +280,7 @@ export default function ContestEntry() {
                   No eligible players found
                 </div>
               ) : (
-                filteredPlayers.map((holding: Holding & { player: Player; isEligible: boolean }) => (
+                filteredPlayers.map((holding: Holding & { player: Player; isEligible: boolean; availableShares: number }) => (
                   <div
                     key={holding.player.id}
                     className="flex items-center justify-between p-3 border rounded-md hover-elevate"
@@ -301,7 +301,7 @@ export default function ContestEntry() {
                           />
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          {holding.player.team} · {holding.player.position} · {holding.quantity} shares
+                          {holding.player.team} · {holding.player.position} · {holding.availableShares} available
                         </div>
                       </div>
                     </div>

@@ -2095,11 +2095,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const eligiblePlayers = await Promise.all(
         userHoldings
           .filter(h => h.assetType === "player")
-          .map(async (holding) => ({
-            ...holding,
-            player: await storage.getPlayer(holding.assetId),
-            isEligible: true, // Simplified - would check game schedule
-          }))
+          .map(async (holding) => {
+            const availableShares = await storage.getAvailableShares(user.id, "player", holding.assetId);
+            return {
+              ...holding,
+              availableShares, // Available shares (unlocked)
+              player: await storage.getPlayer(holding.assetId),
+              isEligible: true, // Simplified - would check game schedule
+            };
+          })
       );
 
       res.json({
