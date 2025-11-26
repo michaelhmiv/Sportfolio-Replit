@@ -18,6 +18,7 @@ import { updateContestStatuses } from "./update-contest-statuses";
 import { dailySnapshot } from "./daily-snapshot";
 import { backfillContestStats } from "./backfill-contest-stats";
 import { generateWeeklyRoundup } from "./weekly-roundup";
+import { backfillMarketSnapshots } from "./market-snapshot";
 import type { ProgressCallback } from "../lib/admin-stream";
 
 export interface JobResult {
@@ -251,6 +252,7 @@ export class JobScheduler {
       daily_snapshot: (callback) => dailySnapshot(callback),
       backfill_contest_stats: (callback) => backfillContestStats(callback),
       weekly_roundup: (callback) => generateWeeklyRoundup(callback),
+      backfill_market_snapshots: (callback) => backfillMarketSnapshots(callback),
     };
 
     const handler = jobConfigs[jobName];

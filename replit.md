@@ -50,15 +50,22 @@ The platform provides comprehensive data analysis features to meet AdSense requi
 
 **Analytics Page (`/analytics`):**
 
-*Market Health Dashboard (6 Metric Cards - 2x3 Grid):*
-- Transactions: Count with percentage change vs previous period
-- Volume: Total trading volume with percentage change
-- Market Cap: Total market capitalization (shares × price) with percentage change
-- Shares Mined: Total shares mined from mining_claims table
-- Shares Burned: Total shares used in contests from contest_entries table  
-- Total Shares: Current shares in economy from holdings table
-- Timeframe selector: 24H, 7D, 30D, 3M, 1Y, All Time
-- All metrics calculated from real trades, holdings, mining_claims, and contest_entries tables
+*Market Health Dashboard - 6 Clickable Metric Tiles:*
+- **Market Cap** (default, shown first): Total market capitalization with % change
+- **Transactions**: Trade count with % change vs previous period  
+- **Volume**: Total trading volume with % change
+- **Shares Mined**: Total shares mined from mining_claims table
+- **Shares Burned**: Total shares used in contests from contest_entries table  
+- **Total Shares**: Current shares in economy from holdings table
+- **Interactive**: Click any tile to switch the chart to show that metric over time
+- **Time Range**: 7D, 30D, 3M, 1Y, All Time (no 24H - minimum is 7 days)
+- **Line Chart**: Shows selected metric's daily values from market_snapshots table
+
+*Market Snapshots System:*
+- `market_snapshots` table stores daily snapshots of all 6 metrics
+- `daily_snapshot` cron job (1 AM ET) captures daily metrics
+- `backfill_market_snapshots` job reconstructs historical data from event tables
+- `/api/analytics/snapshots?timeRange=<7D|30D|3M|1Y|All>` - Returns daily snapshots
 
 *Tabs (Simplified - 4 tabs):*
 - Overview: ComposedChart with volume bars and transaction line, Economy Summary, Top 5 Players

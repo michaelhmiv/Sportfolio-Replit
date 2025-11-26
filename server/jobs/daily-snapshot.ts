@@ -15,6 +15,7 @@ import type { ProgressCallback } from "../lib/admin-stream";
 import { eq, sql, desc } from "drizzle-orm";
 import { users, holdings, players, portfolioSnapshots } from "@shared/schema";
 import { db } from "../db";
+import { takeMarketSnapshot } from "./market-snapshot";
 
 interface UserPortfolioData {
   userId: string;
@@ -140,12 +141,39 @@ export async function dailySnapshot(progressCallback?: ProgressCallback): Promis
       }
     }
 
-    console.log(`[daily_snapshot] Created ${snapshotsCreated} snapshots successfully`);
+    console.log(`[daily_snapshot] Created ${snapshotsCreated} portfolio snapshots successfully`);
     
+    progressCallback?.({
+      type: 'info',
+      timestamp: new Date().toISOString(),
+      message: `Portfolio snapshots complete: ${snapshotsCreated} created`,
+    });
+
+    // Step 4: Take market-wide snapshot for analytics
+    console.log("[daily_snapshot] Step 4: Taking market snapshot...");
+    progressCallback?.({
+      type: 'info',
+      timestamp: new Date().toISOString(),
+      message: 'Taking market-wide snapshot for analytics...',
+    });
+
+    try {
+      const marketResult = await takeMarketSnapshot(progressCallback);
+      if (marketResult.errorCount > 0) {
+        console.warn("[daily_snapshot] Market snapshot had errors");
+        errorCount += marketResult.errorCount;
+      } else {
+        console.log("[daily_snapshot] Market snapshot complete");
+      }
+    } catch (marketError: any) {
+      console.error("[daily_snapshot] Market snapshot failed:", marketError.message);
+      errorCount++;
+    }
+
     progressCallback?.({
       type: 'complete',
       timestamp: new Date().toISOString(),
-      message: `Daily snapshot completed: ${snapshotsCreated} snapshots created`,
+      message: `Daily snapshot completed: ${snapshotsCreated} portfolio + market snapshot`,
       data: {
         success: true,
         summary: {
@@ -157,7 +185,7 @@ export async function dailySnapshot(progressCallback?: ProgressCallback): Promis
 
     return { 
       requestCount: 0, 
-      recordsProcessed: snapshotsCreated, 
+      recordsProcessed: snapshotsCreated + 1, 
       errorCount 
     };
 

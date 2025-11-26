@@ -15,6 +15,7 @@ import type { JobResult } from "./scheduler";
 import type { ProgressCallback } from "../lib/admin-stream";
 import { getGameDay, getETDayBoundaries } from "../lib/time";
 import { backfillContestStats } from "./backfill-contest-stats";
+import { updateContestStatuses } from "./update-contest-statuses";
 
 export async function settleContests(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[settle_contests] Starting contest settlement...");
@@ -30,6 +31,29 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
   let requestCount = 0;
 
   try {
+    // Step 0: First update contest statuses (open → live) before settling
+    console.log("[settle_contests] Step 0: Updating contest statuses...");
+    progressCallback?.({
+      type: 'info',
+      timestamp: new Date().toISOString(),
+      message: 'Updating contest statuses (open → live)...',
+    });
+    
+    try {
+      const statusResult = await updateContestStatuses(progressCallback);
+      if (statusResult.recordsProcessed > 0) {
+        console.log(`[settle_contests] Transitioned ${statusResult.recordsProcessed} contests to live`);
+        progressCallback?.({
+          type: 'info',
+          timestamp: new Date().toISOString(),
+          message: `Transitioned ${statusResult.recordsProcessed} contests to live`,
+        });
+      }
+    } catch (statusError: any) {
+      console.warn(`[settle_contests] Status update warning: ${statusError.message}`);
+      // Continue with settlement even if status update fails
+    }
+
     // Step 1: First backfill any missing stats for games in live contests
     console.log("[settle_contests] Step 1: Checking for missing player stats...");
     progressCallback?.({

@@ -97,16 +97,40 @@ interface AnalyticsData {
   };
 }
 
-type TimeRange = "24H" | "7D" | "30D" | "3M" | "1Y" | "All";
+type TimeRange = "7D" | "30D" | "3M" | "1Y" | "All";
+type MetricType = "marketCap" | "transactions" | "volume" | "sharesMined" | "sharesBurned" | "totalShares";
+
+interface MarketSnapshot {
+  date: string;
+  marketCap: number;
+  transactions: number;
+  volume: number;
+  sharesMined: number;
+  sharesBurned: number;
+  totalShares: number;
+}
+
+interface SnapshotsResponse {
+  timeRange: string;
+  startDate: string;
+  endDate: string;
+  snapshots: MarketSnapshot[];
+}
 
 export default function Analytics() {
-  const [timeRange, setTimeRange] = useState<TimeRange>("7D");
+  const [timeRange, setTimeRange] = useState<TimeRange>("30D");
   const [selectedPlayers, setSelectedPlayers] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("overview");
+  const [selectedMetric, setSelectedMetric] = useState<MetricType>("marketCap");
 
   const { data: analyticsData, isLoading } = useQuery<AnalyticsData>({
     queryKey: [`/api/analytics?timeRange=${timeRange}`],
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    refetchInterval: 30000,
+  });
+
+  const { data: snapshotsData } = useQuery<SnapshotsResponse>({
+    queryKey: [`/api/analytics/snapshots?timeRange=${timeRange}`],
+    refetchInterval: 60000,
   });
 
   const { data: comparisonData, isLoading: comparisonLoading } = useQuery<{
@@ -191,7 +215,6 @@ export default function Analytics() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="24H">24 Hours</SelectItem>
                 <SelectItem value="7D">7 Days</SelectItem>
                 <SelectItem value="30D">30 Days</SelectItem>
                 <SelectItem value="3M">3 Months</SelectItem>
@@ -202,10 +225,37 @@ export default function Analytics() {
           </div>
         </div>
 
-        {/* Market Health Dashboard - 6 Metric Cards */}
+        {/* Market Health Dashboard - 6 Clickable Metric Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {/* Market Cap - First and Default */}
+          <Card 
+            data-testid="card-market-cap"
+            className={`cursor-pointer transition-all ${selectedMetric === 'marketCap' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
+            onClick={() => setSelectedMetric('marketCap')}
+          >
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex flex-col gap-1">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
+                  <BarChart3 className="w-3 h-3" />
+                  Market Cap
+                </div>
+                <div className="text-xl sm:text-2xl font-mono font-bold">
+                  {formatLargeNumber(mh?.marketCap || 0)}
+                </div>
+                <div className={`flex items-center gap-1 text-xs ${(mh?.marketCapChange || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {(mh?.marketCapChange || 0) >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
+                  {formatPercent(mh?.marketCapChange || 0)}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Transactions */}
-          <Card data-testid="card-transactions">
+          <Card 
+            data-testid="card-transactions"
+            className={`cursor-pointer transition-all ${selectedMetric === 'transactions' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
+            onClick={() => setSelectedMetric('transactions')}
+          >
             <CardContent className="p-3 sm:p-4">
               <div className="flex flex-col gap-1">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -224,7 +274,11 @@ export default function Analytics() {
           </Card>
           
           {/* Volume */}
-          <Card data-testid="card-volume">
+          <Card 
+            data-testid="card-volume"
+            className={`cursor-pointer transition-all ${selectedMetric === 'volume' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
+            onClick={() => setSelectedMetric('volume')}
+          >
             <CardContent className="p-3 sm:p-4">
               <div className="flex flex-col gap-1">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -241,28 +295,13 @@ export default function Analytics() {
               </div>
             </CardContent>
           </Card>
-          
-          {/* Market Cap */}
-          <Card data-testid="card-market-cap">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex flex-col gap-1">
-                <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                  <BarChart3 className="w-3 h-3" />
-                  Market Cap
-                </div>
-                <div className="text-xl sm:text-2xl font-mono font-bold">
-                  {formatLargeNumber(mh?.marketCap || 0)}
-                </div>
-                <div className={`flex items-center gap-1 text-xs ${(mh?.marketCapChange || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {(mh?.marketCapChange || 0) >= 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                  {formatPercent(mh?.marketCapChange || 0)}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Shares Mined */}
-          <Card data-testid="card-shares-mined">
+          <Card 
+            data-testid="card-shares-mined"
+            className={`cursor-pointer transition-all ${selectedMetric === 'sharesMined' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
+            onClick={() => setSelectedMetric('sharesMined')}
+          >
             <CardContent className="p-3 sm:p-4">
               <div className="flex flex-col gap-1">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -280,7 +319,11 @@ export default function Analytics() {
           </Card>
 
           {/* Shares Burned */}
-          <Card data-testid="card-shares-burned">
+          <Card 
+            data-testid="card-shares-burned"
+            className={`cursor-pointer transition-all ${selectedMetric === 'sharesBurned' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
+            onClick={() => setSelectedMetric('sharesBurned')}
+          >
             <CardContent className="p-3 sm:p-4">
               <div className="flex flex-col gap-1">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -298,7 +341,11 @@ export default function Analytics() {
           </Card>
 
           {/* Total Shares */}
-          <Card data-testid="card-total-shares">
+          <Card 
+            data-testid="card-total-shares"
+            className={`cursor-pointer transition-all ${selectedMetric === 'totalShares' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
+            onClick={() => setSelectedMetric('totalShares')}
+          >
             <CardContent className="p-3 sm:p-4">
               <div className="flex flex-col gap-1">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
@@ -315,6 +362,79 @@ export default function Analytics() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Dynamic Metric Chart - Based on Selected Metric */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              {selectedMetric === 'marketCap' && <><BarChart3 className="w-4 h-4" /> Market Cap Over Time</>}
+              {selectedMetric === 'transactions' && <><Activity className="w-4 h-4" /> Transactions Over Time</>}
+              {selectedMetric === 'volume' && <><DollarSign className="w-4 h-4" /> Volume Over Time</>}
+              {selectedMetric === 'sharesMined' && <><Pickaxe className="w-4 h-4" /> Shares Mined Over Time</>}
+              {selectedMetric === 'sharesBurned' && <><Flame className="w-4 h-4" /> Shares Burned Over Time</>}
+              {selectedMetric === 'totalShares' && <><Coins className="w-4 h-4" /> Total Shares Over Time</>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {snapshotsData?.snapshots && snapshotsData.snapshots.length > 0 ? (
+              <ResponsiveContainer width="100%" height={280}>
+                <LineChart data={snapshotsData.snapshots}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                  <XAxis 
+                    dataKey="date" 
+                    stroke="hsl(var(--muted-foreground))" 
+                    fontSize={10}
+                    tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  />
+                  <YAxis 
+                    stroke="hsl(var(--muted-foreground))" 
+                    fontSize={10}
+                    tickFormatter={(v) => {
+                      if (selectedMetric === 'marketCap' || selectedMetric === 'volume') {
+                        if (v >= 1000000) return `$${(v / 1000000).toFixed(1)}M`;
+                        if (v >= 1000) return `$${(v / 1000).toFixed(0)}K`;
+                        return `$${v}`;
+                      }
+                      if (v >= 1000) return `${(v / 1000).toFixed(0)}K`;
+                      return v.toString();
+                    }}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--card))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '6px',
+                      fontSize: '12px'
+                    }}
+                    labelFormatter={(v) => new Date(v).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                    formatter={(value: number) => {
+                      if (selectedMetric === 'marketCap' || selectedMetric === 'volume') {
+                        return [`$${value.toLocaleString()}`, selectedMetric === 'marketCap' ? 'Market Cap' : 'Volume'];
+                      }
+                      return [value.toLocaleString(), 
+                        selectedMetric === 'transactions' ? 'Transactions' :
+                        selectedMetric === 'sharesMined' ? 'Shares Mined' :
+                        selectedMetric === 'sharesBurned' ? 'Shares Burned' : 'Total Shares'
+                      ];
+                    }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey={selectedMetric}
+                    stroke="hsl(var(--primary))" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 3 }}
+                    activeDot={{ r: 5, fill: 'hsl(var(--primary))' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[280px] text-muted-foreground text-sm">
+                {snapshotsData ? 'No snapshot data available for selected time range' : 'Loading market data...'}
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Tabs - Simplified to Overview, Rankings, Compare, Positions */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">

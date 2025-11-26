@@ -5,8 +5,8 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { fetchActivePlayers, calculateFantasyPoints } from "./mysportsfeeds";
 import type { InsertPlayer, Player, User, Holding } from "@shared/schema";
-import { contestLineups, contestEntries, contests, holdings } from "@shared/schema";
-import { sql, eq, desc, and } from "drizzle-orm";
+import { contestLineups, contestEntries, contests, holdings, marketSnapshots } from "@shared/schema";
+import { sql, eq, desc, and, gte, lte } from "drizzle-orm";
 import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
 import { calculateAccrualUpdate } from "@shared/mining-utils";
@@ -3192,7 +3192,7 @@ ${posts.map(post => `  <url>
         return res.status(400).json({ error: 'jobName required' });
       }
       
-      const validJobs = ['roster_sync', 'sync_player_game_logs', 'schedule_sync', 'stats_sync', 'create_contests', 'settle_contests'];
+      const validJobs = ['roster_sync', 'sync_player_game_logs', 'schedule_sync', 'stats_sync', 'create_contests', 'settle_contests', 'daily_snapshot', 'backfill_market_snapshots'];
       if (!validJobs.includes(jobName)) {
         return res.status(400).json({ error: `Invalid jobName. Must be one of: ${validJobs.join(', ')}` });
       }
@@ -3541,6 +3541,53 @@ ${posts.map(post => `  <url>
       });
     } catch (error: any) {
       console.error("[analytics] Error:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Market snapshots API - daily metrics for analytics charts
+  app.get("/api/analytics/snapshots", async (req, res) => {
+    try {
+      const timeRange = (req.query.timeRange as string) || "30D";
+      
+      // Calculate date range based on timeRange
+      const now = new Date();
+      let startDate = new Date();
+      switch (timeRange) {
+        case "7D": startDate.setDate(now.getDate() - 7); break;
+        case "30D": startDate.setDate(now.getDate() - 30); break;
+        case "3M": startDate.setMonth(now.getMonth() - 3); break;
+        case "1Y": startDate.setFullYear(now.getFullYear() - 1); break;
+        case "All": startDate = new Date(2020, 0, 1); break;
+        default: startDate.setDate(now.getDate() - 30);
+      }
+
+      // Query market snapshots from database
+      const snapshots = await db
+        .select()
+        .from(marketSnapshots)
+        .where(and(
+          gte(marketSnapshots.snapshotDate, startDate),
+          lte(marketSnapshots.snapshotDate, now)
+        ))
+        .orderBy(marketSnapshots.snapshotDate);
+
+      res.json({
+        timeRange,
+        startDate: startDate.toISOString(),
+        endDate: now.toISOString(),
+        snapshots: snapshots.map(s => ({
+          date: s.snapshotDate,
+          marketCap: parseFloat(s.marketCap),
+          transactions: s.transactionsCount,
+          volume: parseFloat(s.volume),
+          sharesMined: s.sharesMined,
+          sharesBurned: s.sharesBurned,
+          totalShares: s.totalShares,
+        })),
+      });
+    } catch (error: any) {
+      console.error("[analytics/snapshots] Error:", error);
       res.status(500).json({ error: error.message });
     }
   });

@@ -331,6 +331,21 @@ export const portfolioSnapshots = pgTable("portfolio_snapshots", {
   dateIdx: index("portfolio_snapshots_date_idx").on(table.snapshotDate),
 }));
 
+// Market snapshots table - daily snapshots of platform-wide market metrics for analytics charts
+export const marketSnapshots = pgTable("market_snapshots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  snapshotDate: timestamp("snapshot_date").notNull().unique(), // One row per day (UTC midnight)
+  marketCap: decimal("market_cap", { precision: 20, scale: 2 }).notNull(), // Total value of all shares (shares * price)
+  transactionsCount: integer("transactions_count").notNull().default(0), // Number of trades that day
+  volume: decimal("volume", { precision: 20, scale: 2 }).notNull().default("0"), // Total trading volume that day
+  sharesMined: integer("shares_mined").notNull().default(0), // Shares mined that day
+  sharesBurned: integer("shares_burned").notNull().default(0), // Shares used in contests that day
+  totalShares: integer("total_shares").notNull().default(0), // Total shares in economy (snapshot)
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  dateIdx: index("market_snapshots_date_idx").on(table.snapshotDate),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   holdings: many(holdings),
@@ -533,3 +548,11 @@ export const insertPortfolioSnapshotSchema = createInsertSchema(portfolioSnapsho
 
 export type PortfolioSnapshot = typeof portfolioSnapshots.$inferSelect;
 export type InsertPortfolioSnapshot = z.infer<typeof insertPortfolioSnapshotSchema>;
+
+export const insertMarketSnapshotSchema = createInsertSchema(marketSnapshots).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type MarketSnapshot = typeof marketSnapshots.$inferSelect;
+export type InsertMarketSnapshot = z.infer<typeof insertMarketSnapshotSchema>;
