@@ -50,23 +50,20 @@ The platform provides comprehensive data analysis features to meet AdSense requi
 
 **Analytics Page (`/analytics`):**
 
-*Market Health Dashboard:*
-- Three metric cards showing Transactions, Volume, and Market Cap with percentage changes vs previous period
+*Market Health Dashboard (6 Metric Cards - 2x3 Grid):*
+- Transactions: Count with percentage change vs previous period
+- Volume: Total trading volume with percentage change
+- Market Cap: Total market capitalization (shares × price) with percentage change
+- Shares Mined: Total shares mined from mining_claims table
+- Shares Burned: Total shares used in contests from contest_entries table  
+- Total Shares: Current shares in economy from holdings table
 - Timeframe selector: 24H, 7D, 30D, 3M, 1Y, All Time
-- Time series chart showing market activity over time (volume trend)
-- All metrics calculated from real trades and holdings tables
+- All metrics calculated from real trades, holdings, mining_claims, and contest_entries tables
 
-*Tabs:*
-- Overview tab: Power Rankings top 10 with composite scores, Volume by Position bar chart
-- Hot/Cold Players: Biggest gainers (positive price change) and losers (negative price change)
-- Rankings: Full power rankings table with Price, Volume, Avg Fantasy Points, Score, 7d Change
-- Heatmap: Team/position matrix showing average price changes and top players per cell
-- Compare: Enhanced multi-player comparison (up to 5 players) with:
-  - Shares Outstanding (from holdings table)
-  - Market Cap (shares × price)
-  - Price, Volume, 24h Change
-  - Contest Usage % (from contest_lineups table)
-  - Overlaid price history chart
+*Tabs (Simplified - 4 tabs):*
+- Overview: ComposedChart with volume bars and transaction line, Economy Summary, Top 5 Players
+- Rankings: Full power rankings table with Price, Volume, Avg Fantasy Points, 7d Change
+- Compare: Multi-player comparison (up to 5 players) with Shares, Market Cap, Price, Volume, Contest Usage %, price history chart
 - Positions: Position-based player rankings (PG, SG, SF, PF, C) with fantasy points averages
 
 *Power Rankings Scoring (40/30/30 weights):*
@@ -96,11 +93,10 @@ The platform provides comprehensive data analysis features to meet AdSense requi
 **Storage Methods (in server/storage.ts):**
 - `getMarketHealthStats(startDate, endDate)` - Transaction count, volume, market cap with period comparison
 - `getMarketHealthTimeSeries(startDate, endDate)` - Daily aggregates for charts
+- `getShareEconomyStats(startDate, endDate)` - Shares mined (mining_claims), shares burned (contest_entries), total shares (holdings)
 - `getPlayerSharesOutstanding(playerIds?)` - Total shares held per player from holdings
 - `getContestUsageStats(playerIds?)` - Times used in contests, usage percentage
 - `getPriceHistoryRange(playerIds, startDate, endDate)` - Historical prices for comparison charts
-- `getHotColdPlayers(limit)` - Players with biggest positive/negative price changes
-- `getHeatmapData()` - Aggregated by team and position
 - `getPowerRankings(limit)` - Composite score calculations with fantasy stats
 
 ### Content & SEO
