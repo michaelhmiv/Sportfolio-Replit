@@ -3437,10 +3437,11 @@ ${posts.map(post => `  <url>
       }
 
       // Get market health stats and share economy stats from storage
-      const [marketHealth, shareEconomy, timeSeries] = await Promise.all([
+      const [marketHealth, shareEconomy, timeSeries, shareEconomyTimeSeries] = await Promise.all([
         storage.getMarketHealthStats(startDate, now),
         storage.getShareEconomyStats(startDate, now),
         storage.getMarketHealthTimeSeries(startDate, now),
+        storage.getShareEconomyTimeSeries(startDate, now),
       ]);
       
       // Calculate percentage changes
@@ -3527,6 +3528,7 @@ ${posts.map(post => `  <url>
           periodSharesMined: shareEconomy.periodSharesMined,
           periodSharesBurned: shareEconomy.periodSharesBurned,
           timeSeries,
+          shareEconomyTimeSeries,
         },
         powerRankings,
         positionRankings,

@@ -63,6 +63,11 @@ interface MarketHealth {
     volume: number;
     marketCap: number;
   }[];
+  shareEconomyTimeSeries: {
+    date: string;
+    sharesMined: number;
+    sharesBurned: number;
+  }[];
 }
 
 interface ComparisonPlayer {
@@ -101,6 +106,7 @@ export default function Analytics() {
 
   const { data: analyticsData, isLoading } = useQuery<AnalyticsData>({
     queryKey: [`/api/analytics?timeRange=${timeRange}`],
+    refetchInterval: 30000, // Auto-refresh every 30 seconds
   });
 
   const { data: comparisonData, isLoading: comparisonLoading } = useQuery<{
@@ -333,16 +339,73 @@ export default function Analytics() {
 
           {/* Overview Tab - All-Encompassing Chart */}
           <TabsContent value="overview" className="space-y-4">
+            {/* Share Economy Chart - Shows mining and burning activity */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                  <Activity className="w-4 h-4" />
-                  Market Activity Over Time
+                  <Coins className="w-4 h-4" />
+                  Share Economy Over Time
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {mh?.timeSeries && mh.timeSeries.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
+                {mh?.shareEconomyTimeSeries && mh.shareEconomyTimeSeries.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={250}>
+                    <ComposedChart data={mh.shareEconomyTimeSeries}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                      <XAxis 
+                        dataKey="date" 
+                        stroke="hsl(var(--muted-foreground))" 
+                        fontSize={10}
+                        tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      />
+                      <YAxis 
+                        stroke="hsl(var(--muted-foreground))" 
+                        fontSize={10}
+                      />
+                      <Tooltip
+                        contentStyle={{
+                          backgroundColor: 'hsl(var(--card))',
+                          border: '1px solid hsl(var(--border))',
+                          borderRadius: '6px',
+                          fontSize: '12px'
+                        }}
+                        labelFormatter={(v) => new Date(v).toLocaleDateString()}
+                        formatter={(value: number, name: string) => [value.toLocaleString(), name]}
+                      />
+                      <Legend />
+                      <Bar 
+                        dataKey="sharesMined" 
+                        fill="hsl(142 76% 36%)" 
+                        name="Shares Mined"
+                        radius={[4, 4, 0, 0]}
+                      />
+                      <Bar 
+                        dataKey="sharesBurned" 
+                        fill="hsl(0 72% 51%)" 
+                        name="Shares Burned"
+                        radius={[4, 4, 0, 0]}
+                      />
+                    </ComposedChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-[250px] text-muted-foreground text-sm">
+                    No mining or contest activity in selected time period
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Trading Activity Chart */}
+            {mh?.timeSeries && mh.timeSeries.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium flex items-center gap-2">
+                    <Activity className="w-4 h-4" />
+                    Trading Activity
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={200}>
                     <ComposedChart data={mh.timeSeries}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis 
@@ -395,13 +458,9 @@ export default function Analytics() {
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
-                ) : (
-                  <div className="flex items-center justify-center h-[300px] text-muted-foreground text-sm">
-                    No trading activity in selected time period
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Quick Stats Summary */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -250,6 +250,18 @@ export interface IStorage {
     avgFantasyPoints: number;
     compositeScore: number;
   }>>;
+  getShareEconomyStats(startDate?: Date, endDate?: Date): Promise<{
+    totalSharesMined: number;
+    totalSharesBurned: number;
+    totalSharesInEconomy: number;
+    periodSharesMined: number;
+    periodSharesBurned: number;
+  }>;
+  getShareEconomyTimeSeries(startDate: Date, endDate: Date): Promise<Array<{
+    date: string;
+    sharesMined: number;
+    sharesBurned: number;
+  }>>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2622,6 +2634,68 @@ export class DatabaseStorage implements IStorage {
       periodSharesMined,
       periodSharesBurned,
     };
+  }
+
+  async getShareEconomyTimeSeries(startDate: Date, endDate: Date): Promise<{
+    date: string;
+    sharesMined: number;
+    sharesBurned: number;
+  }[]> {
+    // Get shares mined by date
+    const minedByDate = await db
+      .select({
+        date: sql<string>`DATE(${miningClaims.claimedAt})`.as('date'),
+        shares: sql<string>`COALESCE(SUM(${miningClaims.sharesClaimed}), 0)`.as('shares'),
+      })
+      .from(miningClaims)
+      .where(and(
+        gte(miningClaims.claimedAt, startDate),
+        lte(miningClaims.claimedAt, endDate)
+      ))
+      .groupBy(sql`DATE(${miningClaims.claimedAt})`)
+      .orderBy(sql`DATE(${miningClaims.claimedAt})`);
+
+    // Get shares burned by date (based on when entry was created/locked)
+    const burnedByDate = await db
+      .select({
+        date: sql<string>`DATE(${contestEntries.createdAt})`.as('date'),
+        shares: sql<string>`COALESCE(SUM(${contestEntries.totalSharesEntered}), 0)`.as('shares'),
+      })
+      .from(contestEntries)
+      .where(and(
+        gte(contestEntries.createdAt, startDate),
+        lte(contestEntries.createdAt, endDate)
+      ))
+      .groupBy(sql`DATE(${contestEntries.createdAt})`)
+      .orderBy(sql`DATE(${contestEntries.createdAt})`);
+
+    // Combine into a single time series
+    const dateMap = new Map<string, { sharesMined: number; sharesBurned: number }>();
+
+    // Add all mined dates
+    for (const row of minedByDate) {
+      const dateStr = row.date;
+      dateMap.set(dateStr, {
+        sharesMined: parseInt(row.shares || "0"),
+        sharesBurned: 0,
+      });
+    }
+
+    // Add/merge burned dates
+    for (const row of burnedByDate) {
+      const dateStr = row.date;
+      const existing = dateMap.get(dateStr) || { sharesMined: 0, sharesBurned: 0 };
+      existing.sharesBurned = parseInt(row.shares || "0");
+      dateMap.set(dateStr, existing);
+    }
+
+    // Sort by date and convert to array
+    const sortedDates = Array.from(dateMap.keys()).sort();
+    return sortedDates.map(date => ({
+      date,
+      sharesMined: dateMap.get(date)?.sharesMined || 0,
+      sharesBurned: dateMap.get(date)?.sharesBurned || 0,
+    }));
   }
 }
 
