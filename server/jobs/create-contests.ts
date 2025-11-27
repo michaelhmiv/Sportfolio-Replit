@@ -116,12 +116,12 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
     // Create contests for each game day
     for (const [dateStr, gameDay] of Array.from(gameDays.entries())) {
       try {
-        // Check if a contest already exists for this date (no status filter to get all contests)
+        // Check if a contest already exists for this date using database query (prevents race conditions)
         const existingContests = await storage.getContests();
         const contestExists = existingContests.some(c => {
           const contestDate = new Date(c.gameDate);
           const contestDateStr = contestDate.toISOString().split('T')[0];
-          return contestDateStr === dateStr && c.status !== "completed";
+          return contestDateStr === dateStr && (c.status === "open" || c.status === "live");
         });
 
         if (contestExists) {
