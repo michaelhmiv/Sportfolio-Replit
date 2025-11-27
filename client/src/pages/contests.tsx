@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,9 +36,23 @@ export default function Contests() {
 
   const { data, isLoading } = useQuery<ContestsData>({
     queryKey: [contestsUrl],
-    refetchOnMount: "stale",
+    refetchOnMount: "always",
     staleTime: 0,
+    gcTime: 0,
   });
+
+  const contests = useMemo(() => {
+    if (!data?.contests) return [];
+    const seen = new Set<string>();
+    return data.contests.filter(contest => {
+      if (seen.has(contest.id)) {
+        console.warn('[contests] Duplicate contest filtered:', contest.id, contest.name);
+        return false;
+      }
+      seen.add(contest.id);
+      return true;
+    });
+  }, [data?.contests]);
 
   const goToPrevDay = () => {
     setSelectedDate(prev => {
@@ -126,7 +140,7 @@ export default function Contests() {
 
         {isLoading ? (
           <div className="text-center py-6 text-muted-foreground">Loading contests...</div>
-        ) : data?.contests.length === 0 ? (
+        ) : contests.length === 0 ? (
           <Card>
             <CardContent className="py-6 text-center text-muted-foreground">
               No contests available for this date
@@ -136,7 +150,7 @@ export default function Contests() {
           <>
             {/* Mobile: Card Layout */}
             <div className="sm:hidden p-3 space-y-3">
-              {data?.contests.map((contest) => {
+              {contests.map((contest) => {
                     const isLocked = new Date() >= new Date(contest.startsAt);
                     return (
                       <Card key={contest.id} className="hover-elevate" data-testid={`card-contest-${contest.id}`}>
@@ -236,7 +250,7 @@ export default function Contests() {
                           </tr>
                         </thead>
                         <tbody>
-                          {data?.contests.map((contest) => {
+                          {contests.map((contest) => {
                             const isLocked = new Date() >= new Date(contest.startsAt);
                             return (
                               <tr 
@@ -317,7 +331,7 @@ export default function Contests() {
         )}
 
         {/* AdSense Ad - Contests */}
-        {data && data.contests.length > 0 && (
+        {contests.length > 0 && (
           <div className="my-6">
             <AdSenseAd 
               slot="9148489051" 
