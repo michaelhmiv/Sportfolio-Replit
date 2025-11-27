@@ -36,6 +36,8 @@ export default function Contests() {
 
   const { data, isLoading } = useQuery<ContestsData>({
     queryKey: [contestsUrl],
+    refetchOnMount: "stale",
+    staleTime: 0,
   });
 
   const goToPrevDay = () => {
