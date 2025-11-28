@@ -49,9 +49,9 @@ export function BottomNav() {
             >
               <div
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 py-2 rounded-lg transition-colors w-full relative",
+                  "flex flex-col items-center justify-center gap-1 py-2 rounded-none border-r border-b border-border transition-colors w-full relative",
                   isActive
-                    ? "text-primary"
+                    ? "text-primary bg-primary/10"
                     : "text-muted-foreground hover-elevate"
                 )}
                 data-testid={`button-nav-${item.title.toLowerCase()}`}
