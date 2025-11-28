@@ -246,7 +246,7 @@ export default function Leaderboards() {
     <div className="min-h-screen bg-background p-3 sm:p-4">
       <div className="max-w-7xl mx-auto">
         <div className="mb-4 sm:mb-4">
-          <h1 className="text-3xl font-bold mb-2">Global Leaderboards</h1>
+          <h1 className="hidden sm:block text-3xl font-bold mb-2">Global Leaderboards</h1>
           <p className="text-muted-foreground">See how you rank against all players</p>
         </div>
 

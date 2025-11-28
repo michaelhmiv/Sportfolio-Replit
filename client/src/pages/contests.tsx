@@ -75,7 +75,7 @@ export default function Contests() {
       <div className="max-w-7xl mx-auto">
         <div className="mb-4 sm:mb-4">
           <div className="flex items-center justify-between mb-2">
-            <h1 className="text-3xl font-bold">Contests</h1>
+            <h1 className="hidden sm:block text-3xl font-bold">Contests</h1>
             <div className="flex items-center gap-2">
               <Button
                 variant="outline"

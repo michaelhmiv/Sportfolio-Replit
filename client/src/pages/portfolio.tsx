@@ -151,7 +151,7 @@ export default function Portfolio() {
     <div className="min-h-screen bg-background p-3 sm:p-4">
       <div className="max-w-7xl mx-auto">
         <div className="mb-4 sm:mb-4">
-          <h1 className="text-3xl font-bold mb-4 sm:mb-6">Portfolio</h1>
+          <h1 className="hidden sm:block text-3xl font-bold mb-4 sm:mb-6">Portfolio</h1>
           
           {/* Portfolio Summary - Mobile: Single row, Desktop: 3 cards */}
           <div className="mb-4 sm:mb-4">
