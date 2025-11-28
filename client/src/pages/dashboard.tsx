@@ -499,28 +499,22 @@ export default function Dashboard() {
           </div>
         )}
         
-        {/* Market Ticker */}
+        {/* Market Activity Ticker */}
         <div className="border-b bg-card overflow-x-hidden">
         <div className="h-12 overflow-hidden relative">
           <div className="flex gap-3 animate-slide-left absolute whitespace-nowrap py-3 px-4">
-            {(data?.hotPlayers ?? []).concat(data?.hotPlayers ?? []).map((player, idx) => (
-              <div key={`${player.id}-${idx}`} className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md">
-                <span className="font-medium">
+            {(data?.recentTrades ?? []).concat(data?.recentTrades ?? []).map((trade, idx) => (
+              <div key={`${trade.id}-${idx}`} className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md">
+                <span className="text-blue-500 font-bold text-sm">⊡</span>
+                <span className="font-medium text-xs sm:text-sm">
                   <PlayerName 
-                    playerId={player.id} 
-                    firstName={player.firstName} 
-                    lastName={player.lastName}
+                    playerId={trade.player.id} 
+                    firstName={trade.player.firstName} 
+                    lastName={trade.player.lastName}
                   />
                 </span>
-                <span className="font-mono font-bold">
-                  {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-sm">No value</span>}
-                </span>
-                {player.lastTradePrice && (
-                  <span className={`flex items-center text-sm ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
-                    {parseFloat(player.priceChange24h) >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
-                    {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
-                  </span>
-                )}
+                <span className="font-mono font-bold text-xs sm:text-sm">${trade.price}</span>
+                <span className="text-muted-foreground text-xs">{trade.quantity} sh</span>
               </div>
             ))}
           </div>
