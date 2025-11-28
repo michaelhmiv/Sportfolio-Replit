@@ -398,7 +398,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json({
           user: null, // No user data for anonymous visitors
           hotPlayers,
-          mining: null,
+          vesting: null,
           contests: allContests.slice(0, 5),
           recentTrades: recentTrades.map(trade => ({
             ...trade,
@@ -549,7 +549,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           portfolioRankChange,
         },
         hotPlayers,
-        mining: miningData ? {
+        vesting: miningData ? {
           ...miningData,
           player: miningPlayer,
           players: miningPlayers,
