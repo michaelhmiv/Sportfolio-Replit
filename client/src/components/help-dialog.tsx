@@ -21,7 +21,7 @@ export function HelpDialog() {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-2xl">🏟️ Welcome to Sportfolio: The Persistent Fantasy Sports Market</DialogTitle>
+            <DialogTitle className="text-2xl">Welcome to Sportfolio: The Persistent Fantasy Sports Market</DialogTitle>
           </DialogHeader>
           
           <div className="space-y-6 text-sm">
@@ -43,23 +43,23 @@ export function HelpDialog() {
 
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-semibold mb-2">1. ⛏️ Mine Player Shares</h4>
+                  <h4 className="font-semibold mb-2">1. Vest Player Shares</h4>
                   <ul className="list-disc pl-6 space-y-1">
-                    <li><strong>What it is:</strong> Mining is the <em>only</em> way to create new shares of active players.</li>
-                    <li><strong>How it works:</strong> You simply select an active player to mine, and your account will generate shares of that player over time at a set rate of 100 shares per hour.</li>
-                    <li><strong>The Strategy:</strong> You must decide which players to invest your mining time in. Do you mine a superstar, or an underrated rookie you think will break out?</li>
+                    <li><strong>What it is:</strong> Vesting is the <em>only</em> way to create new shares of active players.</li>
+                    <li><strong>How it works:</strong> You simply select active players to vest, and your account will generate shares of those players over time at a set rate of 100 shares per hour (distributed across your selected players).</li>
+                    <li><strong>The Strategy:</strong> You must decide which players to invest your vesting time in. Do you vest a superstar, or an underrated rookie you think will break out?</li>
                   </ul>
                 </div>
 
                 <div>
-                  <h4 className="font-semibold mb-2">2. 📈 Use Your Shares (Trade or Compete)</h4>
+                  <h4 className="font-semibold mb-2">2. Use Your Shares (Trade or Compete)</h4>
                   <p className="mb-2">Once shares are in your portfolio, you have two main options:</p>
                   
                   <div className="pl-4 space-y-3">
                     <div>
                       <p className="font-medium mb-1">Option A: Trade on the Player Exchange</p>
                       <p className="text-muted-foreground">
-                        You can immediately sell your mined shares on the "Player Exchange," which functions just like a real-world stock market. You can set your price, and other users can buy your shares, allowing you to speculate and build your in-game wealth.
+                        You can immediately sell your vested shares on the "Player Exchange," which functions just like a real-world stock market. You can set your price, and other users can buy your shares, allowing you to speculate and build your in-game wealth.
                       </p>
                     </div>
 
@@ -73,7 +73,7 @@ export function HelpDialog() {
                 </div>
 
                 <div>
-                  <h4 className="font-semibold mb-2">3. 🔥 The "Burn" Mechanic</h4>
+                  <h4 className="font-semibold mb-2">3. The "Burn" Mechanic</h4>
                   <p className="mb-2">This is the most important part of the economy:</p>
                   <ul className="list-disc pl-6 space-y-1">
                     <li>When you submit shares into a contest, they are <strong>permanently removed (or "burned")</strong> from the game after the contest ends.</li>
@@ -89,13 +89,13 @@ export function HelpDialog() {
               <h3 className="text-lg font-semibold mb-3">Key Things to Know as a New User</h3>
               <ul className="list-disc pl-6 space-y-2">
                 <li><strong>It's a Virtual Economy:</strong> Sportfolio is a game based on virtual currency. There are <strong>no cash-out options</strong>.</li>
-                <li><strong>Persistence is Key:</strong> Unlike seasonal fantasy, you don't have to redraft your players every year. If you mine a player and they become a star, you can benefit from that investment for their <em>entire career</em>.</li>
-                <li><strong>You Control the Market:</strong> A player's mining rate is the same for everyone (100 shares/hour). Their value is only determined by what other users are willing to pay for them on the Exchange, based on their contest performance or hype.</li>
+                <li><strong>Persistence is Key:</strong> Unlike seasonal fantasy, you don't have to redraft your players every year. If you vest a player and they become a star, you can benefit from that investment for their <em>entire career</em>.</li>
+                <li><strong>You Control the Market:</strong> A player's vesting rate is the same for everyone (100 shares/hour total). Their value is only determined by what other users are willing to pay for them on the Exchange, based on their contest performance or hype.</li>
               </ul>
             </div>
 
             <p className="text-center font-medium pt-4">
-              In short, your goal is to <strong>Mine</strong> shares of players you believe in, and then decide whether to <strong>Trade</strong> them for profit or <strong>Compete</strong> with them in contests to win prizes.
+              In short, your goal is to <strong>Vest</strong> shares of players you believe in, and then decide whether to <strong>Trade</strong> them for profit or <strong>Compete</strong> with them in contests to win prizes.
             </p>
           </div>
         </DialogContent>

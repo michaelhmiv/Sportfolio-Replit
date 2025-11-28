@@ -459,7 +459,7 @@ export default function Analytics() {
 
           {/* Overview Tab - All-Encompassing Chart */}
           <TabsContent value="overview" className="space-y-4">
-            {/* Share Economy Chart - Shows mining and burning activity */}
+            {/* Share Economy Chart - Shows vesting and burning activity */}
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -496,7 +496,7 @@ export default function Analytics() {
                       <Bar 
                         dataKey="sharesMined" 
                         fill="hsl(142 76% 36%)" 
-                        name="Shares Mined"
+                        name="Shares Vested"
                         radius={[4, 4, 0, 0]}
                       />
                       <Bar 
@@ -509,7 +509,7 @@ export default function Analytics() {
                   </ResponsiveContainer>
                 ) : (
                   <div className="flex items-center justify-center h-[250px] text-muted-foreground text-sm">
-                    No mining or contest activity in selected time period
+                    No vesting or contest activity in selected time period
                   </div>
                 )}
               </CardContent>

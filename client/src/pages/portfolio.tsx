@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, DollarSign, Crown, Pickaxe, ShoppingCart, Trophy, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Crown, Clock, ShoppingCart, Trophy, ArrowUpRight, ArrowDownRight } from "lucide-react";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -31,7 +31,7 @@ interface PortfolioData {
 interface UserActivity {
   id: string;
   timestamp: string;
-  category: 'mining' | 'market' | 'contest';
+  category: 'vesting' | 'market' | 'contest';
   type: string;
   description: string;
   cashDelta?: string;
@@ -581,21 +581,21 @@ function ActivityFeed() {
           <CardTitle className="text-sm font-medium uppercase tracking-wide">Activity History</CardTitle>
         </CardHeader>
         <CardContent className="p-12 text-center text-muted-foreground" data-testid="text-no-activity">
-          No activity yet. Start trading, mining, or entering contests!
+          No activity yet. Start trading, vesting, or entering contests!
         </CardContent>
       </Card>
     );
   }
 
   const getActivityIcon = (category: string, type: string) => {
-    if (category === 'mining') return <Pickaxe className="w-4 h-4" />;
+    if (category === 'vesting') return <Clock className="w-4 h-4" />;
     if (category === 'market') return <ShoppingCart className="w-4 h-4" />;
     if (category === 'contest') return <Trophy className="w-4 h-4" />;
     return null;
   };
 
   const getCategoryColor = (category: string) => {
-    if (category === 'mining') return 'text-yellow-500';
+    if (category === 'vesting') return 'text-yellow-500';
     if (category === 'market') return 'text-blue-500';
     if (category === 'contest') return 'text-purple-500';
     return 'text-muted-foreground';

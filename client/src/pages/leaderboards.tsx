@@ -48,8 +48,8 @@ export default function Leaderboards() {
 
   // Subscribe to WebSocket events for real-time leaderboard updates
   useEffect(() => {
-    // Mining events → update shares mined leaderboard
-    const unsubMining = subscribe('mining', () => {
+    // Vesting events → update shares vested leaderboard
+    const unsubVesting = subscribe('vesting', () => {
       queryClient.invalidateQueries({ queryKey: ["/api/leaderboards?category=sharesMined"] });
     });
 
@@ -69,7 +69,7 @@ export default function Leaderboards() {
     });
 
     return () => {
-      unsubMining();
+      unsubVesting();
       unsubPortfolio();
       unsubTrade();
     };
@@ -267,10 +267,10 @@ export default function Leaderboards() {
               <span className="hidden sm:inline">Portfolio</span>
               <span className="sm:hidden text-xs">Port</span>
             </TabsTrigger>
-            <TabsTrigger value="sharesMined" data-testid="tab-shares-mined">
+            <TabsTrigger value="sharesMined" data-testid="tab-shares-vested">
               <TrendingUp className="w-4 h-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Shares Mined</span>
-              <span className="sm:hidden text-xs">Mine</span>
+              <span className="hidden sm:inline">Shares Vested</span>
+              <span className="sm:hidden text-xs">Vest</span>
             </TabsTrigger>
             <TabsTrigger value="marketOrders" data-testid="tab-market-orders">
               <ShoppingCart className="w-4 h-4 mr-1 sm:mr-2" />

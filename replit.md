@@ -1,7 +1,10 @@
 # Sportfolio - Fantasy Sports Stock Market Platform
 
 ## Overview
-Sportfolio is a fantasy sports trading platform that gamifies NBA player performance by allowing users to trade player shares like stocks. It combines real-time sports data with financial trading mechanics, featuring player share mining, 50/50 contests, and a professional-grade trading interface. The platform aims to provide an engaging experience for sports fans, blending fantasy sports with financial market dynamics, with a vision to expand to other sports and achieve sub-500ms response times for all major endpoints.
+Sportfolio is a fantasy sports trading platform that gamifies NBA player performance by allowing users to trade player shares like stocks. It combines real-time sports data with financial trading mechanics, featuring player share vesting (earning shares over time), 50/50 contests, and a professional-grade trading interface. The platform aims to provide an engaging experience for sports fans, blending fantasy sports with financial market dynamics, with a vision to expand to other sports and achieve sub-500ms response times for all major endpoints.
+
+### Terminology Note
+The platform uses "vesting" terminology instead of "mining" to avoid crypto associations. Users "vest" shares over time rather than "mine" them. Database tables still use `mining` column names for backwards compatibility, but all user-facing UI displays "vesting" terminology. Up to 10 players can be selected for vesting simultaneously, with 100 shares/hour distributed equally among them.
 
 ## User Preferences
 Preferred communication style: Simple, everyday language.
@@ -11,7 +14,7 @@ CRITICAL RULE: Never use mock, sample, or placeholder data under any circumstanc
 ## System Architecture
 
 ### Frontend
-The frontend uses React, TypeScript, Vite, Wouter for routing, and TanStack Query for server state management. Shadcn/ui (Radix UI, Tailwind CSS) provides components, following a custom design system inspired by Robinhood/Bloomberg with Inter typography. It features a sidebar navigation, real-time market ticker, card-based responsive layouts, a mining widget, and optimistic UI updates. Mobile experience is prioritized with bottom navigation.
+The frontend uses React, TypeScript, Vite, Wouter for routing, and TanStack Query for server state management. Shadcn/ui (Radix UI, Tailwind CSS) provides components, following a Bloomberg terminal aesthetic with JetBrains Mono typography and sharp corners. It features a sidebar navigation, real-time market ticker, card-based responsive layouts, a vesting widget, and optimistic UI updates. Mobile experience is prioritized with bottom navigation.
 
 Authentication uses the `useAuth()` hook to handle unauthenticated sessions gracefully, allowing public access to dashboards and market data. A centralized cache invalidation utility and WebSocket provider manage real-time updates. A notification system tracks unread activity for background events like trade executions and contest settlements.
 
@@ -54,7 +57,7 @@ The platform provides comprehensive data analysis features to meet AdSense requi
 - **Market Cap** (default, shown first): Total market capitalization with % change
 - **Transactions**: Trade count with % change vs previous period  
 - **Volume**: Total trading volume with % change
-- **Shares Mined**: Total shares mined from mining_claims table
+- **Shares Vested**: Total shares vested from mining_claims table
 - **Shares Burned**: Total shares used in contests from contest_entries table  
 - **Total Shares**: Current shares in economy from holdings table
 - **Interactive**: Click any tile to switch the chart to show that metric over time
@@ -82,7 +85,7 @@ The platform provides comprehensive data analysis features to meet AdSense requi
 - Net Worth rankings
 - Portfolio Value rankings
 - Cash Balance rankings
-- Shares Mined rankings
+- Shares Vested rankings
 - Market Orders rankings
 - Real-time WebSocket updates
 

@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TrendingUp, Trophy, Pickaxe, BarChart3, Users, CheckCircle2 } from "lucide-react";
+import { TrendingUp, Trophy, Clock, BarChart3, Users, CheckCircle2 } from "lucide-react";
 import { SchemaOrg, schemas } from "@/components/schema-org";
 
 const faqs = [
@@ -8,8 +8,8 @@ const faqs = [
     answer: "NBA players on Sportfolio are represented as tradable shares, similar to stocks. Each player has a market price that changes based on trading activity. You can place market orders to buy or sell immediately, or use limit orders to specify exact prices."
   },
   {
-    question: "What is the mining system and how do I earn free shares?",
-    answer: "Mining rewards active users with free player shares. By participating on the platform - trading, entering contests, and engaging with the community - you accumulate mining points that convert into tradable player shares. Check the mining widget on your dashboard to claim shares."
+    question: "What is the vesting system and how do I earn free shares?",
+    answer: "Vesting rewards active users with free player shares. By selecting players to vest, you accumulate shares over time at a rate of 100 shares per hour distributed across your selections. Check the vesting widget on your dashboard to claim shares."
   },
   {
     question: "How do fantasy contests work?",
@@ -56,16 +56,16 @@ export default function HowItWorks() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Pickaxe className="w-5 h-5 text-primary" />
-                2. Mining Free Shares
+                <Clock className="w-5 h-5 text-primary" />
+                2. Vesting Free Shares
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                Sportfolio features a mining system that rewards active users with free player shares. By participating on the platform - trading, entering contests, and engaging with the community - you accumulate mining points that convert into tradable player shares.
+                Sportfolio features a vesting system that rewards active users with free player shares. By selecting players to vest, you accumulate shares over time - up to 100 shares per hour distributed across your selected players (maximum 10).
               </p>
               <p className="text-muted-foreground">
-                Check the mining widget on your dashboard to see your current accumulation and claim shares when available. Mining is a great way to build your portfolio without spending virtual currency.
+                Check the vesting widget on your dashboard to see your current accumulation and claim shares when available. Vesting is a great way to build your portfolio without spending virtual currency.
               </p>
             </CardContent>
           </Card>
@@ -113,7 +113,7 @@ export default function HowItWorks() {
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-muted-foreground">
-                Track your performance against other Sportfolio users on global leaderboards. Rankings are available for portfolio net worth, total shares mined, and market orders placed. See where you stand and compete for bragging rights in the community.
+                Track your performance against other Sportfolio users on global leaderboards. Rankings are available for portfolio net worth, total shares vested, and market orders placed. See where you stand and compete for bragging rights in the community.
               </p>
             </CardContent>
           </Card>

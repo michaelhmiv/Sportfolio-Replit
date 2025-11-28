@@ -57,7 +57,7 @@ export default function About() {
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-primary mt-1">•</span>
-                  <span><strong>Share Mining:</strong> Earn free player shares by actively participating on the platform</span>
+                  <span><strong>Share Vesting:</strong> Earn free player shares over time by selecting players to vest</span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-primary mt-1">•</span>

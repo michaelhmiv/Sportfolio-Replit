@@ -9,7 +9,7 @@ import { contestLineups, contestEntries, contests, holdings, marketSnapshots } f
 import { sql, eq, desc, and, gte, lte } from "drizzle-orm";
 import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
-import { calculateAccrualUpdate } from "@shared/mining-utils";
+import { calculateAccrualUpdate } from "@shared/vesting-utils";
 import { createContests } from "./jobs/create-contests";
 import { calculateContestLeaderboard } from "./contest-scoring";
 import { setupAuth, isAuthenticated, optionalAuth } from "./replitAuth";
@@ -71,15 +71,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
-  // Helper: Accrue mining shares based on elapsed time
-  async function accrueMiningShares(userId: string) {
+  // Helper: Accrue vesting shares based on elapsed time
+  async function accrueVestingShares(userId: string) {
     const user = await storage.getUser(userId);
     if (!user) return;
 
     const miningData = await storage.getMining(userId);
     if (!miningData) return;
     
-    // Check if using multi-player mining (splits)
+    // Check if using multi-player vesting (splits)
     const splits = await storage.getMiningSplits(userId);
     const usingSplits = splits.length > 0;
     
@@ -416,7 +416,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Accrue mining shares based on elapsed time
-      await accrueMiningShares(user.id);
+      await accrueVestingShares(user.id);
       
       // Fetch user-specific data in parallel
       const [userHoldings, miningData, miningSplits] = await Promise.all([
@@ -1658,14 +1658,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       for (const player of playersArray) {
         if (!player.isEligibleForMining) {
-          return res.status(400).json({ error: `${player.firstName} ${player.lastName} is not eligible for mining` });
+          return res.status(400).json({ error: `${player.firstName} ${player.lastName} is not eligible for vesting` });
         }
       }
       
       const players = playersArray;
 
       // AUTO-CLAIM: Check if user has unclaimed shares and claim them automatically
-      await accrueMiningShares(user.id);
+      await accrueVestingShares(user.id);
       const currentMining = await storage.getMining(user.id);
       let claimedData = null;
 
@@ -1675,7 +1675,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const usingSplits = splits.length > 0;
 
         if (usingSplits) {
-          // Multi-player mining: distribute shares proportionally
+          // Multi-player vesting: distribute shares proportionally
           const totalRate = 100;
           const claimedPlayers = [];
           let totalDistributed = 0;
@@ -1772,7 +1772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         broadcast({ type: "portfolio", userId: user.id });
-        broadcast({ type: "mining", userId: user.id, claimed: totalAccumulated });
+        broadcast({ type: "vesting", userId: user.id, claimed: totalAccumulated });
       }
 
       // Calculate shares per hour for each player (equal distribution)
@@ -1801,7 +1801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updatedAt: now,
       });
 
-      broadcast({ type: "mining", userId: user.id, playerIds });
+      broadcast({ type: "vesting", userId: user.id, playerIds });
 
       res.json({ 
         success: true, 
@@ -1824,7 +1824,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Accrue any final shares before claiming
-      await accrueMiningShares(user.id);
+      await accrueVestingShares(user.id);
       
       const miningData = await storage.getMining(user.id);
 
@@ -1832,14 +1832,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "No shares to claim" });
       }
 
-      // Check if using multi-player mining (splits)
+      // Check if using multi-player vesting (splits)
       const splits = await storage.getMiningSplits(user.id);
       const usingSplits = splits.length > 0;
 
       if (!usingSplits) {
         // Legacy single-player mining - use batched queries for consistency
         if (!miningData.playerId) {
-          return res.status(400).json({ error: "No player selected for mining" });
+          return res.status(400).json({ error: "No player selected for vesting" });
         }
 
         const [players, holdings] = await Promise.all([
@@ -1885,7 +1885,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         broadcast({ type: "portfolio", userId: user.id });
-        broadcast({ type: "mining", userId: user.id, claimed: miningData.sharesAccumulated });
+        broadcast({ type: "vesting", userId: user.id, claimed: miningData.sharesAccumulated });
 
         return res.json({ 
           success: true, 
@@ -1971,7 +1971,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       broadcast({ type: "portfolio", userId: user.id });
-      broadcast({ type: "mining", userId: user.id, claimed: totalDistributed });
+      broadcast({ type: "vesting", userId: user.id, claimed: totalDistributed });
 
       res.json({ 
         success: true, 

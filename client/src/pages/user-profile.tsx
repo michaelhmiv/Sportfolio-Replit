@@ -88,8 +88,8 @@ export default function UserProfile() {
       }
     });
 
-    // Subscribe to mining events
-    const unsubMining = subscribe('mining', (data) => {
+    // Subscribe to vesting events
+    const unsubVesting = subscribe('vesting', (data) => {
       if (data.userId === userId) {
         queryClient.invalidateQueries({ queryKey: [`/api/user/${userId}/profile`] });
       }
@@ -102,7 +102,7 @@ export default function UserProfile() {
 
     return () => {
       unsubPortfolio();
-      unsubMining();
+      unsubVesting();
       unsubTrade();
     };
   }, [userId, subscribe]);
