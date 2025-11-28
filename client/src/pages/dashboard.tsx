@@ -500,11 +500,11 @@ export default function Dashboard() {
         )}
         
         {/* Market Activity Ticker */}
-        <div className="border-b bg-card overflow-x-hidden">
-          <div className="h-12 overflow-hidden relative">
-            {data && (data?.recentTrades ?? []).length > 0 ? (
+        {data && data.recentTrades && data.recentTrades.length > 0 && (
+          <div className="border-b bg-card overflow-x-hidden">
+            <div className="h-12 overflow-hidden relative">
               <div className="flex gap-3 animate-slide-left absolute whitespace-nowrap py-3 px-4">
-                {data.recentTrades!.concat(data.recentTrades!).map((trade, idx) => (
+                {data.recentTrades.concat(data.recentTrades).map((trade, idx) => (
                   <div key={`${trade.id}-${idx}`} className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md">
                     <span className="text-blue-500 font-bold text-sm">⊡</span>
                     <span className="font-medium text-xs sm:text-sm">
@@ -519,13 +519,9 @@ export default function Dashboard() {
                   </div>
                 ))}
               </div>
-            ) : (
-              <div className="flex items-center px-4 py-3 text-sm text-muted-foreground">
-                ⊡ Waiting for market activity...
-              </div>
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Main Dashboard Grid */}
         <div className="p-3 sm:p-4 max-w-full overflow-x-hidden">
