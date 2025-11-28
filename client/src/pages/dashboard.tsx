@@ -584,7 +584,7 @@ export default function Dashboard() {
         )}
 
         {/* Games */}
-        {todayGames && todayGames.length > 0 && (
+        {todayGames && (
           <Card className="mb-3 sm:mb-6">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium uppercase tracking-wide">
@@ -656,7 +656,7 @@ export default function Dashboard() {
               </div>
             </CardHeader>
             <CardContent>
-              {/* Horizontal Scroll with 2 Rows */}
+              {todayGames.length > 0 ? (
               <div className="overflow-x-auto -mx-2 px-2">
                 <div className="grid grid-rows-2 grid-flow-col auto-cols-[minmax(140px,1fr)] gap-2">
                   {todayGames.map((game) => {
@@ -771,6 +771,11 @@ export default function Dashboard() {
                   })}
                 </div>
               </div>
+              ) : (
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  ⊡ No games scheduled for this date
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
