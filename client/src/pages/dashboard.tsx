@@ -501,23 +501,29 @@ export default function Dashboard() {
         
         {/* Market Activity Ticker */}
         <div className="border-b bg-card overflow-x-hidden">
-        <div className="h-12 overflow-hidden relative">
-          <div className="flex gap-3 animate-slide-left absolute whitespace-nowrap py-3 px-4">
-            {(data?.recentTrades ?? []).concat(data?.recentTrades ?? []).map((trade, idx) => (
-              <div key={`${trade.id}-${idx}`} className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md">
-                <span className="text-blue-500 font-bold text-sm">⊡</span>
-                <span className="font-medium text-xs sm:text-sm">
-                  <PlayerName 
-                    playerId={trade.player.id} 
-                    firstName={trade.player.firstName} 
-                    lastName={trade.player.lastName}
-                  />
-                </span>
-                <span className="font-mono font-bold text-xs sm:text-sm">${trade.price}</span>
-                <span className="text-muted-foreground text-xs">{trade.quantity} sh</span>
+          <div className="h-12 overflow-hidden relative">
+            {data && (data?.recentTrades ?? []).length > 0 ? (
+              <div className="flex gap-3 animate-slide-left absolute whitespace-nowrap py-3 px-4">
+                {data.recentTrades!.concat(data.recentTrades!).map((trade, idx) => (
+                  <div key={`${trade.id}-${idx}`} className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md">
+                    <span className="text-blue-500 font-bold text-sm">⊡</span>
+                    <span className="font-medium text-xs sm:text-sm">
+                      <PlayerName 
+                        playerId={trade.player.id} 
+                        firstName={trade.player.firstName} 
+                        lastName={trade.player.lastName}
+                      />
+                    </span>
+                    <span className="font-mono font-bold text-xs sm:text-sm">${trade.price}</span>
+                    <span className="text-muted-foreground text-xs">{trade.quantity} sh</span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            ) : (
+              <div className="flex items-center px-4 py-3 text-sm text-muted-foreground">
+                ⊡ Waiting for market activity...
+              </div>
+            )}
           </div>
         </div>
 
