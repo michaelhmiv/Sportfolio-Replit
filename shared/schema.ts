@@ -28,6 +28,7 @@ export const users = pgTable("users", {
   isAdmin: boolean("is_admin").notNull().default(false), // Admin access to system management
   isPremium: boolean("is_premium").notNull().default(false),
   premiumExpiresAt: timestamp("premium_expires_at"),
+  hasSeenOnboarding: boolean("has_seen_onboarding").notNull().default(false), // Track if user completed onboarding
   // Profile stats
   totalSharesMined: integer("total_shares_mined").notNull().default(0),
   totalMarketOrders: integer("total_market_orders").notNull().default(0),
