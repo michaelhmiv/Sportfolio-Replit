@@ -45,14 +45,8 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             break;
 
           case 'vesting':
-            // Invalidate vesting data and portfolio (vesting affects holdings)
-            Promise.all([
-              queryClient.invalidateQueries({ queryKey: ['/api/vesting/status'] }),
-              queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] }),
-              message.userId 
-                ? queryClient.invalidateQueries({ queryKey: [`/api/user/${message.userId}/profile`] })
-                : Promise.resolve(),
-            ]);
+            // Invalidate all portfolio queries when vesting changes (affects holdings, dashboard, etc.)
+            invalidatePortfolioQueries();
             break;
 
           case 'trade':
