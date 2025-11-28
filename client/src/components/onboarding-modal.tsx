@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
-import { Pickaxe, TrendingUp, Trophy } from "lucide-react";
+import { Clock, TrendingUp, Trophy } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -15,11 +15,11 @@ interface OnboardingModalProps {
 
 const slides = [
   {
-    id: "mining",
-    icon: Pickaxe,
-    title: "MINE SHARES",
-    subtitle: "Generate player shares automatically",
-    description: "Select up to 3 NBA players to mine. Your mining rig generates shares every hour - up to 2,400 shares per day. Claim them before they hit the cap!",
+    id: "vesting",
+    icon: Clock,
+    title: "VEST SHARES",
+    subtitle: "Earn player shares over time",
+    description: "Select up to 10 NBA players to vest. You'll automatically earn shares every hour - up to 2,400 shares per day. Claim them before they hit the cap!",
     color: "text-yellow-500",
   },
   {
@@ -27,7 +27,7 @@ const slides = [
     icon: TrendingUp,
     title: "TRADE SHARES",
     subtitle: "Buy and sell like stocks",
-    description: "Place market orders for instant execution or set limit orders at your target price. Watch the order book, track price movements, and build your portfolio.",
+    description: "Place market orders for instant execution or set limit orders at your target price. Watch the order book and build your portfolio.",
     color: "text-green-500",
   },
   {
@@ -35,7 +35,7 @@ const slides = [
     icon: Trophy,
     title: "ENTER CONTESTS",
     subtitle: "Compete in daily 50/50 contests",
-    description: "Use your player shares to enter fantasy contests. Build a 5-player lineup and score based on real NBA performance. Top 50% of entries win!",
+    description: "Use your player shares to enter fantasy contests. Build a 5-player lineup and score based on real NBA performance. Top 50% win!",
     color: "text-blue-500",
   },
   {
@@ -43,7 +43,7 @@ const slides = [
     icon: SiDiscord,
     title: "JOIN THE COMMUNITY",
     subtitle: "Connect with other traders",
-    description: "Get trading tips, contest strategies, and platform updates. Join our Discord to chat with fellow Sportfolio traders!",
+    description: "Get trading tips, contest strategies, and platform updates. Join our Discord to chat with fellow traders!",
     color: "text-[#5865F2]",
     isDiscord: true,
   },
@@ -93,7 +93,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent 
-        className="sm:max-w-md p-0 gap-0 border-2 border-border overflow-hidden"
+        className="w-[calc(100%-2rem)] max-w-[360px] p-0 gap-0 border-2 border-border overflow-hidden rounded-none"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
         data-testid="onboarding-modal"
@@ -108,23 +108,24 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
               const Icon = slide.icon;
               return (
                 <CarouselItem key={slide.id}>
-                  <div className="flex flex-col items-center justify-center p-6 sm:p-8 text-center min-h-[380px]">
-                    <div className={`mb-6 ${slide.color}`}>
-                      <Icon className="w-16 h-16 sm:w-20 sm:h-20" />
+                  <div className="flex flex-col items-center justify-center px-4 py-6 text-center min-h-[280px]">
+                    <div className={`mb-4 ${slide.color}`}>
+                      <Icon className="w-12 h-12" />
                     </div>
-                    <h2 className="text-xl sm:text-2xl font-mono font-bold tracking-tight mb-2">
+                    <h2 className="text-lg font-mono font-bold tracking-tight mb-1">
                       {slide.title}
                     </h2>
-                    <p className="text-sm text-muted-foreground uppercase tracking-wide mb-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">
                       {slide.subtitle}
                     </p>
-                    <p className="text-sm text-foreground/80 leading-relaxed max-w-xs">
+                    <p className="text-sm text-foreground/80 leading-relaxed px-2">
                       {slide.description}
                     </p>
                     {slide.isDiscord && (
                       <Button
                         variant="outline"
-                        className="mt-6 gap-2 border-[#5865F2] text-[#5865F2] hover:bg-[#5865F2] hover:text-white"
+                        size="sm"
+                        className="mt-4 gap-2 border-[#5865F2] text-[#5865F2] hover:bg-[#5865F2] hover:text-white"
                         asChild
                       >
                         <a 
@@ -145,7 +146,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
           </CarouselContent>
         </Carousel>
 
-        <div className="flex flex-col gap-4 p-4 border-t border-border bg-muted/30">
+        <div className="flex flex-col gap-3 p-3 border-t border-border bg-muted/30">
           <div className="flex justify-center gap-2">
             {slides.map((_, index) => (
               <button
@@ -159,17 +160,18 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
               />
             ))}
           </div>
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center justify-between gap-2">
             <Button 
               variant="ghost" 
               size="sm" 
               onClick={handleSkip}
-              className="text-muted-foreground"
+              className="text-muted-foreground text-xs"
               data-testid="button-skip-onboarding"
             >
               Skip
             </Button>
             <Button 
+              size="sm"
               onClick={handleNext}
               disabled={completeOnboarding.isPending}
               data-testid="button-next-onboarding"

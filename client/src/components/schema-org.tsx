@@ -49,7 +49,7 @@ export const schemas = {
     "@context": "https://schema.org",
     "@type": "Organization",
     "name": "Sportfolio",
-    "description": "Fantasy sports stock market platform where you can trade player shares like stocks, mine shares, and compete in contests.",
+    "description": "Fantasy sports stock market platform where you can trade player shares like stocks, vest shares, and compete in contests.",
     "url": "https://sportfolio.replit.app",
     "logo": "https://sportfolio.replit.app/favicon.png",
     "sameAs": [],
@@ -59,7 +59,7 @@ export const schemas = {
     "@context": "https://schema.org",
     "@type": "WebSite",
     "name": "Sportfolio",
-    "description": "Trade player shares like stocks. Mine, trade, and compete in fantasy sports contests with real-time pricing.",
+    "description": "Trade player shares like stocks. Vest, trade, and compete in fantasy sports contests with real-time pricing.",
     "url": "https://sportfolio.replit.app",
     "potentialAction": {
       "@type": "SearchAction",

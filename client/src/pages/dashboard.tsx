@@ -11,14 +11,14 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Pickaxe, Calendar, Search, ChevronDown, BarChart3, ChevronLeft, ChevronRight, ExternalLink, ArrowUpDown, LogIn } from "lucide-react";
+import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Calendar, Search, ChevronDown, BarChart3, ChevronLeft, ChevronRight, ExternalLink, ArrowUpDown, LogIn } from "lucide-react";
 import { Link, useLocation } from "wouter";
-import type { Player, Mining, Contest, Trade, DailyGame } from "@shared/schema";
+import type { Player, Vesting, Contest, Trade, DailyGame } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
-import { calculateMiningShares } from "@shared/mining-utils";
+import { calculateVestingShares } from "@shared/vesting-utils";
 import { MarketActivityWidget } from "@/components/market-activity-widget";
 import { PlayerName } from "@/components/player-name";
 import { AdSenseAd } from "@/components/adsense-ad";
@@ -33,7 +33,7 @@ interface DashboardData {
     portfolioRankChange: number | null;
   } | null; // Null for non-authenticated users
   hotPlayers: Player[];
-  mining: (Mining & { 
+  vesting: (Vesting & { 
     player?: Player; 
     players?: Array<{ player: Player | undefined; sharesPerHour: number }>;
     capLimit: number; 
@@ -133,53 +133,53 @@ export default function Dashboard() {
     refetchInterval: 10000,
   });
 
-  // Real-time mining share projection
+  // Real-time vesting share projection
   const [projectedShares, setProjectedShares] = useState(0);
   
   useEffect(() => {
-    if (!data?.mining) {
+    if (!data?.vesting) {
       setProjectedShares(0);
       return;
     }
 
     const calculateProjectedShares = () => {
-      const mining = data.mining;
-      if (!mining) {
+      const vesting = data.vesting;
+      if (!vesting) {
         setProjectedShares(0);
         return;
       }
 
-      const usingSplits = mining.players && mining.players.length > 0;
+      const usingSplits = vesting.players && vesting.players.length > 0;
       
       // If using splits or single player mode, check if configured
-      if (!usingSplits && !mining.playerId) {
+      if (!usingSplits && !vesting.playerId) {
         setProjectedShares(0);
         return;
       }
 
       // Calculate total shares per hour (from splits or single player)
       let totalSharesPerHour = 0;
-      if (usingSplits && mining.players) {
-        // Sum individual player rates for multi-player mining
-        totalSharesPerHour = mining.players.reduce((sum, p) => sum + (p.sharesPerHour || 0), 0);
+      if (usingSplits && vesting.players) {
+        // Sum individual player rates for multi-player vesting
+        totalSharesPerHour = vesting.players.reduce((sum, p) => sum + (p.sharesPerHour || 0), 0);
       } else {
-        // Use single player rate for legacy mining
-        totalSharesPerHour = mining.sharesPerHour || 0;
+        // Use single player rate for legacy vesting
+        totalSharesPerHour = vesting.sharesPerHour || 0;
       }
 
       // Guard against missing required fields
-      if (!totalSharesPerHour || totalSharesPerHour === 0 || !mining.lastAccruedAt) {
-        setProjectedShares(mining.sharesAccumulated || 0);
+      if (!totalSharesPerHour || totalSharesPerHour === 0 || !vesting.lastAccruedAt) {
+        setProjectedShares(vesting.sharesAccumulated || 0);
         return;
       }
 
       // Use shared utility to ensure frontend matches backend calculation exactly
-      const result = calculateMiningShares({
-        sharesAccumulated: mining.sharesAccumulated || 0,
-        residualMs: mining.residualMs || 0,
-        lastAccruedAt: mining.lastAccruedAt,
+      const result = calculateVestingShares({
+        sharesAccumulated: vesting.sharesAccumulated || 0,
+        residualMs: vesting.residualMs || 0,
+        lastAccruedAt: vesting.lastAccruedAt,
         sharesPerHour: totalSharesPerHour,
-        capLimit: mining.capLimit || 2400,
+        capLimit: vesting.capLimit || 2400,
       });
 
       setProjectedShares(result.projectedShares);
@@ -191,13 +191,13 @@ export default function Dashboard() {
 
     return () => clearInterval(interval);
   }, [
-    data?.mining?.playerId,
-    data?.mining?.lastAccruedAt,
-    data?.mining?.residualMs,
-    data?.mining?.sharesAccumulated,
-    data?.mining?.sharesPerHour,
-    data?.mining?.capLimit,
-    data?.mining?.players,
+    data?.vesting?.playerId,
+    data?.vesting?.lastAccruedAt,
+    data?.vesting?.residualMs,
+    data?.vesting?.sharesAccumulated,
+    data?.vesting?.sharesPerHour,
+    data?.vesting?.capLimit,
+    data?.vesting?.players,
   ]);
 
   // Handle Escape key and click-outside to close flipped card
@@ -233,8 +233,8 @@ export default function Dashboard() {
       const params = new URLSearchParams();
       if (debouncedSearchTerm) params.append("search", debouncedSearchTerm);
       if (selectedTeam && selectedTeam !== "all") params.append("team", selectedTeam);
-      // Only show mining-eligible players
-      params.append("limit", "1000"); // Load all eligible players for mining selection
+      // Only show vesting-eligible players
+      params.append("limit", "1000"); // Load all eligible players for vesting selection
       
       const url = `/api/players?${params.toString()}`;
       const res = await fetch(url);
@@ -247,7 +247,7 @@ export default function Dashboard() {
 
   const playersData = playersResponse?.players;
 
-  // Filter only for mining eligibility (server-side handles search and team filter)
+  // Filter only for vesting eligibility (server-side handles search and team filter)
   const eligiblePlayers = playersData?.filter(p => p.isEligibleForMining) || [];
   
   // Sort players based on selected criteria
@@ -361,9 +361,9 @@ export default function Dashboard() {
     }
   };
 
-  const startMiningMutation = useMutation({
+  const startVestingMutation = useMutation({
     mutationFn: async (playerIds: string[]) => {
-      const res = await apiRequest("POST", "/api/mining/start", { playerIds });
+      const res = await apiRequest("POST", "/api/vesting/start", { playerIds });
       const data = await res.json();
       // Don't await cache invalidation - let it run in background for instant UI response
       return data;
@@ -387,43 +387,43 @@ export default function Dashboard() {
             .map((p: any) => `${p.playerName} (${p.sharesClaimed})`)
             .join(", ");
           toast({
-            title: "Mining Switched!",
-            description: `Auto-claimed ${claimed.totalSharesClaimed} shares (${playerBreakdown}). Now mining ${playerCount} player${playerCount !== 1 ? 's' : ''}.`,
+            title: "Vesting Updated!",
+            description: `Auto-claimed ${claimed.totalSharesClaimed} shares (${playerBreakdown}). Now vesting ${playerCount} player${playerCount !== 1 ? 's' : ''}.`,
           });
         } else if (claimed.player) {
           // Single-player claim
           const playerName = `${claimed.player.firstName} ${claimed.player.lastName}`;
           toast({
-            title: "Mining Switched!",
-            description: `Auto-claimed ${claimed.sharesClaimed} shares of ${playerName}. Now mining ${playerCount} player${playerCount !== 1 ? 's' : ''}.`,
+            title: "Vesting Updated!",
+            description: `Auto-claimed ${claimed.sharesClaimed} shares of ${playerName}. Now vesting ${playerCount} player${playerCount !== 1 ? 's' : ''}.`,
           });
         } else {
           // Generic auto-claim message
           toast({
-            title: "Mining Switched!",
-            description: `Auto-claimed pending shares and started mining ${playerCount} player${playerCount !== 1 ? 's' : ''}.`,
+            title: "Vesting Updated!",
+            description: `Auto-claimed pending shares and started vesting ${playerCount} player${playerCount !== 1 ? 's' : ''}.`,
           });
         }
       } else {
         // No auto-claim needed
         toast({
-          title: "Mining Started!",
-          description: `Now mining shares of ${playerCount} player${playerCount !== 1 ? 's' : ''}`,
+          title: "Vesting Started!",
+          description: `Now vesting shares of ${playerCount} player${playerCount !== 1 ? 's' : ''}`,
         });
       }
     },
     onError: (error: any) => {
       toast({
-        title: "Failed to Start Mining",
+        title: "Failed to Start Vesting",
         description: error.error || error.message,
         variant: "destructive",
       });
     },
   });
 
-  const claimMiningMutation = useMutation({
+  const claimVestingMutation = useMutation({
     mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/mining/claim");
+      const res = await apiRequest("POST", "/api/vesting/claim");
       const data = await res.json();
       // Don't await cache invalidation - let it run in background for instant UI response
       return data;
@@ -432,7 +432,7 @@ export default function Dashboard() {
       // Invalidate cache in background (non-blocking)
       invalidatePortfolioQueries();
       
-      // Multi-player mining response
+      // Multi-player vesting response
       if (data?.players && data.players.length > 0) {
         const playerBreakdown = data.players
           .map((p: any) => `${p.playerName} (${p.sharesClaimed})`)
@@ -442,7 +442,7 @@ export default function Dashboard() {
           description: `Distribution: ${playerBreakdown}`,
         });
       } else {
-        // Single player mining response
+        // Single player vesting response
         const sharesClaimed = data?.sharesClaimed || 0;
         const playerName = data?.player?.firstName && data?.player?.lastName 
           ? `${data.player.firstName} ${data.player.lastName}`
@@ -480,7 +480,7 @@ export default function Dashboard() {
               <div className="flex items-center gap-2 text-sm sm:text-base">
                 <LogIn className="w-4 h-4 flex-shrink-0" />
                 <span className="font-medium">
-                  See live NBA trading in action. <span className="hidden sm:inline">Sign in to start trading, mining, and competing.</span>
+                  See live NBA trading in action. <span className="hidden sm:inline">Sign in to start trading, vesting, and competing.</span>
                 </span>
               </div>
               <Button 
@@ -782,26 +782,26 @@ export default function Dashboard() {
 
         {/* Widgets Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-3">
-          {/* Mining Widget */}
+          {/* Vesting Widget */}
           <Card className="lg:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium uppercase tracking-wide">Mining</CardTitle>
+              <CardTitle className="text-sm font-medium uppercase tracking-wide">Vesting</CardTitle>
               <Clock className="w-4 h-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="space-y-3 sm:space-y-4">
               {!isAuthenticated ? (
                 <div className="text-center py-6">
-                  <Pickaxe className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mb-4">Generate shares automatically over time</p>
+                  <Clock className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                  <p className="text-sm text-muted-foreground mb-4">Earn shares automatically over time</p>
                   <Button 
                     className="w-full" 
                     size="lg"
                     asChild
-                    data-testid="button-login-mining"
+                    data-testid="button-login-vesting"
                   >
                     <a href="/api/login" className="flex items-center justify-center gap-2">
                       <LogIn className="w-4 h-4" />
-                      Sign In to Start Mining
+                      Sign In to Start Vesting
                     </a>
                   </Button>
                 </div>
@@ -809,26 +809,26 @@ export default function Dashboard() {
                 <>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Rate: {data?.mining?.sharesPerHour || 100} sh/hr</span>
+                      <span className="text-xs text-muted-foreground">Rate: {data?.vesting?.sharesPerHour || 100} sh/hr</span>
                       <span className="text-xs text-muted-foreground font-mono">
-                        {projectedShares} / {data?.mining?.capLimit || 2400}
+                        {projectedShares} / {data?.vesting?.capLimit || 2400}
                       </span>
                     </div>
                     <Progress 
-                      value={(projectedShares / (data?.mining?.capLimit || 2400)) * 100} 
+                      value={(projectedShares / (data?.vesting?.capLimit || 2400)) * 100} 
                       className={`h-2 transition-all ${
-                        data?.mining?.player && projectedShares < (data?.mining?.capLimit || 2400)
+                        data?.vesting?.player && projectedShares < (data?.vesting?.capLimit || 2400)
                           ? 'animate-pulse shadow-[0_0_8px_hsl(var(--primary)_/_0.4)]'
                           : ''
                       }`}
-                      data-testid="progress-mining"
+                      data-testid="progress-vesting"
                     />
                   </div>
                   
-                  {data?.mining?.players && data.mining.players.length > 0 ? (
+                  {data?.vesting?.players && data.vesting.players.length > 0 ? (
                     <>
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                        {data.mining.players.map((entry, idx) => entry.player && (
+                        {data.vesting.players.map((entry, idx) => entry.player && (
                           <div key={entry.player.id} className="flex items-center gap-2 p-1.5 rounded-md bg-muted text-xs">
                             <div className="flex-1 min-w-0">
                               <div className="font-medium truncate">
@@ -850,7 +850,7 @@ export default function Dashboard() {
                           size="sm"
                           variant="outline"
                           onClick={() => setShowPlayerSelection(true)}
-                          data-testid="button-change-mining-players"
+                          data-testid="button-change-vesting-players"
                           className="flex-1"
                         >
                           Change
@@ -858,26 +858,26 @@ export default function Dashboard() {
                         <Button 
                           className="flex-1" 
                           size="sm"
-                          disabled={!projectedShares || claimMiningMutation.isPending}
-                          onClick={() => claimMiningMutation.mutate()}
-                          data-testid="button-claim-mining"
+                          disabled={!projectedShares || claimVestingMutation.isPending}
+                          onClick={() => claimVestingMutation.mutate()}
+                          data-testid="button-claim-vesting"
                         >
-                          {claimMiningMutation.isPending ? "Claiming..." : `Claim ${projectedShares}`}
+                          {claimVestingMutation.isPending ? "Claiming..." : `Claim ${projectedShares}`}
                         </Button>
                       </div>
                     </>
-                  ) : data?.mining?.player ? (
+                  ) : data?.vesting?.player ? (
                     <>
                       <div className="flex items-center gap-2 p-2 rounded-md bg-muted">
                         <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{data.mining.player.firstName} {data.mining.player.lastName}</div>
-                          <div className="text-xs text-muted-foreground">{data.mining.player.team} · {data.mining.player.position}</div>
+                          <div className="text-sm font-medium truncate">{data.vesting.player.firstName} {data.vesting.player.lastName}</div>
+                          <div className="text-xs text-muted-foreground">{data.vesting.player.team} · {data.vesting.player.position}</div>
                         </div>
                         <Button
                           size="sm"
                           variant="ghost"
                           onClick={() => setShowPlayerSelection(true)}
-                          data-testid="button-change-mining-player"
+                          data-testid="button-change-vesting-player"
                           className="flex-shrink-0"
                         >
                           Change
@@ -887,24 +887,24 @@ export default function Dashboard() {
                       <Button 
                         className="w-full" 
                         size="lg"
-                        disabled={!projectedShares || claimMiningMutation.isPending}
-                        onClick={() => claimMiningMutation.mutate()}
-                        data-testid="button-claim-mining"
+                        disabled={!projectedShares || claimVestingMutation.isPending}
+                        onClick={() => claimVestingMutation.mutate()}
+                        data-testid="button-claim-vesting"
                       >
-                        {claimMiningMutation.isPending ? "Claiming..." : `Claim ${projectedShares} Shares`}
+                        {claimVestingMutation.isPending ? "Claiming..." : `Claim ${projectedShares} Shares`}
                       </Button>
                     </>
                   ) : (
                     <div className="text-center py-4">
-                      <Pickaxe className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground mb-4">No player selected for mining</p>
+                      <Clock className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
+                      <p className="text-sm text-muted-foreground mb-4">No players selected for vesting</p>
                       <Button 
                         className="w-full" 
                         size="lg"
                         onClick={() => setShowPlayerSelection(true)}
-                        data-testid="button-select-mining-player"
+                        data-testid="button-select-vesting-player"
                       >
-                        Select Player to Mine
+                        Select Players to Vest
                       </Button>
                     </div>
                   )}
@@ -1006,22 +1006,22 @@ export default function Dashboard() {
           setSelectedPlayers([]);
         } else {
           // Pre-populate selected players when opening dialog
-          if (data?.mining?.players && data.mining.players.length > 0) {
-            const activePlayers = data.mining.players
+          if (data?.vesting?.players && data.vesting.players.length > 0) {
+            const activePlayers = data.vesting.players
               .map(p => p.player)
               .filter((p): p is Player => p !== undefined);
             setSelectedPlayers(activePlayers);
-          } else if (data?.mining?.player) {
+          } else if (data?.vesting?.player) {
             // Legacy single-player mode - add the single player
-            setSelectedPlayers([data.mining.player]);
+            setSelectedPlayers([data.vesting.player]);
           }
         }
       }}>
         <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
           <DialogHeader>
-            <DialogTitle>Select Players to Mine ({selectedPlayers.length}/10)</DialogTitle>
+            <DialogTitle>Select Players to Vest ({selectedPlayers.length}/10)</DialogTitle>
             <DialogDescription>
-              Choose up to 10 players to mine shares. Total rate is 100 shares/hour distributed equally across selected players.
+              Choose up to 10 players to vest shares. Total rate is 100 shares/hour distributed equally across selected players.
             </DialogDescription>
           </DialogHeader>
           
@@ -1150,7 +1150,7 @@ export default function Dashboard() {
                         });
                       }
                     }}
-                    isPending={startMiningMutation.isPending}
+                    isPending={startVestingMutation.isPending}
                     isSelected={isSelected}
                   />
                 ];
@@ -1181,14 +1181,14 @@ export default function Dashboard() {
               className="w-full"
               disabled={
                 selectedPlayers.length === 0 || 
-                startMiningMutation.isPending
+                startVestingMutation.isPending
               }
-              onClick={() => startMiningMutation.mutate(selectedPlayers.map(p => p.id))}
-              data-testid="button-confirm-mining-selection"
+              onClick={() => startVestingMutation.mutate(selectedPlayers.map(p => p.id))}
+              data-testid="button-confirm-vesting-selection"
             >
-              {startMiningMutation.isPending 
+              {startVestingMutation.isPending 
                 ? "Starting..." 
-                : `Start Mining ${selectedPlayers.length} Player${selectedPlayers.length !== 1 ? 's' : ''}`}
+                : `Start Vesting ${selectedPlayers.length} Player${selectedPlayers.length !== 1 ? 's' : ''}`}
             </Button>
           </div>
         </DialogContent>

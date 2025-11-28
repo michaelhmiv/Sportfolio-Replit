@@ -508,11 +508,14 @@ export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Trade = typeof trades.$inferSelect;
 
 export type Mining = typeof mining.$inferSelect;
+export type Vesting = Mining; // Alias for frontend terminology
 
 export type MiningSplit = typeof miningSplits.$inferSelect;
+export type VestingSplit = MiningSplit; // Alias for frontend terminology
 export type InsertMiningSplit = typeof miningSplits.$inferInsert;
 
 export type MiningClaim = typeof miningClaims.$inferSelect;
+export type VestingClaim = MiningClaim; // Alias for frontend terminology
 export type InsertMiningClaim = z.infer<typeof insertMiningClaimSchema>;
 
 export type DailyGame = typeof dailyGames.$inferSelect;

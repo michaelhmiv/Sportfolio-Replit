@@ -44,10 +44,10 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
             invalidatePortfolioQueries();
             break;
 
-          case 'mining':
-            // Invalidate mining data and portfolio (mining affects holdings)
+          case 'vesting':
+            // Invalidate vesting data and portfolio (vesting affects holdings)
             Promise.all([
-              queryClient.invalidateQueries({ queryKey: ['/api/mining/status'] }),
+              queryClient.invalidateQueries({ queryKey: ['/api/vesting/status'] }),
               queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] }),
               message.userId 
                 ? queryClient.invalidateQueries({ queryKey: [`/api/user/${message.userId}/profile`] })

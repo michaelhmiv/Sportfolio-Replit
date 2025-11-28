@@ -2,7 +2,7 @@ import { queryClient } from "./queryClient";
 
 /**
  * Invalidate all portfolio-related queries across the entire application.
- * Call this whenever holdings change (trades, contest entries, mining claims, etc.)
+ * Call this whenever holdings change (trades, contest entries, vesting claims, etc.)
  * 
  * This ensures ALL pages show updated data after any portfolio change:
  * - Cash balance updates everywhere
@@ -18,11 +18,11 @@ export async function invalidatePortfolioQueries(): Promise<void> {
     queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] }),
     queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
     
-    // Activity feed (mining, orders, trades, contests)
+    // Activity feed (vesting, orders, trades, contests)
     queryClient.invalidateQueries({ queryKey: ["/api/activity"] }),
     
-    // Mining status (shows current holdings for selection)
-    queryClient.invalidateQueries({ queryKey: ["/api/mining"] }),
+    // Vesting status (shows current holdings for selection)
+    queryClient.invalidateQueries({ queryKey: ["/api/vesting"] }),
     
     // Player pages (prices, holdings, order books need refresh after trades)
     queryClient.invalidateQueries({ queryKey: ["/api/players"] }),
