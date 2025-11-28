@@ -93,7 +93,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
   return (
     <Dialog open={open} onOpenChange={() => {}}>
       <DialogContent 
-        className="w-[calc(100%-2rem)] max-w-[360px] p-0 gap-0 border-2 border-border overflow-hidden rounded-none"
+        className="w-[90vw] max-w-[400px] sm:max-w-[420px] p-0 gap-0 border-2 border-border overflow-hidden rounded-none"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
         data-testid="onboarding-modal"
@@ -102,57 +102,59 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
         <VisuallyHidden>
           <DialogTitle>Welcome to Sportfolio</DialogTitle>
         </VisuallyHidden>
-        <Carousel setApi={setApi} className="w-full">
-          <CarouselContent>
-            {slides.map((slide) => {
-              const Icon = slide.icon;
-              return (
-                <CarouselItem key={slide.id}>
-                  <div className="flex flex-col items-center justify-center px-4 py-6 text-center min-h-[280px]">
-                    <div className={`mb-4 ${slide.color}`}>
-                      <Icon className="w-12 h-12" />
-                    </div>
-                    <h2 className="text-lg font-mono font-bold tracking-tight mb-1">
-                      {slide.title}
-                    </h2>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-3">
-                      {slide.subtitle}
-                    </p>
-                    <p className="text-sm text-foreground/80 leading-relaxed px-2">
-                      {slide.description}
-                    </p>
-                    {slide.isDiscord && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-4 gap-2 border-[#5865F2] text-[#5865F2] hover:bg-[#5865F2] hover:text-white"
-                        asChild
-                      >
-                        <a 
-                          href="https://discord.gg/r8MsduNvXG" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          data-testid="link-discord"
+        <div className="w-full overflow-hidden">
+          <Carousel setApi={setApi} className="w-full" opts={{ align: "start", containScroll: "trimSnaps" }}>
+            <CarouselContent className="-ml-0">
+              {slides.map((slide) => {
+                const Icon = slide.icon;
+                return (
+                  <CarouselItem key={slide.id} className="pl-0 basis-full">
+                    <div className="flex flex-col items-center justify-center px-6 sm:px-8 py-8 text-center min-h-[300px]">
+                      <div className={`mb-5 ${slide.color}`}>
+                        <Icon className="w-14 h-14" />
+                      </div>
+                      <h2 className="text-xl font-mono font-bold tracking-tight mb-2 whitespace-nowrap">
+                        {slide.title}
+                      </h2>
+                      <p className="text-xs text-muted-foreground uppercase tracking-widest mb-4">
+                        {slide.subtitle}
+                      </p>
+                      <p className="text-sm text-foreground/80 leading-relaxed max-w-[280px] sm:max-w-[320px]">
+                        {slide.description}
+                      </p>
+                      {slide.isDiscord && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="mt-5 gap-2 border-[#5865F2] text-[#5865F2] hover:bg-[#5865F2] hover:text-white"
+                          asChild
                         >
-                          <SiDiscord className="w-4 h-4" />
-                          Join Discord
-                        </a>
-                      </Button>
-                    )}
-                  </div>
-                </CarouselItem>
-              );
-            })}
-          </CarouselContent>
-        </Carousel>
+                          <a 
+                            href="https://discord.gg/r8MsduNvXG" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            data-testid="link-discord"
+                          >
+                            <SiDiscord className="w-4 h-4" />
+                            Join Discord
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  </CarouselItem>
+                );
+              })}
+            </CarouselContent>
+          </Carousel>
+        </div>
 
-        <div className="flex flex-col gap-3 p-3 border-t border-border bg-muted/30">
+        <div className="flex flex-col gap-3 p-4 border-t border-border bg-muted/30">
           <div className="flex justify-center gap-2">
             {slides.map((_, index) => (
               <button
                 key={index}
                 onClick={() => api?.scrollTo(index)}
-                className={`w-2 h-2 rounded-full transition-colors ${
+                className={`w-2.5 h-2.5 rounded-full transition-colors ${
                   index === current ? "bg-primary" : "bg-muted-foreground/30"
                 }`}
                 aria-label={`Go to slide ${index + 1}`}
@@ -165,7 +167,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
               variant="ghost" 
               size="sm" 
               onClick={handleSkip}
-              className="text-muted-foreground text-xs"
+              className="text-muted-foreground"
               data-testid="button-skip-onboarding"
             >
               Skip
