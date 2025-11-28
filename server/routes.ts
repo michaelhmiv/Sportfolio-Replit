@@ -757,6 +757,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mark onboarding as complete
+  app.post("/api/user/onboarding/complete", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      await storage.markOnboardingComplete(userId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Admin endpoint to manually trigger sync jobs
   app.post("/api/admin/sync/:jobName", isAuthenticated, async (req, res) => {
     try {

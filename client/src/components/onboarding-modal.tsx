@@ -122,7 +122,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
                         asChild
                       >
                         <a 
-                          href="https://discord.gg/sportfolio" 
+                          href="https://discord.gg/r8MsduNvXG" 
                           target="_blank" 
                           rel="noopener noreferrer"
                           data-testid="link-discord"

@@ -1,5 +1,5 @@
 import { Switch, Route, Link } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -14,6 +14,7 @@ import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { WebSocketProvider, useWebSocket } from "@/lib/websocket";
 import { NotificationProvider } from "@/lib/notification-context";
 import { useAuth } from "@/hooks/useAuth";
+import { OnboardingModal } from "@/components/onboarding-modal";
 import Dashboard from "@/pages/dashboard";
 import Marketplace from "@/pages/marketplace";
 import PlayerPage from "@/pages/player";
@@ -39,6 +40,23 @@ import logoUrl from "@assets/Sportfolio png_1763227952318.png";
 import { LogOut, User } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
 import { SchemaOrg, schemas } from "@/components/schema-org";
+
+function OnboardingCheck() {
+  const { user, isAuthenticated } = useAuth();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (isAuthenticated && user && user.hasSeenOnboarding === false) {
+      setShowOnboarding(true);
+    }
+  }, [isAuthenticated, user]);
+
+  const handleComplete = () => {
+    setShowOnboarding(false);
+  };
+
+  return <OnboardingModal open={showOnboarding} onComplete={handleComplete} />;
+}
 
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -277,6 +295,7 @@ function App() {
               </div>
             </div>
             <BottomNav />
+            <OnboardingCheck />
           </SidebarProvider>
           <Toaster />
         </TooltipProvider>

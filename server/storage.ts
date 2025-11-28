@@ -100,6 +100,7 @@ export interface IStorage {
   updateUserBalance(userId: string, amount: string): Promise<void>;
   updateUsername(userId: string, username: string): Promise<User | undefined>;
   incrementTotalSharesMined(userId: string, amount: number): Promise<void>;
+  markOnboardingComplete(userId: string): Promise<void>;
   
   // Player methods
   getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]>;
@@ -367,6 +368,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId));
     
     return await this.getUser(userId);
+  }
+
+  async markOnboardingComplete(userId: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ hasSeenOnboarding: true })
+      .where(eq(users.id, userId));
   }
 
   // Helper: Build player query conditions (reused by getPlayers and getPlayersPaginated)
