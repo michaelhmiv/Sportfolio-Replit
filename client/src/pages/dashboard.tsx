@@ -829,9 +829,6 @@ export default function Dashboard() {
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
                         {data.mining.players.map((entry, idx) => entry.player && (
                           <div key={entry.player.id} className="flex items-center gap-2 p-1.5 rounded-md bg-muted text-xs">
-                            <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              <span className="text-[10px] font-bold">{entry.player.firstName[0]}{entry.player.lastName[0]}</span>
-                            </div>
                             <div className="flex-1 min-w-0">
                               <div className="font-medium truncate">
                                 <PlayerName 
@@ -871,9 +868,6 @@ export default function Dashboard() {
                   ) : data?.mining?.player ? (
                     <>
                       <div className="flex items-center gap-2 p-2 rounded-md bg-muted">
-                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                          <span className="text-xs font-bold">{data.mining.player.firstName[0]}{data.mining.player.lastName[0]}</span>
-                        </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-sm font-medium truncate">{data.mining.player.firstName} {data.mining.player.lastName}</div>
                           <div className="text-xs text-muted-foreground">{data.mining.player.team} · {data.mining.player.position}</div>
