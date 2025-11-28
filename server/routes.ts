@@ -1628,8 +1628,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Start/select mining for player(s)
-  app.post("/api/mining/start", isAuthenticated, async (req, res) => {
+  // Start/select vesting for player(s)
+  app.post("/api/vesting/start", isAuthenticated, async (req, res) => {
     try {
       const userId = getUserId(req);
       const user = await storage.getUser(userId);
@@ -1814,8 +1814,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Mining claim
-  app.post("/api/mining/claim", isAuthenticated, async (req, res) => {
+  // Vesting claim
+  app.post("/api/vesting/claim", isAuthenticated, async (req, res) => {
     try {
       const userId = getUserId(req);
       const user = await storage.getUser(userId);
