@@ -35,7 +35,7 @@ const slides = [
     icon: Trophy,
     title: "ENTER CONTESTS",
     subtitle: "Compete in daily 50/50 contests",
-    description: "Use your player shares to enter fantasy contests. Build a 5-player lineup and score based on real NBA performance. Top 50% win!",
+    description: "Use your player shares to enter contests. Build a 5-player lineup and score based on real player performance. Top 50% win Sportfolio cash!",
     color: "text-blue-500",
   },
   {
