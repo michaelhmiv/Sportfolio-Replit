@@ -1394,6 +1394,7 @@ export class DatabaseStorage implements IStorage {
           contestId: contestEntries.contestId,
           contestName: contests.name,
           contestStatus: contests.status,
+          contestEndsAt: contests.endsAt,
           entryFee: contests.entryFee,
           totalSharesEntered: contestEntries.totalSharesEntered,
           totalScore: contestEntries.totalScore,
@@ -1430,7 +1431,7 @@ export class DatabaseStorage implements IStorage {
           activities.push({
             id: `contest-payout-${entry.id}`,
             userId,
-            occurredAt: entry.createdAt, // Use entry creation date as proxy for completion
+            occurredAt: entry.contestEndsAt || entry.createdAt, // Use contest end time for payout timestamp
             category: 'contest',
             subtype: 'contest_payout',
             cashDelta: `${entry.payout}`,
