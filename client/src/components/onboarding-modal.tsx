@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { VisuallyHidden } from "@radix-ui/react-visually-hidden";
 import { Button } from "@/components/ui/button";
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
 import { Pickaxe, TrendingUp, Trophy } from "lucide-react";
@@ -57,7 +58,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
       await apiRequest("POST", "/api/user/onboarding/complete");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       onComplete();
     },
     onError: () => {
@@ -95,7 +96,12 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
         className="sm:max-w-md p-0 gap-0 border-2 border-border overflow-hidden"
         onPointerDownOutside={(e) => e.preventDefault()}
         onEscapeKeyDown={(e) => e.preventDefault()}
+        data-testid="onboarding-modal"
+        aria-describedby={undefined}
       >
+        <VisuallyHidden>
+          <DialogTitle>Welcome to Sportfolio</DialogTitle>
+        </VisuallyHidden>
         <Carousel setApi={setApi} className="w-full">
           <CarouselContent>
             {slides.map((slide) => {
