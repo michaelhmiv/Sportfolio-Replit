@@ -19,6 +19,7 @@ import { dailySnapshot } from "./daily-snapshot";
 import { backfillContestStats } from "./backfill-contest-stats";
 import { generateWeeklyRoundup } from "./weekly-roundup";
 import { backfillMarketSnapshots } from "./market-snapshot";
+import { runBotEngineTick } from "../bot/bot-engine";
 import type { ProgressCallback } from "../lib/admin-stream";
 
 export interface JobResult {
@@ -116,6 +117,19 @@ export class JobScheduler {
         schedule: "*/5 * * * *", // Every 5 minutes - check for contests to settle
         enabled: true,
         handler: settleContests,
+      },
+      {
+        name: "bot_engine",
+        schedule: "*/2 * * * *", // Every 2 minutes - run market maker bots
+        enabled: true,
+        handler: async () => {
+          const result = await runBotEngineTick();
+          return {
+            requestCount: 0,
+            recordsProcessed: result.botsProcessed,
+            errorCount: result.errors,
+          };
+        },
       },
     ];
 
@@ -253,6 +267,14 @@ export class JobScheduler {
       backfill_contest_stats: (callback) => backfillContestStats(callback),
       weekly_roundup: (callback) => generateWeeklyRoundup(callback),
       backfill_market_snapshots: (callback) => backfillMarketSnapshots(callback),
+      bot_engine: async () => {
+        const result = await runBotEngineTick();
+        return {
+          requestCount: 0,
+          recordsProcessed: result.botsProcessed,
+          errorCount: result.errors,
+        };
+      },
     };
 
     const handler = jobConfigs[jobName];
