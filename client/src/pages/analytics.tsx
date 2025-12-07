@@ -425,6 +425,9 @@ export default function Analytics() {
                     strokeWidth={2}
                     dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 3 }}
                     activeDot={{ r: 5, fill: 'hsl(var(--primary))' }}
+                    isAnimationActive={true}
+                    animationDuration={1200}
+                    animationEasing="ease-out"
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -498,12 +501,19 @@ export default function Analytics() {
                         fill="hsl(142 76% 36%)" 
                         name="Shares Vested"
                         radius={[4, 4, 0, 0]}
+                        isAnimationActive={true}
+                        animationDuration={800}
+                        animationEasing="ease-out"
                       />
                       <Bar 
                         dataKey="sharesBurned" 
                         fill="hsl(0 72% 51%)" 
                         name="Shares Burned"
                         radius={[4, 4, 0, 0]}
+                        isAnimationActive={true}
+                        animationDuration={800}
+                        animationEasing="ease-out"
+                        animationBegin={200}
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -566,6 +576,9 @@ export default function Analytics() {
                         fill="hsl(var(--primary) / 0.3)" 
                         name="Volume"
                         radius={[4, 4, 0, 0]}
+                        isAnimationActive={true}
+                        animationDuration={800}
+                        animationEasing="ease-out"
                       />
                       <Line 
                         yAxisId="right"
@@ -575,6 +588,10 @@ export default function Analytics() {
                         strokeWidth={2}
                         dot={false}
                         name="Transactions"
+                        isAnimationActive={true}
+                        animationDuration={1200}
+                        animationEasing="ease-out"
+                        animationBegin={300}
                       />
                     </ComposedChart>
                   </ResponsiveContainer>
@@ -804,6 +821,10 @@ export default function Analytics() {
                                   name={player.name}
                                   strokeWidth={2}
                                   dot={false}
+                                  isAnimationActive={true}
+                                  animationDuration={1200}
+                                  animationEasing="ease-out"
+                                  animationBegin={idx * 150}
                                 />
                               )
                             ))}

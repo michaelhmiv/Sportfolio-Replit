@@ -364,6 +364,9 @@ export default function PlayerPage() {
                         stroke="hsl(var(--primary))" 
                         strokeWidth={2}
                         dot={false}
+                        isAnimationActive={true}
+                        animationDuration={1200}
+                        animationEasing="ease-out"
                       />
                     </LineChart>
                   </ResponsiveContainer>
