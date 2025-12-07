@@ -14,6 +14,7 @@ import { invalidatePortfolioQueries, invalidateContestQueries } from "@/lib/cach
 import type { Player, Holding, DailyGame } from "@shared/schema";
 import { format } from "date-fns";
 import { PlayerName } from "@/components/player-name";
+import { AnimatedButton } from "@/components/ui/animations";
 
 interface ContestEntryData {
   contest: {
@@ -413,15 +414,19 @@ export default function ContestEntry() {
                   </div>
                 </div>
 
-                <Button
+                <AnimatedButton
                   className="w-full"
                   size="lg"
                   onClick={handleSubmit}
-                  disabled={lineup.size === 0 || submitEntryMutation.isPending}
+                  disabled={lineup.size === 0}
+                  isLoading={submitEntryMutation.isPending}
+                  isSuccess={submitEntryMutation.isSuccess}
+                  loadingText="Submitting..."
+                  successText="Entry Submitted!"
                   data-testid="button-submit-entry"
                 >
-                  {submitEntryMutation.isPending ? "Submitting..." : "Submit Entry"}
-                </Button>
+                  Submit Entry
+                </AnimatedButton>
               </div>
             </CardContent>
           </Card>

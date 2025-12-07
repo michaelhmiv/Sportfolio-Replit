@@ -16,6 +16,7 @@ import type { Player, Order, Trade, PriceHistory } from "@shared/schema";
 import { SchemaOrg, schemas } from "@/components/schema-org";
 import { AnimatedPrice } from "@/components/ui/animated-price";
 import { Confetti, CelebrationBurst } from "@/components/ui/confetti";
+import { AnimatedButton } from "@/components/ui/animations";
 
 interface PlayerPageData {
   player: Player;
@@ -555,15 +556,18 @@ export default function PlayerPage() {
                 </div>
 
                 {/* Submit Button */}
-                <Button
+                <AnimatedButton
                   className="w-full"
                   size="lg"
                   onClick={handlePlaceOrder}
-                  disabled={placeOrderMutation.isPending}
+                  isLoading={placeOrderMutation.isPending}
+                  isSuccess={placeOrderMutation.isSuccess}
+                  loadingText="Placing..."
+                  successText="Order Placed!"
                   data-testid="button-place-order"
                 >
-                  {placeOrderMutation.isPending ? "Placing..." : `${side === "buy" ? "Buy" : "Sell"} Shares`}
-                </Button>
+                  {side === "buy" ? "Buy" : "Sell"} Shares
+                </AnimatedButton>
               </CardContent>
             </Card>
           </div>

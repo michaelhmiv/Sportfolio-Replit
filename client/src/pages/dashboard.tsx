@@ -22,7 +22,7 @@ import { calculateVestingShares } from "@shared/vesting-utils";
 import { MarketActivityWidget } from "@/components/market-activity-widget";
 import { PlayerName } from "@/components/player-name";
 import { AdSenseAd } from "@/components/adsense-ad";
-import { Shimmer, ShimmerCard, ScrollReveal } from "@/components/ui/animations";
+import { Shimmer, ShimmerCard, ScrollReveal, AnimatedButton } from "@/components/ui/animations";
 import { AnimatedPrice } from "@/components/ui/animated-price";
 
 interface DashboardData {
@@ -881,15 +881,19 @@ export default function Dashboard() {
                         >
                           Change
                         </Button>
-                        <Button 
+                        <AnimatedButton 
                           className="flex-1" 
                           size="sm"
-                          disabled={!projectedShares || claimVestingMutation.isPending}
+                          disabled={!projectedShares}
+                          isLoading={claimVestingMutation.isPending}
+                          isSuccess={claimVestingMutation.isSuccess}
+                          loadingText="Claiming..."
+                          successText="Claimed!"
                           onClick={() => claimVestingMutation.mutate()}
                           data-testid="button-claim-vesting"
                         >
-                          {claimVestingMutation.isPending ? "Claiming..." : `Claim ${projectedShares}`}
-                        </Button>
+                          Claim {projectedShares}
+                        </AnimatedButton>
                       </div>
                     </>
                   ) : data?.vesting?.player ? (
@@ -910,15 +914,19 @@ export default function Dashboard() {
                         </Button>
                       </div>
                       
-                      <Button 
+                      <AnimatedButton 
                         className="w-full" 
                         size="lg"
-                        disabled={!projectedShares || claimVestingMutation.isPending}
+                        disabled={!projectedShares}
+                        isLoading={claimVestingMutation.isPending}
+                        isSuccess={claimVestingMutation.isSuccess}
+                        loadingText="Claiming..."
+                        successText="Claimed!"
                         onClick={() => claimVestingMutation.mutate()}
                         data-testid="button-claim-vesting"
                       >
-                        {claimVestingMutation.isPending ? "Claiming..." : `Claim ${projectedShares} Shares`}
-                      </Button>
+                        Claim {projectedShares} Shares
+                      </AnimatedButton>
                     </>
                   ) : (
                     <div className="text-center py-4">
@@ -1210,19 +1218,18 @@ export default function Dashboard() {
 
           {/* Confirm Button */}
           <div className="px-1 pt-3 border-t">
-            <Button
+            <AnimatedButton
               className="w-full"
-              disabled={
-                selectedPlayers.length === 0 || 
-                startVestingMutation.isPending
-              }
+              disabled={selectedPlayers.length === 0}
+              isLoading={startVestingMutation.isPending}
+              isSuccess={startVestingMutation.isSuccess}
+              loadingText="Starting..."
+              successText="Vesting Started!"
               onClick={() => startVestingMutation.mutate(selectedPlayers.map(p => p.id))}
               data-testid="button-confirm-vesting-selection"
             >
-              {startVestingMutation.isPending 
-                ? "Starting..." 
-                : `Start Vesting ${selectedPlayers.length} Player${selectedPlayers.length !== 1 ? 's' : ''}`}
-            </Button>
+              Start Vesting {selectedPlayers.length} Player{selectedPlayers.length !== 1 ? 's' : ''}
+            </AnimatedButton>
           </div>
         </DialogContent>
       </Dialog>
