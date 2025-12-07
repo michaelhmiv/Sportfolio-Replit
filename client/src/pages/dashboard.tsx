@@ -22,7 +22,7 @@ import { calculateVestingShares } from "@shared/vesting-utils";
 import { MarketActivityWidget } from "@/components/market-activity-widget";
 import { PlayerName } from "@/components/player-name";
 import { AdSenseAd } from "@/components/adsense-ad";
-import { Shimmer, ShimmerCard } from "@/components/ui/animations";
+import { Shimmer, ShimmerCard, ScrollReveal } from "@/components/ui/animations";
 import { AnimatedPrice } from "@/components/ui/animated-price";
 
 interface DashboardData {
@@ -608,6 +608,7 @@ export default function Dashboard() {
 
         {/* Games */}
         {todayGames && (
+          <ScrollReveal delay={0.1}>
           <Card className="mb-3 sm:mb-6">
             <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 space-y-0 pb-2">
               <CardTitle className="text-sm font-medium uppercase tracking-wide">
@@ -801,11 +802,13 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
+          </ScrollReveal>
         )}
 
         {/* Widgets Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-3">
           {/* Vesting Widget */}
+          <ScrollReveal delay={0.15}>
           <Card className="lg:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium uppercase tracking-wide">Vesting</CardTitle>
@@ -935,11 +938,15 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
+          </ScrollReveal>
 
           {/* Market Activity */}
+          <ScrollReveal delay={0.25}>
           <MarketActivityWidget />
+          </ScrollReveal>
 
           {/* Contest Summary */}
+          <ScrollReveal delay={0.35}>
           <Card className="lg:col-span-1">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium uppercase tracking-wide">Contests</CardTitle>
@@ -977,9 +984,11 @@ export default function Dashboard() {
               )}
             </CardContent>
           </Card>
+          </ScrollReveal>
 
           {/* Portfolio Summary - Only show for authenticated users */}
           {isAuthenticated && data?.topHoldings && data.topHoldings.length > 0 && (
+            <ScrollReveal delay={0.45}>
             <Card className="lg:col-span-1">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium uppercase tracking-wide">Top Holdings</CardTitle>
@@ -1017,6 +1026,7 @@ export default function Dashboard() {
                 </Link>
               </CardContent>
             </Card>
+            </ScrollReveal>
           )}
         </div>
       </div>

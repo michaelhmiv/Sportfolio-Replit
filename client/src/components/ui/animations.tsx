@@ -1,5 +1,5 @@
 import { motion, AnimatePresence, useInView, useSpring, useTransform } from "framer-motion";
-import { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 interface AnimatedNumberProps {
@@ -459,6 +459,121 @@ export function Highlight({
       transition={{ duration: 0.6 }}
     >
       {children}
+    </motion.div>
+  );
+}
+
+interface ScrollRevealProps {
+  children: React.ReactNode;
+  className?: string;
+  delay?: number;
+  duration?: number;
+  direction?: "up" | "down" | "left" | "right" | "none";
+  distance?: number;
+  once?: boolean;
+  threshold?: number;
+  scale?: number;
+}
+
+export function ScrollReveal({
+  children,
+  className,
+  delay = 0,
+  duration = 0.5,
+  direction = "up",
+  distance = 30,
+  once = true,
+  threshold = 0.1,
+  scale = 1,
+}: ScrollRevealProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once, amount: threshold });
+
+  const getInitialTransform = () => {
+    const transforms: { x?: number; y?: number; scale?: number } = {};
+    switch (direction) {
+      case "up": transforms.y = distance; break;
+      case "down": transforms.y = -distance; break;
+      case "left": transforms.x = distance; break;
+      case "right": transforms.x = -distance; break;
+    }
+    if (scale !== 1) transforms.scale = scale;
+    return transforms;
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, ...getInitialTransform() }}
+      animate={isInView ? { opacity: 1, x: 0, y: 0, scale: 1 } : { opacity: 0, ...getInitialTransform() }}
+      transition={{ duration, delay, ease: "easeOut" }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+interface ScrollRevealGroupProps {
+  children: React.ReactNode;
+  className?: string;
+  itemClassName?: string;
+  staggerDelay?: number;
+  direction?: "up" | "down" | "left" | "right" | "none";
+  threshold?: number;
+}
+
+export function ScrollRevealGroup({
+  children,
+  className,
+  itemClassName,
+  staggerDelay = 0.1,
+  direction = "up",
+  threshold = 0.1,
+}: ScrollRevealGroupProps) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, amount: threshold });
+  const childrenArray = React.Children.toArray(children);
+
+  const getInitialPosition = () => {
+    switch (direction) {
+      case "up": return { y: 30 };
+      case "down": return { y: -30 };
+      case "left": return { x: 30 };
+      case "right": return { x: -30 };
+      default: return {};
+    }
+  };
+
+  return (
+    <motion.div
+      ref={ref}
+      initial="hidden"
+      animate={isInView ? "visible" : "hidden"}
+      variants={{
+        hidden: { opacity: 1 },
+        visible: {
+          opacity: 1,
+          transition: {
+            staggerChildren: staggerDelay,
+          },
+        },
+      }}
+      className={className}
+    >
+      {childrenArray.map((child, index) => (
+        <motion.div
+          key={index}
+          variants={{
+            hidden: { opacity: 0, ...getInitialPosition() },
+            visible: { opacity: 1, x: 0, y: 0 },
+          }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+          className={itemClassName}
+        >
+          {child}
+        </motion.div>
+      ))}
     </motion.div>
   );
 }

@@ -15,7 +15,7 @@ import type { Player } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { PlayerName } from "@/components/player-name";
 import { AdSenseAd } from "@/components/adsense-ad";
-import { Shimmer } from "@/components/ui/animations";
+import { Shimmer, ScrollReveal } from "@/components/ui/animations";
 import { AnimatedPrice } from "@/components/ui/animated-price";
 import { AnimatedList } from "@/components/ui/animated-list";
 
@@ -155,6 +155,7 @@ export default function Marketplace() {
 
           <TabsContent value="players" className="space-y-4">
             {/* Filters */}
+            <ScrollReveal>
             <Card>
           <CardContent className="p-3 sm:p-4 space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
@@ -241,8 +242,10 @@ export default function Marketplace() {
             </div>
           </CardContent>
         </Card>
+        </ScrollReveal>
 
         {/* Player Table */}
+        <ScrollReveal delay={0.15}>
         <Card>
           <CardHeader className="p-3">
             <div className="flex items-center justify-between gap-3">
@@ -528,6 +531,7 @@ export default function Marketplace() {
             )}
           </CardContent>
         </Card>
+        </ScrollReveal>
           </TabsContent>
 
           <TabsContent value="activity" className="space-y-4">
