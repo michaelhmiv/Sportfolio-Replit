@@ -18,6 +18,7 @@ import { AdSenseAd } from "@/components/adsense-ad";
 import { Shimmer, ScrollReveal } from "@/components/ui/animations";
 import { AnimatedPrice } from "@/components/ui/animated-price";
 import { AnimatedList } from "@/components/ui/animated-list";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type PlayerWithOrderBook = Player & {
   bestBid: string | null;
@@ -666,9 +667,14 @@ function MarketActivityFeed() {
       </CardHeader>
       <CardContent className="p-0">
         {activity.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            {debouncedPlayerFilter ? "No activity for this player" : "No market activity yet"}
-          </div>
+          <EmptyState
+            icon="chart"
+            title={debouncedPlayerFilter ? "No activity for this player" : "No market activity yet"}
+            description={debouncedPlayerFilter ? "Try searching for a different player." : "Trades will appear here as they happen."}
+            size="sm"
+            className="py-6"
+            data-testid="empty-activity"
+          />
         ) : (
           <AnimatedList
             items={activity}

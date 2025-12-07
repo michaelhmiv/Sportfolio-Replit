@@ -8,6 +8,7 @@ import { Trophy, TrendingUp, ShoppingCart, DollarSign, Wallet, PieChart } from "
 import { useAuth } from "@/hooks/useAuth";
 import { useWebSocket } from "@/lib/websocket";
 import { queryClient } from "@/lib/queryClient";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface LeaderboardEntry {
   rank: number;
@@ -116,8 +117,14 @@ export default function Leaderboards() {
     if (!data || data.leaderboard.length === 0) {
       return (
         <Card>
-          <CardContent className="py-6 text-center text-muted-foreground">
-            No data available
+          <CardContent className="p-0">
+            <EmptyState
+              icon="users"
+              title="No rankings yet"
+              description="Be the first to make your mark! Start trading and competing to appear on the leaderboard."
+              size="md"
+              data-testid="empty-leaderboard"
+            />
           </CardContent>
         </Card>
       );

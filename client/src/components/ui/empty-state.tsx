@@ -12,7 +12,7 @@ import {
   Wallet
 } from "lucide-react";
 
-interface EmptyStateProps {
+interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
   title: string;
   description?: string;
   icon?: "inbox" | "search" | "file" | "cart" | "chart" | "users" | "trophy" | "wallet" | React.ReactNode;
@@ -20,7 +20,6 @@ interface EmptyStateProps {
     label: string;
     onClick: () => void;
   };
-  className?: string;
   size?: "sm" | "md" | "lg";
 }
 
@@ -42,6 +41,7 @@ export function EmptyState({
   action,
   className,
   size = "md",
+  ...props
 }: EmptyStateProps) {
   const sizeClasses = {
     sm: {
@@ -79,6 +79,7 @@ export function EmptyState({
         sizes.container,
         className
       )}
+      {...props}
     >
       <motion.div
         animate={{

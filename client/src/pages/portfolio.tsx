@@ -17,6 +17,7 @@ import type { Holding, Order, Player } from "@shared/schema";
 import { PlayerName } from "@/components/player-name";
 import { Shimmer, ShimmerCard } from "@/components/ui/animations";
 import { AnimatedPrice } from "@/components/ui/animated-price";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface PortfolioData {
   balance: string;
@@ -318,7 +319,15 @@ export default function Portfolio() {
               </CardHeader>
               <CardContent className="p-0">
                 {!data?.premiumShares && data?.holdings.filter(h => h.assetType === "player").length === 0 ? (
-                  <div className="p-6 text-center text-muted-foreground" data-testid="text-no-holdings">No holdings yet. Start trading to build your portfolio!</div>
+                  <EmptyState
+                    icon="wallet"
+                    title="Your portfolio is empty"
+                    description="Start trading to build your portfolio. Browse the marketplace to find players to invest in."
+                    action={{ label: "Browse Marketplace", onClick: () => window.location.href = "/marketplace" }}
+                    size="sm"
+                    className="py-8"
+                    data-testid="empty-holdings"
+                  />
                 ) : (
                   <div>
                     <table className="w-full">
@@ -515,7 +524,14 @@ export default function Portfolio() {
               </CardHeader>
               <CardContent className="p-0">
                 {data?.openOrders.length === 0 ? (
-                  <div className="p-12 text-center text-muted-foreground">No open orders</div>
+                  <EmptyState
+                    icon="cart"
+                    title="No open orders"
+                    description="Place limit orders to buy or sell players at your target price."
+                    size="sm"
+                    className="py-8"
+                    data-testid="empty-orders"
+                  />
                 ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full">
@@ -617,8 +633,15 @@ function ActivityFeed() {
         <CardHeader>
           <CardTitle className="text-sm font-medium uppercase tracking-wide">Activity History</CardTitle>
         </CardHeader>
-        <CardContent className="p-12 text-center text-muted-foreground" data-testid="text-no-activity">
-          No activity yet. Start trading, vesting, or entering contests!
+        <CardContent className="p-0">
+          <EmptyState
+            icon="inbox"
+            title="No activity yet"
+            description="Start trading, vesting, or entering contests to see your activity here."
+            size="sm"
+            className="py-8"
+            data-testid="empty-activity"
+          />
         </CardContent>
       </Card>
     );

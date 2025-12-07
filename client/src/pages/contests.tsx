@@ -12,6 +12,7 @@ import type { Contest, ContestEntry } from "@shared/schema";
 import { AdSenseAd } from "@/components/adsense-ad";
 import { ShimmerCard } from "@/components/ui/animations";
 import { AnimatedCard } from "@/components/ui/animated-card";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface ContestsData {
   contests: Contest[];
@@ -148,8 +149,14 @@ export default function Contests() {
           </div>
         ) : contests.length === 0 ? (
           <Card>
-            <CardContent className="py-6 text-center text-muted-foreground">
-              No contests available for this date
+            <CardContent className="p-0">
+              <EmptyState
+                icon="trophy"
+                title="No contests available"
+                description={`No contests scheduled for ${format(selectedDate, 'MMM d, yyyy')}. Try another date or check back later.`}
+                size="md"
+                data-testid="empty-contests"
+              />
             </CardContent>
           </Card>
         ) : (

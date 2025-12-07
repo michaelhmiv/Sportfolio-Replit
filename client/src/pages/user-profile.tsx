@@ -15,6 +15,7 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { Player } from "@shared/schema";
 import { PlayerName } from "@/components/player-name";
+import { EmptyState } from "@/components/ui/empty-state";
 
 interface UserProfile {
   user: {
@@ -332,9 +333,14 @@ export default function UserProfile() {
           </CardHeader>
           <CardContent>
             {holdings.length === 0 ? (
-              <div className="text-center py-4 text-muted-foreground">
-                No public holdings to display
-              </div>
+              <EmptyState
+                icon="wallet"
+                title="No holdings yet"
+                description="This user hasn't built a portfolio yet."
+                size="sm"
+                className="py-4"
+                data-testid="empty-user-holdings"
+              />
             ) : (
               <div className="space-y-2">
                 {holdings.map((holding) => {
