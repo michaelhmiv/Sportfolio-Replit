@@ -6,6 +6,7 @@
 import { db } from "../db";
 import { balanceLocks, holdingsLocks, type Order } from "@shared/schema";
 import { eq, and, sql } from "drizzle-orm";
+// Note: holdingsLocks is used in getAvailableShares for reading locked quantities
 import { storage } from "../storage";
 import { getMarketMakingCandidates, type PlayerValuation } from "./player-valuation";
 import { logBotAction, updateBotCounters, type BotProfile } from "./bot-engine";
@@ -226,15 +227,11 @@ async function executeTakerTrade(
           await storage.adjustLockAmount(order.id, newLockedAmount.toFixed(2));
         }
       } else {
-        // Release shares from seller's lock
+        // Adjust or release locked shares for sell orders (same pattern as routes.ts)
         if (remainingOrderQty <= 0) {
           await storage.releaseSharesByReference(order.id);
         } else {
-          // Adjust shares lock to new quantity
-          await db
-            .update(holdingsLocks)
-            .set({ lockedQuantity: remainingOrderQty })
-            .where(eq(holdingsLocks.lockReferenceId, order.id));
+          await storage.adjustLockQuantity(order.id, remainingOrderQty);
         }
       }
       
