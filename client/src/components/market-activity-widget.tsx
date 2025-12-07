@@ -3,13 +3,14 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, Clock } from "lucide-react";
+import { Clock } from "lucide-react";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { useWebSocket } from "@/lib/websocket";
 import { queryClient } from "@/lib/queryClient";
 import { PlayerName } from "@/components/player-name";
 import { UserName } from "@/components/user-name";
+import { AnimatedList } from "@/components/ui/animated-list";
 
 interface MarketActivity {
   activityType: "trade" | "order_placed" | "order_cancelled";
@@ -133,10 +134,14 @@ export function MarketActivityWidget() {
           <div className="text-center py-4 text-muted-foreground text-sm">No recent activity</div>
         ) : (
           <>
-            <div className="space-y-2">
-              {activity.slice(0, 5).map((item) => (
+            <AnimatedList
+              items={activity.slice(0, 5)}
+              keyExtractor={(item) => `${item.activityType}-${item.id}`}
+              animateDirection="right"
+              staggerDelay={0.05}
+              highlightNew={true}
+              renderItem={(item) => (
                 <div
-                  key={`${item.activityType}-${item.id}`}
                   className="flex items-center justify-between py-2 border-b last:border-0"
                   data-testid={`activity-${item.activityType}-${item.id}`}
                 >
@@ -165,8 +170,8 @@ export function MarketActivityWidget() {
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+              )}
+            />
             <Link href="/marketplace?tab=activity">
               <Button variant="outline" className="w-full" data-testid="button-view-market-activity">
                 View More Activity

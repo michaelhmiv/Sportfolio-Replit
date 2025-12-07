@@ -17,6 +17,7 @@ import { PlayerName } from "@/components/player-name";
 import { AdSenseAd } from "@/components/adsense-ad";
 import { Shimmer } from "@/components/ui/animations";
 import { AnimatedPrice } from "@/components/ui/animated-price";
+import { AnimatedList } from "@/components/ui/animated-list";
 
 type PlayerWithOrderBook = Player & {
   bestBid: string | null;
@@ -665,13 +666,18 @@ function MarketActivityFeed() {
             {debouncedPlayerFilter ? "No activity for this player" : "No market activity yet"}
           </div>
         ) : (
-          <div className="divide-y">
-            {activity.map((item) => {
+          <AnimatedList
+            items={activity}
+            keyExtractor={(item) => `${item.activityType}-${item.id}`}
+            animateDirection="right"
+            staggerDelay={0.02}
+            highlightNew={true}
+            className="divide-y"
+            renderItem={(item) => {
               const label = getActivityLabel(item);
               const sideLabel = getSideLabel(item);
               return (
                 <div
-                  key={`${item.activityType}-${item.id}`}
                   className="flex items-center gap-2 px-3 py-2 hover-elevate text-sm"
                   data-testid={`activity-${item.activityType}-${item.id}`}
                 >
@@ -716,8 +722,8 @@ function MarketActivityFeed() {
                   </div>
                 </div>
               );
-            })}
-          </div>
+            }}
+          />
         )}
       </CardContent>
     </Card>
