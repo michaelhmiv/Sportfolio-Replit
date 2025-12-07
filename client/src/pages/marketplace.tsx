@@ -246,7 +246,6 @@ export default function Marketplace() {
         </ScrollReveal>
 
         {/* Player Table */}
-        <ScrollReveal delay={0.15}>
         <Card>
           <CardHeader className="p-3">
             <div className="flex items-center justify-between gap-3">
@@ -532,7 +531,6 @@ export default function Marketplace() {
             )}
           </CardContent>
         </Card>
-        </ScrollReveal>
           </TabsContent>
 
           <TabsContent value="activity" className="space-y-4">
