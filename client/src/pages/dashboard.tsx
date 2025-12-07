@@ -22,7 +22,7 @@ import { calculateVestingShares } from "@shared/vesting-utils";
 import { MarketActivityWidget } from "@/components/market-activity-widget";
 import { PlayerName } from "@/components/player-name";
 import { AdSenseAd } from "@/components/adsense-ad";
-import { Shimmer, ShimmerCard, ScrollReveal, AnimatedButton } from "@/components/ui/animations";
+import { Shimmer, ShimmerCard, ScrollReveal, AnimatedButton, SwipeHint } from "@/components/ui/animations";
 import { AnimatedPrice } from "@/components/ui/animated-price";
 
 interface DashboardData {
@@ -691,7 +691,7 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent>
               {todayGames.length > 0 ? (
-              <div className="overflow-x-auto -mx-2 px-2">
+              <div className="overflow-x-auto -mx-2 px-2 relative">
                 <div className="grid grid-rows-2 grid-flow-col auto-cols-[minmax(140px,1fr)] gap-2">
                   {todayGames.map((game) => {
                     const effectiveStatus = getEffectiveGameStatus(game);
@@ -804,6 +804,12 @@ export default function Dashboard() {
                     );
                   })}
                 </div>
+                {/* Mobile swipe hint */}
+                <SwipeHint 
+                  direction="both" 
+                  className="mt-2 sm:hidden" 
+                  show={todayGames.length > 3} 
+                />
               </div>
               ) : (
                 <div className="text-center py-8 text-sm text-muted-foreground">

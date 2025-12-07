@@ -690,4 +690,212 @@ export function AnimatedButton({
   );
 }
 
+// Pull-to-refresh indicator component for mobile
+interface PullToRefreshIndicatorProps {
+  pullProgress: number; // 0 to 1
+  isRefreshing: boolean;
+  className?: string;
+}
+
+export function PullToRefreshIndicator({
+  pullProgress,
+  isRefreshing,
+  className,
+}: PullToRefreshIndicatorProps) {
+  const clampedProgress = Math.min(1, Math.max(0, pullProgress));
+  const rotation = clampedProgress * 360;
+  const opacity = Math.min(1, clampedProgress * 1.5);
+  
+  return (
+    <motion.div
+      className={cn(
+        "flex items-center justify-center py-3",
+        className
+      )}
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ 
+        opacity: clampedProgress > 0.1 ? opacity : 0, 
+        height: clampedProgress > 0.1 ? 48 : 0 
+      }}
+      transition={{ duration: 0.2 }}
+    >
+      <motion.div
+        className="w-6 h-6 rounded-full border-2 border-primary/30 border-t-primary"
+        animate={isRefreshing ? { rotate: 360 } : { rotate: rotation }}
+        transition={isRefreshing 
+          ? { duration: 0.8, repeat: Infinity, ease: "linear" }
+          : { duration: 0 }
+        }
+      />
+      <AnimatePresence>
+        {clampedProgress >= 1 && !isRefreshing && (
+          <motion.span
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0 }}
+            className="ml-2 text-xs text-muted-foreground"
+          >
+            Release to refresh
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+// Gesture hint for swipeable cards
+interface SwipeHintProps {
+  direction?: "left" | "right" | "both";
+  className?: string;
+  show?: boolean;
+}
+
+export function SwipeHint({ direction = "both", className, show = true }: SwipeHintProps) {
+  if (!show) return null;
+  
+  return (
+    <motion.div
+      className={cn(
+        "flex items-center justify-center gap-1 text-xs text-muted-foreground/60",
+        className
+      )}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 1, duration: 0.5 }}
+    >
+      {(direction === "left" || direction === "both") && (
+        <motion.span
+          animate={{ x: [-2, 2, -2] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        >
+          ←
+        </motion.span>
+      )}
+      <span>Swipe</span>
+      {(direction === "right" || direction === "both") && (
+        <motion.span
+          animate={{ x: [2, -2, 2] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        >
+          →
+        </motion.span>
+      )}
+    </motion.div>
+  );
+}
+
+// Tap hint for touchable elements
+interface TapHintProps {
+  className?: string;
+  show?: boolean;
+  label?: string;
+}
+
+export function TapHint({ className, show = true, label = "Tap" }: TapHintProps) {
+  if (!show) return null;
+  
+  return (
+    <motion.div
+      className={cn(
+        "flex flex-col items-center gap-1",
+        className
+      )}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ delay: 1.5, duration: 0.5 }}
+    >
+      <motion.div
+        className="w-8 h-8 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center"
+        animate={{ 
+          scale: [1, 0.9, 1],
+          borderColor: ["hsl(var(--muted-foreground) / 0.3)", "hsl(var(--primary) / 0.5)", "hsl(var(--muted-foreground) / 0.3)"]
+        }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+      >
+        <motion.div
+          className="w-3 h-3 rounded-full bg-muted-foreground/20"
+          animate={{ scale: [1, 1.2, 1] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </motion.div>
+      <span className="text-xs text-muted-foreground/50">{label}</span>
+    </motion.div>
+  );
+}
+
+// Mobile scroll indicator that fades as user scrolls
+interface ScrollIndicatorProps {
+  className?: string;
+  show?: boolean;
+}
+
+export function ScrollIndicator({ className, show = true }: ScrollIndicatorProps) {
+  const [visible, setVisible] = useState(true);
+  
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.scrollY > 50) {
+        setVisible(false);
+      }
+    };
+    
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+  
+  if (!show || !visible) return null;
+  
+  return (
+    <motion.div
+      className={cn(
+        "fixed bottom-20 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1 pointer-events-none sm:hidden",
+        className
+      )}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: 10 }}
+      transition={{ delay: 2, duration: 0.5 }}
+    >
+      <motion.div
+        className="w-6 h-10 rounded-full border-2 border-muted-foreground/30 flex justify-center pt-2"
+        animate={{ opacity: [0.5, 1, 0.5] }}
+        transition={{ duration: 2, repeat: Infinity }}
+      >
+        <motion.div
+          className="w-1.5 h-2 rounded-full bg-muted-foreground/40"
+          animate={{ y: [0, 12, 0] }}
+          transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+        />
+      </motion.div>
+      <span className="text-xs text-muted-foreground/40">Scroll</span>
+    </motion.div>
+  );
+}
+
+// Active bounce animation for nav items
+interface NavBounceProps {
+  children: React.ReactNode;
+  isActive: boolean;
+  wasJustActivated: boolean;
+  className?: string;
+}
+
+export function NavBounce({ children, isActive, wasJustActivated, className }: NavBounceProps) {
+  return (
+    <motion.div
+      className={className}
+      animate={wasJustActivated ? {
+        scale: [1, 1.15, 0.95, 1.05, 1],
+        y: [0, -6, 0, -2, 0],
+      } : {}}
+      transition={{
+        duration: 0.4,
+        ease: "easeOut",
+      }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
 export { AnimatePresence, motion };
