@@ -23,6 +23,7 @@ import { MarketActivityWidget } from "@/components/market-activity-widget";
 import { PlayerName } from "@/components/player-name";
 import { AdSenseAd } from "@/components/adsense-ad";
 import { Shimmer, ShimmerCard } from "@/components/ui/animations";
+import { AnimatedPrice } from "@/components/ui/animated-price";
 
 interface DashboardData {
   user: {
@@ -1267,9 +1268,15 @@ function PlayerCard({
                       <span className="font-bold">{(player as any).avgFantasyPointsPerGame || "0.0"}</span> FPG
                     </span>
                     <span>·</span>
-                    <span className="font-mono font-bold">
-                      {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground">No value</span>}
-                    </span>
+                    {player.lastTradePrice ? (
+                      <AnimatedPrice 
+                        value={parseFloat(player.lastTradePrice)} 
+                        size="sm" 
+                        className="font-mono font-bold"
+                      />
+                    ) : (
+                      <span className="text-muted-foreground">No value</span>
+                    )}
                   </div>
                 </div>
               </div>

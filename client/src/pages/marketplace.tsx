@@ -16,6 +16,7 @@ import { formatDistanceToNow } from "date-fns";
 import { PlayerName } from "@/components/player-name";
 import { AdSenseAd } from "@/components/adsense-ad";
 import { Shimmer } from "@/components/ui/animations";
+import { AnimatedPrice } from "@/components/ui/animated-price";
 
 type PlayerWithOrderBook = Player & {
   bestBid: string | null;
@@ -379,9 +380,15 @@ export default function Marketplace() {
                                   <span className="text-muted-foreground">{player.team} • {player.position}</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 text-xs mt-0.5">
-                                  <span className="font-mono font-bold text-foreground">
-                                    {player.lastTradePrice ? `$${player.lastTradePrice}` : '-'}
-                                  </span>
+                                  {player.lastTradePrice ? (
+                                    <AnimatedPrice 
+                                      value={parseFloat(player.lastTradePrice)} 
+                                      size="sm" 
+                                      className="font-mono font-bold"
+                                    />
+                                  ) : (
+                                    <span className="text-muted-foreground">-</span>
+                                  )}
                                   <span className="text-muted-foreground">•</span>
                                   <span className="text-blue-500 dark:text-blue-400 font-mono font-bold">
                                     {player.bestBid ? `$${player.bestBid}` : '-'}
@@ -423,10 +430,16 @@ export default function Marketplace() {
                         <td className="px-2 py-1.5 hidden md:table-cell">
                           <Badge variant="outline" className="text-xs">{player.team}</Badge>
                         </td>
-                        <td className="px-2 py-1.5 text-right hidden sm:table-cell">
-                          <span className="font-mono font-bold text-sm" data-testid={`text-market-value-${player.id}`}>
-                            {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-xs font-normal">-</span>}
-                          </span>
+                        <td className="px-2 py-1.5 text-right hidden sm:table-cell" data-testid={`text-market-value-${player.id}`}>
+                          {player.lastTradePrice ? (
+                            <AnimatedPrice 
+                              value={parseFloat(player.lastTradePrice)} 
+                              size="sm" 
+                              className="font-mono font-bold justify-end"
+                            />
+                          ) : (
+                            <span className="text-muted-foreground text-xs font-normal">-</span>
+                          )}
                         </td>
                         <td className="px-2 py-1.5 text-right hidden lg:table-cell">
                           <div className="flex items-center justify-end gap-2 font-mono text-sm font-bold">

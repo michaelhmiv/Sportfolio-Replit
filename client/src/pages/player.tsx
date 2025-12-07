@@ -14,6 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import type { Player, Order, Trade, PriceHistory } from "@shared/schema";
 import { SchemaOrg, schemas } from "@/components/schema-org";
+import { AnimatedPrice } from "@/components/ui/animated-price";
 
 interface PlayerPageData {
   player: Player;
@@ -282,7 +283,15 @@ export default function PlayerPage() {
             </div>
             <div className="text-right">
               <div className="text-hero font-mono font-bold" data-testid="text-current-price">
-                {player.lastTradePrice ? `$${player.lastTradePrice}` : <span className="text-muted-foreground text-2xl">No market value</span>}
+                {player.lastTradePrice ? (
+                  <AnimatedPrice 
+                    value={parseFloat(player.lastTradePrice)} 
+                    size="lg" 
+                    className="text-4xl justify-end"
+                  />
+                ) : (
+                  <span className="text-muted-foreground text-2xl">No market value</span>
+                )}
               </div>
               {player.lastTradePrice && (
                 <div className={`flex items-center justify-end gap-1 ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>

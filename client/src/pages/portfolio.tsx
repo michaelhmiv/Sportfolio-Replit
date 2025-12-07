@@ -16,6 +16,7 @@ import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import type { Holding, Order, Player } from "@shared/schema";
 import { PlayerName } from "@/components/player-name";
 import { Shimmer, ShimmerCard } from "@/components/ui/animations";
+import { AnimatedPrice } from "@/components/ui/animated-price";
 
 interface PortfolioData {
   balance: string;
@@ -410,9 +411,15 @@ export default function Portfolio() {
                                   <div className="flex items-center gap-1.5 text-xs mt-0.5">
                                     <span className="text-muted-foreground">Avg: ${holding.avgCostBasis}</span>
                                     <span className="text-muted-foreground">•</span>
-                                    <span className="font-mono font-bold text-foreground">
-                                      {holding.player?.lastTradePrice ? `$${holding.player.lastTradePrice}` : '-'}
-                                    </span>
+                                    {holding.player?.lastTradePrice ? (
+                                      <AnimatedPrice 
+                                        value={parseFloat(holding.player.lastTradePrice)} 
+                                        size="sm" 
+                                        className="font-mono font-bold"
+                                      />
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
                                     {holding.pnl !== null && (
                                       <>
                                         <span className="text-muted-foreground">•</span>
@@ -454,8 +461,16 @@ export default function Portfolio() {
                           </td>
                           <td className="px-2 py-1.5 text-right font-mono text-sm hidden sm:table-cell">{holding.quantity}</td>
                           <td className="px-2 py-1.5 text-right font-mono text-sm hidden sm:table-cell">${holding.avgCostBasis}</td>
-                          <td className="px-2 py-1.5 text-right font-mono text-sm hidden md:table-cell">
-                            {holding.player?.lastTradePrice ? `$${holding.player.lastTradePrice}` : <span className="text-muted-foreground text-xs">-</span>}
+                          <td className="px-2 py-1.5 text-right hidden md:table-cell">
+                            {holding.player?.lastTradePrice ? (
+                              <AnimatedPrice 
+                                value={parseFloat(holding.player.lastTradePrice)} 
+                                size="sm" 
+                                className="font-mono font-bold justify-end"
+                              />
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
                           </td>
                           <td className="px-2 py-1.5 text-right font-mono font-bold text-sm hidden lg:table-cell">
                             {holding.currentValue !== null ? `$${holding.currentValue}` : <span className="text-muted-foreground text-xs">-</span>}
