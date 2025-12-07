@@ -232,6 +232,11 @@ async function executeBotStrategies(
         // Already handled mining above
         break;
       
+      case "taker":
+        const { executeTakerStrategy } = await import("./taker-strategy");
+        await executeTakerStrategy(profile);
+        break;
+      
       case "casual":
         // Casual bots do a mix with low frequency
         if (Math.random() < 0.3) {
