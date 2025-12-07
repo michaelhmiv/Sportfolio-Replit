@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Calendar, Search, ChevronDown, BarChart3, ChevronLeft, ChevronRight, ExternalLink, ArrowUpDown, LogIn } from "lucide-react";
+import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Calendar, Search, ChevronDown, BarChart3, ChevronLeft, ChevronRight, ExternalLink, ArrowUpDown, LogIn, Activity } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import type { Player, Vesting, Contest, Trade, DailyGame } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -524,12 +524,21 @@ export default function Dashboard() {
         
         {/* Market Activity Ticker */}
         {data && data.recentTrades && data.recentTrades.length > 0 && (
-          <div className="border-b bg-card overflow-x-hidden">
+          <div className="border-b bg-card/80 backdrop-blur-sm overflow-x-hidden relative">
+            {/* Gradient fade edges */}
+            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-card to-transparent z-10 pointer-events-none" />
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-card to-transparent z-10 pointer-events-none" />
+            
             <div className="h-12 overflow-hidden relative">
-              <div className="flex gap-3 animate-slide-left absolute whitespace-nowrap py-3 px-4">
-                {data.recentTrades.concat(data.recentTrades).map((trade, idx) => (
-                  <div key={`${trade.id}-${idx}`} className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md">
-                    <span className="text-blue-500 font-bold text-sm">⊡</span>
+              <div className="flex gap-4 animate-ticker absolute whitespace-nowrap py-3 px-4">
+                {data.recentTrades.concat(data.recentTrades).concat(data.recentTrades).map((trade, idx) => (
+                  <div 
+                    key={`${trade.id}-${idx}`} 
+                    className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md transition-all duration-200 group"
+                  >
+                    <span className="text-primary font-bold text-sm group-hover:scale-110 transition-transform">
+                      <Activity className="w-3 h-3" />
+                    </span>
                     <span className="font-medium text-xs sm:text-sm">
                       <PlayerName 
                         playerId={trade.player.id} 
@@ -537,8 +546,9 @@ export default function Dashboard() {
                         lastName={trade.player.lastName}
                       />
                     </span>
-                    <span className="font-mono font-bold text-xs sm:text-sm">${trade.price}</span>
+                    <span className="font-mono font-bold text-xs sm:text-sm text-primary">${trade.price}</span>
                     <span className="text-muted-foreground text-xs">{trade.quantity} sh</span>
+                    <span className="text-muted-foreground/50 text-xs">|</span>
                   </div>
                 ))}
               </div>

@@ -108,6 +108,10 @@ export default {
           from: { transform: "translateX(0)" },
           to: { transform: "translateX(-100%)" },
         },
+        "ticker": {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-33.333%)" },
+        },
         "fade-in": {
           from: { opacity: "0" },
           to: { opacity: "1" },
@@ -131,6 +135,7 @@ export default {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "slide-left": "slide-left 30s linear infinite",
+        "ticker": "ticker 40s linear infinite",
         "fade-in": "fade-in 0.3s ease-out",
         "highlight-once": "highlight-once 2s ease-out forwards",
         "toast-slide-in": "toast-slide-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)",
