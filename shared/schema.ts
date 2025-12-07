@@ -362,6 +362,7 @@ export const botProfiles = pgTable("bot_profiles", {
   minOrderSize: integer("min_order_size").notNull().default(5), // Minimum shares per order
   maxDailyOrders: integer("max_daily_orders").notNull().default(50), // Daily order cap
   maxDailyVolume: integer("max_daily_volume").notNull().default(1000), // Max shares traded per day
+  targetTiers: integer("target_tiers").array(), // Player tiers to target (1-5), null = all tiers
   // Mining configuration
   miningClaimThreshold: decimal("mining_claim_threshold", { precision: 3, scale: 2 }).notNull().default("0.85"), // Claim at 85% of cap
   maxPlayersToMine: integer("max_players_to_mine").notNull().default(5), // Max players to split mining across

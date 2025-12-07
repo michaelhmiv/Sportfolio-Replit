@@ -310,11 +310,16 @@ export async function getEffectivePrice(playerId: string): Promise<number> {
 
 /**
  * Get players suitable for market making (have some trading history)
+ * @param limit - Maximum number of players to return
+ * @param targetTiers - Optional specific tiers to target (1-5), defaults to all tiers
  */
-export async function getMarketMakingCandidates(limit: number = 20): Promise<PlayerValuation[]> {
+export async function getMarketMakingCandidates(
+  limit: number = 30,
+  targetTiers?: number[]
+): Promise<PlayerValuation[]> {
   return getPlayersForTrading({
-    tier: [1, 2, 3], // Focus on tier 1-3 players
-    minGamesPlayed: 3, // At least some recent stats
+    tier: targetTiers || [1, 2, 3, 4, 5], // Include ALL tiers for full market coverage
+    minGamesPlayed: 1, // Lower threshold to include newer players
     limit,
   });
 }

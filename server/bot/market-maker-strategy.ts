@@ -236,16 +236,23 @@ export async function executeMarketMakerStrategy(
     return;
   }
   
-  // Get candidate players for market making
-  const candidates = await getMarketMakingCandidates(5);
+  // Determine target tiers based on bot profile (use targetTiers if set, otherwise cover all)
+  // Type assertion needed as schema type inference may not include new column immediately
+  const profileTiers = (profile as any).targetTiers as number[] | null;
+  const targetTiers = profileTiers && profileTiers.length > 0 
+    ? profileTiers 
+    : undefined; // undefined = all tiers
+  
+  // Get candidate players for market making - fetch 30 candidates for better coverage
+  const candidates = await getMarketMakingCandidates(30, targetTiers);
   
   if (candidates.length === 0) {
-    console.log(`[MarketMaker] ${profile.botName} no candidates found`);
+    console.log(`[MarketMaker] ${profile.botName} no candidates found (tiers: ${targetTiers?.join(',') || 'all'})`);
     return;
   }
   
-  // Pick random candidates based on aggressiveness
-  const numToTrade = Math.max(1, Math.floor(candidates.length * config.aggressiveness));
+  // Pick random candidates based on aggressiveness - select from larger pool for diversity
+  const numToTrade = Math.max(1, Math.floor(Math.min(candidates.length, 10) * config.aggressiveness));
   const shuffled = candidates.sort(() => Math.random() - 0.5);
   const selected = shuffled.slice(0, numToTrade);
   
