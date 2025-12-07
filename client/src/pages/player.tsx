@@ -15,6 +15,7 @@ import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import type { Player, Order, Trade, PriceHistory } from "@shared/schema";
 import { SchemaOrg, schemas } from "@/components/schema-org";
 import { AnimatedPrice } from "@/components/ui/animated-price";
+import { Confetti, CelebrationBurst } from "@/components/ui/confetti";
 
 interface PlayerPageData {
   player: Player;
@@ -39,6 +40,7 @@ export default function PlayerPage() {
   const [quantity, setQuantity] = useState("");
   const [limitPrice, setLimitPrice] = useState("");
   const [timeRange, setTimeRange] = useState<TimeRange>("1D");
+  const [celebrationKey, setCelebrationKey] = useState(0);
 
   const { data, isLoading } = useQuery<PlayerPageData>({
     queryKey: ["/api/player", id],
@@ -158,6 +160,7 @@ export default function PlayerPage() {
     },
     onSuccess: async () => {
       await invalidatePortfolioQueries();
+      setCelebrationKey(prev => prev + 1);
       toast({ title: "Order placed successfully" });
       setQuantity("");
       setLimitPrice("");
@@ -258,6 +261,21 @@ export default function PlayerPage() {
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+      {celebrationKey > 0 && (
+        <>
+          <Confetti 
+            key={`confetti-${celebrationKey}`}
+            active={true} 
+            type="coins" 
+            particleCount={30}
+            duration={2000}
+          />
+          <CelebrationBurst 
+            key={`burst-${celebrationKey}`}
+            active={true} 
+          />
+        </>
+      )}
       <SchemaOrg schema={schemas.createPlayer({
         name: playerName,
         team: player.team,
