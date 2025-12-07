@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import type { Contest, ContestEntry } from "@shared/schema";
 import { AdSenseAd } from "@/components/adsense-ad";
 import { ShimmerCard } from "@/components/ui/animations";
+import { AnimatedCard } from "@/components/ui/animated-card";
 
 interface ContestsData {
   contests: Contest[];
@@ -155,10 +156,16 @@ export default function Contests() {
           <>
             {/* Mobile: Card Layout */}
             <div className="sm:hidden p-3 space-y-3">
-              {contests.map((contest) => {
+              {contests.map((contest, index) => {
                     const isLocked = new Date() >= new Date(contest.startsAt);
                     return (
-                      <Card key={contest.id} className="hover-elevate" data-testid={`card-contest-${contest.id}`}>
+                      <AnimatedCard 
+                        key={contest.id} 
+                        hoverLift 
+                        clickable
+                        delay={index * 0.05}
+                        data-testid={`card-contest-${contest.id}`}
+                      >
                         <CardContent className="p-4">
                           <div className="flex items-start justify-between gap-3 mb-3">
                             <div className="flex-1">
@@ -230,7 +237,7 @@ export default function Contests() {
                             )}
                           </div>
                         </CardContent>
-                      </Card>
+                      </AnimatedCard>
                     );
                   })}
                 </div>
@@ -353,8 +360,14 @@ export default function Contests() {
             <>
                 {/* Mobile: Card Layout */}
                 <div className="sm:hidden p-3 space-y-3">
-                  {data?.myEntries.map((entry) => (
-                    <Card key={entry.id} className="hover-elevate" data-testid={`card-entry-${entry.id}`}>
+                  {data?.myEntries.map((entry, index) => (
+                    <AnimatedCard 
+                      key={entry.id} 
+                      hoverLift 
+                      clickable
+                      delay={index * 0.05}
+                      data-testid={`card-entry-${entry.id}`}
+                    >
                       <CardContent className="p-4">
                         <div className="mb-3">
                           <h3 className="font-bold mb-2">{entry.contest.name}</h3>
@@ -402,7 +415,7 @@ export default function Contests() {
                           )}
                         </div>
                       </CardContent>
-                    </Card>
+                    </AnimatedCard>
                   ))}
                 </div>
 
