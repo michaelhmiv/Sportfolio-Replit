@@ -3220,7 +3220,7 @@ ${posts.map(post => `  <url>
         return res.status(400).json({ error: 'jobName required' });
       }
       
-      const validJobs = ['roster_sync', 'sync_player_game_logs', 'schedule_sync', 'stats_sync', 'create_contests', 'settle_contests', 'daily_snapshot', 'backfill_market_snapshots'];
+      const validJobs = ['roster_sync', 'sync_player_game_logs', 'schedule_sync', 'stats_sync', 'create_contests', 'settle_contests', 'daily_snapshot', 'backfill_market_snapshots', 'bot_engine'];
       if (!validJobs.includes(jobName)) {
         return res.status(400).json({ error: `Invalid jobName. Must be one of: ${validJobs.join(', ')}` });
       }
@@ -3443,6 +3443,47 @@ ${posts.map(post => `  <url>
       if (!res.headersSent) {
         res.status(500).json({ error: error.message });
       }
+    }
+  });
+
+  // Admin endpoint: Bot statistics and recent actions
+  app.get("/api/admin/bots", adminAuth, async (req, res) => {
+    try {
+      const { getBotStats } = await import('./bot/bot-engine');
+      const { botActionsLog } = await import('@shared/schema');
+      
+      const stats = await getBotStats();
+      
+      // Get recent actions
+      const recentActions = await db
+        .select()
+        .from(botActionsLog)
+        .orderBy(desc(botActionsLog.createdAt))
+        .limit(50);
+      
+      res.json({
+        stats,
+        recentActions,
+      });
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to get bot stats:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint: Manually trigger bot engine
+  app.post("/api/admin/bots/trigger", adminAuth, async (req, res) => {
+    try {
+      const { runBotEngineTick } = await import('./bot/bot-engine');
+      const result = await runBotEngineTick();
+      
+      res.json({
+        success: true,
+        ...result,
+      });
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to trigger bot engine:', error.message);
+      res.status(500).json({ error: error.message });
     }
   });
 
@@ -3696,7 +3737,7 @@ ${posts.map(post => `  <url>
         .slice(0, 20);
 
       // Calculate correlations based on price change patterns
-      const correlations: { player1: string; player2: string; correlation: number }[] = [];
+      const correlations: { player1: string; player2: string; player1Id: string; player2Id: string; correlation: number }[] = [];
       
       for (let i = 0; i < topPlayers.length; i++) {
         for (let j = i + 1; j < topPlayers.length; j++) {
