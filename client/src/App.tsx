@@ -1,4 +1,4 @@
-import { Switch, Route, Link } from "wouter";
+import { Switch, Route, Link, useLocation } from "wouter";
 import { useEffect, useState } from "react";
 import { queryClient, apiRequest } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ import { WebSocketProvider, useWebSocket } from "@/lib/websocket";
 import { NotificationProvider } from "@/lib/notification-context";
 import { useAuth } from "@/hooks/useAuth";
 import { OnboardingModal } from "@/components/onboarding-modal";
+import { AnimatePresence, motion } from "framer-motion";
 import Dashboard from "@/pages/dashboard";
 import Marketplace from "@/pages/marketplace";
 import PlayerPage from "@/pages/player";
@@ -58,8 +59,20 @@ function OnboardingCheck() {
   return <OnboardingModal open={showOnboarding} onComplete={handleComplete} />;
 }
 
+const pageTransitionVariants = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+};
+
+const pageTransitionSettings = {
+  duration: 0.2,
+  ease: "easeOut" as const,
+};
+
 function Router() {
   const { isAuthenticated, isLoading } = useAuth();
+  const [location] = useLocation();
 
   // Ensure viewport is properly set after OAuth redirect on mobile
   useEffect(() => {
@@ -82,47 +95,59 @@ function Router() {
 
   // Public routes (accessible without authentication)
   return (
-    <Switch>
-      {/* Dashboard is now public - shows live data with login CTAs for non-authenticated users */}
-      <Route path="/" component={Dashboard} />
-      
-      {/* Public routes - contests and leaderboards */}
-      <Route path="/contests" component={Contests} />
-      <Route path="/contest/:id/leaderboard" component={ContestLeaderboard} />
-      <Route path="/leaderboards" component={Leaderboards} />
-      <Route path="/user/:id" component={UserProfile} />
-      <Route path="/marketplace" component={Marketplace} />
-      <Route path="/blog" component={Blog} />
-      <Route path="/blog/:slug" component={BlogPost} />
-      <Route path="/privacy" component={Privacy} />
-      <Route path="/terms" component={Terms} />
-      <Route path="/about" component={About} />
-      <Route path="/contact" component={Contact} />
-      <Route path="/how-it-works" component={HowItWorks} />
-      <Route path="/analytics" component={Analytics} />
-      
-      {/* Protected routes - require authentication, redirect to dashboard if not logged in */}
-      <Route path="/player/:id">
-        {isAuthenticated ? <PlayerPage /> : <Dashboard />}
-      </Route>
-      <Route path="/contest/:id/entry">
-        {isAuthenticated ? <ContestEntry /> : <Dashboard />}
-      </Route>
-      <Route path="/contest/:id/entry/:entryId">
-        {isAuthenticated ? <ContestEntry /> : <Dashboard />}
-      </Route>
-      <Route path="/portfolio">
-        {isAuthenticated ? <Portfolio /> : <Dashboard />}
-      </Route>
-      <Route path="/admin">
-        {isAuthenticated ? <Admin /> : <Dashboard />}
-      </Route>
-      
-      {/* Auth error page - public, always accessible */}
-      <Route path="/auth/error" component={AuthError} />
-      
-      <Route component={NotFound} />
-    </Switch>
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={location}
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        variants={pageTransitionVariants}
+        transition={pageTransitionSettings}
+        className="w-full"
+      >
+        <Switch>
+          {/* Dashboard is now public - shows live data with login CTAs for non-authenticated users */}
+          <Route path="/" component={Dashboard} />
+          
+          {/* Public routes - contests and leaderboards */}
+          <Route path="/contests" component={Contests} />
+          <Route path="/contest/:id/leaderboard" component={ContestLeaderboard} />
+          <Route path="/leaderboards" component={Leaderboards} />
+          <Route path="/user/:id" component={UserProfile} />
+          <Route path="/marketplace" component={Marketplace} />
+          <Route path="/blog" component={Blog} />
+          <Route path="/blog/:slug" component={BlogPost} />
+          <Route path="/privacy" component={Privacy} />
+          <Route path="/terms" component={Terms} />
+          <Route path="/about" component={About} />
+          <Route path="/contact" component={Contact} />
+          <Route path="/how-it-works" component={HowItWorks} />
+          <Route path="/analytics" component={Analytics} />
+          
+          {/* Protected routes - require authentication, redirect to dashboard if not logged in */}
+          <Route path="/player/:id">
+            {isAuthenticated ? <PlayerPage /> : <Dashboard />}
+          </Route>
+          <Route path="/contest/:id/entry">
+            {isAuthenticated ? <ContestEntry /> : <Dashboard />}
+          </Route>
+          <Route path="/contest/:id/entry/:entryId">
+            {isAuthenticated ? <ContestEntry /> : <Dashboard />}
+          </Route>
+          <Route path="/portfolio">
+            {isAuthenticated ? <Portfolio /> : <Dashboard />}
+          </Route>
+          <Route path="/admin">
+            {isAuthenticated ? <Admin /> : <Dashboard />}
+          </Route>
+          
+          {/* Auth error page - public, always accessible */}
+          <Route path="/auth/error" component={AuthError} />
+          
+          <Route component={NotFound} />
+        </Switch>
+      </motion.div>
+    </AnimatePresence>
   );
 }
 
