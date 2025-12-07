@@ -173,6 +173,34 @@
 
   body {
     @apply font-mono antialiased bg-background text-foreground tracking-tight;
+    transition: 
+      background-color 0.3s ease-in-out,
+      color 0.2s ease-in-out;
+  }
+
+  /* Smooth theme transitions for key surfaces */
+  main,
+  header,
+  nav,
+  aside,
+  footer,
+  section,
+  article,
+  div[class*="bg-"],
+  [data-sidebar],
+  .card,
+  .bg-background,
+  .bg-card,
+  .bg-sidebar,
+  .bg-popover,
+  .bg-muted,
+  .bg-secondary,
+  .bg-primary,
+  .bg-accent {
+    transition: 
+      background-color 0.3s ease-in-out,
+      border-color 0.25s ease-in-out,
+      color 0.2s ease-in-out;
   }
 }
 
