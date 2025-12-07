@@ -29,6 +29,7 @@ export const users = pgTable("users", {
   isPremium: boolean("is_premium").notNull().default(false),
   premiumExpiresAt: timestamp("premium_expires_at"),
   hasSeenOnboarding: boolean("has_seen_onboarding").notNull().default(false), // Track if user completed onboarding
+  isBot: boolean("is_bot").notNull().default(false), // True for market maker bot accounts
   // Profile stats
   totalSharesMined: integer("total_shares_mined").notNull().default(0),
   totalMarketOrders: integer("total_market_orders").notNull().default(0),
@@ -347,6 +348,60 @@ export const marketSnapshots = pgTable("market_snapshots", {
   dateIdx: index("market_snapshots_date_idx").on(table.snapshotDate),
 }));
 
+// Bot profiles table - configuration for market maker bots
+export const botProfiles = pgTable("bot_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  botName: text("bot_name").notNull(), // Human-readable name like "MarketMaker_Alpha"
+  botRole: text("bot_role").notNull(), // "market_maker", "trader", "contest", "miner", "casual"
+  isActive: boolean("is_active").notNull().default(true), // Enable/disable this bot
+  // Trading configuration
+  aggressiveness: decimal("aggressiveness", { precision: 3, scale: 2 }).notNull().default("0.50"), // 0.0-1.0 scale
+  spreadPercent: decimal("spread_percent", { precision: 5, scale: 2 }).notNull().default("2.00"), // Bid/ask spread percentage
+  maxOrderSize: integer("max_order_size").notNull().default(100), // Maximum shares per order
+  minOrderSize: integer("min_order_size").notNull().default(5), // Minimum shares per order
+  maxDailyOrders: integer("max_daily_orders").notNull().default(50), // Daily order cap
+  maxDailyVolume: integer("max_daily_volume").notNull().default(1000), // Max shares traded per day
+  // Mining configuration
+  miningClaimThreshold: decimal("mining_claim_threshold", { precision: 3, scale: 2 }).notNull().default("0.85"), // Claim at 85% of cap
+  maxPlayersToMine: integer("max_players_to_mine").notNull().default(5), // Max players to split mining across
+  // Contest configuration
+  maxContestEntriesPerDay: integer("max_contest_entries_per_day").notNull().default(2),
+  contestEntryBudget: integer("contest_entry_budget").notNull().default(500), // Max shares per entry
+  // Timing configuration
+  minActionCooldownMs: integer("min_action_cooldown_ms").notNull().default(60000), // 1 minute minimum between actions
+  maxActionCooldownMs: integer("max_action_cooldown_ms").notNull().default(300000), // 5 minute max cooldown
+  activeHoursStart: integer("active_hours_start").notNull().default(8), // Start hour (0-23 UTC)
+  activeHoursEnd: integer("active_hours_end").notNull().default(23), // End hour (0-23 UTC)
+  // State tracking
+  lastActionAt: timestamp("last_action_at"),
+  ordersToday: integer("orders_today").notNull().default(0),
+  volumeToday: integer("volume_today").notNull().default(0),
+  contestEntriesToday: integer("contest_entries_today").notNull().default(0),
+  lastResetDate: timestamp("last_reset_date").notNull().defaultNow(), // Reset daily counters
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  roleIdx: index("bot_role_idx").on(table.botRole),
+  activeIdx: index("bot_active_idx").on(table.isActive),
+}));
+
+// Bot actions log table - audit trail of all bot actions
+export const botActionsLog = pgTable("bot_actions_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  botUserId: varchar("bot_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  actionType: text("action_type").notNull(), // "order_placed", "order_cancelled", "mining_claim", "contest_entry", "mining_selection"
+  actionDetails: jsonb("action_details").notNull(), // JSON with specific details (order ID, player ID, amounts, etc.)
+  triggerReason: text("trigger_reason").notNull(), // Why this action was taken
+  success: boolean("success").notNull().default(true),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  botUserIdx: index("bot_actions_user_idx").on(table.botUserId),
+  actionTypeIdx: index("bot_actions_type_idx").on(table.actionType),
+  createdAtIdx: index("bot_actions_created_idx").on(table.createdAt),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   holdings: many(holdings),
@@ -560,3 +615,27 @@ export const insertMarketSnapshotSchema = createInsertSchema(marketSnapshots).om
 
 export type MarketSnapshot = typeof marketSnapshots.$inferSelect;
 export type InsertMarketSnapshot = z.infer<typeof insertMarketSnapshotSchema>;
+
+// Bot profile schemas and types
+export const insertBotProfileSchema = createInsertSchema(botProfiles).omit({
+  id: true,
+  lastActionAt: true,
+  ordersToday: true,
+  volumeToday: true,
+  contestEntriesToday: true,
+  lastResetDate: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type BotProfile = typeof botProfiles.$inferSelect;
+export type InsertBotProfile = z.infer<typeof insertBotProfileSchema>;
+
+// Bot actions log schemas and types
+export const insertBotActionLogSchema = createInsertSchema(botActionsLog).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type BotActionLog = typeof botActionsLog.$inferSelect;
+export type InsertBotActionLog = z.infer<typeof insertBotActionLogSchema>;
