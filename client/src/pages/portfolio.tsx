@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import type { Holding, Order, Player } from "@shared/schema";
 import { PlayerName } from "@/components/player-name";
+import { Shimmer, ShimmerCard } from "@/components/ui/animations";
 
 interface PortfolioData {
   balance: string;
@@ -141,8 +142,17 @@ export default function Portfolio() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-muted-foreground">Loading portfolio...</div>
+      <div className="min-h-screen bg-background p-3 sm:p-4">
+        <div className="max-w-7xl mx-auto">
+          <Shimmer height="36px" width="150px" className="mb-6 hidden sm:block" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <ShimmerCard lines={2} />
+            <ShimmerCard lines={2} />
+            <ShimmerCard lines={2} />
+          </div>
+          <ShimmerCard lines={6} className="mb-4" />
+          <ShimmerCard lines={8} />
+        </div>
       </div>
     );
   }
@@ -567,8 +577,17 @@ function ActivityFeed() {
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="p-12 text-center text-muted-foreground">
-          Loading activity...
+        <CardContent className="p-4 space-y-3">
+          {[85, 75, 90, 70, 80].map((width, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <Shimmer width="40px" height="40px" className="rounded-full flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <Shimmer height="14px" width={`${width}%`} />
+                <Shimmer height="12px" width="120px" />
+              </div>
+              <Shimmer height="16px" width="60px" />
+            </div>
+          ))}
         </CardContent>
       </Card>
     );

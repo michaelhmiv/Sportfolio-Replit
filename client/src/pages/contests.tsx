@@ -10,6 +10,7 @@ import { Link } from "wouter";
 import { format } from "date-fns";
 import type { Contest, ContestEntry } from "@shared/schema";
 import { AdSenseAd } from "@/components/adsense-ad";
+import { ShimmerCard } from "@/components/ui/animations";
 
 interface ContestsData {
   contests: Contest[];
@@ -139,7 +140,11 @@ export default function Contests() {
         </div>
 
         {isLoading ? (
-          <div className="text-center py-6 text-muted-foreground">Loading contests...</div>
+          <div className="space-y-3 p-3 sm:p-0">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <ShimmerCard key={i} lines={4} />
+            ))}
+          </div>
         ) : contests.length === 0 ? (
           <Card>
             <CardContent className="py-6 text-center text-muted-foreground">

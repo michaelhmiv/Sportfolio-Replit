@@ -15,6 +15,7 @@ import type { Player } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { PlayerName } from "@/components/player-name";
 import { AdSenseAd } from "@/components/adsense-ad";
+import { Shimmer } from "@/components/ui/animations";
 
 type PlayerWithOrderBook = Player & {
   bestBid: string | null;
@@ -278,7 +279,22 @@ export default function Marketplace() {
           </CardHeader>
           <CardContent className="p-0">
             {isLoading ? (
-              <div className="p-8 text-center text-muted-foreground">Loading players...</div>
+              <div className="p-2">
+                {[75, 85, 65, 90, 70, 80, 60, 88].map((width, i) => (
+                  <div key={i} className="flex items-center gap-3 p-2 border-b last:border-0">
+                    <Shimmer width="32px" height="32px" className="rounded-full flex-shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <Shimmer height="16px" width={`${width}%`} />
+                      <Shimmer height="12px" width="100px" />
+                    </div>
+                    <div className="hidden sm:flex flex-col items-end gap-1">
+                      <Shimmer height="16px" width="60px" />
+                      <Shimmer height="12px" width="40px" />
+                    </div>
+                    <Shimmer height="32px" width="60px" className="rounded-md" />
+                  </div>
+                ))}
+              </div>
             ) : (
               <div>
                 <table className="w-full">

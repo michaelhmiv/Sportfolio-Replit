@@ -22,6 +22,7 @@ import { calculateVestingShares } from "@shared/vesting-utils";
 import { MarketActivityWidget } from "@/components/market-activity-widget";
 import { PlayerName } from "@/components/player-name";
 import { AdSenseAd } from "@/components/adsense-ad";
+import { Shimmer, ShimmerCard } from "@/components/ui/animations";
 
 interface DashboardData {
   user: {
@@ -464,8 +465,29 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-muted-foreground">Loading...</div>
+      <div className="min-h-screen bg-background p-3 sm:p-4">
+        <div className="mb-4">
+          <div className="flex flex-row justify-between gap-3">
+            <div className="flex-1">
+              <Shimmer height="14px" width="80px" className="mb-2" />
+              <Shimmer height="32px" width="120px" />
+            </div>
+            <div className="flex-1 flex flex-col items-end">
+              <Shimmer height="14px" width="100px" className="mb-2" />
+              <Shimmer height="32px" width="140px" />
+            </div>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+          <div className="lg:col-span-2 space-y-3">
+            <ShimmerCard lines={4} />
+            <ShimmerCard lines={6} />
+          </div>
+          <div className="space-y-3">
+            <ShimmerCard lines={3} />
+            <ShimmerCard lines={5} />
+          </div>
+        </div>
       </div>
     );
   }
