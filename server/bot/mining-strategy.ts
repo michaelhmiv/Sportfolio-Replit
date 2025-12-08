@@ -116,7 +116,8 @@ async function claimMiningShares(
         assetType: "player",
         assetId: playerId,
         quantity: sharesClaimed,
-        averageCost: "0.00",
+        avgCostBasis: "0.0000",
+        totalCostBasis: "0.00",
       });
     }
   }
@@ -181,18 +182,29 @@ async function updateMiningSplits(
 }
 
 /**
- * Initialize mining record for a bot
+ * Initialize mining record for a bot with a random player selected
  */
 async function initializeBotMining(userId: string): Promise<void> {
   const existing = await storage.getMining(userId);
   if (existing) return;
   
+  // Select a random player to mine
+  const candidates = await getMiningCandidates(20);
+  const selectedPlayerId = candidates.length > 0 
+    ? candidates[Math.floor(Math.random() * candidates.length)].playerId 
+    : null;
+  
   await db.insert(mining).values({
     userId,
+    playerId: selectedPlayerId,
     sharesAccumulated: 0,
     residualMs: 0,
     lastAccruedAt: new Date(),
   });
+  
+  if (selectedPlayerId) {
+    console.log(`[MiningBot] Initialized mining for user ${userId} with player ${selectedPlayerId}`);
+  }
 }
 
 /**
@@ -210,12 +222,26 @@ export async function executeMiningStrategy(
   };
   
   // Get current mining state
-  const miningState = await getBotMiningState(config.userId);
+  let miningState = await getBotMiningState(config.userId);
   
   if (!miningState) {
     console.log(`[MiningBot] ${profile.botName} has no mining record, initializing...`);
     await initializeBotMining(config.userId);
     return;
+  }
+  
+  // If no player is selected, select one now (fix for bots initialized without a player)
+  let currentPlayerId = miningState.playerId;
+  if (!currentPlayerId) {
+    const candidates = await getMiningCandidates(20);
+    if (candidates.length > 0) {
+      currentPlayerId = candidates[Math.floor(Math.random() * candidates.length)].playerId;
+      await db
+        .update(mining)
+        .set({ playerId: currentPlayerId, updatedAt: new Date() })
+        .where(eq(mining.id, miningState.id));
+      console.log(`[MiningBot] ${profile.botName} selected player ${currentPlayerId} for mining`);
+    }
   }
   
   // Calculate accrued shares
@@ -245,7 +271,7 @@ export async function executeMiningStrategy(
     
     const result = await claimMiningShares(
       miningState.id,
-      miningState.playerId,
+      currentPlayerId, // Use the updated playerId
       config.userId
     );
     

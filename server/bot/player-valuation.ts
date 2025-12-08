@@ -25,6 +25,8 @@ export interface PlayerValuation {
   avgFantasyPoints: number;
   gamesPlayed: number;
   recentFormFactor: number; // 1.0 = neutral, >1 = hot, <1 = cold
+  // Trading volume
+  volume24h: number;
   // Tier (1-5, where 1 is elite)
   tier: number;
   tierLabel: string;
@@ -203,6 +205,7 @@ export async function getAllPlayerValuations(): Promise<ValuationSummary> {
       avgFantasyPoints: parseFloat(v.avgFantasyPoints.toFixed(2)),
       gamesPlayed: v.gamesPlayed,
       recentFormFactor: parseFloat(v.recentFormFactor.toFixed(2)),
+      volume24h: v.player.volume24h || 0,
       tier,
       tierLabel,
       zScore: parseFloat(zScore.toFixed(2)),

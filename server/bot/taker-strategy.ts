@@ -106,8 +106,8 @@ async function findTakingOpportunities(
     const bestAsk = parseFloat(asks[0].limitPrice!);
     const spreadPercent = ((bestAsk - basePrice) / basePrice) * 100;
     
-    // Only take if spread is reasonable
-    if (spreadPercent <= config.spreadThreshold && bestAsk <= fairValue * 1.05) {
+    // Only take if spread is reasonable (widened tolerance for more trades)
+    if (spreadPercent <= config.spreadThreshold && bestAsk <= fairValue * 1.15) {
       const totalAvailable = asks.reduce((sum, o) => sum + (o.quantity - o.filledQuantity), 0);
       
       opportunities.push({
@@ -131,8 +131,8 @@ async function findTakingOpportunities(
     const bestBid = parseFloat(bids[0].limitPrice!);
     const spreadPercent = ((basePrice - bestBid) / basePrice) * 100;
     
-    // Only take if spread is reasonable
-    if (spreadPercent <= config.spreadThreshold && bestBid >= fairValue * 0.95) {
+    // Only take if spread is reasonable (widened tolerance for more trades)
+    if (spreadPercent <= config.spreadThreshold && bestBid >= fairValue * 0.85) {
       const totalAvailable = bids.reduce((sum, o) => sum + (o.quantity - o.filledQuantity), 0);
       
       opportunities.push({
@@ -374,7 +374,8 @@ export async function executeTakerStrategy(
     return;
   }
   
-  const candidates = await getMarketMakingCandidates(10);
+  // Fetch more candidates for better market coverage
+  const candidates = await getMarketMakingCandidates(50);
   
   if (candidates.length === 0) {
     console.log(`[Taker] ${profile.botName} no candidates found`);
@@ -384,7 +385,10 @@ export async function executeTakerStrategy(
   let totalTrades = 0;
   let totalVolume = 0;
   
-  const numToCheck = Math.max(1, Math.ceil(candidates.length * config.aggressiveness));
+  // Check more candidates for taking opportunities (10-30 based on aggressiveness)
+  const minToCheck = 5;
+  const maxToCheck = 20;
+  const numToCheck = Math.max(minToCheck, Math.ceil(Math.min(candidates.length, maxToCheck) * (0.5 + config.aggressiveness * 0.5)));
   const shuffled = candidates.sort(() => Math.random() - 0.5);
   const selected = shuffled.slice(0, numToCheck);
   
@@ -395,12 +399,15 @@ export async function executeTakerStrategy(
     const opportunities = await findTakingOpportunities(config, candidate);
     
     for (const opportunity of opportunities) {
-      if (Math.random() > config.aggressiveness) continue;
+      // More aggressive - only skip 30% of opportunities at high aggressiveness
+      const skipChance = 0.3 * (1 - config.aggressiveness);
+      if (Math.random() < skipChance) continue;
       
       const result = await executeTakerTrade(config, opportunity);
       totalTrades += result.tradesExecuted;
       totalVolume += result.volumeTraded;
       
+      // Continue to next player after one successful trade (don't break, trade more!)
       if (result.tradesExecuted > 0) break;
     }
   }

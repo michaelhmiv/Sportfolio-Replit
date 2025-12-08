@@ -4,10 +4,12 @@
 
 import { db } from "../db";
 import { orders, holdings, balanceLocks } from "@shared/schema";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, lt } from "drizzle-orm";
 import { storage } from "../storage";
 import { getMarketMakingCandidates, getEffectivePrice, type PlayerValuation } from "./player-valuation";
 import { logBotAction, updateBotCounters, type BotProfile } from "./bot-engine";
+
+const STALE_ORDER_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
 
 interface MarketMakerConfig {
   userId: string;
@@ -52,6 +54,47 @@ async function getAvailableBalance(userId: string): Promise<number> {
   
   const lockedBalance = await getLockedBalanceTotal(userId);
   return parseFloat(user.balance) - lockedBalance;
+}
+
+/**
+ * Cancel stale orders (older than threshold) to refresh the order book
+ */
+async function cancelStaleOrders(userId: string, botName: string): Promise<number> {
+  const staleThreshold = new Date(Date.now() - STALE_ORDER_THRESHOLD_MS);
+  
+  // Find stale open orders for this bot
+  const staleOrders = await db
+    .select()
+    .from(orders)
+    .where(and(
+      eq(orders.userId, userId),
+      eq(orders.status, "open"),
+      lt(orders.createdAt, staleThreshold)
+    ));
+  
+  if (staleOrders.length === 0) return 0;
+  
+  let cancelledCount = 0;
+  for (const order of staleOrders) {
+    try {
+      await storage.cancelOrder(order.id);
+      cancelledCount++;
+    } catch (error: any) {
+      console.error(`[MarketMaker] ${botName} failed to cancel stale order ${order.id}:`, error.message);
+    }
+  }
+  
+  if (cancelledCount > 0) {
+    console.log(`[MarketMaker] ${botName} cancelled ${cancelledCount} stale orders`);
+    await logBotAction(userId, {
+      actionType: "orders_cancelled",
+      actionDetails: { cancelledCount, threshold: "15 minutes" },
+      triggerReason: "Periodic order refresh - cancelling stale orders",
+      success: true,
+    });
+  }
+  
+  return cancelledCount;
 }
 
 /**
@@ -120,6 +163,44 @@ async function placeBotOrder(
 }
 
 /**
+ * Calculate dynamic spread based on player activity
+ * Lower volume players get tighter spreads to encourage trading
+ * Higher volume/volatile players get wider spreads for safety
+ */
+function calculateDynamicSpread(baseSpread: number, valuation: PlayerValuation): number {
+  const { volume24h, tier } = valuation;
+  
+  // Base spread adjustment based on 24h volume
+  // Low volume (< 100): reduce spread by up to 40%
+  // High volume (> 1000): increase spread by up to 20%
+  let volumeAdjustment = 1.0;
+  if (volume24h < 50) {
+    volumeAdjustment = 0.6; // Tighten spreads significantly for low-activity players
+  } else if (volume24h < 100) {
+    volumeAdjustment = 0.75;
+  } else if (volume24h < 500) {
+    volumeAdjustment = 0.9;
+  } else if (volume24h > 1000) {
+    volumeAdjustment = 1.1;
+  } else if (volume24h > 2000) {
+    volumeAdjustment = 1.2;
+  }
+  
+  // Tier adjustment: Lower tier (better) players may warrant tighter spreads
+  let tierAdjustment = 1.0;
+  if (tier <= 2) {
+    tierAdjustment = 0.9; // Tighter for star players
+  } else if (tier >= 4) {
+    tierAdjustment = 1.1; // Wider for lower-tier players
+  }
+  
+  const adjustedSpread = baseSpread * volumeAdjustment * tierAdjustment;
+  
+  // Clamp to reasonable bounds (0.5% to 10%)
+  return Math.max(0.5, Math.min(10, adjustedSpread));
+}
+
+/**
  * Execute market making strategy for a single player
  */
 async function makeMarketForPlayer(
@@ -131,8 +212,9 @@ async function makeMarketForPlayer(
   // Use last trade price if available, otherwise fair value
   const basePrice = lastTradePrice ?? fairValue;
   
-  // Calculate spread
-  const spreadMultiplier = config.spreadPercent / 100;
+  // Calculate dynamic spread based on player activity
+  const dynamicSpreadPercent = calculateDynamicSpread(config.spreadPercent, valuation);
+  const spreadMultiplier = dynamicSpreadPercent / 100;
   const halfSpread = basePrice * (spreadMultiplier / 2);
   
   const bidPrice = parseFloat((basePrice - halfSpread).toFixed(2));
@@ -168,7 +250,9 @@ async function makeMarketForPlayer(
           quantity: buySize,
           price: bidPrice,
           fairValue,
-          spread: config.spreadPercent,
+          baseSpread: config.spreadPercent,
+          dynamicSpread: dynamicSpreadPercent,
+          volume24h: valuation.volume24h,
         },
         triggerReason: "Market making - bid placement",
         success: true,
@@ -194,7 +278,9 @@ async function makeMarketForPlayer(
           quantity: sellSize,
           price: askPrice,
           fairValue,
-          spread: config.spreadPercent,
+          baseSpread: config.spreadPercent,
+          dynamicSpread: dynamicSpreadPercent,
+          volume24h: valuation.volume24h,
         },
         triggerReason: "Market making - ask placement",
         success: true,
@@ -225,6 +311,9 @@ export async function executeMarketMakerStrategy(
     profileId: profile.id,
   };
   
+  // Cancel stale orders first to refresh the order book and free up locked capital
+  await cancelStaleOrders(config.userId, profile.botName);
+  
   // Check if we've hit daily limits
   if (config.ordersToday >= config.maxDailyOrders) {
     console.log(`[MarketMaker] ${profile.botName} hit daily order limit`);
@@ -243,16 +332,19 @@ export async function executeMarketMakerStrategy(
     ? profileTiers 
     : undefined; // undefined = all tiers
   
-  // Get candidate players for market making - fetch 30 candidates for better coverage
-  const candidates = await getMarketMakingCandidates(30, targetTiers);
+  // Get candidate players for market making - fetch 100 candidates for full market coverage
+  const candidates = await getMarketMakingCandidates(100, targetTiers);
   
   if (candidates.length === 0) {
     console.log(`[MarketMaker] ${profile.botName} no candidates found (tiers: ${targetTiers?.join(',') || 'all'})`);
     return;
   }
   
-  // Pick random candidates based on aggressiveness - select from larger pool for diversity
-  const numToTrade = Math.max(1, Math.floor(Math.min(candidates.length, 10) * config.aggressiveness));
+  // Pick more candidates for better market coverage (15-30 based on aggressiveness)
+  // Higher aggressiveness = more players covered per tick
+  const minPlayers = 5;
+  const maxPlayers = 20;
+  const numToTrade = Math.max(minPlayers, Math.floor(Math.min(candidates.length, maxPlayers) * (0.5 + config.aggressiveness * 0.5)));
   const shuffled = candidates.sort(() => Math.random() - 0.5);
   const selected = shuffled.slice(0, numToTrade);
   

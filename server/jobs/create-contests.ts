@@ -116,21 +116,27 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
     // Create contests for each game day
     for (const [dateStr, gameDay] of Array.from(gameDays.entries())) {
       try {
-        // Check if a contest already exists for this date using database query (prevents race conditions)
+        // Check if a contest already exists for this date using starts_at date (not game_date)
+        // This ensures one contest per calendar day based on when games actually start
         const existingContests = await storage.getContests();
+        
+        // Calculate what starts_at would be for this contest (earliest game time)
+        const proposedStartsAt = new Date(gameDay.date);
+        const proposedStartsAtDateStr = proposedStartsAt.toISOString().split('T')[0];
+        
         const contestExists = existingContests.some(c => {
-          const contestDate = new Date(c.gameDate);
-          const contestDateStr = contestDate.toISOString().split('T')[0];
-          return contestDateStr === dateStr && (c.status === "open" || c.status === "live");
+          const startsAtDate = new Date(c.startsAt);
+          const startsAtDateStr = startsAtDate.toISOString().split('T')[0];
+          return startsAtDateStr === proposedStartsAtDateStr && (c.status === "open" || c.status === "live");
         });
 
         if (contestExists) {
-          console.log(`[create_contests] Contest already exists for ${dateStr}, skipping...`);
+          console.log(`[create_contests] Contest already exists for starts_at date ${proposedStartsAtDateStr} (game day ${dateStr}), skipping...`);
           
           progressCallback?.({
             type: 'debug',
             timestamp: new Date().toISOString(),
-            message: `Contest already exists for ${dateStr}, skipping`,
+            message: `Contest already exists for starts_at date ${proposedStartsAtDateStr}, skipping`,
           });
           
           continue;
