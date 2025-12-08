@@ -360,8 +360,9 @@ export async function executeTakerStrategy(
     aggressiveness: parseFloat(profile.aggressiveness),
     balance: parseFloat(profile.user.balance),
     profileId: profile.id,
-    // Spread threshold based on aggressiveness
-    spreadThreshold: 2 + (parseFloat(profile.aggressiveness) * 5),
+    // Spread threshold based on aggressiveness (higher threshold = more willing to take)
+    // Base 5% + up to 10% for aggressive bots = max 15% tolerance
+    spreadThreshold: 5 + (parseFloat(profile.aggressiveness) * 10),
   };
   
   if (config.ordersToday >= config.maxDailyOrders) {
