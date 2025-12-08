@@ -2,6 +2,9 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { jobScheduler } from "./jobs/scheduler.js";
+import { db } from "./db";
+import { botProfiles } from "@shared/schema";
+import { sql } from "drizzle-orm";
 
 const app = express();
 
@@ -78,6 +81,19 @@ app.use((req, res, next) => {
     reusePort: true,
   }, async () => {
     log(`serving on port ${port}`);
+    
+    // Startup migration: Ensure all bot profiles have unlimited daily limits
+    try {
+      await db
+        .update(botProfiles)
+        .set({
+          maxDailyOrders: 999999,
+          maxDailyVolume: 999999,
+        });
+      log("Bot profiles updated with unlimited daily limits");
+    } catch (error: any) {
+      console.error("Failed to update bot profiles:", error.message);
+    }
     
     // Always initialize contest jobs (database-only, no API required)
     try {

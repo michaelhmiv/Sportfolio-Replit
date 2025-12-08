@@ -61,11 +61,10 @@ export async function logBotAction(
 
 /**
  * Check if it's currently within a bot's active hours
+ * NOTE: Disabled - bots now run 24/7 per user request
  */
 function isWithinActiveHours(profile: BotProfile): boolean {
-  const now = new Date();
-  const currentHour = now.getUTCHours();
-  return currentHour >= profile.activeHoursStart && currentHour < profile.activeHoursEnd;
+  return true; // Bots run 24/7
 }
 
 /**
