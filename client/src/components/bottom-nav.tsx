@@ -107,10 +107,11 @@ export function BottomNav() {
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                    className="absolute top-1 right-2 z-[51]"
                   >
                     <Badge 
                       variant="default" 
-                      className="absolute top-1 right-2 min-w-5 h-5 flex items-center justify-center px-1.5 text-xs"
+                      className="min-w-5 h-5 flex items-center justify-center px-1.5 text-xs"
                       data-testid="badge-notification-count-mobile"
                     >
                       {unreadCount}
