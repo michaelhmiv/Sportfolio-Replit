@@ -477,14 +477,14 @@ export default function Portfolio() {
                             <span className="flex items-center justify-end">Price<SortIcon field="price" /></span>
                           </th>
                           <th 
-                            className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell cursor-pointer hover:text-foreground select-none"
+                            className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden sm:table-cell cursor-pointer hover:text-foreground select-none"
                             onClick={() => handleSort('bid')}
                             data-testid="th-sort-bid"
                           >
                             <span className="flex items-center justify-end">Bid<SortIcon field="bid" /></span>
                           </th>
                           <th 
-                            className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell cursor-pointer hover:text-foreground select-none"
+                            className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden sm:table-cell cursor-pointer hover:text-foreground select-none"
                             onClick={() => handleSort('ask')}
                             data-testid="th-sort-ask"
                           >
@@ -504,14 +504,13 @@ export default function Portfolio() {
                           >
                             <span className="flex items-center justify-end">P&L<SortIcon field="pnl" /></span>
                           </th>
-                          <th className="px-2 py-1.5"></th>
                         </tr>
                       </thead>
                       <tbody>
                       {(data?.premiumShares ?? 0) > 0 && (
                         <tr className="border-b hover-elevate" data-testid="row-premium-shares">
                           {/* Mobile layout */}
-                          <td className="px-2 py-2 sm:hidden" colSpan={9}>
+                          <td className="px-2 py-2 sm:hidden" colSpan={8}>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 min-w-0 flex-1">
                                 <Crown className="w-8 h-8 text-primary flex-shrink-0" />
@@ -544,11 +543,10 @@ export default function Portfolio() {
                           <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">{data.premiumShares}</td>
                           <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">-</td>
                           <td className="px-2 py-1.5 text-right font-mono hidden md:table-cell">-</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden lg:table-cell">-</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden lg:table-cell">-</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden xl:table-cell">-</td>
                           <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">-</td>
-                          <td className="px-2 py-1.5 hidden sm:table-cell">
+                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">-</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden xl:table-cell">-</td>
+                          <td className="px-2 py-1.5 text-right hidden sm:table-cell">
                             <Button
                               size="sm"
                               onClick={() => redeemPremiumMutation.mutate()}
@@ -563,7 +561,7 @@ export default function Portfolio() {
                       {sortedHoldings.map((holding) => (
                         <tr key={holding.id} className="border-b last:border-0 hover-elevate" data-testid={`row-holding-${holding.player?.id}`}>
                           {/* Mobile layout - stacked info matching marketplace */}
-                          <td className="px-2 py-2 sm:hidden" colSpan={9}>
+                          <td className="px-2 py-2 sm:hidden" colSpan={8}>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 min-w-0 flex-1">
                                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -628,9 +626,6 @@ export default function Portfolio() {
                                   </div>
                                 </div>
                               </div>
-                              <Link href={`/player/${holding.player?.id}`}>
-                                <Button size="sm" data-testid={`button-trade-${holding.player?.id}`}>Trade</Button>
-                              </Link>
                             </div>
                           </td>
 
@@ -670,7 +665,7 @@ export default function Portfolio() {
                             )}
                           </td>
                           {/* Bid - clicking sells at this price */}
-                          <td className="px-2 py-1.5 text-right hidden lg:table-cell">
+                          <td className="px-2 py-1.5 text-right hidden sm:table-cell">
                             {holding.bestBid ? (
                               <Link href={`/player/${holding.player?.id}?action=sell&price=${holding.bestBid}`}>
                                 <span 
@@ -686,7 +681,7 @@ export default function Portfolio() {
                             )}
                           </td>
                           {/* Ask - clicking buys at this price */}
-                          <td className="px-2 py-1.5 text-right hidden lg:table-cell">
+                          <td className="px-2 py-1.5 text-right hidden sm:table-cell">
                             {holding.bestAsk ? (
                               <Link href={`/player/${holding.player?.id}?action=buy&price=${holding.bestAsk}`}>
                                 <span 
@@ -717,11 +712,6 @@ export default function Portfolio() {
                             ) : (
                               <span className="text-muted-foreground text-xs">-</span>
                             )}
-                          </td>
-                          <td className="px-2 py-1.5 hidden sm:table-cell">
-                            <Link href={`/player/${holding.player?.id}`}>
-                              <Button size="sm" data-testid={`button-trade-desktop-${holding.player?.id}`}>Trade</Button>
-                            </Link>
                           </td>
                         </tr>
                       ))}
