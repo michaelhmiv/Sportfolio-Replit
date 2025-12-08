@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams } from "wouter";
+import { useParams, useSearch } from "wouter";
 import { useWebSocket } from "@/lib/websocket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ type TimeRange = "1D" | "1W" | "1M" | "1Y";
 
 export default function PlayerPage() {
   const { id } = useParams<{ id: string }>();
+  const searchString = useSearch();
   const { toast } = useToast();
   const { subscribe } = useWebSocket();
   const [orderType, setOrderType] = useState<"limit" | "market">("limit");
@@ -42,10 +43,35 @@ export default function PlayerPage() {
   const [limitPrice, setLimitPrice] = useState("");
   const [timeRange, setTimeRange] = useState<TimeRange>("1D");
   const [celebrationKey, setCelebrationKey] = useState(0);
+  const [hasAppliedUrlParams, setHasAppliedUrlParams] = useState(false);
 
   const { data, isLoading } = useQuery<PlayerPageData>({
     queryKey: ["/api/player", id],
   });
+
+  // Read URL query parameters to pre-fill order form (from portfolio bid/ask clicks)
+  useEffect(() => {
+    if (hasAppliedUrlParams) return;
+    
+    const params = new URLSearchParams(searchString);
+    const actionParam = params.get("action");
+    const priceParam = params.get("price");
+    
+    if (actionParam && priceParam) {
+      if (actionParam === "buy" || actionParam === "sell") {
+        setSide(actionParam);
+        setOrderType("limit");
+        setLimitPrice(priceParam);
+        setHasAppliedUrlParams(true);
+        
+        toast({
+          title: "Order form pre-filled",
+          description: `Set to ${actionParam.toUpperCase()} at $${priceParam}. Enter quantity to complete.`,
+          duration: 4000
+        });
+      }
+    }
+  }, [searchString, hasAppliedUrlParams, toast]);
 
   // Fetch contest performance data
   const { data: contestData } = useQuery<{

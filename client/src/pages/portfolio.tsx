@@ -24,7 +24,16 @@ interface PortfolioData {
   portfolioValue: string;
   totalPnL: string;
   totalPnLPercent: string;
-  holdings: (Holding & { player?: Player; currentValue: string; pnl: string; pnlPercent: string })[];
+  holdings: (Holding & { 
+    player?: Player; 
+    currentValue: string; 
+    pnl: string; 
+    pnlPercent: string;
+    bestBid?: string | null;
+    bestAsk?: string | null;
+    bidSize?: number;
+    askSize?: number;
+  })[];
   openOrders: (Order & { player: Player })[];
   premiumShares: number;
   isPremium: boolean;
@@ -337,7 +346,9 @@ export default function Portfolio() {
                           <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
                           <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Avg Cost</th>
                           <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Current Price</th>
-                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Market Value</th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Bid</th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Ask</th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden xl:table-cell">Market Value</th>
                           <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">P&L</th>
                           <th className="px-2 py-1.5"></th>
                         </tr>
@@ -346,7 +357,7 @@ export default function Portfolio() {
                       {(data?.premiumShares ?? 0) > 0 && (
                         <tr className="border-b hover-elevate" data-testid="row-premium-shares">
                           {/* Mobile layout */}
-                          <td className="px-2 py-2 sm:hidden" colSpan={7}>
+                          <td className="px-2 py-2 sm:hidden" colSpan={9}>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 min-w-0 flex-1">
                                 <Crown className="w-8 h-8 text-primary flex-shrink-0" />
@@ -380,6 +391,8 @@ export default function Portfolio() {
                           <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">-</td>
                           <td className="px-2 py-1.5 text-right font-mono hidden md:table-cell">-</td>
                           <td className="px-2 py-1.5 text-right font-mono hidden lg:table-cell">-</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden lg:table-cell">-</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden xl:table-cell">-</td>
                           <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">-</td>
                           <td className="px-2 py-1.5 hidden sm:table-cell">
                             <Button
@@ -396,7 +409,7 @@ export default function Portfolio() {
                       {data?.holdings.filter(h => h.assetType === "player").map((holding) => (
                         <tr key={holding.id} className="border-b last:border-0 hover-elevate" data-testid={`row-holding-${holding.player?.id}`}>
                           {/* Mobile layout - stacked info matching marketplace */}
-                          <td className="px-2 py-2 sm:hidden" colSpan={7}>
+                          <td className="px-2 py-2 sm:hidden" colSpan={9}>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 min-w-0 flex-1">
                                 <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
@@ -439,6 +452,24 @@ export default function Portfolio() {
                                           {parseFloat(holding.pnl) >= 0 ? '+' : ''}${holding.pnl} ({parseFloat(holding.pnlPercent) >= 0 ? '+' : ''}{holding.pnlPercent}%)
                                         </span>
                                       </>
+                                    )}
+                                  </div>
+                                  {/* Mobile bid/ask row */}
+                                  <div className="flex items-center gap-2 text-xs mt-1">
+                                    {holding.bestBid && (
+                                      <Link href={`/player/${holding.player?.id}?action=sell&price=${holding.bestBid}`}>
+                                        <span className="text-positive hover:underline cursor-pointer font-mono" data-testid={`link-bid-mobile-${holding.player?.id}`}>
+                                          Bid: ${holding.bestBid}
+                                        </span>
+                                      </Link>
+                                    )}
+                                    {holding.bestBid && holding.bestAsk && <span className="text-muted-foreground">|</span>}
+                                    {holding.bestAsk && (
+                                      <Link href={`/player/${holding.player?.id}?action=buy&price=${holding.bestAsk}`}>
+                                        <span className="text-negative hover:underline cursor-pointer font-mono" data-testid={`link-ask-mobile-${holding.player?.id}`}>
+                                          Ask: ${holding.bestAsk}
+                                        </span>
+                                      </Link>
                                     )}
                                   </div>
                                 </div>
@@ -484,7 +515,39 @@ export default function Portfolio() {
                               <span className="text-muted-foreground text-xs">-</span>
                             )}
                           </td>
-                          <td className="px-2 py-1.5 text-right font-mono font-bold text-sm hidden lg:table-cell">
+                          {/* Bid - clicking sells at this price */}
+                          <td className="px-2 py-1.5 text-right hidden lg:table-cell">
+                            {holding.bestBid ? (
+                              <Link href={`/player/${holding.player?.id}?action=sell&price=${holding.bestBid}`}>
+                                <span 
+                                  className="font-mono text-sm text-positive hover:underline cursor-pointer"
+                                  data-testid={`link-bid-${holding.player?.id}`}
+                                  title={`Sell at $${holding.bestBid} (${holding.bidSize} shares)`}
+                                >
+                                  ${holding.bestBid}
+                                </span>
+                              </Link>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
+                          </td>
+                          {/* Ask - clicking buys at this price */}
+                          <td className="px-2 py-1.5 text-right hidden lg:table-cell">
+                            {holding.bestAsk ? (
+                              <Link href={`/player/${holding.player?.id}?action=buy&price=${holding.bestAsk}`}>
+                                <span 
+                                  className="font-mono text-sm text-negative hover:underline cursor-pointer"
+                                  data-testid={`link-ask-${holding.player?.id}`}
+                                  title={`Buy at $${holding.bestAsk} (${holding.askSize} shares)`}
+                                >
+                                  ${holding.bestAsk}
+                                </span>
+                              </Link>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">-</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono font-bold text-sm hidden xl:table-cell">
                             {holding.currentValue !== null ? `$${holding.currentValue}` : <span className="text-muted-foreground text-xs">-</span>}
                           </td>
                           <td className="px-2 py-1.5 text-right hidden sm:table-cell">

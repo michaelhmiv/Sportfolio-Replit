@@ -1547,6 +1547,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : [];
       const orderPlayersMap = new Map(orderPlayers.map(p => [p.id, p]));
 
+      // Batch fetch bid/ask data for all player holdings
+      const playerHoldingIds = holdingsWithData
+        .filter((item: any) => item.holding.assetType === "player" && item.player)
+        .map((item: any) => item.player.id.toString());
+      const orderBooksMap = playerHoldingIds.length > 0
+        ? await storage.getBatchOrderBooks(playerHoldingIds)
+        : new Map();
+
       const enrichedHoldings = holdingsWithData.map((item: any) => {
         const holding = item.holding;
         const player = item.player;
@@ -1566,6 +1574,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalCost += parseFloat(holding.totalCostBasis);
           }
 
+          // Get bid/ask data for this player
+          const orderBookData = orderBooksMap.get(player.id.toString());
+          const bestBid = orderBookData?.bestBid || null;
+          const bestAsk = orderBookData?.bestAsk || null;
+          const bidSize = orderBookData?.bidSize || 0;
+          const askSize = orderBookData?.askSize || 0;
+
           return { 
             ...holding, 
             player, 
@@ -1573,7 +1588,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             pnl, 
             pnlPercent,
             lockedQuantity,
-            availableQuantity: Math.max(0, holding.quantity - lockedQuantity)
+            availableQuantity: Math.max(0, holding.quantity - lockedQuantity),
+            bestBid,
+            bestAsk,
+            bidSize,
+            askSize
           };
         }
         return holding;
