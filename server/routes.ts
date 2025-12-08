@@ -261,6 +261,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
 
+  // Ezoic ads.txt redirect
+  app.get("/ads.txt", (_req, res) => {
+    res.redirect(301, "https://srv.adstxtmanager.com/19390/sportfolio.market");
+  });
+
   // SEO: Dynamic Sitemap XML
   app.get("/sitemap.xml", async (_req, res) => {
     try {
