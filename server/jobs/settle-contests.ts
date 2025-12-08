@@ -11,6 +11,7 @@
 
 import { storage } from "../storage";
 import { settleContest } from "../contest-scoring";
+import { broadcast } from "../websocket";
 import type { JobResult } from "./scheduler";
 import type { ProgressCallback } from "../lib/admin-stream";
 import { getGameDay, getETDayBoundaries } from "../lib/time";
@@ -218,6 +219,9 @@ export async function settleContests(progressCallback?: ProgressCallback): Promi
         await settleContest(contest.id);
         contestsProcessed++;
         console.log(`[settle_contests] ✓ Contest ${contest.id} settled successfully`);
+        
+        // Broadcast settlement notification to all connected users
+        broadcast({ type: "contestSettled", contestId: contest.id });
         
         progressCallback?.({
           type: 'info',

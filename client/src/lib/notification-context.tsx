@@ -26,17 +26,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Only increment for background events (not user-initiated actions)
     
-    // 1. Trade executions (your limit order matched)
+    // 1. Trade executions (your limit order matched - market order fills)
     const unsubTrade = subscribe('trade', () => {
       setUnreadCount(prev => prev + 1);
     });
 
-    // 2. Contest settlements (you won/placed)
-    const unsubContestUpdate = subscribe('contestUpdate', (data) => {
-      // Only notify on settlement/payout events
-      if (data?.type === 'settled' || data?.type === 'payout') {
-        setUnreadCount(prev => prev + 1);
-      }
+    // 2. Contest settlements (you won/placed in a contest)
+    const unsubContestUpdate = subscribe('contestSettled', () => {
+      setUnreadCount(prev => prev + 1);
     });
 
     return () => {
