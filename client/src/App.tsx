@@ -219,8 +219,8 @@ function Header() {
           <SidebarTrigger data-testid="button-sidebar-toggle" />
         </div>
         <div className="flex items-center gap-2">
-          <img src={logoUrl} alt="Sportfolio" className="w-8 h-8" />
-          <span className="text-lg font-bold text-primary">
+          <img src={logoUrl} alt="Sportfolio" className="w-10 h-10" />
+          <span className="text-xl font-extrabold tracking-tight text-primary">
             Sportfolio
           </span>
         </div>

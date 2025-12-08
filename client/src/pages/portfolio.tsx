@@ -2,6 +2,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useWebSocket } from "@/lib/websocket";
 import { useNotifications } from "@/lib/notification-context";
+import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -91,7 +92,7 @@ const SORT_OPTIONS: { value: SortField; label: string }[] = [
 export default function Portfolio() {
   const { toast } = useToast();
   const { subscribe } = useWebSocket();
-  const { clearUnread } = useNotifications();
+  const { unreadCount, clearUnread } = useNotifications();
   const [activeTab, setActiveTab] = useState("holdings");
   const [chartTimeRange, setChartTimeRange] = useState("1M");
   const [sortField, setSortField] = useState<SortField>('value');
@@ -401,7 +402,32 @@ export default function Portfolio() {
           <TabsList>
             <TabsTrigger value="holdings" data-testid="tab-holdings">Holdings</TabsTrigger>
             <TabsTrigger value="orders" data-testid="tab-open-orders">Open Orders</TabsTrigger>
-            <TabsTrigger value="activity" data-testid="tab-activity">Activity</TabsTrigger>
+            <TabsTrigger 
+              value="activity" 
+              data-testid="tab-activity"
+              className={unreadCount > 0 ? "relative ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}
+            >
+              <span className="flex items-center gap-1.5">
+                Activity
+                <AnimatePresence>
+                  {unreadCount > 0 && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      exit={{ scale: 0 }}
+                    >
+                      <Badge 
+                        variant="default" 
+                        className="min-w-5 h-5 flex items-center justify-center px-1.5 text-xs font-bold"
+                        data-testid="badge-activity-count"
+                      >
+                        {unreadCount}
+                      </Badge>
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </span>
+            </TabsTrigger>
           </TabsList>
 
           {/* Holdings */}
