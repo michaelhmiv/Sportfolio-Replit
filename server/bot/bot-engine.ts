@@ -196,64 +196,61 @@ async function getActiveBots(): Promise<Array<BotProfile & { user: typeof users.
 }
 
 /**
- * Execute strategies based on bot role - lazy import to avoid circular deps
+ * Execute ALL strategies for every bot - mining, trading, and contests
+ * Each bot's individual settings (aggressiveness, limits, budgets) determine their behavior
+ * The bot_role field now acts as a "persona" hint but doesn't gate any strategies
  */
 async function executeBotStrategies(
   profile: BotProfile & { user: typeof users.$inferSelect }
 ): Promise<void> {
-  const role = profile.botRole;
-  
   // Lazy imports to avoid circular dependency issues
   const { executeMarketMakerStrategy } = await import("./market-maker-strategy");
   const { executeMiningStrategy } = await import("./mining-strategy");
   const { executeContestStrategy } = await import("./contest-strategy");
+  const { executeTakerStrategy } = await import("./taker-strategy");
+  
+  const strategiesExecuted: string[] = [];
   
   try {
-    // All bots can do mining
+    // 1. MINING - All bots mine to accumulate shares
+    // Uses: maxPlayersToMine, miningClaimThreshold
     await executeMiningStrategy(profile);
+    strategiesExecuted.push("mining");
     
-    // Role-specific actions
-    switch (role) {
-      case "market_maker":
-        await executeMarketMakerStrategy(profile);
-        break;
-      
-      case "trader":
-        // Traders also use market maker strategy but less aggressively
-        await executeMarketMakerStrategy(profile);
-        break;
-      
-      case "contest":
-        await executeContestStrategy(profile);
-        break;
-      
-      case "miner":
-        // Already handled mining above
-        break;
-      
-      case "taker":
-        const { executeTakerStrategy } = await import("./taker-strategy");
-        await executeTakerStrategy(profile);
-        break;
-      
-      case "casual":
-        // Casual bots do a mix with low frequency
-        if (Math.random() < 0.3) {
-          await executeMarketMakerStrategy(profile);
-        }
-        if (Math.random() < 0.2) {
-          await executeContestStrategy(profile);
-        }
-        break;
-      
-      default:
-        console.log(`[BotEngine] Unknown role: ${role} for bot ${profile.botName}`);
+    // 2. TRADING - All bots can place orders in the marketplace
+    // Uses: maxDailyOrders, maxDailyVolume, maxOrderSize, minOrderSize, spreadPercent, aggressiveness
+    // Check if bot has trading budget remaining
+    if (profile.ordersToday < profile.maxDailyOrders) {
+      await executeMarketMakerStrategy(profile);
+      strategiesExecuted.push("trading");
     }
+    
+    // 3. TAKER - Additional taker strategy for aggressive market orders
+    // Uses aggressiveness to determine if it should take orders
+    if (parseFloat(profile.aggressiveness) > 0.5 && Math.random() < 0.3) {
+      await executeTakerStrategy(profile);
+      strategiesExecuted.push("taker");
+    }
+    
+    // 4. CONTESTS - All bots can enter contests
+    // Uses: maxContestEntriesPerDay, contestEntryBudget, aggressiveness
+    // Check if bot has contest entries remaining
+    if (profile.contestEntriesToday < profile.maxContestEntriesPerDay) {
+      await executeContestStrategy(profile);
+      strategiesExecuted.push("contests");
+    }
+    
+    console.log(`[BotEngine] ${profile.botName} executed: [${strategiesExecuted.join(", ")}]`);
+    
   } catch (error: any) {
     console.error(`[BotEngine] Error executing strategies for ${profile.botName}:`, error.message);
     await logBotAction(profile.userId, {
       actionType: "strategy_error",
-      actionDetails: { role, error: error.message },
+      actionDetails: { 
+        persona: profile.botRole, 
+        strategiesAttempted: strategiesExecuted,
+        error: error.message 
+      },
       triggerReason: "Strategy execution failed",
       success: false,
       errorMessage: error.message,
