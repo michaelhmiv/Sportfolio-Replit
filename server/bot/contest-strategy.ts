@@ -9,8 +9,9 @@ import { storage } from "../storage";
 import { getPlayersForTrading, type PlayerValuation } from "./player-valuation";
 import { logBotAction, updateContestEntries, type BotProfile } from "./bot-engine";
 
-// Contest lineup constraints - relaxed for bot participation
-// Bots can enter with as few as 1 player to ensure contests have liquidity
+// Contest lineup constraints - aligned with human entry validation
+// NOTE: Human entries also don't require specific positions - only share availability is validated
+// See server/routes.ts POST /api/contest/:id/enter for human validation (no positional requirements)
 const LINEUP_POSITIONS = {
   PG: 1,
   SG: 1,
@@ -21,7 +22,8 @@ const LINEUP_POSITIONS = {
 };
 const MAX_PLAYERS_PER_TEAM = 4; // Relaxed from 2 for bots with limited holdings
 const MAX_HOLDINGS_PERCENT_PER_PLAYER = 0.6; // 60% of holdings per player (relaxed from 40%)
-const MIN_LINEUP_SIZE = 1; // Minimum players needed for a valid bot lineup
+const MIN_LINEUP_SIZE = 1; // Minimum players needed for a valid lineup (same as human minimum)
+const MIN_TOTAL_SHARES = 10; // Minimum total shares to ensure meaningful participation
 
 interface ContestConfig {
   userId: string;
@@ -148,6 +150,12 @@ async function enterContest(
   try {
     // Calculate total shares
     const totalShares = lineup.reduce((sum, p) => sum + p.sharesEntered, 0);
+    
+    // Validate minimum shares to prevent zero-participation entries
+    if (totalShares < MIN_TOTAL_SHARES) {
+      console.log(`[ContestBot] Entry rejected: totalShares=${totalShares} < min=${MIN_TOTAL_SHARES}`);
+      return false;
+    }
     
     // Create contest entry
     const [entry] = await db
