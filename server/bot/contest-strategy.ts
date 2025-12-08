@@ -9,7 +9,8 @@ import { storage } from "../storage";
 import { getPlayersForTrading, type PlayerValuation } from "./player-valuation";
 import { logBotAction, updateContestEntries, type BotProfile } from "./bot-engine";
 
-// Contest lineup constraints
+// Contest lineup constraints - relaxed for bot participation
+// Bots can enter with as few as 1 player to ensure contests have liquidity
 const LINEUP_POSITIONS = {
   PG: 1,
   SG: 1,
@@ -18,8 +19,9 @@ const LINEUP_POSITIONS = {
   C: 1,
   FLEX: 2, // Any position
 };
-const MAX_PLAYERS_PER_TEAM = 2;
-const MAX_HOLDINGS_PERCENT_PER_PLAYER = 0.4; // 40% of holdings per player
+const MAX_PLAYERS_PER_TEAM = 4; // Relaxed from 2 for bots with limited holdings
+const MAX_HOLDINGS_PERCENT_PER_PLAYER = 0.6; // 60% of holdings per player (relaxed from 40%)
+const MIN_LINEUP_SIZE = 1; // Minimum players needed for a valid bot lineup
 
 interface ContestConfig {
   userId: string;
@@ -78,6 +80,7 @@ async function hasEnteredContest(userId: string, contestId: string): Promise<boo
 
 /**
  * Build a valid lineup from available holdings
+ * Uses a flex-first approach to maximize participation even with limited holdings
  */
 function buildLineup(
   candidates: PlayerValuation[],
@@ -86,74 +89,46 @@ function buildLineup(
 ): LineupPlayer[] {
   const lineup: LineupPlayer[] = [];
   const teamCounts = new Map<string, number>();
-  const positionsFilled = {
-    PG: 0,
-    SG: 0,
-    SF: 0,
-    PF: 0,
-    C: 0,
-    FLEX: 0,
-  };
   
   let sharesUsed = 0;
   
-  // Sort candidates by tier (prefer better players)
+  // Sort candidates by tier (prefer better players), then by fair value
   const sortedCandidates = [...candidates].sort((a, b) => {
     if (a.tier !== b.tier) return a.tier - b.tier;
     return b.fairValue - a.fairValue;
   });
   
+  // FLEX-FIRST approach: Just add any players the bot holds, up to 7
   for (const candidate of sortedCandidates) {
     const heldShares = holdingsMap.get(candidate.playerId) || 0;
     if (heldShares <= 0) continue;
     
-    // Check team constraint
+    // Check team constraint (relaxed)
     const teamCount = teamCounts.get(candidate.team) || 0;
     if (teamCount >= MAX_PLAYERS_PER_TEAM) continue;
     
-    // Determine position to fill
-    const position = candidate.position.toUpperCase();
-    let slotToFill: keyof typeof positionsFilled | null = null;
-    
-    if (position === "PG" && positionsFilled.PG < LINEUP_POSITIONS.PG) {
-      slotToFill = "PG";
-    } else if (position === "SG" && positionsFilled.SG < LINEUP_POSITIONS.SG) {
-      slotToFill = "SG";
-    } else if (position === "SF" && positionsFilled.SF < LINEUP_POSITIONS.SF) {
-      slotToFill = "SF";
-    } else if (position === "PF" && positionsFilled.PF < LINEUP_POSITIONS.PF) {
-      slotToFill = "PF";
-    } else if (position === "C" && positionsFilled.C < LINEUP_POSITIONS.C) {
-      slotToFill = "C";
-    } else if (positionsFilled.FLEX < LINEUP_POSITIONS.FLEX) {
-      slotToFill = "FLEX";
-    }
-    
-    if (!slotToFill) continue;
-    
-    // Calculate shares to enter (40% max of holdings, within budget)
+    // Calculate shares to enter (60% max of holdings, within budget)
     const maxFromHoldings = Math.floor(heldShares * MAX_HOLDINGS_PERCENT_PER_PLAYER);
     const remainingBudget = budget - sharesUsed;
-    const sharesToEnter = Math.min(maxFromHoldings, remainingBudget, 100); // Cap at 100 per player
+    const sharesToEnter = Math.min(maxFromHoldings, remainingBudget, 200); // Cap at 200 per player
     
     if (sharesToEnter <= 0) continue;
     
-    // Add to lineup
+    // Add to lineup with original position or FLEX
+    const position = candidate.position.toUpperCase();
     lineup.push({
       playerId: candidate.playerId,
       playerName: candidate.playerName,
-      position: slotToFill,
+      position: position || "FLEX",
       team: candidate.team,
       sharesEntered: sharesToEnter,
     });
     
-    positionsFilled[slotToFill]++;
     teamCounts.set(candidate.team, teamCount + 1);
     sharesUsed += sharesToEnter;
     
-    // Check if we have a complete lineup (7 players)
-    const totalFilled = Object.values(positionsFilled).reduce((a, b) => a + b, 0);
-    if (totalFilled >= 7) break;
+    // Cap at 7 players max
+    if (lineup.length >= 7) break;
     
     // Stop if we hit budget
     if (sharesUsed >= budget) break;
@@ -269,9 +244,9 @@ export async function executeContestStrategy(
     // Build lineup
     const lineup = buildLineup(candidates, holdingsMap, config.entryBudget);
     
-    // Need at least 5 players for a valid lineup
-    if (lineup.length < 5) {
-      console.log(`[ContestBot] ${profile.botName} couldn't build valid lineup`);
+    // Need at least MIN_LINEUP_SIZE players for a valid lineup (relaxed to 1 for bot liquidity)
+    if (lineup.length < MIN_LINEUP_SIZE) {
+      console.log(`[ContestBot] ${profile.botName} couldn't build valid lineup (need at least ${MIN_LINEUP_SIZE} players)`);
       continue;
     }
     
