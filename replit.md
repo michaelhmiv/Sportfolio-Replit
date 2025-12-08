@@ -155,6 +155,26 @@ The platform implements comprehensive SEO optimizations for both traditional sea
 - LocalBusiness schema if expanding to physical locations
 - Additional FAQ pages for common queries
 
+### Monetization - Ezoic Ad Network (Updated: 2025-12-08)
+The platform uses Ezoic for ad monetization (replaced Google AdSense due to content policy issues with data-heavy pages).
+
+**Integration Files:**
+- `client/index.html` - Ezoic verification meta tag, privacy scripts, and header script
+- `server/routes.ts` - `/ads.txt` redirect to Ezoic's managed ads.txt
+- `client/src/components/ezoic-ad.tsx` - Reusable React component for ad placements
+
+**How to Add Ads:**
+1. Create placements in Ezoic dashboard to get placement IDs
+2. Import and use the EzoicAd component:
+```tsx
+import { EzoicAd } from "@/components/ezoic-ad";
+<EzoicAd placementId={101} className="my-4" />
+```
+
+**SPA Handling:**
+- `refreshEzoicAds()` is called on route changes in App.tsx
+- Component properly handles mount/unmount lifecycle with `showAds()` and `destroyPlaceholders()`
+
 ## External Dependencies
 
 -   **MySportsFeeds API:** Provides NBA player rosters, game schedules, and statistics.
@@ -163,5 +183,5 @@ The platform implements comprehensive SEO optimizations for both traditional sea
 -   **Plain Text Sports:** External link for live game statistics.
 -   **Google Fonts CDN:** For typography.
 -   **Google Analytics 4:** For tracking and analytics.
--   **Google AdSense:** For monetization.
+-   **Ezoic:** For ad monetization (JavaScript integration, no DNS changes).
 -   **Replit Auth:** For user authentication and secure sessions, with new users receiving a starting balance.
