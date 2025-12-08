@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, DollarSign, Crown, Clock, ShoppingCart, Trophy, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Crown, Clock, ShoppingCart, Trophy, ArrowUpRight, ArrowDownRight, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
@@ -73,12 +74,28 @@ interface ActivityResponse {
   offset: number;
 }
 
+type SortField = 'name' | 'quantity' | 'avgCost' | 'price' | 'bid' | 'ask' | 'value' | 'pnl';
+type SortDirection = 'asc' | 'desc';
+
+const SORT_OPTIONS: { value: SortField; label: string }[] = [
+  { value: 'name', label: 'Name' },
+  { value: 'quantity', label: 'Quantity' },
+  { value: 'avgCost', label: 'Avg Cost' },
+  { value: 'price', label: 'Price' },
+  { value: 'bid', label: 'Bid' },
+  { value: 'ask', label: 'Ask' },
+  { value: 'value', label: 'Value' },
+  { value: 'pnl', label: 'P&L' },
+];
+
 export default function Portfolio() {
   const { toast } = useToast();
   const { subscribe } = useWebSocket();
   const { clearUnread } = useNotifications();
   const [activeTab, setActiveTab] = useState("holdings");
   const [chartTimeRange, setChartTimeRange] = useState("1M");
+  const [sortField, setSortField] = useState<SortField>('value');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const { data, isLoading } = useQuery<PortfolioData>({
     queryKey: ["/api/portfolio"],
@@ -150,6 +167,73 @@ export default function Portfolio() {
       toast({ title: "Redemption failed", description: error.message, variant: "destructive" });
     },
   });
+
+  // Toggle sort direction or change sort field
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      // Name sorts A-Z (asc) by default, numeric fields sort high-to-low (desc)
+      setSortDirection(field === 'name' ? 'asc' : 'desc');
+    }
+  };
+
+  // Parse currency string to number (strips $, commas, etc.)
+  const parseCurrency = (value: string | null | undefined): number => {
+    if (!value) return 0;
+    const cleaned = value.replace(/[^0-9.-]/g, '');
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
+
+  // Get sort value for a holding
+  const getSortValue = (holding: PortfolioData['holdings'][0], field: SortField): number | string => {
+    switch (field) {
+      case 'name':
+        return `${holding.player?.lastName || ''} ${holding.player?.firstName || ''}`.toLowerCase();
+      case 'quantity':
+        return holding.quantity;
+      case 'avgCost':
+        return parseCurrency(holding.avgCostBasis);
+      case 'price':
+        return parseCurrency(holding.player?.lastTradePrice);
+      case 'bid':
+        return parseCurrency(holding.bestBid);
+      case 'ask':
+        return parseCurrency(holding.bestAsk);
+      case 'value':
+        return parseCurrency(holding.currentValue);
+      case 'pnl':
+        return parseCurrency(holding.pnl);
+      default:
+        return 0;
+    }
+  };
+
+  // Sort player holdings
+  const sortedHoldings = (data?.holdings.filter(h => h.assetType === "player") || []).slice().sort((a, b) => {
+    const aVal = getSortValue(a, sortField);
+    const bVal = getSortValue(b, sortField);
+    
+    if (typeof aVal === 'string' && typeof bVal === 'string') {
+      return sortDirection === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    }
+    
+    const aNum = typeof aVal === 'number' ? aVal : 0;
+    const bNum = typeof bVal === 'number' ? bVal : 0;
+    return sortDirection === 'asc' ? aNum - bNum : bNum - aNum;
+  });
+
+  // Render sort icon for column header
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ChevronUp className="w-3 h-3 ml-1" />
+      : <ChevronDown className="w-3 h-3 ml-1" />;
+  };
 
   if (isLoading) {
     return (
@@ -323,11 +407,33 @@ export default function Portfolio() {
           {/* Holdings */}
           <TabsContent value="holdings">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between gap-2">
                 <CardTitle className="text-sm font-medium uppercase tracking-wide">Your Holdings</CardTitle>
+                {/* Mobile sort dropdown */}
+                <div className="sm:hidden flex items-center gap-2">
+                  <Select value={sortField} onValueChange={(val) => setSortField(val as SortField)}>
+                    <SelectTrigger className="h-8 text-xs w-[100px]" data-testid="select-mobile-sort-field">
+                      <SelectValue placeholder="Sort by" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SORT_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-8 w-8"
+                    onClick={() => setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc')}
+                    data-testid="button-mobile-sort-direction"
+                  >
+                    {sortDirection === 'asc' ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-0">
-                {!data?.premiumShares && data?.holdings.filter(h => h.assetType === "player").length === 0 ? (
+                {!data?.premiumShares && sortedHoldings.length === 0 ? (
                   <EmptyState
                     icon="wallet"
                     title="Your portfolio is empty"
@@ -342,14 +448,62 @@ export default function Portfolio() {
                     <table className="w-full">
                       <thead className="border-b bg-muted/50 hidden sm:table-header-group">
                         <tr>
-                          <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Asset</th>
-                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Quantity</th>
-                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Avg Cost</th>
-                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Current Price</th>
-                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Bid</th>
-                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">Ask</th>
-                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden xl:table-cell">Market Value</th>
-                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">P&L</th>
+                          <th 
+                            className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                            onClick={() => handleSort('name')}
+                            data-testid="th-sort-name"
+                          >
+                            <span className="flex items-center">Asset<SortIcon field="name" /></span>
+                          </th>
+                          <th 
+                            className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                            onClick={() => handleSort('quantity')}
+                            data-testid="th-sort-quantity"
+                          >
+                            <span className="flex items-center justify-end">Qty<SortIcon field="quantity" /></span>
+                          </th>
+                          <th 
+                            className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                            onClick={() => handleSort('avgCost')}
+                            data-testid="th-sort-avgcost"
+                          >
+                            <span className="flex items-center justify-end">Avg<SortIcon field="avgCost" /></span>
+                          </th>
+                          <th 
+                            className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell cursor-pointer hover:text-foreground select-none"
+                            onClick={() => handleSort('price')}
+                            data-testid="th-sort-price"
+                          >
+                            <span className="flex items-center justify-end">Price<SortIcon field="price" /></span>
+                          </th>
+                          <th 
+                            className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell cursor-pointer hover:text-foreground select-none"
+                            onClick={() => handleSort('bid')}
+                            data-testid="th-sort-bid"
+                          >
+                            <span className="flex items-center justify-end">Bid<SortIcon field="bid" /></span>
+                          </th>
+                          <th 
+                            className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell cursor-pointer hover:text-foreground select-none"
+                            onClick={() => handleSort('ask')}
+                            data-testid="th-sort-ask"
+                          >
+                            <span className="flex items-center justify-end">Ask<SortIcon field="ask" /></span>
+                          </th>
+                          <th 
+                            className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden xl:table-cell cursor-pointer hover:text-foreground select-none"
+                            onClick={() => handleSort('value')}
+                            data-testid="th-sort-value"
+                          >
+                            <span className="flex items-center justify-end">Value<SortIcon field="value" /></span>
+                          </th>
+                          <th 
+                            className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground cursor-pointer hover:text-foreground select-none"
+                            onClick={() => handleSort('pnl')}
+                            data-testid="th-sort-pnl"
+                          >
+                            <span className="flex items-center justify-end">P&L<SortIcon field="pnl" /></span>
+                          </th>
                           <th className="px-2 py-1.5"></th>
                         </tr>
                       </thead>
@@ -406,7 +560,7 @@ export default function Portfolio() {
                           </td>
                         </tr>
                       )}
-                      {data?.holdings.filter(h => h.assetType === "player").map((holding) => (
+                      {sortedHoldings.map((holding) => (
                         <tr key={holding.id} className="border-b last:border-0 hover-elevate" data-testid={`row-holding-${holding.player?.id}`}>
                           {/* Mobile layout - stacked info matching marketplace */}
                           <td className="px-2 py-2 sm:hidden" colSpan={9}>
