@@ -2599,12 +2599,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(holdings.assetType, 'player'));
     const totalSharesInEconomy = parseInt(totalHoldingsResult[0]?.total || "0");
 
-    // Total shares burned = shares used in contest entries (removed from circulation)
+    // Total shares burned = shares used in contest entries where contest has started (live or completed)
+    // Shares are only "burned" when the contest actually begins, not when entered
     const totalBurnedResult = await db
       .select({
         total: sql<string>`COALESCE(SUM(${contestEntries.totalSharesEntered}), 0)`.as('total'),
       })
-      .from(contestEntries);
+      .from(contestEntries)
+      .innerJoin(contests, eq(contestEntries.contestId, contests.id))
+      .where(sql`${contests.status} IN ('live', 'completed')`);
     const totalSharesBurned = parseInt(totalBurnedResult[0]?.total || "0");
 
     // Period stats (if dates provided)
@@ -2664,19 +2667,22 @@ export class DatabaseStorage implements IStorage {
       .groupBy(sql`DATE(${miningClaims.claimedAt})`)
       .orderBy(sql`DATE(${miningClaims.claimedAt})`);
 
-    // Get shares burned by date (based on when entry was created/locked)
+    // Get shares burned by contest game_date (shares are burned when contest starts, not when entry created)
+    // Only count entries from contests that have started (live or completed status)
     const burnedByDate = await db
       .select({
-        date: sql<string>`DATE(${contestEntries.createdAt})`.as('date'),
+        date: sql<string>`DATE(${contests.gameDate})`.as('date'),
         shares: sql<string>`COALESCE(SUM(${contestEntries.totalSharesEntered}), 0)`.as('shares'),
       })
       .from(contestEntries)
+      .innerJoin(contests, eq(contestEntries.contestId, contests.id))
       .where(and(
-        gte(contestEntries.createdAt, startDate),
-        lte(contestEntries.createdAt, endDate)
+        gte(contests.gameDate, startDate),
+        lte(contests.gameDate, endDate),
+        sql`${contests.status} IN ('live', 'completed')`
       ))
-      .groupBy(sql`DATE(${contestEntries.createdAt})`)
-      .orderBy(sql`DATE(${contestEntries.createdAt})`);
+      .groupBy(sql`DATE(${contests.gameDate})`)
+      .orderBy(sql`DATE(${contests.gameDate})`);
 
     // Combine into a single time series
     const dateMap = new Map<string, { sharesMined: number; sharesBurned: number }>();
