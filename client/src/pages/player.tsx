@@ -185,10 +185,31 @@ export default function PlayerPage() {
     mutationFn: async (orderData: { orderType: string; side: string; quantity: number; limitPrice?: string }) => {
       return await apiRequest("POST", `/api/orders/${id}`, orderData);
     },
-    onSuccess: async () => {
+    onSuccess: async (response: any) => {
       await invalidatePortfolioQueries();
       setCelebrationKey(prev => prev + 1);
-      toast({ title: "Order placed successfully" });
+      
+      // Check for partial fill details on market orders
+      if (response.marketOrderDetails) {
+        const details = response.marketOrderDetails;
+        if (details.cancelledQuantity > 0) {
+          // Partial fill - show warning with details
+          toast({ 
+            title: "Partial Fill", 
+            description: details.message,
+            duration: 6000
+          });
+        } else {
+          // Full fill
+          toast({ 
+            title: "Order filled", 
+            description: details.message 
+          });
+        }
+      } else {
+        toast({ title: "Order placed successfully" });
+      }
+      
       setQuantity("");
       setLimitPrice("");
     },

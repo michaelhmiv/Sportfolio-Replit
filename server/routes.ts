@@ -1473,24 +1473,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Safety check: If no fills occurred despite passing pre-check, cancel the order
         if (filledQty === 0) {
           await storage.updateOrder(order.id, { status: "cancelled" });
+          // Release all locked resources
+          if (side === "sell") {
+            await storage.adjustLockQuantity(order.id, 0);
+          } else {
+            await storage.releaseCashByReference(order.id);
+          }
           broadcast({ type: "orderBook", playerId: req.params.playerId });
           return res.status(400).json({ error: "Market order could not be filled - order cancelled" });
         }
         
+        // Market orders should always complete - mark as "filled" even if partial
+        // The unfilled portion is effectively cancelled (no more liquidity available)
         await storage.updateOrder(order.id, {
           filledQuantity: filledQty,
-          status: remainingQty === 0 ? "filled" : "partial",
+          status: "filled", // Always "filled" - unfilled portion is cancelled
         });
 
-        // Adjust locked resources for the placed market order
+        // Release ALL locked resources for market orders (filled portion already executed)
         if (side === "sell") {
-          // Adjust locked shares for sell market orders
-          await storage.adjustLockQuantity(order.id, remainingQty);
+          // Release any remaining locked shares (unfilled portion cancelled)
+          await storage.adjustLockQuantity(order.id, 0);
         } else {
-          // Adjust locked cash for buy market orders
-          // For market orders, we need to release excess locked cash since actual cost may be less
-          // The actual cost is totalCost, so we can release the difference
+          // Release locked cash (actual cost already deducted from balance)
           await storage.releaseCashByReference(order.id);
+        }
+        
+        // Log if there was unfilled quantity
+        if (remainingQty > 0) {
+          console.log(`[Market Order] Partial fill: ${filledQty}/${quantity} shares filled for order ${order.id}. Unfilled ${remainingQty} shares cancelled due to insufficient liquidity.`);
         }
 
         // Broadcast real-time updates for order book and trades
@@ -1500,6 +1511,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         broadcast({ type: "orderBook", playerId: req.params.playerId });
         broadcast({ type: "trade", playerId: req.params.playerId, quantity: filledQty, price: vwap });
         // Note: portfolio broadcasts already sent for each party in the fill loop above
+        
+        // Return enhanced response for market orders with fill details
+        return res.json({ 
+          success: true, 
+          order: { ...order, filledQuantity: filledQty, status: "filled" },
+          marketOrderDetails: {
+            requestedQuantity: quantity,
+            filledQuantity: filledQty,
+            cancelledQuantity: remainingQty,
+            avgFillPrice: vwap,
+            totalCost: totalCost.toFixed(2),
+            message: remainingQty > 0 
+              ? `Filled ${filledQty} of ${quantity} shares at avg price $${vwap}. ${remainingQty} shares cancelled - insufficient liquidity.`
+              : `Filled ${filledQty} shares at avg price $${vwap}`
+          }
+        });
       } else {
         // Limit order - try to match
         await matchOrders(req.params.playerId);
