@@ -99,6 +99,7 @@ async function cancelStaleOrders(userId: string, botName: string): Promise<numbe
 
 /**
  * Calculate order size based on aggressiveness and limits
+ * Uses smaller order sizes to enable wider player coverage
  */
 function calculateOrderSize(
   config: MarketMakerConfig,
@@ -113,9 +114,14 @@ function calculateOrderSize(
     return 0;
   }
   
-  // Base size influenced by aggressiveness
+  // Use smaller order sizes to enable more player coverage
+  // Minimum is 1 share, max influenced by config and aggressiveness
+  const effectiveMinSize = 1; // Always allow at least 1 share orders
+  const effectiveMaxSize = Math.max(3, config.maxOrderSize); // Cap for diversification
+  
+  // Base size influenced by aggressiveness (smaller orders = more players covered)
   const baseSize = Math.floor(
-    config.minOrderSize + (config.maxOrderSize - config.minOrderSize) * config.aggressiveness
+    effectiveMinSize + (effectiveMaxSize - effectiveMinSize) * config.aggressiveness
   );
   
   // For sell orders, cap at current holdings
