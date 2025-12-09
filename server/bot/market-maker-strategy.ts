@@ -115,9 +115,9 @@ function calculateOrderSize(
   }
   
   // Use smaller order sizes to enable more player coverage
-  // Minimum is 1 share, max influenced by config and aggressiveness
+  // Minimum is 1 share, max capped at configured limit and 5 shares for diversification
   const effectiveMinSize = 1; // Always allow at least 1 share orders
-  const effectiveMaxSize = Math.max(3, config.maxOrderSize); // Cap for diversification
+  const effectiveMaxSize = Math.min(5, config.maxOrderSize); // Cap to encourage diversification
   
   // Base size influenced by aggressiveness (smaller orders = more players covered)
   const baseSize = Math.floor(
