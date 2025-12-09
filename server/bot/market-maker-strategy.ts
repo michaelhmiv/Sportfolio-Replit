@@ -340,10 +340,10 @@ export async function executeMarketMakerStrategy(
     return;
   }
   
-  // Pick more candidates for better market coverage (15-30 based on aggressiveness)
+  // Pick more candidates for better market coverage (20-50 based on aggressiveness)
   // Higher aggressiveness = more players covered per tick
-  const minPlayers = 5;
-  const maxPlayers = 20;
+  const minPlayers = 20;
+  const maxPlayers = 50;
   const numToTrade = Math.max(minPlayers, Math.floor(Math.min(candidates.length, maxPlayers) * (0.5 + config.aggressiveness * 0.5)));
   const shuffled = candidates.sort(() => Math.random() - 0.5);
   const selected = shuffled.slice(0, numToTrade);

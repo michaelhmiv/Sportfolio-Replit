@@ -4,8 +4,8 @@
  */
 
 import { db } from "../db";
-import { players, playerGameStats } from "@shared/schema";
-import { eq, desc, sql, isNotNull, and, gte } from "drizzle-orm";
+import { players, playerGameStats, orders } from "@shared/schema";
+import { eq, desc, sql, isNotNull, and, gte, notInArray, inArray } from "drizzle-orm";
 
 // Configuration
 const FAIR_VALUE_MULTIPLIER = 0.50; // $0.50 per fantasy point per game
@@ -312,7 +312,43 @@ export async function getEffectivePrice(playerId: string): Promise<number> {
 }
 
 /**
+ * Get player IDs that have no open orders in the order book
+ * These are "cold" players that need liquidity bootstrapping
+ */
+async function getPlayersWithNoOrders(): Promise<Set<string>> {
+  // Get all player IDs that currently have open/partial orders
+  const playersWithOrders = await db
+    .selectDistinct({ playerId: orders.playerId })
+    .from(orders)
+    .where(
+      and(
+        inArray(orders.status, ["open", "partial"]),
+        isNotNull(orders.playerId)
+      )
+    );
+  
+  const playersWithOrdersSet = new Set(playersWithOrders.map(p => p.playerId).filter(Boolean) as string[]);
+  
+  // Get all active players
+  const allActivePlayers = await db
+    .select({ id: players.id })
+    .from(players)
+    .where(eq(players.isActive, true));
+  
+  // Return players that DON'T have orders
+  const coldPlayers = new Set<string>();
+  for (const player of allActivePlayers) {
+    if (!playersWithOrdersSet.has(player.id)) {
+      coldPlayers.add(player.id);
+    }
+  }
+  
+  return coldPlayers;
+}
+
+/**
  * Get players suitable for market making (have some trading history)
+ * Prioritizes players without any order book presence to bootstrap liquidity
  * @param limit - Maximum number of players to return
  * @param targetTiers - Optional specific tiers to target (1-5), defaults to all tiers
  */
@@ -320,11 +356,29 @@ export async function getMarketMakingCandidates(
   limit: number = 30,
   targetTiers?: number[]
 ): Promise<PlayerValuation[]> {
-  return getPlayersForTrading({
+  const allCandidates = await getPlayersForTrading({
     tier: targetTiers || [1, 2, 3, 4, 5], // Include ALL tiers for full market coverage
     minGamesPlayed: 1, // Lower threshold to include newer players
-    limit,
+    limit: Math.max(limit * 2, 200), // Fetch more to allow for prioritization
   });
+  
+  // Get players that have no orders (need liquidity bootstrapping)
+  const coldPlayers = await getPlayersWithNoOrders();
+  
+  // Separate cold players (priority) from players with existing orders
+  const coldCandidates = allCandidates.filter(c => coldPlayers.has(c.playerId));
+  const warmCandidates = allCandidates.filter(c => !coldPlayers.has(c.playerId));
+  
+  // Prioritize cold players (50% of results), then fill with warm players
+  const coldLimit = Math.floor(limit * 0.5);
+  const warmLimit = limit - Math.min(coldCandidates.length, coldLimit);
+  
+  // Shuffle both groups for variety
+  const shuffledCold = coldCandidates.sort(() => Math.random() - 0.5).slice(0, coldLimit);
+  const shuffledWarm = warmCandidates.sort(() => Math.random() - 0.5).slice(0, warmLimit);
+  
+  // Combine: cold first, then warm
+  return [...shuffledCold, ...shuffledWarm];
 }
 
 /**
