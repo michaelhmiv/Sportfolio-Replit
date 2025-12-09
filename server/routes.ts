@@ -146,12 +146,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Match buy and sell limit orders
     for (const buyOrder of orderBook.bids) {
-      if (buyOrder.status !== "open" || buyOrder.filledQuantity >= buyOrder.quantity) continue;
-      if (!buyOrder.limitPrice) continue; // Skip if no limit price (shouldn't happen for limit orders)
+      // Skip filled or invalid orders (check both status and actual quantities)
+      if (buyOrder.filledQuantity >= buyOrder.quantity) continue;
+      if (buyOrder.status !== "open" && buyOrder.status !== "partial") continue;
+      if (!buyOrder.limitPrice) continue;
 
       for (const sellOrder of orderBook.asks) {
-        if (sellOrder.status !== "open" || sellOrder.filledQuantity >= sellOrder.quantity) continue;
-        if (!sellOrder.limitPrice) continue; // Skip if no limit price (shouldn't happen for limit orders)
+        // Skip filled or invalid orders (check both status and actual quantities)
+        if (sellOrder.filledQuantity >= sellOrder.quantity) continue;
+        if (sellOrder.status !== "open" && sellOrder.status !== "partial") continue;
+        if (!sellOrder.limitPrice) continue;
 
         // Check if prices match
         const buyPrice = parseFloat(buyOrder.limitPrice);
@@ -175,19 +179,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
             price: tradePrice.toFixed(2),
           });
 
-          // Update orders
+          // Update orders - calculate new fill quantities
           const newBuyFilled = buyOrder.filledQuantity + tradeQuantity;
           const newSellFilled = sellOrder.filledQuantity + tradeQuantity;
+          const buyOrderStatus = newBuyFilled >= buyOrder.quantity ? "filled" : "partial";
+          const sellOrderStatus = newSellFilled >= sellOrder.quantity ? "filled" : "partial";
 
           await storage.updateOrder(buyOrder.id, {
             filledQuantity: newBuyFilled,
-            status: newBuyFilled >= buyOrder.quantity ? "filled" : "partial",
+            status: buyOrderStatus,
           });
 
           await storage.updateOrder(sellOrder.id, {
             filledQuantity: newSellFilled,
-            status: newSellFilled >= sellOrder.quantity ? "filled" : "partial",
+            status: sellOrderStatus,
           });
+
+          // CRITICAL: Update local order objects to reflect new state
+          // This prevents over-matching in subsequent loop iterations
+          buyOrder.filledQuantity = newBuyFilled;
+          buyOrder.status = buyOrderStatus;
+          sellOrder.filledQuantity = newSellFilled;
+          sellOrder.status = sellOrderStatus;
 
           // Adjust locked resources
           // Adjust locked shares for the sell order
@@ -255,6 +268,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           if (updatedSeller) {
             broadcast({ type: "portfolio", userId: sellOrder.userId, balance: updatedSeller.balance });
+          }
+
+          // If buy order is fully filled, break inner loop and move to next buy order
+          if (buyOrder.filledQuantity >= buyOrder.quantity) {
+            break;
           }
         }
       }
