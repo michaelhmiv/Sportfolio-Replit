@@ -37,6 +37,7 @@ import About from "@/pages/about";
 import Contact from "@/pages/contact";
 import HowItWorks from "@/pages/how-it-works";
 import Analytics from "@/pages/analytics";
+import Premium from "@/pages/premium";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
 import { LogOut, User } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
@@ -140,6 +141,9 @@ function Router() {
           </Route>
           <Route path="/admin">
             {isAuthenticated ? <Admin /> : <Dashboard />}
+          </Route>
+          <Route path="/premium">
+            {isAuthenticated ? <Premium /> : <Dashboard />}
           </Route>
           
           {/* Auth error page - public, always accessible */}

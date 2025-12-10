@@ -1,4 +1,4 @@
-import { Home, TrendingUp, Trophy, User, Settings, BarChart3 } from "lucide-react";
+import { Home, TrendingUp, Trophy, User, Settings, BarChart3, Crown } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -41,6 +41,11 @@ const menuItems = [
     url: "/portfolio",
     icon: User,
   },
+  {
+    title: "Premium",
+    url: "/premium",
+    icon: Crown,
+  },
 ];
 
 export function AppSidebar() {
@@ -50,12 +55,14 @@ export function AppSidebar() {
   const { unreadCount } = useNotifications();
 
   const handleNavigation = (item: typeof menuItems[0], e: React.MouseEvent) => {
-    // Portfolio tab requires authentication
-    if (item.url === "/portfolio" && !isAuthenticated) {
+    // Portfolio and Premium tabs require authentication
+    if ((item.url === "/portfolio" || item.url === "/premium") && !isAuthenticated) {
       e.preventDefault();
       toast({
         title: "Authentication Required",
-        description: "Please create an account or log in to view your portfolio.",
+        description: item.url === "/premium" 
+          ? "Please create an account or log in to access Premium features."
+          : "Please create an account or log in to view your portfolio.",
         variant: "destructive",
       });
     }
