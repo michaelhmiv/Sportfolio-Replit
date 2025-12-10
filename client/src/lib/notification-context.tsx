@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useWebSocket } from './websocket';
+import { useAuth } from '@/hooks/useAuth';
 
 interface NotificationContextType {
   unreadCount: number;
@@ -18,29 +19,39 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   });
 
   const { subscribe } = useWebSocket();
+  const { user } = useAuth();
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, unreadCount.toString());
   }, [unreadCount]);
 
   useEffect(() => {
-    // Only increment for background events (not user-initiated actions)
+    // Only increment for background events that affect the CURRENT user
+    // Not for trades/events from other users or bots
     
-    // 1. Trade executions (your limit order matched - market order fills)
-    const unsubTrade = subscribe('trade', () => {
-      setUnreadCount(prev => prev + 1);
+    // 1. Portfolio updates (your order was filled - balance changed)
+    // Only triggers when YOUR balance/holdings change from a filled order
+    const unsubPortfolio = subscribe('portfolio', (data: { userId?: string }) => {
+      // Only increment if this portfolio update is for the current user
+      if (user?.id && data.userId === user.id) {
+        setUnreadCount(prev => prev + 1);
+      }
     });
 
     // 2. Contest settlements (you won/placed in a contest)
-    const unsubContestUpdate = subscribe('contestSettled', () => {
-      setUnreadCount(prev => prev + 1);
+    // contestSettled events are user-specific
+    const unsubContestSettled = subscribe('contestSettled', (data: { userId?: string }) => {
+      // Only increment if this settlement is for the current user
+      if (!data.userId || (user?.id && data.userId === user.id)) {
+        setUnreadCount(prev => prev + 1);
+      }
     });
 
     return () => {
-      unsubTrade();
-      unsubContestUpdate();
+      unsubPortfolio();
+      unsubContestSettled();
     };
-  }, [subscribe]);
+  }, [subscribe, user?.id]);
 
   const incrementUnread = () => setUnreadCount(prev => prev + 1);
   const clearUnread = () => setUnreadCount(0);
