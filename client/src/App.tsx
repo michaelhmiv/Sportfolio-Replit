@@ -80,10 +80,18 @@ function Router() {
   // Ensure viewport is properly set after OAuth redirect on mobile
   useEffect(() => {
     const viewport = document.querySelector('meta[name="viewport"]');
-    if (viewport && viewport.getAttribute('content') !== 'width=device-width, initial-scale=1.0, maximum-scale=1') {
-      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1');
+    if (viewport) {
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=yes');
     }
   }, [isAuthenticated]);
+
+  // Also restore viewport on mount to catch initial load
+  useEffect(() => {
+    const viewport = document.querySelector('meta[name="viewport"]');
+    if (viewport) {
+      viewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1, user-scalable=yes');
+    }
+  }, []);
 
 
   if (isLoading) {
