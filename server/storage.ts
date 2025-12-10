@@ -18,6 +18,7 @@ import {
   jobExecutionLogs,
   blogPosts,
   portfolioSnapshots,
+  premiumCheckoutSessions,
   type User,
   type InsertUser,
   type UpsertUser,
@@ -50,6 +51,7 @@ import {
   type PortfolioSnapshot,
   type InsertPortfolioSnapshot,
   type PriceHistory,
+  type PremiumCheckoutSession,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, or, gte, lte, isNotNull, count } from "drizzle-orm";
@@ -263,6 +265,13 @@ export interface IStorage {
     sharesMined: number;
     sharesBurned: number;
   }>>;
+  
+  // Premium checkout session methods
+  createPremiumCheckoutSession(session: { userId: string; planId: string; quantity: number; amountCents: number; whopSessionId?: string }): Promise<PremiumCheckoutSession>;
+  getPremiumCheckoutSession(id: string): Promise<PremiumCheckoutSession | undefined>;
+  getPremiumCheckoutSessionByReceipt(receiptId: string): Promise<PremiumCheckoutSession | undefined>;
+  completePremiumCheckoutSession(id: string, receiptId: string): Promise<PremiumCheckoutSession | undefined>;
+  getUserPremiumCheckoutSessions(userId: string): Promise<PremiumCheckoutSession[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2711,6 +2720,58 @@ export class DatabaseStorage implements IStorage {
       sharesMined: dateMap.get(date)?.sharesMined || 0,
       sharesBurned: dateMap.get(date)?.sharesBurned || 0,
     }));
+  }
+
+  // Premium checkout session methods
+  async createPremiumCheckoutSession(session: { userId: string; planId: string; quantity: number; amountCents: number; whopSessionId?: string }): Promise<PremiumCheckoutSession> {
+    const [created] = await db
+      .insert(premiumCheckoutSessions)
+      .values({
+        userId: session.userId,
+        planId: session.planId,
+        quantity: session.quantity,
+        amountCents: session.amountCents,
+        whopSessionId: session.whopSessionId,
+      })
+      .returning();
+    return created;
+  }
+
+  async getPremiumCheckoutSession(id: string): Promise<PremiumCheckoutSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(premiumCheckoutSessions)
+      .where(eq(premiumCheckoutSessions.id, id));
+    return session || undefined;
+  }
+
+  async getPremiumCheckoutSessionByReceipt(receiptId: string): Promise<PremiumCheckoutSession | undefined> {
+    const [session] = await db
+      .select()
+      .from(premiumCheckoutSessions)
+      .where(eq(premiumCheckoutSessions.receiptId, receiptId));
+    return session || undefined;
+  }
+
+  async completePremiumCheckoutSession(id: string, receiptId: string): Promise<PremiumCheckoutSession | undefined> {
+    const [updated] = await db
+      .update(premiumCheckoutSessions)
+      .set({
+        status: "completed",
+        receiptId,
+        completedAt: new Date(),
+      })
+      .where(eq(premiumCheckoutSessions.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async getUserPremiumCheckoutSessions(userId: string): Promise<PremiumCheckoutSession[]> {
+    return await db
+      .select()
+      .from(premiumCheckoutSessions)
+      .where(eq(premiumCheckoutSessions.userId, userId))
+      .orderBy(desc(premiumCheckoutSessions.createdAt));
   }
 }
 

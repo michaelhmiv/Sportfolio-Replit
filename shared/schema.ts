@@ -403,6 +403,24 @@ export const botActionsLog = pgTable("bot_actions_log", {
   createdAtIdx: index("bot_actions_created_idx").on(table.createdAt),
 }));
 
+// Premium checkout sessions table - tracks Whop checkout sessions for premium share purchases
+export const premiumCheckoutSessions = pgTable("premium_checkout_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  whopSessionId: varchar("whop_session_id").unique(), // Whop's session ID (if using session API)
+  planId: text("plan_id").notNull(), // Whop plan ID
+  quantity: integer("quantity").notNull().default(1), // Number of premium shares to credit
+  amountCents: integer("amount_cents").notNull(), // Amount in cents (500 = $5)
+  status: text("status").notNull().default("pending"), // "pending", "completed", "failed"
+  receiptId: varchar("receipt_id").unique(), // Whop receipt/payment ID for idempotency
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("premium_checkout_user_idx").on(table.userId),
+  statusIdx: index("premium_checkout_status_idx").on(table.status),
+  receiptIdx: index("premium_checkout_receipt_idx").on(table.receiptId),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   holdings: many(holdings),
@@ -640,3 +658,14 @@ export const insertBotActionLogSchema = createInsertSchema(botActionsLog).omit({
 
 export type BotActionLog = typeof botActionsLog.$inferSelect;
 export type InsertBotActionLog = z.infer<typeof insertBotActionLogSchema>;
+
+// Premium checkout session schemas and types
+export const insertPremiumCheckoutSessionSchema = createInsertSchema(premiumCheckoutSessions).omit({
+  id: true,
+  status: true,
+  completedAt: true,
+  createdAt: true,
+});
+
+export type PremiumCheckoutSession = typeof premiumCheckoutSessions.$inferSelect;
+export type InsertPremiumCheckoutSession = z.infer<typeof insertPremiumCheckoutSessionSchema>;
