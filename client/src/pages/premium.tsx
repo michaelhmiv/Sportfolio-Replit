@@ -3,12 +3,13 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Crown, Zap, TrendingUp, Gift, Check, Loader2, ShoppingCart, Plus, Minus } from "lucide-react";
+import { Crown, Zap, Check, Loader2, ShoppingCart, Plus, Minus, TrendingUp, X } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { formatDistanceToNow } from "date-fns";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 interface PremiumStatus {
   isPremium: boolean;
@@ -35,18 +36,19 @@ const PRICE_PER_SHARE = 5;
 
 const premiumBenefits = [
   { icon: Zap, title: "Double Mining Power", description: "Earn shares 2x faster during daily mining sessions" },
-  { icon: TrendingUp, title: "No Transaction Fees", description: "Trade without paying any marketplace fees" },
-  { icon: Gift, title: "Exclusive Contests", description: "Access premium-only contests with bigger prizes" },
-  { icon: Crown, title: "Priority Support", description: "Get help faster with dedicated support queue" },
+  { icon: Crown, title: "Ad-Free Experience", description: "Browse and trade without any advertisements" },
 ];
 
 export default function Premium() {
   const { toast } = useToast();
   const { isAuthenticated } = useAuth();
+  const [, setLocation] = useLocation();
   const [quantity, setQuantity] = useState(1);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [showCheckout, setShowCheckout] = useState(false);
   const [checkoutSession, setCheckoutSession] = useState<CheckoutSession | null>(null);
+  const [showPostPurchaseModal, setShowPostPurchaseModal] = useState(false);
+  const [purchasedQuantity, setPurchasedQuantity] = useState(0);
 
   const { data: premiumStatus, isLoading } = useQuery<PremiumStatus>({
     queryKey: ["/api/premium/status"],
@@ -355,6 +357,57 @@ export default function Premium() {
           </CardContent>
         </Card>
       )}
+
+      {/* Post-Purchase Modal */}
+      <Dialog open={showPostPurchaseModal} onOpenChange={setShowPostPurchaseModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-center justify-center">
+              <Crown className="h-6 w-6 text-yellow-500" />
+              Purchase Complete!
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              You now have {purchasedQuantity} new Premium Share{purchasedQuantity > 1 ? 's' : ''}.
+              What would you like to do?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3 mt-4">
+            <Button
+              className="w-full bg-yellow-500 hover:bg-yellow-600 text-black"
+              onClick={() => {
+                setShowPostPurchaseModal(false);
+                redeemMutation.mutate();
+              }}
+              disabled={redeemMutation.isPending || premiumStatus?.isPremium}
+              data-testid="button-modal-redeem"
+            >
+              <Crown className="h-4 w-4 mr-2" />
+              Redeem for 30 Days Premium
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setShowPostPurchaseModal(false);
+                setLocation("/marketplace?tab=premium");
+              }}
+              data-testid="button-modal-sell"
+            >
+              <TrendingUp className="h-4 w-4 mr-2" />
+              Sell on Marketplace
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full"
+              onClick={() => setShowPostPurchaseModal(false)}
+              data-testid="button-modal-hold"
+            >
+              <X className="h-4 w-4 mr-2" />
+              Hold for Later
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

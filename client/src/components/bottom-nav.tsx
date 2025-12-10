@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { useNotifications } from "@/lib/notification-context";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
 
 const navItems = [
   {
@@ -37,6 +38,8 @@ const navItems = [
 export function BottomNav() {
   const [location] = useLocation();
   const { unreadCount } = useNotifications();
+  const { user } = useAuth();
+  const isPremium = user?.isPremium || false;
   const [previousLocation, setPreviousLocation] = useState(location);
   const [justActivated, setJustActivated] = useState<string | null>(null);
 
@@ -50,7 +53,10 @@ export function BottomNav() {
   }, [location, previousLocation]);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t sm:hidden">
+    <nav className={cn(
+      "fixed bottom-0 left-0 right-0 z-50 bg-card border-t sm:hidden",
+      isPremium && "shadow-[0_-4px_20px_rgba(234,179,8,0.3)] border-t-yellow-500/50"
+    )}>
       <div className="grid grid-cols-5 h-16 max-w-md mx-auto">
         {navItems.map((item) => {
           const isActive = location === item.url;

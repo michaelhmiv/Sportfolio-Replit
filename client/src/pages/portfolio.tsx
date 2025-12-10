@@ -273,18 +273,27 @@ export default function Portfolio() {
                     <div className="text-muted-foreground uppercase tracking-wide mb-0.5">Portfolio</div>
                     <div className="font-mono font-bold" data-testid="text-portfolio-value">${data?.portfolioValue}</div>
                   </div>
-                  <div className="flex-1 min-w-0 text-right">
+                  <div className="flex-1 min-w-0 text-center">
                     <div className="text-muted-foreground uppercase tracking-wide mb-0.5">P&L</div>
                     <div className={`font-mono font-bold ${parseFloat(data?.totalPnL || "0") >= 0 ? 'text-positive' : 'text-negative'}`} data-testid="text-total-pnl">
                       {parseFloat(data?.totalPnL || "0") >= 0 ? '+' : ''}${data?.totalPnL}
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0 text-right">
+                    <div className="flex items-center justify-end gap-1 text-muted-foreground uppercase tracking-wide mb-0.5">
+                      <Crown className="w-3 h-3 text-yellow-500" />
+                      <span>Premium</span>
+                    </div>
+                    <div className="font-mono font-bold text-yellow-500" data-testid="text-premium-shares">
+                      {data?.premiumShares || 0}
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Desktop Layout - 3 separate cards */}
-            <div className="hidden md:grid md:grid-cols-3 gap-3">
+            {/* Desktop Layout - 4 separate cards */}
+            <div className="hidden md:grid md:grid-cols-4 gap-3">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                   <CardTitle className="text-sm font-medium uppercase tracking-wide">Cash Balance</CardTitle>
@@ -321,6 +330,35 @@ export default function Portfolio() {
                   <div className={`text-sm ${parseFloat(data?.totalPnL || "0") >= 0 ? 'text-positive' : 'text-negative'}`}>
                     {parseFloat(data?.totalPnL || "0") >= 0 ? '+' : ''}{data?.totalPnLPercent}%
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card className={data?.isPremium ? "border-yellow-500/50 bg-gradient-to-br from-yellow-500/5 to-amber-500/5" : ""}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium uppercase tracking-wide">Premium Shares</CardTitle>
+                  <Crown className="w-4 h-4 text-yellow-500" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-3xl font-mono font-bold text-yellow-500" data-testid="text-premium-shares-desktop">
+                    {data?.premiumShares || 0}
+                  </div>
+                  {data?.isPremium && data?.premiumExpiresAt && (
+                    <div className="text-sm text-muted-foreground">
+                      Expires {formatDistanceToNow(new Date(data.premiumExpiresAt), { addSuffix: true })}
+                    </div>
+                  )}
+                  {(!data?.isPremium && (data?.premiumShares || 0) > 0) && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-2 h-7 text-xs border-yellow-500/50 text-yellow-600 hover:bg-yellow-500/10"
+                      onClick={() => redeemPremiumMutation.mutate()}
+                      disabled={redeemPremiumMutation.isPending}
+                      data-testid="button-redeem-premium-desktop"
+                    >
+                      {redeemPremiumMutation.isPending ? "Redeeming..." : "Redeem for 30 days"}
+                    </Button>
+                  )}
                 </CardContent>
               </Card>
             </div>

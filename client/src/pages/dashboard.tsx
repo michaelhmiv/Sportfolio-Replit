@@ -79,7 +79,8 @@ const getEffectiveGameStatus = (game: DailyGame): string => {
 
 export default function Dashboard() {
   const { toast } = useToast();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isPremiumUser = user?.isPremium || false;
   const [, setLocation] = useLocation();
   const [showPlayerSelection, setShowPlayerSelection] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -1216,7 +1217,7 @@ export default function Dashboard() {
                 if ((index + 1) % 6 === 0 && index < filteredPlayers.length - 1) {
                   items.push(
                     <div key={`ad-${index}`} className="my-2">
-                      <WhopAd />
+                      <WhopAd isPremium={isPremiumUser} />
                     </div>
                   );
                 }

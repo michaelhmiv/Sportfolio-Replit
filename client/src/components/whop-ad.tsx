@@ -1,8 +1,13 @@
 interface WhopAdProps {
   className?: string;
+  isPremium?: boolean;
 }
 
-export function WhopAd({ className = "" }: WhopAdProps) {
+export function WhopAd({ className = "", isPremium = false }: WhopAdProps) {
+  if (isPremium) {
+    return null;
+  }
+
   return (
     <div className={`flex justify-center ${className}`} data-testid="whop-ad-container">
       <iframe

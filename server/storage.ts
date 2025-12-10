@@ -103,6 +103,7 @@ export interface IStorage {
   updateUsername(userId: string, username: string): Promise<User | undefined>;
   incrementTotalSharesMined(userId: string, amount: number): Promise<void>;
   markOnboardingComplete(userId: string): Promise<void>;
+  updateUserPremiumStatus(userId: string, isPremium: boolean, premiumExpiresAt: Date | null): Promise<void>;
   
   // Player methods
   getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]>;
@@ -383,6 +384,17 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(users)
       .set({ hasSeenOnboarding: true })
+      .where(eq(users.id, userId));
+  }
+
+  async updateUserPremiumStatus(userId: string, isPremium: boolean, premiumExpiresAt: Date | null): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        isPremium, 
+        premiumExpiresAt,
+        updatedAt: new Date()
+      })
       .where(eq(users.id, userId));
   }
 

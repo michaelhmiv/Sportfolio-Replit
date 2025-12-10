@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, TrendingUp, TrendingDown, ArrowUpDown, Filter, Clock } from "lucide-react";
+import { Search, TrendingUp, TrendingDown, ArrowUpDown, Filter, Clock, Crown } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import type { Player } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -19,6 +19,7 @@ import { Shimmer, ScrollReveal } from "@/components/ui/animations";
 import { AnimatedPrice } from "@/components/ui/animated-price";
 import { AnimatedList } from "@/components/ui/animated-list";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useAuth } from "@/hooks/useAuth";
 
 type PlayerWithOrderBook = Player & {
   bestBid: string | null;
@@ -31,6 +32,8 @@ type SortField = "price" | "volume" | "change" | "bid" | "ask";
 type SortOrder = "asc" | "desc";
 
 export default function Marketplace() {
+  const { user } = useAuth();
+  const isPremiumUser = user?.isPremium || false;
   const searchParams = new URLSearchParams(useSearch());
   const [,setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "players");
@@ -147,6 +150,36 @@ export default function Marketplace() {
           <h1 className="hidden sm:block text-3xl font-bold mb-2">Marketplace</h1>
           <p className="text-muted-foreground">Browse and trade player shares</p>
         </div>
+
+        {/* Premium Shares Section */}
+        <Card className="mb-4 border-yellow-500/30 bg-gradient-to-r from-yellow-500/5 to-amber-500/5">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-yellow-500/10 rounded-lg">
+                  <Crown className="h-6 w-6 text-yellow-500" />
+                </div>
+                <div>
+                  <div className="font-semibold flex items-center gap-2">
+                    Premium Shares
+                    <Badge variant="outline" className="text-yellow-500 border-yellow-500/50">
+                      $5.00
+                    </Badge>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    Redeem for 30 days premium or trade on the marketplace
+                  </div>
+                </div>
+              </div>
+              <Link href="/premium">
+                <Button className="bg-yellow-500 hover:bg-yellow-600 text-black" data-testid="button-view-premium">
+                  <Crown className="h-4 w-4 mr-2" />
+                  Buy Premium Shares
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList className="grid w-full max-w-md grid-cols-2">
@@ -485,7 +518,7 @@ export default function Marketplace() {
                           playerRow,
                           <tr key={`ad-${index}`} className="border-b">
                             <td colSpan={7} className="py-4">
-                              <WhopAd />
+                              <WhopAd isPremium={isPremiumUser} />
                             </td>
                           </tr>
                         ];

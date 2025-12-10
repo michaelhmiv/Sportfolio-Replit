@@ -3145,8 +3145,15 @@ ${posts.map(post => `  <url>
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30);
 
-      // Update user premium status (would use storage method, but simplified here)
-      res.json({ success: true });
+      // Update user premium status in database
+      await storage.updateUserPremiumStatus(user.id, true, expiresAt);
+
+      res.json({ 
+        success: true, 
+        isPremium: true, 
+        premiumExpiresAt: expiresAt.toISOString(),
+        remainingShares: premiumHolding.quantity - 1
+      });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

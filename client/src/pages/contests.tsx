@@ -13,6 +13,7 @@ import { WhopAd } from "@/components/whop-ad";
 import { ShimmerCard } from "@/components/ui/animations";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ContestsData {
   contests: Contest[];
@@ -20,6 +21,8 @@ interface ContestsData {
 }
 
 export default function Contests() {
+  const { user } = useAuth();
+  const isPremiumUser = user?.isPremium || false;
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
 
@@ -352,7 +355,7 @@ export default function Contests() {
         {/* Whop Ad - Contests */}
         {contests.length > 0 && (
           <div className="my-6">
-            <WhopAd />
+            <WhopAd isPremium={isPremiumUser} />
           </div>
         )}
         

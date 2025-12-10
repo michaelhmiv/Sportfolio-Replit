@@ -10,6 +10,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { HelpDialog } from "@/components/help-dialog";
 import { Footer } from "@/components/footer";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { WebSocketProvider, useWebSocket } from "@/lib/websocket";
 import { NotificationProvider } from "@/lib/notification-context";
@@ -210,9 +211,13 @@ function Header() {
   };
 
   const userName = user?.username || user?.email || "User";
+  const isPremium = user?.isPremium || false;
 
   return (
-    <header className="flex items-center justify-between h-16 px-4 border-b bg-card sticky top-0 z-10">
+    <header className={cn(
+      "flex items-center justify-between h-16 px-4 border-b bg-card sticky top-0 z-10",
+      isPremium && "shadow-[0_4px_20px_rgba(234,179,8,0.3)] border-b-yellow-500/50"
+    )}>
       <div className="flex items-center gap-4">
         <div className="hidden sm:block">
           <SidebarTrigger data-testid="button-sidebar-toggle" />
