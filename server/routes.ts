@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { fetchActivePlayers, calculateFantasyPoints } from "./mysportsfeeds";
 import type { InsertPlayer, Player, User, Holding } from "@shared/schema";
-import { contestLineups, contestEntries, contests, holdings, marketSnapshots } from "@shared/schema";
+import { contestLineups, contestEntries, contests, holdings, marketSnapshots, premiumCheckoutSessions } from "@shared/schema";
 import { sql, eq, desc, and, gte, lte } from "drizzle-orm";
 import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
@@ -3466,61 +3466,84 @@ ${posts.map(post => `  <url>
   }
 
   // Whop webhook handler - receives payment.succeeded events
+  // Uses official @whop/sdk for signature verification
   app.post("/api/webhooks/whop", express.raw({ type: 'application/json' }), async (req, res) => {
     try {
       const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
+      
+      // Safely convert body to string (handles both Buffer and string)
+      const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body || '');
+      
+      // Log that we received a request (helps diagnose if webhook is reaching us)
+      console.log("[WHOP WEBHOOK] ========== INCOMING REQUEST ==========");
+      console.log("[WHOP WEBHOOK] Timestamp:", new Date().toISOString());
+      console.log("[WHOP WEBHOOK] Method:", req.method);
+      console.log("[WHOP WEBHOOK] Content-Type:", req.headers['content-type']);
+      console.log("[WHOP WEBHOOK] Body length:", rawBody.length);
+      console.log("[WHOP WEBHOOK] Has webhook-id header:", !!req.headers['webhook-id']);
+      console.log("[WHOP WEBHOOK] Has webhook-timestamp header:", !!req.headers['webhook-timestamp']);
+      console.log("[WHOP WEBHOOK] Has webhook-signature header:", !!req.headers['webhook-signature']);
+      console.log("[WHOP WEBHOOK] Raw body preview:", rawBody.length > 200 ? rawBody.substring(0, 200) + "..." : rawBody);
       
       if (!webhookSecret) {
         console.error("[WHOP WEBHOOK] WHOP_WEBHOOK_SECRET not configured");
         return res.status(500).json({ error: "Webhook secret not configured" });
       }
       
-      // Get raw body for signature verification
-      const rawBody = req.body.toString();
-      const headers = req.headers;
+      // Use the official Whop SDK for webhook verification
+      const { Whop } = await import("@whop/sdk");
       
-      // Standard Webhooks signature headers
-      const webhookId = headers['webhook-id'] as string;
-      const webhookTimestamp = headers['webhook-timestamp'] as string;
-      const webhookSignature = headers['webhook-signature'] as string;
-      
-      if (!webhookId || !webhookTimestamp || !webhookSignature) {
-        console.error("[WHOP WEBHOOK] Missing required webhook headers");
-        return res.status(400).json({ error: "Missing webhook headers" });
+      // Convert Express headers to plain object for SDK (filter out undefined values)
+      const headersObj: Record<string, string> = {};
+      for (const [key, value] of Object.entries(req.headers)) {
+        if (value !== undefined) {
+          headersObj[key] = Array.isArray(value) ? value[0] : value;
+        }
       }
       
-      // Verify timestamp is within 5 minutes to prevent replay attacks
-      const timestamp = parseInt(webhookTimestamp);
-      const now = Math.floor(Date.now() / 1000);
-      if (Math.abs(now - timestamp) > 300) {
-        console.error("[WHOP WEBHOOK] Webhook timestamp too old");
-        return res.status(400).json({ error: "Webhook timestamp expired" });
+      let payload: any;
+      let verificationSucceeded = false;
+      
+      // Try verification with different key formats
+      // Whop docs show: webhookKey: btoa(process.env.WHOP_WEBHOOK_SECRET || "")
+      // But the secret from Whop dashboard might already be base64 encoded
+      const keyFormats = [
+        { name: "base64-encoded", key: Buffer.from(webhookSecret).toString('base64') },
+        { name: "raw-secret", key: webhookSecret },
+      ];
+      
+      for (const format of keyFormats) {
+        try {
+          const whopsdk = new Whop({
+            apiKey: process.env.WHOP_API_KEY,
+            webhookKey: format.key,
+          });
+          
+          payload = whopsdk.webhooks.unwrap(rawBody, { headers: headersObj });
+          console.log(`[WHOP WEBHOOK] SDK verification successful with ${format.name}! Event type:`, payload.type);
+          verificationSucceeded = true;
+          break;
+        } catch (err: any) {
+          console.log(`[WHOP WEBHOOK] ${format.name} verification failed:`, err.message);
+        }
       }
       
-      // Verify signature using Standard Webhooks format
-      // Format: "v1,<base64-signature>"
-      const signedContent = `${webhookId}.${webhookTimestamp}.${rawBody}`;
-      const crypto = await import('crypto');
-      const secretBytes = Buffer.from(webhookSecret.replace('whsec_', ''), 'base64');
-      const expectedSignature = crypto.createHmac('sha256', secretBytes)
-        .update(signedContent)
-        .digest('base64');
-      
-      // Check if any provided signature matches
-      const signatures = webhookSignature.split(' ');
-      const isValid = signatures.some(sig => {
-        const [version, sigValue] = sig.split(',');
-        return version === 'v1' && sigValue === expectedSignature;
-      });
-      
-      if (!isValid) {
-        console.error("[WHOP WEBHOOK] Invalid signature");
-        return res.status(401).json({ error: "Invalid webhook signature" });
+      if (!verificationSucceeded) {
+        console.error("[WHOP WEBHOOK] All verification attempts failed");
+        
+        // Log header values for debugging (masked for security)
+        const webhookId = req.headers['webhook-id'] as string;
+        const webhookTimestamp = req.headers['webhook-timestamp'] as string;
+        const webhookSignature = req.headers['webhook-signature'] as string;
+        console.log("[WHOP WEBHOOK] Debug - webhook-id:", webhookId);
+        console.log("[WHOP WEBHOOK] Debug - webhook-timestamp:", webhookTimestamp);
+        console.log("[WHOP WEBHOOK] Debug - signature (first 20 chars):", webhookSignature?.substring(0, 20) + "...");
+        console.log("[WHOP WEBHOOK] Debug - secret configured:", !!webhookSecret);
+        console.log("[WHOP WEBHOOK] Debug - secret length:", webhookSecret?.length);
+        
+        // Return 401 immediately - do not process unverified payloads
+        return res.status(401).json({ error: "Webhook signature verification failed" });
       }
-      
-      // Parse the verified payload
-      const payload = JSON.parse(rawBody);
-      console.log("[WHOP WEBHOOK] Received event:", payload.type);
       
       // Handle payment.succeeded event
       if (payload.type === "payment.succeeded") {
@@ -3997,6 +4020,69 @@ ${posts.map(post => `  <url>
       });
     } catch (error: any) {
       console.error('[ADMIN] Failed to trigger bot engine:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint: Manually credit premium shares (for failed Whop purchases)
+  app.post("/api/admin/premium/credit", adminAuth, async (req, res) => {
+    try {
+      const { userId, quantity, reason } = req.body;
+      
+      if (!userId || !quantity) {
+        return res.status(400).json({ error: "userId and quantity are required" });
+      }
+      
+      const qty = parseInt(quantity);
+      if (isNaN(qty) || qty <= 0) {
+        return res.status(400).json({ error: "quantity must be a positive integer" });
+      }
+      
+      // Verify user exists
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Get current premium holding
+      const existingHolding = await storage.getHolding(userId, "premium", "premium");
+      const currentQuantity = existingHolding?.quantity || 0;
+      const newQuantity = currentQuantity + qty;
+      
+      // Credit the shares
+      await storage.updateHolding(userId, "premium", "premium", newQuantity, "5.0000");
+      
+      console.log(`[ADMIN] Manually credited ${qty} premium shares to user ${userId}. Reason: ${reason || 'No reason provided'}`);
+      
+      // Broadcast portfolio update
+      broadcast({ type: "portfolio" });
+      
+      res.json({
+        success: true,
+        userId,
+        previousQuantity: currentQuantity,
+        creditedQuantity: qty,
+        newQuantity,
+        reason: reason || 'Manual credit by admin',
+      });
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to credit premium shares:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint: View pending premium checkout sessions
+  app.get("/api/admin/premium/sessions", adminAuth, async (req, res) => {
+    try {
+      const sessions = await db
+        .select()
+        .from(premiumCheckoutSessions)
+        .orderBy(desc(premiumCheckoutSessions.createdAt))
+        .limit(50);
+      
+      res.json({ sessions });
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to get premium sessions:', error.message);
       res.status(500).json({ error: error.message });
     }
   });
