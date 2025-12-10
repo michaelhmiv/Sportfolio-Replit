@@ -421,6 +421,39 @@ export const premiumCheckoutSessions = pgTable("premium_checkout_sessions", {
   receiptIdx: index("premium_checkout_receipt_idx").on(table.receiptId),
 }));
 
+// Premium orders table - limit and market orders for premium share trading
+export const premiumOrders = pgTable("premium_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orderType: text("order_type").notNull(), // "limit" or "market"
+  side: text("side").notNull(), // "buy" or "sell"
+  quantity: integer("quantity").notNull(),
+  filledQuantity: integer("filled_quantity").notNull().default(0),
+  limitPrice: decimal("limit_price", { precision: 10, scale: 2 }), // null for market orders
+  status: text("status").notNull().default("open"), // "open", "filled", "cancelled", "partial"
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  sideStatusIdx: index("premium_orders_side_status_idx").on(table.side, table.status),
+  userIdx: index("premium_orders_user_idx").on(table.userId),
+  createdAtIdx: index("premium_orders_created_idx").on(table.createdAt),
+}));
+
+// Premium trades table - executed premium share trade history
+export const premiumTrades = pgTable("premium_trades", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  buyerId: varchar("buyer_id").notNull().references(() => users.id),
+  sellerId: varchar("seller_id").notNull().references(() => users.id),
+  buyOrderId: varchar("buy_order_id").references(() => premiumOrders.id),
+  sellOrderId: varchar("sell_order_id").references(() => premiumOrders.id),
+  quantity: integer("quantity").notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  executedAt: timestamp("executed_at").notNull().defaultNow(),
+}, (table) => ({
+  executedIdx: index("premium_trades_executed_idx").on(table.executedAt),
+  buyerIdx: index("premium_trades_buyer_idx").on(table.buyerId),
+  sellerIdx: index("premium_trades_seller_idx").on(table.sellerId),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   holdings: many(holdings),
@@ -669,3 +702,23 @@ export const insertPremiumCheckoutSessionSchema = createInsertSchema(premiumChec
 
 export type PremiumCheckoutSession = typeof premiumCheckoutSessions.$inferSelect;
 export type InsertPremiumCheckoutSession = z.infer<typeof insertPremiumCheckoutSessionSchema>;
+
+// Premium order schemas and types
+export const insertPremiumOrderSchema = createInsertSchema(premiumOrders).omit({
+  id: true,
+  filledQuantity: true,
+  status: true,
+  createdAt: true,
+});
+
+export type PremiumOrder = typeof premiumOrders.$inferSelect;
+export type InsertPremiumOrder = z.infer<typeof insertPremiumOrderSchema>;
+
+// Premium trade schemas and types
+export const insertPremiumTradeSchema = createInsertSchema(premiumTrades).omit({
+  id: true,
+  executedAt: true,
+});
+
+export type PremiumTrade = typeof premiumTrades.$inferSelect;
+export type InsertPremiumTrade = z.infer<typeof insertPremiumTradeSchema>;
