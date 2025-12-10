@@ -25,7 +25,8 @@ interface PremiumTradeData {
   isPremium: boolean;
 }
 
-const FIXED_PRICE = 5.00;
+// Default price suggestion for new orders - actual market price is determined by trades
+const DEFAULT_PRICE_SUGGESTION = 5.00;
 
 export default function PremiumTradePage() {
   const searchString = useSearch();
@@ -34,7 +35,7 @@ export default function PremiumTradePage() {
   const [orderType, setOrderType] = useState<"limit" | "market">("limit");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [quantity, setQuantity] = useState("");
-  const [limitPrice, setLimitPrice] = useState(FIXED_PRICE.toFixed(2));
+  const [limitPrice, setLimitPrice] = useState(DEFAULT_PRICE_SUGGESTION.toFixed(2));
   const [hasAppliedUrlParams, setHasAppliedUrlParams] = useState(false);
 
   // Fetch premium trading data
@@ -118,7 +119,12 @@ export default function PremiumTradePage() {
 
   const balance = parseFloat(data?.userBalance || "0");
   const holding = data?.premiumShares || 0;
-  const orderValue = parseFloat(quantity || "0") * parseFloat(limitPrice || FIXED_PRICE.toString());
+  const orderValue = parseFloat(quantity || "0") * parseFloat(limitPrice || DEFAULT_PRICE_SUGGESTION.toString());
+  
+  // Get last trade price from recent trades (market price is determined by actual trades)
+  const lastTradePrice = data?.recentTrades && data.recentTrades.length > 0 
+    ? parseFloat(data.recentTrades[0].price) 
+    : null;
 
   // Validation
   const canBuy = side === "buy" && balance >= orderValue && parseInt(quantity) > 0;
@@ -171,12 +177,12 @@ export default function PremiumTradePage() {
       </div>
 
       {/* Stats Bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card className="bg-gradient-to-br from-yellow-500/5 to-amber-500/5 border-yellow-500/20">
           <CardContent className="p-4">
-            <div className="text-sm text-muted-foreground">Market Price</div>
+            <div className="text-sm text-muted-foreground">Last Trade</div>
             <div className="text-2xl font-bold text-yellow-500" data-testid="text-premium-price">
-              ${FIXED_PRICE.toFixed(2)}
+              {lastTradePrice !== null ? `$${lastTradePrice.toFixed(2)}` : "No trades yet"}
             </div>
           </CardContent>
         </Card>
@@ -185,16 +191,7 @@ export default function PremiumTradePage() {
           <CardContent className="p-4">
             <div className="text-sm text-muted-foreground">Your Holdings</div>
             <div className="text-2xl font-bold" data-testid="text-premium-holding">
-              {holding}
-            </div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-4">
-            <div className="text-sm text-muted-foreground">Holdings Value</div>
-            <div className="text-2xl font-bold">
-              ${(holding * FIXED_PRICE).toFixed(2)}
+              {holding} share{holding !== 1 ? 's' : ''}
             </div>
           </CardContent>
         </Card>
@@ -207,6 +204,13 @@ export default function PremiumTradePage() {
             </div>
           </CardContent>
         </Card>
+      </div>
+
+      {/* Disclaimer */}
+      <div className="bg-muted/50 border border-muted rounded-lg p-3 text-sm text-muted-foreground">
+        Premium shares are <span className="font-medium text-foreground">in-game consumable items</span>. 
+        They can be redeemed for premium access or traded with other users for in-game currency. 
+        Premium shares have no cash value and <span className="font-medium text-foreground">cannot be withdrawn for real money</span>.
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -373,10 +377,16 @@ export default function PremiumTradePage() {
                 )}
               </div>
 
-              {/* Spread */}
+              {/* Spread / Last Trade */}
               <div className="text-center py-2 border-y">
-                <span className="text-lg font-bold text-yellow-500">${FIXED_PRICE.toFixed(2)}</span>
-                <span className="text-xs text-muted-foreground ml-2">Market Price</span>
+                {lastTradePrice !== null ? (
+                  <>
+                    <span className="text-lg font-bold text-yellow-500">${lastTradePrice.toFixed(2)}</span>
+                    <span className="text-xs text-muted-foreground ml-2">Last Trade</span>
+                  </>
+                ) : (
+                  <span className="text-sm text-muted-foreground">No trades yet</span>
+                )}
               </div>
 
               {/* Bids (Buy orders) */}
@@ -420,7 +430,7 @@ export default function PremiumTradePage() {
               <div className="flex items-start gap-3">
                 <Crown className="h-5 w-5 text-yellow-500 mt-0.5" />
                 <div>
-                  <div className="font-medium">Double Mining Rate</div>
+                  <div className="font-medium">Double Vesting Rate</div>
                   <div className="text-sm text-muted-foreground">
                     200 shares/hour (vs 100 for free users)
                   </div>
@@ -429,7 +439,7 @@ export default function PremiumTradePage() {
               <div className="flex items-start gap-3">
                 <Crown className="h-5 w-5 text-yellow-500 mt-0.5" />
                 <div>
-                  <div className="font-medium">Higher Mining Cap</div>
+                  <div className="font-medium">Higher Vesting Cap</div>
                   <div className="text-sm text-muted-foreground">
                     4,800 shares/day (vs 2,400 for free users)
                   </div>
