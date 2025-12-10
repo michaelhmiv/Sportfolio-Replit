@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, DollarSign, Crown, Clock, ShoppingCart, Trophy, ArrowUpRight, ArrowDownRight, ArrowUpDown, ChevronUp, ChevronDown } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Crown, Clock, ShoppingCart, Trophy, ArrowUpRight, ArrowDownRight, ArrowUpDown, ChevronUp, ChevronDown, Plus } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
@@ -279,15 +279,18 @@ export default function Portfolio() {
                       {parseFloat(data?.totalPnL || "0") >= 0 ? '+' : ''}${data?.totalPnL}
                     </div>
                   </div>
-                  <div className="flex-1 min-w-0 text-right">
-                    <div className="flex items-center justify-end gap-1 text-muted-foreground uppercase tracking-wide mb-0.5">
-                      <Crown className="w-3 h-3 text-yellow-500" />
-                      <span>Premium</span>
+                  <Link href="/premium">
+                    <div className="flex-1 min-w-0 text-right cursor-pointer hover-elevate rounded-md p-1 -m-1" data-testid="link-premium-mobile">
+                      <div className="flex items-center justify-end gap-1 text-muted-foreground uppercase tracking-wide mb-0.5">
+                        <Crown className="w-3 h-3 text-yellow-500" />
+                        <span>Premium</span>
+                        <Plus className="w-3 h-3 text-yellow-500" />
+                      </div>
+                      <div className="font-mono font-bold text-yellow-500" data-testid="text-premium-shares">
+                        {data?.premiumShares || 0}
+                      </div>
                     </div>
-                    <div className="font-mono font-bold text-yellow-500" data-testid="text-premium-shares">
-                      {data?.premiumShares || 0}
-                    </div>
-                  </div>
+                  </Link>
                 </div>
               </CardContent>
             </Card>
@@ -333,33 +336,42 @@ export default function Portfolio() {
                 </CardContent>
               </Card>
 
-              <Card className={data?.isPremium ? "border-yellow-500/50 bg-gradient-to-br from-yellow-500/5 to-amber-500/5" : ""}>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium uppercase tracking-wide">Premium Shares</CardTitle>
-                  <Crown className="w-4 h-4 text-yellow-500" />
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-mono font-bold text-yellow-500" data-testid="text-premium-shares-desktop">
-                    {data?.premiumShares || 0}
-                  </div>
-                  {data?.isPremium && data?.premiumExpiresAt && (
-                    <div className="text-sm text-muted-foreground">
-                      Expires {formatDistanceToNow(new Date(data.premiumExpiresAt), { addSuffix: true })}
+              <Card className={`${data?.isPremium ? "border-yellow-500/50 bg-gradient-to-br from-yellow-500/5 to-amber-500/5" : ""} hover-elevate cursor-pointer`}>
+                <Link href="/premium">
+                  <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium uppercase tracking-wide">Premium Shares</CardTitle>
+                    <div className="flex items-center gap-1">
+                      <Crown className="w-4 h-4 text-yellow-500" />
+                      <Plus className="w-4 h-4 text-yellow-500" data-testid="button-add-premium-desktop" />
                     </div>
-                  )}
-                  {(!data?.isPremium && (data?.premiumShares || 0) > 0) && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="mt-2 h-7 text-xs border-yellow-500/50 text-yellow-600 hover:bg-yellow-500/10"
-                      onClick={() => redeemPremiumMutation.mutate()}
-                      disabled={redeemPremiumMutation.isPending}
-                      data-testid="button-redeem-premium-desktop"
-                    >
-                      {redeemPremiumMutation.isPending ? "Redeeming..." : "Redeem for 30 days"}
-                    </Button>
-                  )}
-                </CardContent>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-mono font-bold text-yellow-500" data-testid="text-premium-shares-desktop">
+                      {data?.premiumShares || 0}
+                    </div>
+                    {data?.isPremium && data?.premiumExpiresAt && (
+                      <div className="text-sm text-muted-foreground">
+                        Expires {formatDistanceToNow(new Date(data.premiumExpiresAt), { addSuffix: true })}
+                      </div>
+                    )}
+                    {(!data?.isPremium && (data?.premiumShares || 0) > 0) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="mt-2 h-7 text-xs border-yellow-500/50 text-yellow-600 hover:bg-yellow-500/10"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          redeemPremiumMutation.mutate();
+                        }}
+                        disabled={redeemPremiumMutation.isPending}
+                        data-testid="button-redeem-premium-desktop"
+                      >
+                        {redeemPremiumMutation.isPending ? "Redeeming..." : "Redeem for 30 days"}
+                      </Button>
+                    )}
+                  </CardContent>
+                </Link>
               </Card>
             </div>
           </div>
