@@ -21,7 +21,7 @@ import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { calculateVestingShares } from "@shared/vesting-utils";
 import { MarketActivityWidget } from "@/components/market-activity-widget";
 import { PlayerName } from "@/components/player-name";
-import { AdSenseAd } from "@/components/adsense-ad";
+import { WhopAd } from "@/components/whop-ad";
 import { Shimmer, ShimmerCard, ScrollReveal, AnimatedButton, SwipeHint } from "@/components/ui/animations";
 import { AnimatedPrice } from "@/components/ui/animated-price";
 
@@ -1216,7 +1216,7 @@ export default function Dashboard() {
                 if ((index + 1) % 6 === 0 && index < filteredPlayers.length - 1) {
                   items.push(
                     <div key={`ad-${index}`} className="my-2">
-                      <AdSenseAd slot="2800193816" format="fluid" layoutKey="-i2-7+2w-11-86" />
+                      <WhopAd />
                     </div>
                   );
                 }

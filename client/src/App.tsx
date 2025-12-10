@@ -16,7 +16,6 @@ import { NotificationProvider } from "@/lib/notification-context";
 import { useAuth } from "@/hooks/useAuth";
 import { OnboardingModal } from "@/components/onboarding-modal";
 import { AnimatePresence, motion } from "framer-motion";
-import { refreshEzoicAds } from "@/components/ezoic-ad";
 import Dashboard from "@/pages/dashboard";
 import Marketplace from "@/pages/marketplace";
 import PlayerPage from "@/pages/player";
@@ -83,10 +82,6 @@ function Router() {
     }
   }, [isAuthenticated]);
 
-  // Refresh Ezoic ads on route changes (SPA navigation)
-  useEffect(() => {
-    refreshEzoicAds();
-  }, [location]);
 
   if (isLoading) {
     return (

@@ -14,7 +14,7 @@ import { Link, useLocation, useSearch } from "wouter";
 import type { Player } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
 import { PlayerName } from "@/components/player-name";
-import { AdSenseAd } from "@/components/adsense-ad";
+import { WhopAd } from "@/components/whop-ad";
 import { Shimmer, ScrollReveal } from "@/components/ui/animations";
 import { AnimatedPrice } from "@/components/ui/animated-price";
 import { AnimatedList } from "@/components/ui/animated-list";
@@ -484,8 +484,8 @@ export default function Marketplace() {
                         return [
                           playerRow,
                           <tr key={`ad-${index}`} className="border-b">
-                            <td colSpan={7} className="p-0">
-                              <AdSenseAd slot="8848272002" format="fluid" layoutKey="-i2-7+2w-11-86" className="py-4" />
+                            <td colSpan={7} className="py-4">
+                              <WhopAd />
                             </td>
                           </tr>
                         ];

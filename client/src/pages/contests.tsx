@@ -9,7 +9,7 @@ import { Trophy, Users, DollarSign, Clock, Calendar, ChevronLeft, ChevronRight }
 import { Link } from "wouter";
 import { format } from "date-fns";
 import type { Contest, ContestEntry } from "@shared/schema";
-import { AdSenseAd } from "@/components/adsense-ad";
+import { WhopAd } from "@/components/whop-ad";
 import { ShimmerCard } from "@/components/ui/animations";
 import { AnimatedCard } from "@/components/ui/animated-card";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -349,14 +349,10 @@ export default function Contests() {
           </>
         )}
 
-        {/* AdSense Ad - Contests */}
+        {/* Whop Ad - Contests */}
         {contests.length > 0 && (
           <div className="my-6">
-            <AdSenseAd 
-              slot="9148489051" 
-              format="auto" 
-              fullWidthResponsive={true}
-            />
+            <WhopAd />
           </div>
         )}
         
