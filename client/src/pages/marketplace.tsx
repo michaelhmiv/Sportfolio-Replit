@@ -151,36 +151,6 @@ export default function Marketplace() {
           <p className="text-muted-foreground">Browse and trade player shares</p>
         </div>
 
-        {/* Premium Shares Section */}
-        <Card className="mb-4 border-yellow-500/30 bg-gradient-to-r from-yellow-500/5 to-amber-500/5">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between flex-wrap gap-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-yellow-500/10 rounded-lg">
-                  <Crown className="h-6 w-6 text-yellow-500" />
-                </div>
-                <div>
-                  <div className="font-semibold flex items-center gap-2">
-                    Premium Shares
-                    <Badge variant="outline" className="text-yellow-500 border-yellow-500/50">
-                      $5.00
-                    </Badge>
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Redeem for 30 days premium or trade on the marketplace
-                  </div>
-                </div>
-              </div>
-              <Link href="/premium">
-                <Button className="bg-yellow-500 hover:bg-yellow-600 text-black" data-testid="button-view-premium">
-                  <Crown className="h-4 w-4 mr-2" />
-                  Buy Premium Shares
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
           <TabsList className="grid w-full max-w-md grid-cols-2">
             <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
@@ -390,6 +360,80 @@ export default function Marketplace() {
                     </tr>
                   </thead>
                   <tbody>
+                    {/* Premium Shares Row - Always First */}
+                    <tr 
+                      key="premium-share"
+                      className="border-b hover-elevate bg-gradient-to-r from-yellow-500/5 to-amber-500/5"
+                      data-testid="row-premium-share"
+                    >
+                      {/* Mobile layout: stacked info */}
+                      <td className="px-2 py-2 sm:hidden" colSpan={6}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0 flex-1">
+                            <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                              <Crown className="w-4 h-4 text-yellow-500" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium text-sm text-yellow-500">Premium Share</div>
+                              <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                                <span className="text-muted-foreground">30 Days Access</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 text-xs mt-0.5">
+                                <span className="font-mono font-bold text-yellow-500">$5.00</span>
+                                <span className="text-muted-foreground">•</span>
+                                <span className="text-blue-500 dark:text-blue-400 font-mono font-bold">$5.00</span>
+                                <span className="text-muted-foreground">/</span>
+                                <span className="text-red-500 dark:text-red-400 font-mono font-bold">$5.00</span>
+                                <span className="text-muted-foreground">•</span>
+                                <span className="text-muted-foreground">Vol: -</span>
+                              </div>
+                            </div>
+                          </div>
+                          <Link href="/premium">
+                            <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black" data-testid="button-trade-premium">Trade</Button>
+                          </Link>
+                        </div>
+                      </td>
+
+                      {/* Desktop layout: table cells */}
+                      <td className="px-2 py-1.5 hidden sm:table-cell">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                            <Crown className="w-4 h-4 text-yellow-500" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-sm text-yellow-500">Premium Share</div>
+                            <div className="text-xs text-muted-foreground md:hidden">30 Days Access</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-2 py-1.5 hidden md:table-cell">
+                        <Badge variant="outline" className="text-xs text-yellow-500 border-yellow-500/50">PREMIUM</Badge>
+                      </td>
+                      <td className="px-2 py-1.5 text-right hidden sm:table-cell">
+                        <span className="font-mono font-bold text-yellow-500">$5.00</span>
+                      </td>
+                      <td className="px-2 py-1.5 text-right hidden lg:table-cell">
+                        <div className="flex items-center justify-end gap-2 font-mono text-sm font-bold">
+                          <span className="text-blue-500 dark:text-blue-400">$5.00</span>
+                          <span className="text-muted-foreground font-normal">×</span>
+                          <span className="text-red-500 dark:text-red-400">$5.00</span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-1.5 text-right hidden lg:table-cell">
+                        <span className="text-xs text-muted-foreground">-</span>
+                      </td>
+                      <td className="px-2 py-1.5 text-right hidden md:table-cell">
+                        <div className="flex items-center justify-end gap-1 text-muted-foreground">
+                          <span className="font-medium text-xs">-</span>
+                        </div>
+                      </td>
+                      <td className="px-2 py-1.5 hidden sm:table-cell">
+                        <Link href="/premium">
+                          <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black" data-testid="button-trade-premium-desktop">Trade</Button>
+                        </Link>
+                      </td>
+                    </tr>
                     {players.flatMap((player: PlayerWithOrderBook, index: number) => {
                       const playerRow = (
                       <tr 

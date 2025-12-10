@@ -572,55 +572,78 @@ export default function Portfolio() {
                       </thead>
                       <tbody>
                       {(data?.premiumShares ?? 0) > 0 && data && (
-                        <tr className="border-b hover-elevate" data-testid="row-premium-shares">
+                        <tr className="border-b hover-elevate bg-gradient-to-r from-yellow-500/5 to-amber-500/5" data-testid="row-premium-shares">
                           {/* Mobile layout */}
                           <td className="px-2 py-2 sm:hidden" colSpan={8}>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <Crown className="w-8 h-8 text-yellow-500 flex-shrink-0" />
+                                <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                                  <Crown className="w-4 h-4 text-yellow-500" />
+                                </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className="font-medium text-sm">Premium Share</div>
-                                  <div className="text-xs text-muted-foreground">Qty: {data.premiumShares} • Redeemable for 30 days</div>
+                                  <div className="font-medium text-sm text-yellow-500">Premium Share</div>
+                                  <div className="text-xs text-muted-foreground">Qty: {data.premiumShares} • 30 Days Access</div>
+                                  <div className="flex items-center gap-1.5 text-xs mt-0.5">
+                                    <span className="font-mono font-bold text-yellow-500">$5.00</span>
+                                    <span className="text-muted-foreground">•</span>
+                                    <span className="font-mono">Value: ${(data.premiumShares * 5).toFixed(2)}</span>
+                                  </div>
                                 </div>
                               </div>
-                              <Button
-                                size="sm"
-                                onClick={() => redeemPremiumMutation.mutate()}
-                                disabled={redeemPremiumMutation.isPending || data.isPremium}
-                                className="bg-yellow-500 hover:bg-yellow-600 text-black"
-                                data-testid="button-redeem-premium"
-                              >
-                                {data.isPremium ? "Active" : "Redeem"}
-                              </Button>
+                              <div className="flex gap-1">
+                                <Link href="/premium">
+                                  <Button size="sm" variant="outline" className="border-yellow-500/50 text-yellow-500" data-testid="button-trade-premium">
+                                    Trade
+                                  </Button>
+                                </Link>
+                                <Button
+                                  size="sm"
+                                  onClick={() => redeemPremiumMutation.mutate()}
+                                  disabled={redeemPremiumMutation.isPending || data.isPremium}
+                                  className="bg-yellow-500 hover:bg-yellow-600 text-black"
+                                  data-testid="button-redeem-premium"
+                                >
+                                  {data.isPremium ? "Active" : "Redeem"}
+                                </Button>
+                              </div>
                             </div>
                           </td>
 
                           {/* Desktop layout */}
                           <td className="px-2 py-1.5 hidden sm:table-cell">
                             <div className="flex items-center gap-2">
-                              <Crown className="w-8 h-8 text-yellow-500" />
+                              <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                                <Crown className="w-4 h-4 text-yellow-500" />
+                              </div>
                               <div>
-                                <div className="font-medium text-sm">Premium Share</div>
-                                <div className="text-xs text-muted-foreground">Redeemable for 30 days access</div>
+                                <div className="font-medium text-sm text-yellow-500">Premium Share</div>
+                                <div className="text-xs text-muted-foreground">30 Days Access</div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">{data.premiumShares}</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">$5.00</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden md:table-cell">$5.00</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">-</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">-</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden xl:table-cell">${(data.premiumShares * 5).toFixed(2)}</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell text-yellow-500 font-bold">{data.premiumShares}</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell text-yellow-500">$5.00</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden md:table-cell text-yellow-500">$5.00</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell text-blue-500 dark:text-blue-400">$5.00</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell text-red-500 dark:text-red-400">$5.00</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden xl:table-cell text-yellow-500 font-bold">${(data.premiumShares * 5).toFixed(2)}</td>
                           <td className="px-2 py-1.5 text-right hidden sm:table-cell">
-                            <Button
-                              size="sm"
-                              onClick={() => redeemPremiumMutation.mutate()}
-                              disabled={redeemPremiumMutation.isPending || data.isPremium}
-                              className="bg-yellow-500 hover:bg-yellow-600 text-black"
-                              data-testid="button-redeem-premium-desktop"
-                            >
-                              {data.isPremium ? "Active" : "Redeem"}
-                            </Button>
+                            <div className="flex gap-1 justify-end">
+                              <Link href="/premium">
+                                <Button size="sm" variant="outline" className="border-yellow-500/50 text-yellow-500" data-testid="button-trade-premium-desktop">
+                                  Trade
+                                </Button>
+                              </Link>
+                              <Button
+                                size="sm"
+                                onClick={() => redeemPremiumMutation.mutate()}
+                                disabled={redeemPremiumMutation.isPending || data.isPremium}
+                                className="bg-yellow-500 hover:bg-yellow-600 text-black"
+                                data-testid="button-redeem-premium-desktop"
+                              >
+                                {data.isPremium ? "Active" : "Redeem"}
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       )}
