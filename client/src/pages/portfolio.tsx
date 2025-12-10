@@ -571,13 +571,13 @@ export default function Portfolio() {
                         </tr>
                       </thead>
                       <tbody>
-                      {(data?.premiumShares ?? 0) > 0 && (
+                      {(data?.premiumShares ?? 0) > 0 && data && (
                         <tr className="border-b hover-elevate" data-testid="row-premium-shares">
                           {/* Mobile layout */}
                           <td className="px-2 py-2 sm:hidden" colSpan={8}>
                             <div className="flex items-center justify-between gap-2">
                               <div className="flex items-center gap-2 min-w-0 flex-1">
-                                <Crown className="w-8 h-8 text-primary flex-shrink-0" />
+                                <Crown className="w-8 h-8 text-yellow-500 flex-shrink-0" />
                                 <div className="min-w-0 flex-1">
                                   <div className="font-medium text-sm">Premium Share</div>
                                   <div className="text-xs text-muted-foreground">Qty: {data.premiumShares} • Redeemable for 30 days</div>
@@ -587,6 +587,7 @@ export default function Portfolio() {
                                 size="sm"
                                 onClick={() => redeemPremiumMutation.mutate()}
                                 disabled={redeemPremiumMutation.isPending || data.isPremium}
+                                className="bg-yellow-500 hover:bg-yellow-600 text-black"
                                 data-testid="button-redeem-premium"
                               >
                                 {data.isPremium ? "Active" : "Redeem"}
@@ -597,7 +598,7 @@ export default function Portfolio() {
                           {/* Desktop layout */}
                           <td className="px-2 py-1.5 hidden sm:table-cell">
                             <div className="flex items-center gap-2">
-                              <Crown className="w-8 h-8 text-primary" />
+                              <Crown className="w-8 h-8 text-yellow-500" />
                               <div>
                                 <div className="font-medium text-sm">Premium Share</div>
                                 <div className="text-xs text-muted-foreground">Redeemable for 30 days access</div>
@@ -605,16 +606,17 @@ export default function Portfolio() {
                             </div>
                           </td>
                           <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">{data.premiumShares}</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">$5.00</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden md:table-cell">$5.00</td>
                           <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">-</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden md:table-cell">-</td>
                           <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">-</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell">-</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden xl:table-cell">-</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden xl:table-cell">${(data.premiumShares * 5).toFixed(2)}</td>
                           <td className="px-2 py-1.5 text-right hidden sm:table-cell">
                             <Button
                               size="sm"
                               onClick={() => redeemPremiumMutation.mutate()}
                               disabled={redeemPremiumMutation.isPending || data.isPremium}
+                              className="bg-yellow-500 hover:bg-yellow-600 text-black"
                               data-testid="button-redeem-premium-desktop"
                             >
                               {data.isPremium ? "Active" : "Redeem"}

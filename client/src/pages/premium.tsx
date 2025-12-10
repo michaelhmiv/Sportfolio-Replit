@@ -85,15 +85,21 @@ export default function Premium() {
       setCheckoutSession(session);
       setShowCheckout(true);
       
-      // Open Whop checkout in a new tab
-      const whopPlanId = session.planId;
-      const checkoutUrl = `https://whop.com/checkout/${whopPlanId}?quantity=${quantity}&metadata[sessionId]=${session.sessionId}`;
-      window.open(checkoutUrl, "_blank");
-      
-      toast({
-        title: "Checkout Opened",
-        description: "Complete your purchase in the new tab. Your shares will be credited automatically.",
-      });
+      // Open Whop checkout in a new tab using the purchaseUrl from API
+      const checkoutUrl = session.purchaseUrl;
+      if (checkoutUrl) {
+        window.open(checkoutUrl, "_blank");
+        
+        toast({
+          title: "Checkout Opened",
+          description: "Complete your purchase in the new tab. Your shares will be credited automatically.",
+        });
+      } else {
+        toast({
+          title: "Checkout Session Created",
+          description: "Please complete your purchase at whop.com",
+        });
+      }
     } catch (error: any) {
       toast({
         title: "Checkout Failed",

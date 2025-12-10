@@ -3159,7 +3159,7 @@ ${posts.map(post => `  <url>
     }
   });
 
-  // Premium checkout - create a checkout session for Whop
+  // Premium checkout - create a checkout session via Whop API
   app.post("/api/premium/checkout-session", isAuthenticated, async (req, res) => {
     try {
       const userId = getUserId(req);
@@ -3170,31 +3170,124 @@ ${posts.map(post => `  <url>
       
       const { quantity = 1 } = req.body;
       const planId = process.env.WHOP_PLAN_ID;
+      const apiKey = process.env.WHOP_API_KEY;
       
       if (!planId) {
         return res.status(500).json({ error: "Whop plan ID not configured" });
       }
       
+      if (!apiKey) {
+        return res.status(500).json({ error: "Whop API key not configured" });
+      }
+      
       const PRICE_PER_SHARE_CENTS = 500; // $5.00 per premium share
       const amountCents = quantity * PRICE_PER_SHARE_CENTS;
       
-      // Create a checkout session record
-      const session = await storage.createPremiumCheckoutSession({
+      // Create a local checkout session record first
+      const localSession = await storage.createPremiumCheckoutSession({
         userId: user.id,
         planId,
         quantity,
         amountCents,
       });
       
-      res.json({
-        sessionId: session.id,
-        planId,
-        quantity,
-        amountCents,
-        email: user.email,
-      });
+      // Call Whop API to create a checkout session
+      const baseUrl = process.env.REPLIT_DEPLOYMENT_URL || 
+                     `https://${process.env.REPLIT_DEV_DOMAIN}` || 
+                     'http://localhost:5000';
+      
+      try {
+        const whopResponse = await fetch('https://api.whop.com/api/v2/checkout-sessions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            plan_id: planId,
+            redirect_url: `${baseUrl}/premium?purchased=true&quantity=${quantity}`,
+            metadata: {
+              sessionId: localSession.id,
+              userId: user.id,
+              quantity: quantity.toString(),
+            },
+          }),
+        });
+        
+        if (!whopResponse.ok) {
+          const errorText = await whopResponse.text();
+          console.error("[WHOP] API error:", whopResponse.status, errorText);
+          throw new Error(`Whop API error: ${whopResponse.status}`);
+        }
+        
+        const whopSession = await whopResponse.json();
+        console.log("[WHOP] Checkout session created:", whopSession.id);
+        
+        res.json({
+          sessionId: localSession.id,
+          whopSessionId: whopSession.id,
+          purchaseUrl: whopSession.purchase_url,
+          planId,
+          quantity,
+          amountCents,
+          email: user.email,
+        });
+      } catch (whopError: any) {
+        // Fallback to direct checkout URL if API fails
+        console.error("[WHOP] API call failed, using direct URL:", whopError.message);
+        const directUrl = `https://whop.com/checkout/${planId}/?d2c=true`;
+        
+        res.json({
+          sessionId: localSession.id,
+          purchaseUrl: directUrl,
+          planId,
+          quantity,
+          amountCents,
+          email: user.email,
+          fallback: true,
+        });
+      }
     } catch (error: any) {
       console.error("[WHOP] Error creating checkout session:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+  
+  // Dev endpoint to grant premium shares for testing (only in development)
+  app.post("/api/dev/grant-premium-shares", async (req, res) => {
+    const isDev = process.env.NODE_ENV === 'development';
+    if (!isDev) {
+      return res.status(403).json({ error: "This endpoint is only available in development" });
+    }
+    
+    try {
+      const { userId, quantity = 1 } = req.body;
+      
+      if (!userId) {
+        return res.status(400).json({ error: "userId is required" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Grant premium shares
+      const existingHolding = await storage.getHolding(userId, "premium", "premium");
+      const currentQuantity = existingHolding?.quantity || 0;
+      const newQuantity = currentQuantity + quantity;
+      
+      await storage.updateHolding(userId, "premium", "premium", newQuantity, "5.0000");
+      
+      console.log(`[DEV] Granted ${quantity} premium shares to user ${userId}. Total: ${newQuantity}`);
+      
+      res.json({
+        success: true,
+        userId,
+        quantity,
+        totalShares: newQuantity,
+      });
+    } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
   });
