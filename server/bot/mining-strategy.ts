@@ -10,9 +10,10 @@ import { getMiningCandidates, type PlayerValuation } from "./player-valuation";
 import { logBotAction, type BotProfile } from "./bot-engine";
 import { calculateAccrualUpdate, type VestingCalculationParams } from "@shared/vesting-utils";
 
-const MINING_CAP = 2400; // 24-hour cap
+const MINING_CAP_FREE = 2400; // 24-hour cap for free users
+const MINING_CAP_PREMIUM = 4800; // 24-hour cap for premium users (double)
 const SHARES_PER_HOUR_FREE = 100;
-const SHARES_PER_HOUR_PREMIUM = 100;
+const SHARES_PER_HOUR_PREMIUM = 200; // Double rate for premium users
 
 interface MiningConfig {
   userId: string;
@@ -58,7 +59,7 @@ function calculateAccruedShares(
     residualMs,
     lastAccruedAt,
     sharesPerHour: isPremium ? SHARES_PER_HOUR_PREMIUM : SHARES_PER_HOUR_FREE,
-    capLimit: MINING_CAP,
+    capLimit: isPremium ? MINING_CAP_PREMIUM : MINING_CAP_FREE,
   };
   
   const result = calculateAccrualUpdate(params);
@@ -263,7 +264,8 @@ export async function executeMiningStrategy(
     })
     .where(eq(mining.id, miningState.id));
   
-  const claimThresholdShares = MINING_CAP * config.claimThreshold;
+  const miningCap = config.isPremium ? MINING_CAP_PREMIUM : MINING_CAP_FREE;
+  const claimThresholdShares = miningCap * config.claimThreshold;
   
   // Check if we should claim
   if (accrued.newTotal >= claimThresholdShares) {

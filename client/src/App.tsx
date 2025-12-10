@@ -39,6 +39,7 @@ import Contact from "@/pages/contact";
 import HowItWorks from "@/pages/how-it-works";
 import Analytics from "@/pages/analytics";
 import Premium from "@/pages/premium";
+import PremiumTrade from "@/pages/premium-trade";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
 import { LogOut, User } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
@@ -145,6 +146,9 @@ function Router() {
           </Route>
           <Route path="/premium">
             {isAuthenticated ? <Premium /> : <Dashboard />}
+          </Route>
+          <Route path="/premium/trade">
+            {isAuthenticated ? <PremiumTrade /> : <Dashboard />}
           </Route>
           
           {/* Auth error page - public, always accessible */}

@@ -2785,6 +2785,101 @@ export class DatabaseStorage implements IStorage {
       .where(eq(premiumCheckoutSessions.userId, userId))
       .orderBy(desc(premiumCheckoutSessions.createdAt));
   }
+
+  // Premium trading methods (in-memory for now)
+  private premiumOrders: Map<string, { orderId: string; userId: string; side: "buy" | "sell"; quantity: number; price: string; orderType: string; status: string; createdAt: Date }> = new Map();
+  private premiumTrades: Array<{ buyerId: string; sellerId: string; quantity: number; price: string; executedAt: Date }> = [];
+  private orderIdCounter = 0;
+
+  async getPremiumOrderBook(): Promise<{
+    bids: { price: string; quantity: number; userId: string; orderId: string }[];
+    asks: { price: string; quantity: number; userId: string; orderId: string }[];
+  }> {
+    const bids: { price: string; quantity: number; userId: string; orderId: string }[] = [];
+    const asks: { price: string; quantity: number; userId: string; orderId: string }[] = [];
+
+    Array.from(this.premiumOrders.entries()).forEach(([orderId, order]) => {
+      if (order.status !== "open" || order.quantity <= 0) return;
+      
+      if (order.side === "buy") {
+        bids.push({ price: order.price, quantity: order.quantity, userId: order.userId, orderId });
+      } else {
+        asks.push({ price: order.price, quantity: order.quantity, userId: order.userId, orderId });
+      }
+    });
+
+    // Sort bids high to low, asks low to high
+    bids.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
+    asks.sort((a, b) => parseFloat(a.price) - parseFloat(b.price));
+
+    return { bids, asks };
+  }
+
+  async getRecentPremiumTrades(limit: number): Promise<Array<{
+    buyerId: string;
+    sellerId: string;
+    quantity: number;
+    price: string;
+    executedAt: Date;
+    buyer: { username: string } | null;
+    seller: { username: string } | null;
+  }>> {
+    const trades = this.premiumTrades.slice(-limit).reverse();
+    
+    // Enrich with usernames
+    const enriched = await Promise.all(trades.map(async (trade) => {
+      const buyer = await this.getUser(trade.buyerId);
+      const seller = await this.getUser(trade.sellerId);
+      return {
+        ...trade,
+        buyer: buyer ? { username: buyer.username || "Unknown" } : null,
+        seller: seller ? { username: seller.username || "Unknown" } : null,
+      };
+    }));
+    
+    return enriched;
+  }
+
+  async createPremiumOrder(order: {
+    userId: string;
+    side: "buy" | "sell";
+    quantity: number;
+    price: string;
+    orderType: string;
+    status: string;
+  }): Promise<{ orderId: string }> {
+    const orderId = `prem_${++this.orderIdCounter}`;
+    this.premiumOrders.set(orderId, {
+      orderId,
+      ...order,
+      createdAt: new Date(),
+    });
+    return { orderId };
+  }
+
+  async updatePremiumOrderQuantity(orderId: string, newQuantity: number): Promise<void> {
+    const order = this.premiumOrders.get(orderId);
+    if (order) {
+      if (newQuantity <= 0) {
+        order.status = "filled";
+        order.quantity = 0;
+      } else {
+        order.quantity = newQuantity;
+      }
+    }
+  }
+
+  async createPremiumTrade(trade: {
+    buyerId: string;
+    sellerId: string;
+    quantity: number;
+    price: string;
+  }): Promise<void> {
+    this.premiumTrades.push({
+      ...trade,
+      executedAt: new Date(),
+    });
+  }
 }
 
 export const storage = new DatabaseStorage();

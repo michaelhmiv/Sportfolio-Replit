@@ -87,9 +87,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!usingSplits && !miningData.playerId) return;
 
     const now = new Date();
-    // Force non-premium rates for demo user (100 shares/hour total, 2400 cap)
-    const capLimit = 2400;
-    const totalSharesPerHour = 100;
+    // Premium users get double rate (200 shares/hour) and double cap (4800)
+    const isPremium = user.isPremium || false;
+    const capLimit = isPremium ? 4800 : 2400;
+    const totalSharesPerHour = isPremium ? 200 : 100;
 
     // If already at cap, don't accrue more - clear residual time
     if (miningData.sharesAccumulated >= capLimit) {
@@ -576,8 +577,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...miningData,
           player: miningPlayer,
           players: miningPlayers,
-          capLimit: 2400,
-          sharesPerHour: 100,
+          capLimit: user.isPremium ? 4800 : 2400,
+          sharesPerHour: user.isPremium ? 200 : 100,
         } : null,
         contests: allContests.slice(0, 5),
         recentTrades: recentTrades.map(trade => ({
@@ -3314,6 +3315,153 @@ ${posts.map(post => `  <url>
       res.status(500).json({ error: error.message });
     }
   });
+
+  // Get premium trading data (order book, holdings, etc.)
+  app.get("/api/premium/trade", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const premiumHolding = await storage.getHolding(user.id, "premium", "premium");
+      
+      // Get order book for premium shares
+      const orderBook = await storage.getPremiumOrderBook();
+      
+      // Get recent premium trades
+      const recentTrades = await storage.getRecentPremiumTrades(10);
+      
+      res.json({
+        premiumShares: premiumHolding?.quantity || 0,
+        userBalance: user.balance,
+        orderBook,
+        recentTrades,
+        isPremium: user.isPremium,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Place premium share order
+  app.post("/api/premium/orders", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const { side, quantity, orderType, limitPrice } = req.body;
+      
+      if (!side || !quantity || !orderType) {
+        return res.status(400).json({ error: "Missing required fields" });
+      }
+      
+      if (quantity <= 0) {
+        return res.status(400).json({ error: "Quantity must be positive" });
+      }
+      
+      const price = orderType === "limit" ? parseFloat(limitPrice) : 5.00;
+      const orderValue = quantity * price;
+      
+      if (side === "buy") {
+        // Check balance
+        if (parseFloat(user.balance) < orderValue) {
+          return res.status(400).json({ error: "Insufficient balance" });
+        }
+        
+        // Lock funds
+        await storage.updateUserBalance(user.id, (parseFloat(user.balance) - orderValue).toFixed(2));
+        
+        // Create buy order
+        const order = await storage.createPremiumOrder({
+          userId: user.id,
+          side: "buy",
+          quantity,
+          price: price.toFixed(4),
+          orderType,
+          status: "open",
+        });
+        
+        // Try to match with existing sell orders
+        await matchPremiumOrders();
+        
+        res.json({ success: true, order });
+      } else if (side === "sell") {
+        // Check holdings
+        const premiumHolding = await storage.getHolding(user.id, "premium", "premium");
+        if (!premiumHolding || premiumHolding.quantity < quantity) {
+          return res.status(400).json({ error: "Insufficient shares" });
+        }
+        
+        // Lock shares
+        await storage.updateHolding(user.id, "premium", "premium", premiumHolding.quantity - quantity, "5.0000");
+        
+        // Create sell order
+        const order = await storage.createPremiumOrder({
+          userId: user.id,
+          side: "sell",
+          quantity,
+          price: price.toFixed(4),
+          orderType,
+          status: "open",
+        });
+        
+        // Try to match with existing buy orders
+        await matchPremiumOrders();
+        
+        res.json({ success: true, order });
+      } else {
+        return res.status(400).json({ error: "Invalid order side" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Helper function to match premium orders
+  async function matchPremiumOrders() {
+    const orderBook = await storage.getPremiumOrderBook();
+    
+    for (const bid of orderBook.bids) {
+      for (const ask of orderBook.asks) {
+        // Match if bid price >= ask price
+        if (parseFloat(bid.price) >= parseFloat(ask.price)) {
+          const matchQuantity = Math.min(bid.quantity, ask.quantity);
+          const matchPrice = ask.price; // Use ask price for execution
+          const matchValue = matchQuantity * parseFloat(matchPrice);
+          
+          // Execute trade - transfer shares to buyer
+          const buyerHolding = await storage.getHolding(bid.userId, "premium", "premium");
+          const buyerQuantity = buyerHolding?.quantity || 0;
+          await storage.updateHolding(bid.userId, "premium", "premium", buyerQuantity + matchQuantity, "5.0000");
+          
+          // Give seller the cash
+          const seller = await storage.getUser(ask.userId);
+          if (seller) {
+            await storage.updateUserBalance(seller.id, (parseFloat(seller.balance) + matchValue).toFixed(2));
+          }
+          
+          // Update or remove orders
+          await storage.updatePremiumOrderQuantity(bid.orderId, bid.quantity - matchQuantity);
+          await storage.updatePremiumOrderQuantity(ask.orderId, ask.quantity - matchQuantity);
+          
+          // Record trade
+          await storage.createPremiumTrade({
+            buyerId: bid.userId,
+            sellerId: ask.userId,
+            quantity: matchQuantity,
+            price: matchPrice,
+          });
+          
+          console.log(`[PREMIUM] Matched ${matchQuantity} shares at $${matchPrice}`);
+        }
+      }
+    }
+  }
 
   // Whop webhook handler - receives payment.succeeded events
   app.post("/api/webhooks/whop", express.raw({ type: 'application/json' }), async (req, res) => {

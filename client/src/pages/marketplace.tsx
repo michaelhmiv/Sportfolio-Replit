@@ -389,7 +389,7 @@ export default function Marketplace() {
                               </div>
                             </div>
                           </div>
-                          <Link href="/premium">
+                          <Link href="/premium/trade">
                             <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black" data-testid="button-trade-premium">Trade</Button>
                           </Link>
                         </div>
@@ -429,7 +429,7 @@ export default function Marketplace() {
                         </div>
                       </td>
                       <td className="px-2 py-1.5 hidden sm:table-cell">
-                        <Link href="/premium">
+                        <Link href="/premium/trade">
                           <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black" data-testid="button-trade-premium-desktop">Trade</Button>
                         </Link>
                       </td>

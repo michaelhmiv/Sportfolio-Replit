@@ -591,7 +591,7 @@ export default function Portfolio() {
                                 </div>
                               </div>
                               <div className="flex gap-1">
-                                <Link href="/premium">
+                                <Link href="/premium/trade">
                                   <Button size="sm" variant="outline" className="border-yellow-500/50 text-yellow-500" data-testid="button-trade-premium">
                                     Trade
                                   </Button>
@@ -629,7 +629,7 @@ export default function Portfolio() {
                           <td className="px-2 py-1.5 text-right font-mono hidden xl:table-cell text-yellow-500 font-bold">${(data.premiumShares * 5).toFixed(2)}</td>
                           <td className="px-2 py-1.5 text-right hidden sm:table-cell">
                             <div className="flex gap-1 justify-end">
-                              <Link href="/premium">
+                              <Link href="/premium/trade">
                                 <Button size="sm" variant="outline" className="border-yellow-500/50 text-yellow-500" data-testid="button-trade-premium-desktop">
                                   Trade
                                 </Button>
