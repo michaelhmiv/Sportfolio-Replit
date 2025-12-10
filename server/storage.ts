@@ -19,6 +19,8 @@ import {
   blogPosts,
   portfolioSnapshots,
   premiumCheckoutSessions,
+  premiumOrders,
+  premiumTrades,
   type User,
   type InsertUser,
   type UpsertUser,
@@ -52,6 +54,8 @@ import {
   type InsertPortfolioSnapshot,
   type PriceHistory,
   type PremiumCheckoutSession,
+  type PremiumOrder,
+  type PremiumTrade,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, or, gte, lte, isNotNull, count } from "drizzle-orm";
@@ -2786,27 +2790,38 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(premiumCheckoutSessions.createdAt));
   }
 
-  // Premium trading methods (in-memory for now)
-  private premiumOrders: Map<string, { orderId: string; userId: string; side: "buy" | "sell"; quantity: number; price: string; orderType: string; status: string; createdAt: Date }> = new Map();
-  private premiumTrades: Array<{ buyerId: string; sellerId: string; quantity: number; price: string; executedAt: Date }> = [];
-  private orderIdCounter = 0;
-
+  // Premium trading methods - database-backed for persistence
   async getPremiumOrderBook(): Promise<{
     bids: { price: string; quantity: number; userId: string; orderId: string }[];
     asks: { price: string; quantity: number; userId: string; orderId: string }[];
   }> {
+    // Get all open or partial orders from database
+    const openOrders = await db
+      .select()
+      .from(premiumOrders)
+      .where(or(eq(premiumOrders.status, "open"), eq(premiumOrders.status, "partial")));
+
     const bids: { price: string; quantity: number; userId: string; orderId: string }[] = [];
     const asks: { price: string; quantity: number; userId: string; orderId: string }[] = [];
 
-    Array.from(this.premiumOrders.entries()).forEach(([orderId, order]) => {
-      if (order.status !== "open" || order.quantity <= 0) return;
+    for (const order of openOrders) {
+      // Calculate remaining quantity
+      const remainingQty = order.quantity - (order.filledQuantity || 0);
+      if (remainingQty <= 0) continue;
+      
+      const orderData = {
+        price: order.limitPrice || "5.00",
+        quantity: remainingQty,
+        userId: order.userId,
+        orderId: order.id,
+      };
       
       if (order.side === "buy") {
-        bids.push({ price: order.price, quantity: order.quantity, userId: order.userId, orderId });
+        bids.push(orderData);
       } else {
-        asks.push({ price: order.price, quantity: order.quantity, userId: order.userId, orderId });
+        asks.push(orderData);
       }
-    });
+    }
 
     // Sort bids high to low, asks low to high
     bids.sort((a, b) => parseFloat(b.price) - parseFloat(a.price));
@@ -2824,14 +2839,22 @@ export class DatabaseStorage implements IStorage {
     buyer: { username: string } | null;
     seller: { username: string } | null;
   }>> {
-    const trades = this.premiumTrades.slice(-limit).reverse();
+    const recentTrades = await db
+      .select()
+      .from(premiumTrades)
+      .orderBy(desc(premiumTrades.executedAt))
+      .limit(limit);
     
     // Enrich with usernames
-    const enriched = await Promise.all(trades.map(async (trade) => {
+    const enriched = await Promise.all(recentTrades.map(async (trade) => {
       const buyer = await this.getUser(trade.buyerId);
       const seller = await this.getUser(trade.sellerId);
       return {
-        ...trade,
+        buyerId: trade.buyerId,
+        sellerId: trade.sellerId,
+        quantity: trade.quantity,
+        price: trade.price,
+        executedAt: trade.executedAt,
         buyer: buyer ? { username: buyer.username || "Unknown" } : null,
         seller: seller ? { username: seller.username || "Unknown" } : null,
       };
@@ -2847,38 +2870,96 @@ export class DatabaseStorage implements IStorage {
     price: string;
     orderType: string;
     status: string;
-  }): Promise<{ orderId: string }> {
-    const orderId = `prem_${++this.orderIdCounter}`;
-    this.premiumOrders.set(orderId, {
-      orderId,
-      ...order,
-      createdAt: new Date(),
-    });
-    return { orderId };
+  }): Promise<PremiumOrder> {
+    const [createdOrder] = await db
+      .insert(premiumOrders)
+      .values({
+        userId: order.userId,
+        side: order.side,
+        quantity: order.quantity,
+        limitPrice: order.price,
+        orderType: order.orderType,
+        status: order.status,
+      })
+      .returning();
+    
+    return createdOrder;
   }
 
-  async updatePremiumOrderQuantity(orderId: string, newQuantity: number): Promise<void> {
-    const order = this.premiumOrders.get(orderId);
-    if (order) {
-      if (newQuantity <= 0) {
-        order.status = "filled";
-        order.quantity = 0;
-      } else {
-        order.quantity = newQuantity;
-      }
+  async getPremiumOrder(orderId: string): Promise<PremiumOrder | undefined> {
+    const [order] = await db
+      .select()
+      .from(premiumOrders)
+      .where(eq(premiumOrders.id, orderId));
+    return order || undefined;
+  }
+
+  async updatePremiumOrderQuantity(orderId: string, remainingQuantity: number): Promise<void> {
+    // remainingQuantity = how many shares are left unfilled in this order
+    // Called after a match: newRemainingQty = oldRemainingQty - matchQuantity
+    const order = await this.getPremiumOrder(orderId);
+    if (!order) return;
+    
+    // Calculate how many have been filled: original - remaining
+    const newFilledQuantity = order.quantity - remainingQuantity;
+    
+    if (remainingQuantity <= 0) {
+      // Order is fully filled
+      await db
+        .update(premiumOrders)
+        .set({ 
+          filledQuantity: order.quantity, 
+          status: "filled" 
+        })
+        .where(eq(premiumOrders.id, orderId));
+    } else if (newFilledQuantity > 0) {
+      // Order is partially filled
+      await db
+        .update(premiumOrders)
+        .set({ 
+          filledQuantity: newFilledQuantity,
+          status: "partial"
+        })
+        .where(eq(premiumOrders.id, orderId));
     }
   }
 
   async createPremiumTrade(trade: {
     buyerId: string;
     sellerId: string;
+    buyOrderId?: string;
+    sellOrderId?: string;
     quantity: number;
     price: string;
-  }): Promise<void> {
-    this.premiumTrades.push({
-      ...trade,
-      executedAt: new Date(),
-    });
+  }): Promise<PremiumTrade> {
+    const [createdTrade] = await db
+      .insert(premiumTrades)
+      .values({
+        buyerId: trade.buyerId,
+        sellerId: trade.sellerId,
+        buyOrderId: trade.buyOrderId,
+        sellOrderId: trade.sellOrderId,
+        quantity: trade.quantity,
+        price: trade.price,
+      })
+      .returning();
+    
+    return createdTrade;
+  }
+
+  async getUserPremiumOrders(userId: string): Promise<PremiumOrder[]> {
+    return await db
+      .select()
+      .from(premiumOrders)
+      .where(eq(premiumOrders.userId, userId))
+      .orderBy(desc(premiumOrders.createdAt));
+  }
+
+  async cancelPremiumOrder(orderId: string): Promise<void> {
+    await db
+      .update(premiumOrders)
+      .set({ status: "cancelled" })
+      .where(eq(premiumOrders.id, orderId));
   }
 }
 

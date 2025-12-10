@@ -3449,10 +3449,12 @@ ${posts.map(post => `  <url>
           await storage.updatePremiumOrderQuantity(bid.orderId, bid.quantity - matchQuantity);
           await storage.updatePremiumOrderQuantity(ask.orderId, ask.quantity - matchQuantity);
           
-          // Record trade
+          // Record trade with order IDs for full audit trail
           await storage.createPremiumTrade({
             buyerId: bid.userId,
             sellerId: ask.userId,
+            buyOrderId: bid.orderId,
+            sellOrderId: ask.orderId,
             quantity: matchQuantity,
             price: matchPrice,
           });

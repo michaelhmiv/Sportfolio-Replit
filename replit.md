@@ -23,7 +23,24 @@ The backend is an Express.js server with TypeScript, supporting HTTP and WebSock
 
 Player IDs are numeric from MySportsFeeds API, ensuring consistency. A season filtering system provides intelligent season resolution based on the NBA calendar. Game logs are cached efficiently using the MySportsFeeds Daily Player Gamelogs endpoint.
 
-The database schema includes tables for `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `mining_claims`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, `price_history`, `holdings_locks`, `balance_locks`, and `blog_posts`. Indexing is optimized for user-asset relationships, player filtering, and order book queries. Share and cash locking systems prevent double-spending. The `/api/players` endpoint supports comprehensive server-side search, filter, and sort.
+The database schema includes tables for `users`, `players`, `holdings`, `orders`, `trades`, `mining`, `mining_claims`, `contests`, `contest_entries`, `contest_lineups`, `player_game_stats`, `price_history`, `holdings_locks`, `balance_locks`, `blog_posts`, `premium_checkout_sessions`, `premium_orders`, and `premium_trades`. Indexing is optimized for user-asset relationships, player filtering, and order book queries. Share and cash locking systems prevent double-spending. The `/api/players` endpoint supports comprehensive server-side search, filter, and sort.
+
+#### Premium Share Trading (Updated: 2025-12-10)
+Premium shares can be purchased via Whop for $5 each. They can be redeemed for 30 days of premium access (double vesting: 200 shares/hour with 4800 cap, no ads) or traded as in-game assets.
+
+**Database Tables:**
+- `premium_checkout_sessions` - Tracks Whop checkout sessions for premium share purchases
+- `premium_orders` - Stores all premium share buy/sell orders with user_id, order_type, side, quantity, filled_quantity, limit_price, status
+- `premium_trades` - Stores executed premium share trades with buyer_id, seller_id, buy_order_id, sell_order_id, quantity, price, executed_at
+
+**API Endpoints:**
+- `GET /api/premium/trade` - Returns order book, user holdings, recent trades
+- `POST /api/premium/orders` - Place buy/sell orders with order matching
+- `POST /api/webhooks/whop` - Webhook for Whop payment completion
+
+**Vesting Rates:**
+- Free users: 100 shares/hour, 2400 cap
+- Premium users: 200 shares/hour, 4800 cap
 
 #### Timezone Handling (Updated: 2025-11-23)
 **CRITICAL: All game scheduling must be based on Eastern Time (ET), not UTC or local timezone.**
