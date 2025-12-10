@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
 import { storage } from "./storage";
@@ -3148,6 +3148,201 @@ ${posts.map(post => `  <url>
       // Update user premium status (would use storage method, but simplified here)
       res.json({ success: true });
     } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Premium checkout - create a checkout session for Whop
+  app.post("/api/premium/checkout-session", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const { quantity = 1 } = req.body;
+      const planId = process.env.WHOP_PLAN_ID;
+      
+      if (!planId) {
+        return res.status(500).json({ error: "Whop plan ID not configured" });
+      }
+      
+      const PRICE_PER_SHARE_CENTS = 500; // $5.00 per premium share
+      const amountCents = quantity * PRICE_PER_SHARE_CENTS;
+      
+      // Create a checkout session record
+      const session = await storage.createPremiumCheckoutSession({
+        userId: user.id,
+        planId,
+        quantity,
+        amountCents,
+      });
+      
+      res.json({
+        sessionId: session.id,
+        planId,
+        quantity,
+        amountCents,
+        email: user.email,
+      });
+    } catch (error: any) {
+      console.error("[WHOP] Error creating checkout session:", error);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get premium status and shares
+  app.get("/api/premium/status", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      const premiumHolding = await storage.getHolding(user.id, "premium", "premium");
+      const recentSessions = await storage.getUserPremiumCheckoutSessions(user.id);
+      
+      res.json({
+        isPremium: user.isPremium,
+        premiumExpiresAt: user.premiumExpiresAt,
+        premiumShares: premiumHolding?.quantity || 0,
+        recentPurchases: recentSessions.filter(s => s.status === "completed").slice(0, 5),
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Whop webhook handler - receives payment.succeeded events
+  app.post("/api/webhooks/whop", express.raw({ type: 'application/json' }), async (req, res) => {
+    try {
+      const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
+      
+      if (!webhookSecret) {
+        console.error("[WHOP WEBHOOK] WHOP_WEBHOOK_SECRET not configured");
+        return res.status(500).json({ error: "Webhook secret not configured" });
+      }
+      
+      // Get raw body for signature verification
+      const rawBody = req.body.toString();
+      const headers = req.headers;
+      
+      // Standard Webhooks signature headers
+      const webhookId = headers['webhook-id'] as string;
+      const webhookTimestamp = headers['webhook-timestamp'] as string;
+      const webhookSignature = headers['webhook-signature'] as string;
+      
+      if (!webhookId || !webhookTimestamp || !webhookSignature) {
+        console.error("[WHOP WEBHOOK] Missing required webhook headers");
+        return res.status(400).json({ error: "Missing webhook headers" });
+      }
+      
+      // Verify timestamp is within 5 minutes to prevent replay attacks
+      const timestamp = parseInt(webhookTimestamp);
+      const now = Math.floor(Date.now() / 1000);
+      if (Math.abs(now - timestamp) > 300) {
+        console.error("[WHOP WEBHOOK] Webhook timestamp too old");
+        return res.status(400).json({ error: "Webhook timestamp expired" });
+      }
+      
+      // Verify signature using Standard Webhooks format
+      // Format: "v1,<base64-signature>"
+      const signedContent = `${webhookId}.${webhookTimestamp}.${rawBody}`;
+      const crypto = await import('crypto');
+      const secretBytes = Buffer.from(webhookSecret.replace('whsec_', ''), 'base64');
+      const expectedSignature = crypto.createHmac('sha256', secretBytes)
+        .update(signedContent)
+        .digest('base64');
+      
+      // Check if any provided signature matches
+      const signatures = webhookSignature.split(' ');
+      const isValid = signatures.some(sig => {
+        const [version, sigValue] = sig.split(',');
+        return version === 'v1' && sigValue === expectedSignature;
+      });
+      
+      if (!isValid) {
+        console.error("[WHOP WEBHOOK] Invalid signature");
+        return res.status(401).json({ error: "Invalid webhook signature" });
+      }
+      
+      // Parse the verified payload
+      const payload = JSON.parse(rawBody);
+      console.log("[WHOP WEBHOOK] Received event:", payload.type);
+      
+      // Handle payment.succeeded event
+      if (payload.type === "payment.succeeded") {
+        const payment = payload.data;
+        const receiptId = payment.id;
+        
+        // Check for idempotency - already processed this payment?
+        const existingSession = await storage.getPremiumCheckoutSessionByReceipt(receiptId);
+        if (existingSession) {
+          console.log("[WHOP WEBHOOK] Payment already processed:", receiptId);
+          return res.json({ success: true, message: "Already processed" });
+        }
+        
+        // Get metadata to find our session
+        const metadata = payment.metadata || {};
+        const sessionId = metadata.sessionId;
+        const userEmail = payment.email;
+        
+        let userId: string | null = null;
+        let quantity = 1;
+        
+        // Try to find user by session ID first
+        if (sessionId) {
+          const session = await storage.getPremiumCheckoutSession(sessionId);
+          if (session) {
+            userId = session.userId;
+            quantity = session.quantity;
+            await storage.completePremiumCheckoutSession(session.id, receiptId);
+          }
+        }
+        
+        // Fallback: find user by email
+        if (!userId && userEmail) {
+          const users = await storage.getUsers();
+          const matchedUser = users.find(u => u.email === userEmail);
+          if (matchedUser) {
+            userId = matchedUser.id;
+            // Create a completed session record
+            await storage.createPremiumCheckoutSession({
+              userId,
+              planId: payment.plan_id || process.env.WHOP_PLAN_ID || "unknown",
+              quantity,
+              amountCents: payment.final_amount || 500,
+            });
+          }
+        }
+        
+        if (!userId) {
+          console.error("[WHOP WEBHOOK] Could not identify user for payment:", receiptId);
+          return res.status(200).json({ success: false, message: "User not found" });
+        }
+        
+        // Credit premium shares to user
+        const existingHolding = await storage.getHolding(userId, "premium", "premium");
+        const currentQuantity = existingHolding?.quantity || 0;
+        const newQuantity = currentQuantity + quantity;
+        
+        // Update holding with new quantity (avgCost is $5 per share)
+        await storage.updateHolding(userId, "premium", "premium", newQuantity, "5.0000");
+        
+        console.log(`[WHOP WEBHOOK] Credited ${quantity} premium shares to user ${userId}`);
+        
+        // Broadcast portfolio update via WebSocket
+        broadcast({ type: "portfolio" });
+        
+        return res.json({ success: true, quantity, userId });
+      }
+      
+      // Other event types - just acknowledge
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[WHOP WEBHOOK] Error processing webhook:", error);
       res.status(500).json({ error: error.message });
     }
   });
