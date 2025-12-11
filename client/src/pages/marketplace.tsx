@@ -193,9 +193,8 @@ export default function Marketplace() {
   return (
     <div className="min-h-screen bg-background p-2 sm:p-3">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-3">
-          <h1 className="hidden sm:block text-lg font-bold mb-1">Marketplace</h1>
-          <p className="text-xs text-muted-foreground">Browse and trade player shares</p>
+        <div className="mb-2">
+          <h1 className="hidden sm:block text-lg font-bold mb-0">Marketplace</h1>
         </div>
 
         <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-3">
