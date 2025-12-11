@@ -61,6 +61,46 @@ function analyzeCookies(cookieHeader: string | undefined): { count: number; hasS
   };
 }
 
+// PWA detection helper - detects if request comes from installed PWA vs browser
+function detectPWAContext(req: any): { isPWA: boolean; context: 'pwa' | 'browser' | 'unknown'; indicators: string[] } {
+  const indicators: string[] = [];
+  
+  // Check Sec-Fetch-Dest header (modern browsers)
+  const secFetchDest = req.get('sec-fetch-dest');
+  if (secFetchDest === 'document') {
+    indicators.push('sec-fetch-dest: document');
+  }
+  
+  // Check Sec-Fetch-Mode header
+  const secFetchMode = req.get('sec-fetch-mode');
+  if (secFetchMode) {
+    indicators.push(`sec-fetch-mode: ${secFetchMode}`);
+  }
+  
+  // Check for display-mode query param (we'll add this on the frontend)
+  const displayMode = req.query['display-mode'];
+  if (displayMode === 'standalone') {
+    indicators.push('display-mode: standalone (query param)');
+    return { isPWA: true, context: 'pwa', indicators };
+  }
+  
+  // Check Referer for PWA indicators
+  const referer = req.get('referer') || '';
+  if (referer.includes('?source=pwa') || referer.includes('&source=pwa')) {
+    indicators.push('referer contains source=pwa');
+    return { isPWA: true, context: 'pwa', indicators };
+  }
+  
+  // Check for Service-Worker header
+  const serviceWorker = req.get('service-worker');
+  if (serviceWorker) {
+    indicators.push(`service-worker: ${serviceWorker}`);
+  }
+  
+  // Default to browser context if no PWA indicators
+  return { isPWA: false, context: 'browser', indicators };
+}
+
 const getOidcConfig = memoize(
   async () => {
     authLog("OIDC", "Starting OIDC configuration discovery");
@@ -319,6 +359,7 @@ export async function setupAuth(app: Express) {
     const userAgent = req.get("user-agent");
     const browserInfo = detectBrowser(userAgent);
     const cookieInfo = analyzeCookies(req.get("cookie"));
+    const pwaContext = detectPWAContext(req);
     
     authLog("LOGIN", "Login initiated", {
       hostname: req.hostname,
@@ -328,6 +369,7 @@ export async function setupAuth(app: Express) {
       callbackURL,
       ip: req.ip,
       browser: browserInfo,
+      pwaContext,
       sessionID: req.sessionID,
       hasSession: !!req.session,
       cookieAnalysis: cookieInfo,
@@ -340,6 +382,15 @@ export async function setupAuth(app: Express) {
         chromeVersion: browserInfo.version,
         cookiesReceived: cookieInfo.count,
         hasExistingSession: cookieInfo.hasSession,
+        isPWA: pwaContext.isPWA,
+      });
+    }
+    
+    // PWA context logging
+    if (pwaContext.isPWA) {
+      authLog("LOGIN", "PWA CONTEXT DETECTED - Login started from installed app", {
+        context: pwaContext.context,
+        indicators: pwaContext.indicators,
       });
     }
 
@@ -353,13 +404,25 @@ export async function setupAuth(app: Express) {
 
     ensureStrategy(req.hostname);
     
+    // Store the login context in session for callback verification
+    (req.session as any).loginContext = {
+      startedAt: Date.now(),
+      browser: browserInfo.browser,
+      browserVersion: browserInfo.version,
+      isPWA: pwaContext.isPWA,
+      context: pwaContext.context,
+      sessionID: req.sessionID,
+    };
+    
     // Ensure session is saved before redirecting to OIDC provider
     // This fixes the race condition where the callback fails on first attempt
     req.session.save((err) => {
       if (err) {
         authLog("LOGIN", "Failed to save session before redirect", { error: err.message });
       } else {
-        authLog("LOGIN", "Session saved successfully, proceeding to authenticate");
+        authLog("LOGIN", "Session saved with login context", {
+          loginContext: (req.session as any).loginContext,
+        });
       }
       
       passport.authenticate(`replitauth:${req.hostname}`, {
@@ -377,6 +440,8 @@ export async function setupAuth(app: Express) {
     const userAgent = req.get("user-agent");
     const browserInfo = detectBrowser(userAgent);
     const cookieInfo = analyzeCookies(req.get("cookie"));
+    const pwaContext = detectPWAContext(req);
+    const loginContext = (req.session as any)?.loginContext;
     
     // Sanitize query params - never log sensitive OAuth codes or state
     const sanitizedQuery = {
@@ -393,14 +458,54 @@ export async function setupAuth(app: Express) {
       expectedCallbackURL: callbackURL,
       query: sanitizedQuery,
       browser: browserInfo,
+      pwaContext,
       sessionID: req.sessionID,
       hasSession: !!req.session,
+      hasLoginContext: !!loginContext,
+      loginContext: loginContext || 'MISSING',
       hasError: !!req.query.error,
       error: req.query.error,
       errorDescription: req.query.error_description,
       cookieAnalysis: cookieInfo,
       rawCookieHeader: req.get("cookie") ? `[${req.get("cookie")?.length} chars]` : 'NONE',
     });
+    
+    // Check for PWA/Browser context mismatch - this is the likely cause of Chrome mobile failures!
+    if (loginContext) {
+      const contextMismatch = loginContext.isPWA !== pwaContext.isPWA;
+      const sessionMismatch = loginContext.sessionID !== req.sessionID;
+      
+      if (contextMismatch || sessionMismatch) {
+        authLog("CALLBACK", "CONTEXT MISMATCH DETECTED - This is likely the auth failure cause!", {
+          loginStartedIn: loginContext.context,
+          callbackReceivedIn: pwaContext.context,
+          loginSessionID: loginContext.sessionID?.substring(0, 20) + '...',
+          callbackSessionID: req.sessionID?.substring(0, 20) + '...',
+          contextMismatch,
+          sessionMismatch,
+          timeSinceLogin: Date.now() - loginContext.startedAt,
+          explanation: contextMismatch 
+            ? "Login started in browser but callback arrived in PWA (or vice versa). These have separate cookie stores!"
+            : "Session ID changed between login and callback - session was lost or regenerated.",
+        });
+      } else {
+        authLog("CALLBACK", "Context check passed - same context as login", {
+          context: pwaContext.context,
+          isPWA: pwaContext.isPWA,
+        });
+      }
+    } else {
+      authLog("CALLBACK", "WARNING: No login context found in session!", {
+        possibleCauses: [
+          "Session was lost during OAuth redirect",
+          "Session cookie not sent with callback request",
+          "PWA/Browser context mismatch caused different session",
+          "Session expired during OAuth flow"
+        ],
+        hasSessionCookie: cookieInfo.hasSession,
+        isPWA: pwaContext.isPWA,
+      });
+    }
     
     // Chrome-specific callback debugging
     if (browserInfo.isChrome) {
@@ -411,6 +516,7 @@ export async function setupAuth(app: Express) {
         sessionIdMatch: cookieInfo.sessionIdPrefix,
         expectedSessionID: req.sessionID?.substring(0, 20) + '...',
         sessionMismatch: cookieInfo.hasSession && cookieInfo.sessionIdPrefix !== (req.sessionID?.substring(0, 20) + '...'),
+        isPWA: pwaContext.isPWA,
       });
       
       // Critical: Check if Chrome lost the session cookie between login and callback
@@ -418,10 +524,12 @@ export async function setupAuth(app: Express) {
         authLog("CALLBACK", "CHROME WARNING: No session cookie received in callback!", {
           possibleCauses: [
             "SameSite cookie policy blocking",
-            "Third-party cookie blocking",
+            "Third-party cookie blocking", 
             "Cookie expired or cleared",
-            "Cross-domain redirect issue"
+            "Cross-domain redirect issue",
+            "PWA and Browser have separate cookie stores - LOGIN IN SAME CONTEXT AS APP"
           ],
+          isPWA: pwaContext.isPWA,
         });
       }
     }
