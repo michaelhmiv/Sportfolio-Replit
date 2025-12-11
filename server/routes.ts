@@ -948,6 +948,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Top risers (24h) - players with highest priceChange24h
+  app.get("/api/players/spotlight/top-risers", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 3;
+      const players = await storage.getPlayers({});
+      
+      // Filter to players with positive price change and actual trade prices
+      const risers = players
+        .filter(p => p.lastTradePrice && parseFloat(p.priceChange24h) > 0)
+        .sort((a, b) => parseFloat(b.priceChange24h) - parseFloat(a.priceChange24h))
+        .slice(0, limit)
+        .map(p => ({
+          id: p.id,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          team: p.team,
+          position: p.position,
+          price: p.lastTradePrice ? parseFloat(p.lastTradePrice) : null,
+          priceChange24h: parseFloat(p.priceChange24h),
+        }));
+      
+      res.json(risers);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Top market cap players
+  app.get("/api/players/spotlight/top-market-cap", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 3;
+      const players = await storage.getPlayers({});
+      
+      // Filter to players with established market prices and sort by marketCap
+      const topMarketCap = players
+        .filter(p => p.lastTradePrice && parseFloat(p.marketCap) > 0)
+        .sort((a, b) => parseFloat(b.marketCap) - parseFloat(a.marketCap))
+        .slice(0, limit)
+        .map(p => ({
+          id: p.id,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          team: p.team,
+          position: p.position,
+          price: p.lastTradePrice ? parseFloat(p.lastTradePrice) : null,
+          marketCap: parseFloat(p.marketCap),
+          totalShares: p.totalShares,
+        }));
+      
+      res.json(topMarketCap);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/players", async (req, res) => {
     try {
       const { search, team, position, limit, offset, sortBy, sortOrder, hasBuyOrders, hasSellOrders, teamsPlayingOnDate } = req.query;

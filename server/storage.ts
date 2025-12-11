@@ -1245,7 +1245,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(priceHistory.timestamp))
       .limit(1);
     
-    return record ? parseFloat(record.closePrice) : null;
+    return record ? parseFloat(record.price) : null;
   }
   
   // Market cap methods

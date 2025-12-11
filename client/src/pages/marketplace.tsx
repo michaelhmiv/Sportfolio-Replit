@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, TrendingUp, TrendingDown, ArrowUpDown, Filter, Clock, Crown } from "lucide-react";
+import { Search, TrendingUp, TrendingDown, ArrowUpDown, Filter, Clock, Crown, ChevronDown, ChevronUp, BarChart3 } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import type { Player } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -46,6 +46,7 @@ export default function Marketplace() {
   const [filterHasBuyOrders, setFilterHasBuyOrders] = useState(false);
   const [filterHasSellOrders, setFilterHasSellOrders] = useState(false);
   const [page, setPage] = useState(1);
+  const [showFilters, setShowFilters] = useState(false); // Collapsed by default
   const ITEMS_PER_PAGE = 50;
   const { subscribe} = useWebSocket();
 
@@ -88,11 +89,44 @@ export default function Marketplace() {
     queryKey: ["/api/premium/market-data"],
   });
 
+  // Spotlight: Top risers (24h price change)
+  type SpotlightRiser = {
+    id: string;
+    firstName: string;
+    lastName: string;
+    team: string;
+    position: string;
+    price: number | null;
+    priceChange24h: number;
+  };
+  
+  const { data: topRisers } = useQuery<SpotlightRiser[]>({
+    queryKey: ["/api/players/spotlight/top-risers"],
+  });
+
+  // Spotlight: Top market cap players
+  type SpotlightMarketCap = {
+    id: string;
+    firstName: string;
+    lastName: string;
+    team: string;
+    position: string;
+    price: number | null;
+    marketCap: number;
+    totalShares: number;
+  };
+  
+  const { data: topMarketCap } = useQuery<SpotlightMarketCap[]>({
+    queryKey: ["/api/players/spotlight/top-market-cap"],
+  });
+
   // WebSocket listener for real-time marketplace updates
   useEffect(() => {
-    // Subscribe to trade events (affects prices, volume, 24h change)
+    // Subscribe to trade events (affects prices, volume, 24h change, market cap)
     const unsubTrade = subscribe('trade', () => {
       queryClient.invalidateQueries({ queryKey: ["/api/players"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/players/spotlight/top-risers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/players/spotlight/top-market-cap"] });
     });
 
     // Subscribe to order book events
@@ -171,92 +205,180 @@ export default function Marketplace() {
           </TabsList>
 
           <TabsContent value="players" className="space-y-4">
-            {/* Filters */}
+            {/* Spotlight Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Top Risers Card */}
+              <Card className="border-green-500/20">
+                <CardHeader className="pb-2 pt-3 px-4">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-green-500" />
+                    Top Risers (24h)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-3 pt-0">
+                  {topRisers && topRisers.length > 0 ? (
+                    <div className="space-y-2">
+                      {topRisers.map((player, index) => (
+                        <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded p-1.5 cursor-pointer">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground w-4">{index + 1}.</span>
+                            <span className="text-sm font-medium">{player.firstName} {player.lastName}</span>
+                            <Badge variant="outline" className="text-xs">{player.team}</Badge>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-mono">${player.price?.toFixed(2) || '-'}</div>
+                            <div className="text-xs text-green-500 font-medium">+${player.priceChange24h.toFixed(2)}</div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No rising players yet</p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Top Market Cap Card */}
+              <Card className="border-blue-500/20">
+                <CardHeader className="pb-2 pt-3 px-4">
+                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-blue-500" />
+                    Top Market Cap
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="px-4 pb-3 pt-0">
+                  {topMarketCap && topMarketCap.length > 0 ? (
+                    <div className="space-y-2">
+                      {topMarketCap.map((player, index) => (
+                        <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded p-1.5 cursor-pointer">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground w-4">{index + 1}.</span>
+                            <span className="text-sm font-medium">{player.firstName} {player.lastName}</span>
+                            <Badge variant="outline" className="text-xs">{player.team}</Badge>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-mono">${player.marketCap.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
+                            <div className="text-xs text-muted-foreground">{player.totalShares} shares</div>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No market cap data yet</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Collapsible Filters */}
             <ScrollReveal>
             <Card>
-          <CardContent className="p-3 sm:p-4 space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
-              <div className="relative md:col-span-2">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search players..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                  data-testid="input-search-players"
-                />
-              </div>
-              
-              <Select value={teamFilter} onValueChange={setTeamFilter}>
-                <SelectTrigger data-testid="select-team-filter">
-                  <SelectValue placeholder="All Teams" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Teams</SelectItem>
-                  {teams?.map((team) => (
-                    <SelectItem key={team} value={team}>{team}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={positionFilter} onValueChange={setPositionFilter}>
-                <SelectTrigger data-testid="select-position-filter">
-                  <SelectValue placeholder="All Positions" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Positions</SelectItem>
-                  <SelectItem value="PG">Point Guard</SelectItem>
-                  <SelectItem value="SG">Shooting Guard</SelectItem>
-                  <SelectItem value="SF">Small Forward</SelectItem>
-                  <SelectItem value="PF">Power Forward</SelectItem>
-                  <SelectItem value="C">Center</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            {/* Order Book Filters */}
-            <div className="flex flex-wrap items-center gap-4 pt-1">
+          <CardContent className="p-3 sm:p-4">
+            {/* Filter Toggle Header */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center justify-between w-full hover-elevate rounded p-1"
+              data-testid="button-toggle-filters"
+            >
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Show only:</span>
+                <span className="text-sm font-medium">Search & Filters</span>
+                {(teamFilter !== "all" || positionFilter !== "all" || filterHasBuyOrders || filterHasSellOrders || search) && (
+                  <Badge variant="secondary" className="text-xs">Active</Badge>
+                )}
               </div>
-              <div className="flex items-center gap-2">
-                <Checkbox 
-                  id="filter-buy-orders" 
-                  checked={filterHasBuyOrders}
-                  onCheckedChange={(checked) => setFilterHasBuyOrders(checked as boolean)}
-                  data-testid="checkbox-filter-buy-orders"
-                />
-                <label htmlFor="filter-buy-orders" className="text-sm cursor-pointer">
-                  Has Buy Orders
-                </label>
+              {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+            
+            {/* Expanded Filters */}
+            {showFilters && (
+              <div className="space-y-3 pt-3 border-t mt-3">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="relative md:col-span-2">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search players..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-search-players"
+                    />
+                  </div>
+                  
+                  <Select value={teamFilter} onValueChange={setTeamFilter}>
+                    <SelectTrigger data-testid="select-team-filter">
+                      <SelectValue placeholder="All Teams" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Teams</SelectItem>
+                      {teams?.map((team) => (
+                        <SelectItem key={team} value={team}>{team}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={positionFilter} onValueChange={setPositionFilter}>
+                    <SelectTrigger data-testid="select-position-filter">
+                      <SelectValue placeholder="All Positions" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Positions</SelectItem>
+                      <SelectItem value="PG">Point Guard</SelectItem>
+                      <SelectItem value="SG">Shooting Guard</SelectItem>
+                      <SelectItem value="SF">Small Forward</SelectItem>
+                      <SelectItem value="PF">Power Forward</SelectItem>
+                      <SelectItem value="C">Center</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Order Book Filters */}
+                <div className="flex flex-wrap items-center gap-4 pt-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Show only:</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="filter-buy-orders" 
+                      checked={filterHasBuyOrders}
+                      onCheckedChange={(checked) => setFilterHasBuyOrders(checked as boolean)}
+                      data-testid="checkbox-filter-buy-orders"
+                    />
+                    <label htmlFor="filter-buy-orders" className="text-sm cursor-pointer">
+                      Has Buy Orders
+                    </label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="filter-sell-orders" 
+                      checked={filterHasSellOrders}
+                      onCheckedChange={(checked) => setFilterHasSellOrders(checked as boolean)}
+                      data-testid="checkbox-filter-sell-orders"
+                    />
+                    <label htmlFor="filter-sell-orders" className="text-sm cursor-pointer">
+                      Has Sell Orders
+                    </label>
+                  </div>
+                  {(filterHasBuyOrders || filterHasSellOrders || search || teamFilter !== "all" || positionFilter !== "all") && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setFilterHasBuyOrders(false);
+                        setFilterHasSellOrders(false);
+                        setSearch("");
+                        setTeamFilter("all");
+                        setPositionFilter("all");
+                      }}
+                      className="text-xs"
+                      data-testid="button-clear-filters"
+                    >
+                      Clear All
+                    </Button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Checkbox 
-                  id="filter-sell-orders" 
-                  checked={filterHasSellOrders}
-                  onCheckedChange={(checked) => setFilterHasSellOrders(checked as boolean)}
-                  data-testid="checkbox-filter-sell-orders"
-                />
-                <label htmlFor="filter-sell-orders" className="text-sm cursor-pointer">
-                  Has Sell Orders
-                </label>
-              </div>
-              {(filterHasBuyOrders || filterHasSellOrders) && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => {
-                    setFilterHasBuyOrders(false);
-                    setFilterHasSellOrders(false);
-                  }}
-                  className="text-xs"
-                  data-testid="button-clear-filters"
-                >
-                  Clear Filters
-                </Button>
-              )}
-            </div>
+            )}
           </CardContent>
         </Card>
         </ScrollReveal>
