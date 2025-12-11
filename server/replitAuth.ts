@@ -23,6 +23,44 @@ function authLog(category: string, message: string, data?: any) {
   }
 }
 
+// Browser detection helper for Chrome-specific debugging
+function detectBrowser(userAgent: string | undefined): { browser: string; isChrome: boolean; version: string | null } {
+  if (!userAgent) return { browser: 'unknown', isChrome: false, version: null };
+  
+  // Chrome detection (but not Edge/Opera which also contain "Chrome")
+  if (userAgent.includes('Chrome') && !userAgent.includes('Edg') && !userAgent.includes('OPR')) {
+    const match = userAgent.match(/Chrome\/(\d+)/);
+    return { browser: 'Chrome', isChrome: true, version: match ? match[1] : null };
+  }
+  if (userAgent.includes('Firefox')) {
+    const match = userAgent.match(/Firefox\/(\d+)/);
+    return { browser: 'Firefox', isChrome: false, version: match ? match[1] : null };
+  }
+  if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) {
+    const match = userAgent.match(/Version\/(\d+)/);
+    return { browser: 'Safari', isChrome: false, version: match ? match[1] : null };
+  }
+  if (userAgent.includes('Edg')) {
+    const match = userAgent.match(/Edg\/(\d+)/);
+    return { browser: 'Edge', isChrome: false, version: match ? match[1] : null };
+  }
+  return { browser: 'other', isChrome: false, version: null };
+}
+
+// Cookie analysis helper
+function analyzeCookies(cookieHeader: string | undefined): { count: number; hasSession: boolean; sessionIdPrefix: string | null } {
+  if (!cookieHeader) return { count: 0, hasSession: false, sessionIdPrefix: null };
+  
+  const cookies = cookieHeader.split(';').map(c => c.trim());
+  const sessionCookie = cookies.find(c => c.startsWith('connect.sid='));
+  
+  return {
+    count: cookies.length,
+    hasSession: !!sessionCookie,
+    sessionIdPrefix: sessionCookie ? sessionCookie.substring(12, 32) + '...' : null,
+  };
+}
+
 const getOidcConfig = memoize(
   async () => {
     authLog("OIDC", "Starting OIDC configuration discovery");
@@ -278,6 +316,9 @@ export async function setupAuth(app: Express) {
     const protocol = req.protocol;
     const host = req.get('host');
     const fullUrl = `${protocol}://${host}${req.originalUrl}`;
+    const userAgent = req.get("user-agent");
+    const browserInfo = detectBrowser(userAgent);
+    const cookieInfo = analyzeCookies(req.get("cookie"));
     
     authLog("LOGIN", "Login initiated", {
       hostname: req.hostname,
@@ -286,11 +327,21 @@ export async function setupAuth(app: Express) {
       fullUrl,
       callbackURL,
       ip: req.ip,
-      userAgent: req.get("user-agent"),
+      browser: browserInfo,
       sessionID: req.sessionID,
       hasSession: !!req.session,
-      cookies: Object.keys(req.cookies || {}),
+      cookieAnalysis: cookieInfo,
+      rawCookieHeader: req.get("cookie") ? `[${req.get("cookie")?.length} chars]` : 'NONE',
     });
+    
+    // Extra Chrome-specific warning
+    if (browserInfo.isChrome) {
+      authLog("LOGIN", "CHROME DETECTED - Monitoring cookie behavior", {
+        chromeVersion: browserInfo.version,
+        cookiesReceived: cookieInfo.count,
+        hasExistingSession: cookieInfo.hasSession,
+      });
+    }
 
     // Validate that we can create a callback URL
     if (!req.hostname) {
@@ -323,6 +374,9 @@ export async function setupAuth(app: Express) {
     const protocol = req.protocol;
     const host = req.get('host');
     const fullUrl = `${protocol}://${host}${req.originalUrl}`;
+    const userAgent = req.get("user-agent");
+    const browserInfo = detectBrowser(userAgent);
+    const cookieInfo = analyzeCookies(req.get("cookie"));
     
     // Sanitize query params - never log sensitive OAuth codes or state
     const sanitizedQuery = {
@@ -338,13 +392,39 @@ export async function setupAuth(app: Express) {
       fullUrl,
       expectedCallbackURL: callbackURL,
       query: sanitizedQuery,
+      browser: browserInfo,
       sessionID: req.sessionID,
       hasSession: !!req.session,
       hasError: !!req.query.error,
       error: req.query.error,
       errorDescription: req.query.error_description,
-      cookies: Object.keys(req.cookies || {}),
+      cookieAnalysis: cookieInfo,
+      rawCookieHeader: req.get("cookie") ? `[${req.get("cookie")?.length} chars]` : 'NONE',
     });
+    
+    // Chrome-specific callback debugging
+    if (browserInfo.isChrome) {
+      authLog("CALLBACK", "CHROME CALLBACK - Cookie state analysis", {
+        chromeVersion: browserInfo.version,
+        cookiesReceived: cookieInfo.count,
+        hasSessionCookie: cookieInfo.hasSession,
+        sessionIdMatch: cookieInfo.sessionIdPrefix,
+        expectedSessionID: req.sessionID?.substring(0, 20) + '...',
+        sessionMismatch: cookieInfo.hasSession && cookieInfo.sessionIdPrefix !== (req.sessionID?.substring(0, 20) + '...'),
+      });
+      
+      // Critical: Check if Chrome lost the session cookie between login and callback
+      if (!cookieInfo.hasSession) {
+        authLog("CALLBACK", "CHROME WARNING: No session cookie received in callback!", {
+          possibleCauses: [
+            "SameSite cookie policy blocking",
+            "Third-party cookie blocking",
+            "Cookie expired or cleared",
+            "Cross-domain redirect issue"
+          ],
+        });
+      }
+    }
 
     // Check for OAuth provider errors in query params
     if (req.query.error) {
