@@ -52,6 +52,8 @@ export const players = pgTable("players", {
   lastTradePrice: decimal("last_trade_price", { precision: 10, scale: 2 }), // Actual market price from last trade, null if no trades
   volume24h: integer("volume_24h").notNull().default(0),
   priceChange24h: decimal("price_change_24h", { precision: 10, scale: 2 }).notNull().default("0.00"),
+  marketCap: decimal("market_cap", { precision: 20, scale: 2 }).notNull().default("0.00"), // Total shares * price, updated on each trade
+  totalShares: integer("total_shares").notNull().default(0), // Total shares held by all users, updated on each trade
   lastUpdated: timestamp("last_updated").notNull().defaultNow(),
 }, (table) => ({
   teamIdx: index("team_idx").on(table.team),
@@ -61,6 +63,7 @@ export const players = pgTable("players", {
   lastTradePriceIdx: index("last_trade_price_idx").on(table.lastTradePrice),
   volume24hIdx: index("volume_24h_idx").on(table.volume24h),
   priceChange24hIdx: index("price_change_24h_idx").on(table.priceChange24h),
+  marketCapIdx: index("market_cap_idx").on(table.marketCap),
 }));
 
 // Holdings table - user ownership of player shares and premium shares
