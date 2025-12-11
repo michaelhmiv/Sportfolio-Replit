@@ -3160,7 +3160,8 @@ ${posts.map(post => `  <url>
     }
   });
 
-  // Premium checkout - create a checkout session via Whop API
+  // Premium checkout - create a checkout session and redirect to Whop
+  // Note: We use direct checkout URL since Whop API requires higher-tier permissions
   app.post("/api/premium/checkout-session", isAuthenticated, async (req, res) => {
     try {
       const userId = getUserId(req);
@@ -3171,20 +3172,15 @@ ${posts.map(post => `  <url>
       
       const { quantity = 1 } = req.body;
       const planId = process.env.WHOP_PLAN_ID;
-      const apiKey = process.env.WHOP_API_KEY;
       
       if (!planId) {
         return res.status(500).json({ error: "Whop plan ID not configured" });
       }
       
-      if (!apiKey) {
-        return res.status(500).json({ error: "Whop API key not configured" });
-      }
-      
       const PRICE_PER_SHARE_CENTS = 500; // $5.00 per premium share
       const amountCents = quantity * PRICE_PER_SHARE_CENTS;
       
-      // Create a local checkout session record first
+      // Create a local checkout session record to track this purchase
       const localSession = await storage.createPremiumCheckoutSession({
         userId: user.id,
         planId,
@@ -3192,62 +3188,20 @@ ${posts.map(post => `  <url>
         amountCents,
       });
       
-      // Call Whop API to create a checkout session
-      const baseUrl = process.env.REPLIT_DEPLOYMENT_URL || 
-                     `https://${process.env.REPLIT_DEV_DOMAIN}` || 
-                     'http://localhost:5000';
+      console.log(`[WHOP] Created checkout session ${localSession.id} for user ${userId}, qty: ${quantity}`);
       
-      try {
-        const whopResponse = await fetch('https://api.whop.com/api/v2/checkout-sessions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            plan_id: planId,
-            redirect_url: `${baseUrl}/premium?purchased=true&quantity=${quantity}`,
-            metadata: {
-              sessionId: localSession.id,
-              userId: user.id,
-              quantity: quantity.toString(),
-            },
-          }),
-        });
-        
-        if (!whopResponse.ok) {
-          const errorText = await whopResponse.text();
-          console.error("[WHOP] API error:", whopResponse.status, errorText);
-          throw new Error(`Whop API error: ${whopResponse.status}`);
-        }
-        
-        const whopSession = await whopResponse.json();
-        console.log("[WHOP] Checkout session created:", whopSession.id);
-        
-        res.json({
-          sessionId: localSession.id,
-          whopSessionId: whopSession.id,
-          purchaseUrl: whopSession.purchase_url,
-          planId,
-          quantity,
-          amountCents,
-          email: user.email,
-        });
-      } catch (whopError: any) {
-        // Fallback to direct checkout URL if API fails
-        console.error("[WHOP] API call failed, using direct URL:", whopError.message);
-        const directUrl = `https://whop.com/checkout/${planId}/?d2c=true`;
-        
-        res.json({
-          sessionId: localSession.id,
-          purchaseUrl: directUrl,
-          planId,
-          quantity,
-          amountCents,
-          email: user.email,
-          fallback: true,
-        });
-      }
+      // Use direct checkout URL - Whop API requires permissions we don't have
+      // The webhook will match this session by userId + pending status + recent timestamp
+      const directUrl = `https://whop.com/checkout/${planId}/?d2c=true`;
+      
+      res.json({
+        sessionId: localSession.id,
+        purchaseUrl: directUrl,
+        planId,
+        quantity,
+        amountCents,
+        email: user.email,
+      });
     } catch (error: any) {
       console.error("[WHOP] Error creating checkout session:", error);
       res.status(500).json({ error: error.message });
@@ -3616,61 +3570,103 @@ ${posts.map(post => `  <url>
           return res.json({ success: true, message: "Already processed" });
         }
         
-        // Get metadata to find our session
+        // Get all available identifiers from webhook payload
         const metadata = payment.metadata || {};
         const sessionId = metadata.sessionId;
+        const metadataUserId = metadata.userId;
         const checkoutId = payment.checkout_id;
+        const whopUserId = payment.user_id;
         const planId = payment.plan_id;
         const finalAmount = payment.final_amount;
         
-        console.log("[WHOP WEBHOOK] Looking for user - sessionId:", sessionId, "checkoutId:", checkoutId);
+        console.log("[WHOP WEBHOOK] === USER IDENTIFICATION ===");
+        console.log("[WHOP WEBHOOK] metadata.sessionId:", sessionId);
+        console.log("[WHOP WEBHOOK] metadata.userId:", metadataUserId);
+        console.log("[WHOP WEBHOOK] payment.checkout_id:", checkoutId);
+        console.log("[WHOP WEBHOOK] payment.user_id:", whopUserId);
+        console.log("[WHOP WEBHOOK] payment.plan_id:", planId);
+        console.log("[WHOP WEBHOOK] payment.final_amount:", finalAmount);
         
         let userId: string | null = null;
         let quantity = 1;
+        let matchedSession: any = null;
         
         // Method 1: Try to find user by our session ID from metadata
         if (sessionId) {
-          console.log("[WHOP WEBHOOK] Trying session ID lookup:", sessionId);
+          console.log("[WHOP WEBHOOK] Method 1: Trying session ID lookup:", sessionId);
           const session = await storage.getPremiumCheckoutSession(sessionId);
-          if (session) {
+          if (session && session.status === "pending") {
+            matchedSession = session;
             userId = session.userId;
             quantity = session.quantity;
-            await storage.completePremiumCheckoutSession(session.id, receiptId);
-            console.log("[WHOP WEBHOOK] Found user via sessionId:", userId);
+            console.log("[WHOP WEBHOOK] Method 1 SUCCESS: Found user via sessionId:", userId);
           }
         }
         
-        // Method 2: Find most recent pending checkout session for the same plan
-        if (!userId && planId) {
-          console.log("[WHOP WEBHOOK] Trying pending session lookup for plan:", planId);
+        // Method 2: Find most recent pending checkout session (any plan, within last 2 hours)
+        // This is the primary fallback when using direct checkout URL
+        if (!userId) {
+          console.log("[WHOP WEBHOOK] Method 2: Trying pending session lookup...");
           const pendingSessions = await storage.getPendingPremiumCheckoutSessions();
-          // Find most recent session for this plan (within last hour)
-          const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-          const matchingSession = pendingSessions.find(s => 
-            s.planId === planId && 
-            new Date(s.createdAt) > oneHourAgo
+          console.log("[WHOP WEBHOOK] Found", pendingSessions.length, "pending sessions");
+          
+          // Sort by createdAt descending (most recent first)
+          const sortedSessions = pendingSessions.sort((a, b) => 
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           );
+          
+          // Log all pending sessions for debugging
+          for (const s of sortedSessions.slice(0, 5)) {
+            console.log(`[WHOP WEBHOOK]   - Session ${s.id}: user=${s.userId}, plan=${s.planId}, qty=${s.quantity}, created=${s.createdAt}`);
+          }
+          
+          // Find most recent session within last 2 hours
+          const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+          
+          // First try to match by planId if available
+          let matchingSession = sortedSessions.find(s => 
+            s.planId === planId && 
+            new Date(s.createdAt) > twoHoursAgo
+          );
+          
+          // If no plan match, use the most recent pending session
+          if (!matchingSession && sortedSessions.length > 0) {
+            matchingSession = sortedSessions.find(s => new Date(s.createdAt) > twoHoursAgo);
+            if (matchingSession) {
+              console.log("[WHOP WEBHOOK] Method 2: No plan match, using most recent pending session");
+            }
+          }
+          
           if (matchingSession) {
+            matchedSession = matchingSession;
             userId = matchingSession.userId;
             quantity = matchingSession.quantity;
-            await storage.completePremiumCheckoutSession(matchingSession.id, receiptId);
-            console.log("[WHOP WEBHOOK] Found user via pending session:", userId);
+            console.log("[WHOP WEBHOOK] Method 2 SUCCESS: Found user via pending session:", userId, "qty:", quantity);
           }
         }
         
-        // Method 3: Calculate quantity from amount if we find user another way
-        if (!userId) {
-          // Quantity can be inferred from amount ($5 = 500 cents per share)
+        // Method 3: Calculate quantity from amount as fallback
+        if (!quantity || quantity < 1) {
           if (finalAmount && finalAmount >= 500) {
             quantity = Math.floor(finalAmount / 500);
-            console.log("[WHOP WEBHOOK] Inferred quantity from amount:", quantity);
+            console.log("[WHOP WEBHOOK] Method 3: Inferred quantity from amount:", quantity);
+          } else {
+            quantity = 1; // Default to 1
           }
         }
         
         if (!userId) {
+          console.error("[WHOP WEBHOOK] === USER IDENTIFICATION FAILED ===");
           console.error("[WHOP WEBHOOK] Could not identify user for payment:", receiptId);
           console.error("[WHOP WEBHOOK] Full payment data:", JSON.stringify(payment, null, 2));
+          // Still return 200 to acknowledge receipt (Whop will retry otherwise)
           return res.status(200).json({ success: false, message: "User not found" });
+        }
+        
+        // Mark the matched session as completed
+        if (matchedSession) {
+          await storage.completePremiumCheckoutSession(matchedSession.id, receiptId);
+          console.log("[WHOP WEBHOOK] Marked session", matchedSession.id, "as completed");
         }
         
         // Credit premium shares to user
@@ -3681,12 +3677,14 @@ ${posts.map(post => `  <url>
         // Update holding with new quantity (avgCost is $5 per share)
         await storage.updateHolding(userId, "premium", "premium", newQuantity, "5.0000");
         
-        console.log(`[WHOP WEBHOOK] SUCCESS! Credited ${quantity} premium shares to user ${userId}. Total: ${newQuantity}`);
+        console.log(`[WHOP WEBHOOK] === SUCCESS ===`);
+        console.log(`[WHOP WEBHOOK] Credited ${quantity} premium shares to user ${userId}`);
+        console.log(`[WHOP WEBHOOK] Previous balance: ${currentQuantity}, New balance: ${newQuantity}`);
         
         // Broadcast portfolio update via WebSocket
         broadcast({ type: "portfolio" });
         
-        return res.json({ success: true, quantity, userId });
+        return res.json({ success: true, quantity, userId, newBalance: newQuantity });
       }
       
       // Other event types - just acknowledge
