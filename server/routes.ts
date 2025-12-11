@@ -3490,8 +3490,18 @@ ${posts.map(post => `  <url>
         return res.status(500).json({ error: "Webhook secret not configured" });
       }
       
-      // Use the official Whop SDK for webhook verification
-      const { Whop } = await import("@whop/sdk");
+      // Enhanced debugging - log all relevant info
+      const webhookId = req.headers['webhook-id'] as string;
+      const webhookTimestamp = req.headers['webhook-timestamp'] as string;
+      const webhookSignature = req.headers['webhook-signature'] as string;
+      
+      console.log("[WHOP WEBHOOK] === VERIFICATION DEBUG ===");
+      console.log("[WHOP WEBHOOK] webhook-id:", webhookId);
+      console.log("[WHOP WEBHOOK] webhook-timestamp:", webhookTimestamp);
+      console.log("[WHOP WEBHOOK] webhook-signature:", webhookSignature);
+      console.log("[WHOP WEBHOOK] secret first 10 chars:", webhookSecret.substring(0, 10) + "...");
+      console.log("[WHOP WEBHOOK] secret length:", webhookSecret.length);
+      console.log("[WHOP WEBHOOK] body first 100 chars:", rawBody.substring(0, 100));
       
       // Convert Express headers to plain object for SDK (filter out undefined values)
       const headersObj: Record<string, string> = {};
@@ -3504,42 +3514,66 @@ ${posts.map(post => `  <url>
       let payload: any;
       let verificationSucceeded = false;
       
-      // Try verification with different key formats
-      // Whop docs show: webhookKey: btoa(process.env.WHOP_WEBHOOK_SECRET || "")
-      // But the secret from Whop dashboard might already be base64 encoded
+      // Standard Webhooks spec requires the secret to be base64 encoded with "whsec_" prefix removed
+      // But Whop uses "ws_" prefix - let's try multiple formats
       const keyFormats = [
-        { name: "base64-encoded", key: Buffer.from(webhookSecret).toString('base64') },
+        { name: "base64-of-raw", key: Buffer.from(webhookSecret).toString('base64') },
         { name: "raw-secret", key: webhookSecret },
+        { name: "base64-without-prefix", key: Buffer.from(webhookSecret.replace(/^ws_/, '')).toString('base64') },
+        { name: "raw-without-prefix", key: webhookSecret.replace(/^ws_/, '') },
       ];
       
-      for (const format of keyFormats) {
-        try {
-          const whopsdk = new Whop({
-            apiKey: process.env.WHOP_API_KEY,
-            webhookKey: format.key,
-          });
-          
-          payload = whopsdk.webhooks.unwrap(rawBody, { headers: headersObj });
-          console.log(`[WHOP WEBHOOK] SDK verification successful with ${format.name}! Event type:`, payload.type);
-          verificationSucceeded = true;
-          break;
-        } catch (err: any) {
-          console.log(`[WHOP WEBHOOK] ${format.name} verification failed:`, err.message);
+      // Try using standardwebhooks library directly first for better error messages
+      try {
+        const { Webhook } = await import("standardwebhooks");
+        
+        for (const format of keyFormats) {
+          try {
+            const wh = new Webhook(format.key);
+            // standardwebhooks expects specific header format
+            const headers = {
+              "webhook-id": webhookId,
+              "webhook-timestamp": webhookTimestamp,
+              "webhook-signature": webhookSignature,
+            };
+            wh.verify(rawBody, headers);
+            payload = JSON.parse(rawBody);
+            console.log(`[WHOP WEBHOOK] standardwebhooks verification SUCCESS with ${format.name}!`);
+            verificationSucceeded = true;
+            break;
+          } catch (err: any) {
+            console.log(`[WHOP WEBHOOK] standardwebhooks ${format.name} failed:`, err.message);
+          }
+        }
+      } catch (importErr: any) {
+        console.log("[WHOP WEBHOOK] Could not import standardwebhooks:", importErr.message);
+      }
+      
+      // If standardwebhooks didn't work, try Whop SDK
+      if (!verificationSucceeded) {
+        const { Whop } = await import("@whop/sdk");
+        
+        for (const format of keyFormats) {
+          try {
+            const whopsdk = new Whop({
+              apiKey: process.env.WHOP_API_KEY,
+              webhookKey: format.key,
+            });
+            
+            payload = whopsdk.webhooks.unwrap(rawBody, { headers: headersObj });
+            console.log(`[WHOP WEBHOOK] SDK verification SUCCESS with ${format.name}! Event type:`, payload.type);
+            verificationSucceeded = true;
+            break;
+          } catch (err: any) {
+            console.log(`[WHOP WEBHOOK] SDK ${format.name} failed:`, err.message);
+          }
         }
       }
       
       if (!verificationSucceeded) {
-        console.error("[WHOP WEBHOOK] All verification attempts failed");
-        
-        // Log header values for debugging (masked for security)
-        const webhookId = req.headers['webhook-id'] as string;
-        const webhookTimestamp = req.headers['webhook-timestamp'] as string;
-        const webhookSignature = req.headers['webhook-signature'] as string;
-        console.log("[WHOP WEBHOOK] Debug - webhook-id:", webhookId);
-        console.log("[WHOP WEBHOOK] Debug - webhook-timestamp:", webhookTimestamp);
-        console.log("[WHOP WEBHOOK] Debug - signature (first 20 chars):", webhookSignature?.substring(0, 20) + "...");
-        console.log("[WHOP WEBHOOK] Debug - secret configured:", !!webhookSecret);
-        console.log("[WHOP WEBHOOK] Debug - secret length:", webhookSecret?.length);
+        console.error("[WHOP WEBHOOK] === ALL VERIFICATION ATTEMPTS FAILED ===");
+        console.error("[WHOP WEBHOOK] This is likely a secret mismatch issue.");
+        console.error("[WHOP WEBHOOK] Please verify WHOP_WEBHOOK_SECRET matches the secret in Whop dashboard.");
         
         // Return 401 immediately - do not process unverified payloads
         return res.status(401).json({ error: "Webhook signature verification failed" });
