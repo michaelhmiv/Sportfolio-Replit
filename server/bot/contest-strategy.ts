@@ -176,12 +176,16 @@ async function enterContest(
       });
     }
     
-    // Update contest entry count
+    // Update contest entry count, total shares, AND prize pool
+    // Prize pool = total shares entered (1 share = $1)
+    // BUGFIX: Previously bots weren't updating totalPrizePool, so their shares
+    // didn't contribute to winnings
     await db
       .update(contests)
       .set({
         entryCount: sql`entry_count + 1`,
         totalSharesEntered: sql`total_shares_entered + ${totalShares}`,
+        totalPrizePool: sql`(total_shares_entered + ${totalShares})::text`,
       })
       .where(eq(contests.id, contestId));
     
