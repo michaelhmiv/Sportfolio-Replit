@@ -561,16 +561,16 @@ export default function Dashboard() {
         <div className="p-3 sm:p-4 max-w-full overflow-x-hidden">
         {/* Balance Header - Only show for authenticated users */}
         {isAuthenticated && data?.user && (
-          <div className="mb-4 sm:mb-4">
-            <div className="flex flex-row justify-between gap-3">
+          <div className="mb-3">
+            <div className="flex flex-row justify-between gap-2">
               <div>
-                <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Cash Balance</div>
-                <div className="flex items-center gap-2">
-                  <div className="text-2xl font-mono font-bold" data-testid="text-balance">${data?.user?.balance || "0.00"}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Cash Balance</div>
+                <div className="flex items-center gap-1.5">
+                  <div className="text-lg font-mono font-bold" data-testid="text-balance">${data?.user?.balance || "0.00"}</div>
                   {data?.user?.cashRank && data?.user.cashRank > 0 && (
                     <button
                       onClick={() => setLocation("/leaderboards#cashBalance")}
-                      className="inline-flex items-center gap-1 border border-border px-2 py-0.5 rounded-md text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 border border-border px-1.5 py-0.5 rounded text-[10px] hover-elevate active-elevate-2 transition-colors cursor-pointer"
                       data-testid="badge-cash-rank"
                       aria-label={`Cash balance rank #${data?.user.cashRank}, click to view leaderboard`}
                     >
@@ -589,12 +589,12 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-sm text-muted-foreground uppercase tracking-wide mb-1">Portfolio Value</div>
-                <div className="flex items-center gap-2 justify-end">
+                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Portfolio Value</div>
+                <div className="flex items-center gap-1.5 justify-end">
                   {data?.user?.portfolioRank && data?.user.portfolioRank > 0 && (
                     <button
                       onClick={() => setLocation("/leaderboards#portfolioValue")}
-                      className="inline-flex items-center gap-1 border border-border px-2 py-0.5 rounded-md text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 border border-border px-1.5 py-0.5 rounded text-[10px] hover-elevate active-elevate-2 transition-colors cursor-pointer"
                       data-testid="badge-portfolio-rank"
                       aria-label={`Portfolio value rank #${data?.user.portfolioRank}, click to view leaderboard`}
                     >
@@ -602,15 +602,15 @@ export default function Dashboard() {
                       {data?.user.portfolioRankChange !== null && data?.user.portfolioRankChange !== 0 && (
                         <span className={data?.user.portfolioRankChange > 0 ? "text-positive" : "text-negative"}>
                           {data?.user.portfolioRankChange > 0 ? (
-                            <TrendingUp className="w-3 h-3 inline" />
+                            <TrendingUp className="w-2.5 h-2.5 inline" />
                           ) : (
-                            <TrendingDown className="w-3 h-3 inline" />
+                            <TrendingDown className="w-2.5 h-2.5 inline" />
                           )}
                         </span>
                       )}
                     </button>
                   )}
-                  <div className="text-2xl font-mono font-bold" data-testid="text-portfolio-value">${data?.user?.portfolioValue || "0.00"}</div>
+                  <div className="text-lg font-mono font-bold" data-testid="text-portfolio-value">${data?.user?.portfolioValue || "0.00"}</div>
                 </div>
               </div>
             </div>
@@ -833,9 +833,9 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="space-y-3 sm:space-y-4">
               {!isAuthenticated ? (
-                <div className="text-center py-6">
-                  <Clock className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                  <p className="text-sm text-muted-foreground mb-4">Earn shares automatically over time</p>
+                <div className="text-center py-4">
+                  <Clock className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-xs text-muted-foreground mb-3">Earn shares automatically over time</p>
                   <Button 
                     className="w-full" 
                     size="lg"
@@ -946,9 +946,9 @@ export default function Dashboard() {
                       </AnimatedButton>
                     </>
                   ) : (
-                    <div className="text-center py-4">
-                      <Clock className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                      <p className="text-sm text-muted-foreground mb-4">No players selected for vesting</p>
+                    <div className="text-center py-3">
+                      <Clock className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-xs text-muted-foreground mb-3">No players selected for vesting</p>
                       <Button 
                         className="w-full" 
                         size="lg"
@@ -979,18 +979,18 @@ export default function Dashboard() {
             </CardHeader>
             <CardContent className="space-y-2 sm:space-y-3">
               {data?.contests?.slice(0, 3).map((contest) => (
-                <div key={contest.id} className="p-2 sm:p-3 border rounded-md hover-elevate">
-                  <div className="flex items-start justify-between mb-1 sm:mb-2">
-                    <div>
-                      <div className="font-medium text-sm">{contest.name}</div>
-                      <Badge variant="outline" className="text-xs mt-1">{contest.sport}</Badge>
+                <div key={contest.id} className="p-2 border rounded-md hover-elevate">
+                  <div className="flex items-start justify-between gap-2 mb-1">
+                    <div className="min-w-0">
+                      <div className="font-medium text-xs truncate">{contest.name}</div>
+                      <Badge variant="outline" className="text-[10px] h-4 mt-0.5">{contest.sport}</Badge>
                     </div>
-                    <div className="text-right">
-                      <div className="text-lg font-mono font-bold text-primary">${contest.totalPrizePool}</div>
-                      <div className="text-xs text-muted-foreground">{contest.entryCount} entries</div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-sm font-mono font-bold text-primary">${contest.totalPrizePool}</div>
+                      <div className="text-[10px] text-muted-foreground">{contest.entryCount} entries</div>
                     </div>
                   </div>
-                  <div className="text-xs text-muted-foreground">{contest.totalSharesEntered} shares entered</div>
+                  <div className="text-[10px] text-muted-foreground">{contest.totalSharesEntered} shares entered</div>
                 </div>
               ))}
               {!isAuthenticated ? (
