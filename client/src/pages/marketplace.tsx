@@ -191,17 +191,17 @@ export default function Marketplace() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-3 sm:p-4">
+    <div className="min-h-screen bg-background p-2 sm:p-3">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-4 sm:mb-4">
-          <h1 className="hidden sm:block text-3xl font-bold mb-2">Marketplace</h1>
-          <p className="text-muted-foreground">Browse and trade player shares</p>
+        <div className="mb-3">
+          <h1 className="hidden sm:block text-lg font-bold mb-1">Marketplace</h1>
+          <p className="text-xs text-muted-foreground">Browse and trade player shares</p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
-            <TabsTrigger value="players" data-testid="tab-players">Players</TabsTrigger>
-            <TabsTrigger value="activity" data-testid="tab-activity">Market Activity</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-3">
+          <TabsList className="grid w-full max-w-xs grid-cols-2 h-8">
+            <TabsTrigger value="players" className="text-xs" data-testid="tab-players">Players</TabsTrigger>
+            <TabsTrigger value="activity" className="text-xs" data-testid="tab-activity">Activity</TabsTrigger>
           </TabsList>
 
           <TabsContent value="players" className="space-y-4">
