@@ -160,6 +160,7 @@ export interface IStorage {
   // Price history methods
   getPriceHistory(playerId: string, days?: number): Promise<PriceHistory[]>;
   getPrice24hAgo(playerId: string): Promise<number | null>;
+  createPriceHistoryRecord(playerId: string, price: string, volume: number): Promise<void>;
   
   // Market cap methods
   getTotalSharesForPlayer(playerId: string): Promise<number>;
@@ -1246,6 +1247,15 @@ export class DatabaseStorage implements IStorage {
       .limit(1);
     
     return record ? parseFloat(record.price) : null;
+  }
+  
+  async createPriceHistoryRecord(playerId: string, price: string, volume: number): Promise<void> {
+    await db.insert(priceHistory).values({
+      playerId,
+      price,
+      volume,
+      timestamp: new Date(),
+    });
   }
   
   // Market cap methods
