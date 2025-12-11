@@ -21,6 +21,7 @@ import {
   premiumCheckoutSessions,
   premiumOrders,
   premiumTrades,
+  whopPayments,
   type User,
   type InsertUser,
   type UpsertUser,
@@ -56,6 +57,8 @@ import {
   type PremiumCheckoutSession,
   type PremiumOrder,
   type PremiumTrade,
+  type WhopPayment,
+  type InsertWhopPayment,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, or, gte, lte, isNotNull, count } from "drizzle-orm";
@@ -278,6 +281,16 @@ export interface IStorage {
   completePremiumCheckoutSession(id: string, receiptId: string): Promise<PremiumCheckoutSession | undefined>;
   getUserPremiumCheckoutSessions(userId: string): Promise<PremiumCheckoutSession[]>;
   getPendingPremiumCheckoutSessions(): Promise<PremiumCheckoutSession[]>;
+  
+  // Whop payment sync methods
+  getWhopPaymentByPaymentId(paymentId: string): Promise<WhopPayment | undefined>;
+  getWhopPaymentsByEmail(email: string): Promise<WhopPayment[]>;
+  getWhopPaymentsByUserId(userId: string): Promise<WhopPayment[]>;
+  getUncreditedWhopPaymentsByEmail(email: string): Promise<WhopPayment[]>;
+  upsertWhopPayment(payment: InsertWhopPayment): Promise<WhopPayment>;
+  creditWhopPayment(paymentId: string, userId: string): Promise<WhopPayment | undefined>;
+  revokeWhopPayment(paymentId: string, revokedQuantity: number, liabilityQuantity?: number): Promise<WhopPayment | undefined>;
+  updateWhopPaymentStatus(paymentId: string, whopStatus: string): Promise<WhopPayment | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2969,6 +2982,103 @@ export class DatabaseStorage implements IStorage {
       .update(premiumOrders)
       .set({ status: "cancelled" })
       .where(eq(premiumOrders.id, orderId));
+  }
+
+  // Whop payment sync methods
+  async getWhopPaymentByPaymentId(paymentId: string): Promise<WhopPayment | undefined> {
+    const [payment] = await db
+      .select()
+      .from(whopPayments)
+      .where(eq(whopPayments.paymentId, paymentId));
+    return payment || undefined;
+  }
+
+  async getWhopPaymentsByEmail(email: string): Promise<WhopPayment[]> {
+    return await db
+      .select()
+      .from(whopPayments)
+      .where(eq(whopPayments.email, email.toLowerCase()))
+      .orderBy(desc(whopPayments.createdAt));
+  }
+
+  async getWhopPaymentsByUserId(userId: string): Promise<WhopPayment[]> {
+    return await db
+      .select()
+      .from(whopPayments)
+      .where(eq(whopPayments.userId, userId))
+      .orderBy(desc(whopPayments.createdAt));
+  }
+
+  async getUncreditedWhopPaymentsByEmail(email: string): Promise<WhopPayment[]> {
+    return await db
+      .select()
+      .from(whopPayments)
+      .where(and(
+        eq(whopPayments.email, email.toLowerCase()),
+        eq(whopPayments.whopStatus, "paid"),
+        sql`${whopPayments.creditedAt} IS NULL`
+      ))
+      .orderBy(desc(whopPayments.createdAt));
+  }
+
+  async upsertWhopPayment(payment: InsertWhopPayment): Promise<WhopPayment> {
+    const [result] = await db
+      .insert(whopPayments)
+      .values({
+        ...payment,
+        email: payment.email.toLowerCase(),
+        lastSyncedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: whopPayments.paymentId,
+        set: {
+          whopStatus: payment.whopStatus,
+          lastSyncedAt: new Date(),
+          rawPayload: payment.rawPayload,
+        },
+      })
+      .returning();
+    return result;
+  }
+
+  async creditWhopPayment(paymentId: string, userId: string): Promise<WhopPayment | undefined> {
+    const [updated] = await db
+      .update(whopPayments)
+      .set({
+        userId,
+        creditedAt: new Date(),
+      })
+      .where(and(
+        eq(whopPayments.paymentId, paymentId),
+        sql`${whopPayments.creditedAt} IS NULL`
+      ))
+      .returning();
+    return updated || undefined;
+  }
+
+  async revokeWhopPayment(paymentId: string, revokedQuantity: number, liabilityQuantity?: number): Promise<WhopPayment | undefined> {
+    const [updated] = await db
+      .update(whopPayments)
+      .set({
+        revokedAt: new Date(),
+        revokedQuantity,
+        liabilityQuantity: liabilityQuantity || 0,
+      })
+      .where(eq(whopPayments.paymentId, paymentId))
+      .returning();
+    return updated || undefined;
+  }
+
+  async updateWhopPaymentStatus(paymentId: string, whopStatus: string): Promise<WhopPayment | undefined> {
+    const [updated] = await db
+      .update(whopPayments)
+      .set({
+        whopStatus,
+        lastSyncedAt: new Date(),
+      })
+      .where(eq(whopPayments.paymentId, paymentId))
+      .returning();
+    return updated || undefined;
   }
 }
 

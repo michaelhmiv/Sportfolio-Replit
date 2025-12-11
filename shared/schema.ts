@@ -454,6 +454,32 @@ export const premiumTrades = pgTable("premium_trades", {
   sellerIdx: index("premium_trades_seller_idx").on(table.sellerId),
 }));
 
+// Whop payments table - tracks Whop purchases for cross-platform crediting
+// Used to sync premium shares between Whop and Sportfolio
+export const whopPayments = pgTable("whop_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  paymentId: varchar("payment_id").notNull().unique(), // Whop's unique payment ID (primary key for idempotency)
+  email: varchar("email").notNull(), // Email from Whop payment (used to match Sportfolio users)
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }), // Sportfolio user who received credit (null if not yet matched)
+  quantity: integer("quantity").notNull().default(1), // Number of premium shares purchased
+  amountCents: integer("amount_cents").notNull(), // Amount paid in cents
+  currency: varchar("currency").notNull().default("usd"),
+  whopStatus: text("whop_status").notNull(), // "paid", "refunded", "disputed", etc.
+  creditedAt: timestamp("credited_at"), // When shares were credited (null if not yet credited)
+  revokedAt: timestamp("revoked_at"), // When shares were revoked due to refund/chargeback
+  revokedQuantity: integer("revoked_quantity"), // How many shares were revoked
+  liabilityQuantity: integer("liability_quantity").default(0), // Shares owed if user traded them away before revocation
+  lastSyncedAt: timestamp("last_synced_at").notNull().defaultNow(), // Last time this payment was synced from Whop
+  rawPayload: jsonb("raw_payload"), // Full Whop payment object for debugging
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  paymentIdIdx: index("whop_payments_payment_id_idx").on(table.paymentId),
+  emailIdx: index("whop_payments_email_idx").on(table.email),
+  userIdIdx: index("whop_payments_user_id_idx").on(table.userId),
+  statusIdx: index("whop_payments_status_idx").on(table.whopStatus),
+  creditedIdx: index("whop_payments_credited_idx").on(table.creditedAt),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   holdings: many(holdings),
@@ -722,3 +748,16 @@ export const insertPremiumTradeSchema = createInsertSchema(premiumTrades).omit({
 
 export type PremiumTrade = typeof premiumTrades.$inferSelect;
 export type InsertPremiumTrade = z.infer<typeof insertPremiumTradeSchema>;
+
+// Whop payment schemas and types
+export const insertWhopPaymentSchema = createInsertSchema(whopPayments).omit({
+  id: true,
+  creditedAt: true,
+  revokedAt: true,
+  revokedQuantity: true,
+  liabilityQuantity: true,
+  createdAt: true,
+});
+
+export type WhopPayment = typeof whopPayments.$inferSelect;
+export type InsertWhopPayment = z.infer<typeof insertWhopPaymentSchema>;
