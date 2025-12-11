@@ -18,6 +18,9 @@ export async function invalidatePortfolioQueries(): Promise<void> {
     queryClient.invalidateQueries({ queryKey: ["/api/portfolio"] }),
     queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] }),
     
+    // Auth/user data (includes premium status which affects vesting rate display)
+    queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] }),
+    
     // Activity feed (vesting, orders, trades, contests)
     queryClient.invalidateQueries({ queryKey: ["/api/activity"] }),
     
