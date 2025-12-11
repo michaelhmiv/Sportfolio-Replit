@@ -132,6 +132,9 @@ export async function matchOrders(playerId: string): Promise<number> {
       priceChange24h = lastTradePrice - price24hAgo;
     }
     
+    // Record price history for charts and analytics
+    await storage.createPriceHistoryRecord(playerId, lastTradePrice.toFixed(2), totalVolume);
+    
     await storage.upsertPlayer({
       ...player,
       currentPrice: lastTradePrice.toFixed(2),
