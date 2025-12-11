@@ -256,6 +256,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             playerId,
             price: tradePrice.toFixed(2),
             quantity: tradeQuantity,
+            buyerId: buyOrder.userId,
+            sellerId: sellOrder.userId,
           });
           
           broadcast({ type: "orderBook", playerId }); // Update order book depth in real-time
@@ -1528,7 +1530,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const vwap = filledQty > 0 ? (totalCost / filledQty).toFixed(2) : lastFillPrice.toFixed(2);
         
         broadcast({ type: "orderBook", playerId: req.params.playerId });
-        broadcast({ type: "trade", playerId: req.params.playerId, quantity: filledQty, price: vwap });
+        broadcast({ type: "trade", playerId: req.params.playerId, quantity: filledQty, price: vwap, userId: user.id });
         // Note: portfolio broadcasts already sent for each party in the fill loop above
         
         // Return enhanced response for market orders with fill details

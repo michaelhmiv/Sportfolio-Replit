@@ -38,7 +38,15 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // 2. Contest settlements (you won/placed in a contest)
+    // 2. Trade notifications - only for trades you participated in
+    // Check if you're the buyer or seller
+    const unsubTrade = subscribe('trade', (data: { buyerId?: string; sellerId?: string }) => {
+      if (user?.id && (data.buyerId === user.id || data.sellerId === user.id)) {
+        setUnreadCount(prev => prev + 1);
+      }
+    });
+
+    // 3. Contest settlements (you won/placed in a contest)
     // contestSettled events are user-specific
     const unsubContestSettled = subscribe('contestSettled', (data: { userId?: string }) => {
       // Only increment if this settlement is for the current user
@@ -49,6 +57,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
     return () => {
       unsubPortfolio();
+      unsubTrade();
       unsubContestSettled();
     };
   }, [subscribe, user?.id]);
