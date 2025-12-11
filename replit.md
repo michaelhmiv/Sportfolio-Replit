@@ -8,6 +8,8 @@ Preferred communication style: Simple, everyday language.
 
 CRITICAL RULE: Never use mock, sample, or placeholder data under any circumstances. All data must come from live API sources (MySportsFeeds). If API data is unavailable, show empty states or loading indicators - never fabricate data.
 
+**MARKET DATA INTEGRITY RULE:** Market prices must ONLY be derived from actual executed trades. Never display fabricated bid/ask prices, market values, or price histories. If no trades have occurred, show an explicit empty state (e.g., "No trades yet" or "Price not established"). The current market value is ALWAYS the most recent trade price - nothing else. This applies to both player shares and premium shares.
+
 ## System Architecture
 
 ### Frontend

@@ -59,12 +59,13 @@ const getOidcConfig = memoize(
 export function getSession() {
   authLog("SESSION", "Initializing session configuration");
   
-  const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
+  // 30 days session lifetime for "stay logged in" experience like Facebook
+  const sessionTtl = 30 * 24 * 60 * 60 * 1000; // 30 days
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
     createTableIfMissing: false,
-    ttl: sessionTtl,
+    ttl: sessionTtl / 1000, // connect-pg-simple expects seconds, not milliseconds
     tableName: "sessions",
   });
 
@@ -80,8 +81,9 @@ export function getSession() {
   const sessionConfig = {
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
-    resave: false,
-    saveUninitialized: false,
+    resave: true, // Enable resave to ensure session is updated on each request
+    saveUninitialized: true, // Save new sessions immediately (fixes first-login race condition)
+    rolling: true, // Refresh session cookie on each request (extends session on activity)
     cookie: {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -91,10 +93,12 @@ export function getSession() {
   };
 
   authLog("SESSION", "Session configuration created", {
-    ttl: sessionTtl,
+    ttlDays: 30,
+    ttlMs: sessionTtl,
     secure: sessionConfig.cookie.secure,
     sameSite: sessionConfig.cookie.sameSite,
     httpOnly: sessionConfig.cookie.httpOnly,
+    rolling: sessionConfig.rolling,
   });
 
   return session(sessionConfig);
@@ -297,10 +301,21 @@ export async function setupAuth(app: Express) {
     }
 
     ensureStrategy(req.hostname);
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      prompt: "login consent",
-      scope: ["openid", "email", "profile", "offline_access"],
-    })(req, res, next);
+    
+    // Ensure session is saved before redirecting to OIDC provider
+    // This fixes the race condition where the callback fails on first attempt
+    req.session.save((err) => {
+      if (err) {
+        authLog("LOGIN", "Failed to save session before redirect", { error: err.message });
+      } else {
+        authLog("LOGIN", "Session saved successfully, proceeding to authenticate");
+      }
+      
+      passport.authenticate(`replitauth:${req.hostname}`, {
+        prompt: "login consent",
+        scope: ["openid", "email", "profile", "offline_access"],
+      })(req, res, next);
+    });
   });
 
   app.get("/api/callback", (req, res, next) => {

@@ -3405,6 +3405,75 @@ ${posts.map(post => `  <url>
     }
   });
 
+  // Get premium share market data with price history and circulation
+  // CRITICAL: Only returns actual trade data - never fabricates prices
+  app.get("/api/premium/market-data", async (req, res) => {
+    try {
+      const period = (req.query.period as string) || "1M";
+      
+      // Calculate time range based on period
+      let startDate: Date;
+      const now = new Date();
+      switch (period) {
+        case "1D":
+          startDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case "1W":
+          startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case "1M":
+          startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+        case "3M":
+          startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+          break;
+        case "ALL":
+        default:
+          startDate = new Date("2020-01-01");
+          break;
+      }
+      
+      // Get premium trades within the time range
+      const trades = await storage.getPremiumTradesInRange(startDate, now);
+      
+      // Get order book for current bid/ask (only show if orders exist)
+      const orderBook = await storage.getPremiumOrderBook();
+      const bestBid = orderBook.bids.length > 0 
+        ? orderBook.bids.sort((a, b) => parseFloat(b.price) - parseFloat(a.price))[0] 
+        : null;
+      const bestAsk = orderBook.asks.length > 0 
+        ? orderBook.asks.sort((a, b) => parseFloat(a.price) - parseFloat(b.price))[0] 
+        : null;
+      
+      // Get total circulation (sum of all premium holdings)
+      const circulation = await storage.getTotalPremiumCirculation();
+      
+      // Get last trade price (market value is ONLY the most recent trade)
+      const lastTrade = trades.length > 0 ? trades[0] : null;
+      const lastTradePrice = lastTrade ? parseFloat(lastTrade.price) : null;
+      
+      // Build price history from actual trades only
+      const priceHistory = trades.map(trade => ({
+        timestamp: trade.executedAt,
+        price: parseFloat(trade.price),
+        volume: trade.quantity,
+      })).reverse(); // Oldest first for charting
+      
+      res.json({
+        // Only show prices that are based on actual data
+        lastTradePrice, // null if no trades
+        bestBid: bestBid ? { price: bestBid.price, quantity: bestBid.quantity } : null,
+        bestAsk: bestAsk ? { price: bestAsk.price, quantity: bestAsk.quantity } : null,
+        circulation,
+        priceHistory,
+        totalTrades: trades.length,
+        period,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Place premium share order
   app.post("/api/premium/orders", isAuthenticated, async (req, res) => {
     try {

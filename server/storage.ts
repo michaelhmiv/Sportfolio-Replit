@@ -2885,6 +2885,34 @@ export class DatabaseStorage implements IStorage {
     return enriched;
   }
 
+  async getPremiumTradesInRange(startDate: Date, endDate: Date): Promise<Array<{
+    buyerId: string;
+    sellerId: string;
+    quantity: number;
+    price: string;
+    executedAt: Date;
+  }>> {
+    const trades = await db
+      .select()
+      .from(premiumTrades)
+      .where(and(
+        gte(premiumTrades.executedAt, startDate),
+        lte(premiumTrades.executedAt, endDate)
+      ))
+      .orderBy(desc(premiumTrades.executedAt));
+    
+    return trades;
+  }
+
+  async getTotalPremiumCirculation(): Promise<number> {
+    const result = await db
+      .select({ total: sql<number>`COALESCE(SUM(quantity), 0)` })
+      .from(holdings)
+      .where(eq(holdings.assetType, "premium"));
+    
+    return result[0]?.total || 0;
+  }
+
   async createPremiumOrder(order: {
     userId: string;
     side: "buy" | "sell";
