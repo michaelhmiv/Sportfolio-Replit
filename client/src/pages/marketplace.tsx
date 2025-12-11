@@ -205,66 +205,64 @@ export default function Marketplace() {
           </TabsList>
 
           <TabsContent value="players" className="space-y-4">
-            {/* Spotlight Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Spotlight Cards - Side by Side */}
+            <div className="grid grid-cols-2 gap-2">
               {/* Top Risers Card */}
               <Card className="border-green-500/20">
-                <CardHeader className="pb-2 pt-3 px-4">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-green-500" />
-                    Top Risers (24h)
+                <CardHeader className="py-1.5 px-2">
+                  <CardTitle className="text-xs font-semibold flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3 text-green-500" />
+                    Top Risers
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-4 pb-3 pt-0">
+                <CardContent className="px-2 pb-2 pt-0">
                   {topRisers && topRisers.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="space-y-0.5">
                       {topRisers.map((player, index) => (
-                        <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded p-1.5 cursor-pointer">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground w-4">{index + 1}.</span>
-                            <span className="text-sm font-medium">{player.firstName} {player.lastName}</span>
-                            <Badge variant="outline" className="text-xs">{player.team}</Badge>
+                        <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded px-1 py-0.5 cursor-pointer">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span className="text-[10px] text-muted-foreground">{index + 1}.</span>
+                            <span className="text-xs font-medium truncate">{player.lastName}</span>
+                            <span className="text-[10px] text-muted-foreground">{player.team}</span>
                           </div>
-                          <div className="text-right">
-                            <div className="text-sm font-mono">${player.price?.toFixed(2) || '-'}</div>
-                            <div className="text-xs text-green-500 font-medium">+${player.priceChange24h.toFixed(2)}</div>
+                          <div className="text-right flex-shrink-0 ml-1">
+                            <span className="text-xs font-mono text-green-500">+${player.priceChange24h.toFixed(2)}</span>
                           </div>
                         </Link>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No rising players yet</p>
+                    <p className="text-xs text-muted-foreground">No data</p>
                   )}
                 </CardContent>
               </Card>
 
               {/* Top Market Cap Card */}
               <Card className="border-blue-500/20">
-                <CardHeader className="pb-2 pt-3 px-4">
-                  <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                    <BarChart3 className="w-4 h-4 text-blue-500" />
+                <CardHeader className="py-1.5 px-2">
+                  <CardTitle className="text-xs font-semibold flex items-center gap-1">
+                    <BarChart3 className="w-3 h-3 text-blue-500" />
                     Top Market Cap
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-4 pb-3 pt-0">
+                <CardContent className="px-2 pb-2 pt-0">
                   {topMarketCap && topMarketCap.length > 0 ? (
-                    <div className="space-y-2">
+                    <div className="space-y-0.5">
                       {topMarketCap.map((player, index) => (
-                        <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded p-1.5 cursor-pointer">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs text-muted-foreground w-4">{index + 1}.</span>
-                            <span className="text-sm font-medium">{player.firstName} {player.lastName}</span>
-                            <Badge variant="outline" className="text-xs">{player.team}</Badge>
+                        <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded px-1 py-0.5 cursor-pointer">
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span className="text-[10px] text-muted-foreground">{index + 1}.</span>
+                            <span className="text-xs font-medium truncate">{player.lastName}</span>
+                            <span className="text-[10px] text-muted-foreground">{player.team}</span>
                           </div>
-                          <div className="text-right">
-                            <div className="text-sm font-mono">${player.marketCap.toLocaleString(undefined, { maximumFractionDigits: 0 })}</div>
-                            <div className="text-xs text-muted-foreground">{player.totalShares} shares</div>
+                          <div className="text-right flex-shrink-0 ml-1">
+                            <span className="text-xs font-mono">${(player.marketCap / 1000).toFixed(0)}K</span>
                           </div>
                         </Link>
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground">No market cap data yet</p>
+                    <p className="text-xs text-muted-foreground">No data</p>
                   )}
                 </CardContent>
               </Card>
