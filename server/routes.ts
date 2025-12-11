@@ -951,7 +951,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Top risers (24h) - players with highest priceChange24h
   app.get("/api/players/spotlight/top-risers", async (req, res) => {
     try {
-      const limit = parseInt(req.query.limit as string) || 3;
+      const limit = parseInt(req.query.limit as string) || 5;
       const players = await storage.getPlayers({});
       
       // Filter to players with positive price change and actual trade prices
@@ -978,7 +978,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Top market cap players
   app.get("/api/players/spotlight/top-market-cap", async (req, res) => {
     try {
-      const limit = parseInt(req.query.limit as string) || 3;
+      const limit = parseInt(req.query.limit as string) || 5;
       const players = await storage.getPlayers({});
       
       // Filter to players with established market prices and sort by marketCap
