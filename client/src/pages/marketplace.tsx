@@ -214,12 +214,13 @@ export default function Marketplace() {
                     Top Risers
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-2 pb-1.5 pt-0">
+                <CardContent className="px-2 pb-1 pt-0">
                   {topRisers && topRisers.length > 0 ? (
-                    <div className="space-y-0">
+                    <div className="flex flex-col">
                       {topRisers.slice(0, 5).map((player, index) => (
-                        <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded px-1 py-0.5 cursor-pointer">
-                          <div className="flex items-center gap-1 min-w-0">
+                        <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded px-1 py-0 cursor-pointer">
+                          <div className="flex items-center gap-0.5 min-w-0 flex-1">
+                            <TrendingUp className="w-2.5 h-2.5 text-green-500 flex-shrink-0" />
                             <span className="text-[10px] text-muted-foreground">{index + 1}.</span>
                             <span className="text-xs font-medium truncate">{player.lastName}</span>
                             <span className="text-[10px] text-muted-foreground">{player.team}</span>
@@ -229,6 +230,7 @@ export default function Marketplace() {
                           </div>
                         </Link>
                       ))}
+                      <Link href="/marketplace?tab=players" className="text-xs text-primary hover:underline mt-1 px-1 py-1">See More →</Link>
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">No data</p>
@@ -244,12 +246,13 @@ export default function Marketplace() {
                     Top Market Cap
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-2 pb-1.5 pt-0">
+                <CardContent className="px-2 pb-1 pt-0">
                   {topMarketCap && topMarketCap.length > 0 ? (
-                    <div className="space-y-0">
+                    <div className="flex flex-col">
                       {topMarketCap.slice(0, 5).map((player, index) => (
-                        <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded px-1 py-0.5 cursor-pointer">
-                          <div className="flex items-center gap-1 min-w-0">
+                        <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded px-1 py-0 cursor-pointer">
+                          <div className="flex items-center gap-0.5 min-w-0 flex-1">
+                            <BarChart3 className="w-2.5 h-2.5 text-blue-500 flex-shrink-0" />
                             <span className="text-[10px] text-muted-foreground">{index + 1}.</span>
                             <span className="text-xs font-medium truncate">{player.lastName}</span>
                             <span className="text-[10px] text-muted-foreground">{player.team}</span>
@@ -259,6 +262,7 @@ export default function Marketplace() {
                           </div>
                         </Link>
                       ))}
+                      <Link href="/marketplace?tab=players" className="text-xs text-primary hover:underline mt-1 px-1 py-1">See More →</Link>
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">No data</p>
