@@ -3445,8 +3445,9 @@ ${posts.map(post => `  <url>
         ? orderBook.asks.sort((a, b) => parseFloat(a.price) - parseFloat(b.price))[0] 
         : null;
       
-      // Get total circulation (sum of all premium holdings)
-      const circulation = await storage.getTotalPremiumCirculation();
+      // Get total circulation (sum of all premium holdings) - ensure it's a number
+      const circulationRaw = await storage.getTotalPremiumCirculation();
+      const circulation = typeof circulationRaw === 'string' ? parseInt(circulationRaw, 10) : (circulationRaw || 0);
       
       // Get last trade price (market value is ONLY the most recent trade)
       const lastTrade = trades.length > 0 ? trades[0] : null;
@@ -3460,10 +3461,10 @@ ${posts.map(post => `  <url>
       })).reverse(); // Oldest first for charting
       
       res.json({
-        // Only show prices that are based on actual data
-        lastTradePrice, // null if no trades
-        bestBid: bestBid ? { price: bestBid.price, quantity: bestBid.quantity } : null,
-        bestAsk: bestAsk ? { price: bestAsk.price, quantity: bestAsk.quantity } : null,
+        // Only show prices that are based on actual data - all numbers, no strings
+        lastTradePrice, // null if no trades, number otherwise
+        bestBid: bestBid ? { price: parseFloat(bestBid.price), quantity: bestBid.quantity } : null,
+        bestAsk: bestAsk ? { price: parseFloat(bestAsk.price), quantity: bestAsk.quantity } : null,
         circulation,
         priceHistory,
         totalTrades: trades.length,

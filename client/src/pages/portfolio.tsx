@@ -102,6 +102,19 @@ export default function Portfolio() {
     queryKey: ["/api/portfolio"],
   });
 
+  // Premium market data - CRITICAL: Only show real trade data, never fabricated prices
+  type PremiumMarketData = {
+    lastTradePrice: number | null;
+    bestBid: { price: number; quantity: number } | null;
+    bestAsk: { price: number; quantity: number } | null;
+    circulation: number;
+    totalTrades: number;
+  };
+  
+  const { data: premiumMarketData } = useQuery<PremiumMarketData>({
+    queryKey: ["/api/premium/market-data"],
+  });
+
   const { data: chartData } = useQuery<{ history: Array<{ date: string; cashBalance: number; portfolioValue: number; netWorth: number }>; timeRange: string }>({
     queryKey: ["/api/user/portfolio-history", chartTimeRange],
     queryFn: async () => {
@@ -596,9 +609,15 @@ export default function Portfolio() {
                                   <div className="font-medium text-sm text-yellow-500">Premium Share</div>
                                   <div className="text-xs text-muted-foreground">Qty: {data.premiumShares} • 30 Days Access</div>
                                   <div className="flex items-center gap-1.5 text-xs mt-0.5">
-                                    <span className="font-mono font-bold text-yellow-500">$5.00</span>
+                                    {premiumMarketData?.lastTradePrice !== null && premiumMarketData?.lastTradePrice !== undefined ? (
+                                      <span className="font-mono font-bold text-yellow-500">${premiumMarketData.lastTradePrice.toFixed(2)}</span>
+                                    ) : (
+                                      <span className="text-muted-foreground">No trades</span>
+                                    )}
                                     <span className="text-muted-foreground">•</span>
-                                    <span className="font-mono">Value: ${(data.premiumShares * 5).toFixed(2)}</span>
+                                    <span className="font-mono">Value: {premiumMarketData?.lastTradePrice !== null && premiumMarketData?.lastTradePrice !== undefined 
+                                      ? `$${(data.premiumShares * premiumMarketData.lastTradePrice).toFixed(2)}`
+                                      : "-"}</span>
                                   </div>
                                 </div>
                               </div>
@@ -634,11 +653,31 @@ export default function Portfolio() {
                             </div>
                           </td>
                           <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell text-yellow-500 font-bold">{data.premiumShares}</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell text-yellow-500">$5.00</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden md:table-cell text-yellow-500">$5.00</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell text-blue-500 dark:text-blue-400">$5.00</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell text-red-500 dark:text-red-400">$5.00</td>
-                          <td className="px-2 py-1.5 text-right font-mono hidden xl:table-cell text-yellow-500 font-bold">${(data.premiumShares * 5).toFixed(2)}</td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell text-yellow-500">
+                            {premiumMarketData?.lastTradePrice !== null && premiumMarketData?.lastTradePrice !== undefined 
+                              ? `$${premiumMarketData.lastTradePrice.toFixed(2)}` 
+                              : "-"}
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden md:table-cell text-yellow-500">
+                            {premiumMarketData?.lastTradePrice !== null && premiumMarketData?.lastTradePrice !== undefined 
+                              ? `$${premiumMarketData.lastTradePrice.toFixed(2)}` 
+                              : "-"}
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell text-blue-500 dark:text-blue-400">
+                            {premiumMarketData?.bestBid 
+                              ? `$${premiumMarketData.bestBid.price.toFixed(2)}` 
+                              : "-"}
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden sm:table-cell text-red-500 dark:text-red-400">
+                            {premiumMarketData?.bestAsk 
+                              ? `$${premiumMarketData.bestAsk.price.toFixed(2)}` 
+                              : "-"}
+                          </td>
+                          <td className="px-2 py-1.5 text-right font-mono hidden xl:table-cell text-yellow-500 font-bold">
+                            {premiumMarketData?.lastTradePrice !== null && premiumMarketData?.lastTradePrice !== undefined 
+                              ? `$${(data.premiumShares * premiumMarketData.lastTradePrice).toFixed(2)}`
+                              : "-"}
+                          </td>
                           <td className="px-2 py-1.5 text-right hidden sm:table-cell">
                             <div className="flex gap-1 justify-end">
                               <Link href="/premium/trade">

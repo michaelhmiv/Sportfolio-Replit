@@ -75,6 +75,19 @@ export default function Marketplace() {
     queryKey: ["/api/teams"],
   });
 
+  // Premium market data - CRITICAL: Only show real trade data, never fabricated prices
+  type PremiumMarketData = {
+    lastTradePrice: number | null;
+    bestBid: { price: number; quantity: number } | null;
+    bestAsk: { price: number; quantity: number } | null;
+    circulation: number;
+    totalTrades: number;
+  };
+  
+  const { data: premiumMarketData } = useQuery<PremiumMarketData>({
+    queryKey: ["/api/premium/market-data"],
+  });
+
   // WebSocket listener for real-time marketplace updates
   useEffect(() => {
     // Subscribe to trade events (affects prices, volume, 24h change)
@@ -379,13 +392,23 @@ export default function Marketplace() {
                                 <span className="text-muted-foreground">30 Days Access</span>
                               </div>
                               <div className="flex items-center gap-1.5 text-xs mt-0.5">
-                                <span className="font-mono font-bold text-yellow-500">$5.00</span>
+                                {premiumMarketData?.lastTradePrice !== null && premiumMarketData?.lastTradePrice !== undefined ? (
+                                  <span className="font-mono font-bold text-yellow-500">${premiumMarketData.lastTradePrice.toFixed(2)}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">No trades</span>
+                                )}
                                 <span className="text-muted-foreground">•</span>
-                                <span className="text-blue-500 dark:text-blue-400 font-mono font-bold">$5.00</span>
+                                {premiumMarketData?.bestBid ? (
+                                  <span className="text-blue-500 dark:text-blue-400 font-mono font-bold">${premiumMarketData.bestBid.price.toFixed(2)}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
                                 <span className="text-muted-foreground">/</span>
-                                <span className="text-red-500 dark:text-red-400 font-mono font-bold">$5.00</span>
-                                <span className="text-muted-foreground">•</span>
-                                <span className="text-muted-foreground">Vol: -</span>
+                                {premiumMarketData?.bestAsk ? (
+                                  <span className="text-red-500 dark:text-red-400 font-mono font-bold">${premiumMarketData.bestAsk.price.toFixed(2)}</span>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -411,17 +434,29 @@ export default function Marketplace() {
                         <Badge variant="outline" className="text-xs text-yellow-500 border-yellow-500/50">PREMIUM</Badge>
                       </td>
                       <td className="px-2 py-1.5 text-right hidden sm:table-cell">
-                        <span className="font-mono font-bold text-yellow-500">$5.00</span>
+                        {premiumMarketData?.lastTradePrice !== null && premiumMarketData?.lastTradePrice !== undefined ? (
+                          <span className="font-mono font-bold text-yellow-500">${premiumMarketData.lastTradePrice.toFixed(2)}</span>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">No trades</span>
+                        )}
                       </td>
                       <td className="px-2 py-1.5 text-right hidden lg:table-cell">
                         <div className="flex items-center justify-end gap-2 font-mono text-sm font-bold">
-                          <span className="text-blue-500 dark:text-blue-400">$5.00</span>
+                          {premiumMarketData?.bestBid ? (
+                            <span className="text-blue-500 dark:text-blue-400">${premiumMarketData.bestBid.price.toFixed(2)}</span>
+                          ) : (
+                            <span className="text-muted-foreground font-normal text-xs">-</span>
+                          )}
                           <span className="text-muted-foreground font-normal">×</span>
-                          <span className="text-red-500 dark:text-red-400">$5.00</span>
+                          {premiumMarketData?.bestAsk ? (
+                            <span className="text-red-500 dark:text-red-400">${premiumMarketData.bestAsk.price.toFixed(2)}</span>
+                          ) : (
+                            <span className="text-muted-foreground font-normal text-xs">-</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-2 py-1.5 text-right hidden lg:table-cell">
-                        <span className="text-xs text-muted-foreground">-</span>
+                        <span className="text-xs text-muted-foreground">{premiumMarketData?.totalTrades || 0}</span>
                       </td>
                       <td className="px-2 py-1.5 text-right hidden md:table-cell">
                         <div className="flex items-center justify-end gap-1 text-muted-foreground">
