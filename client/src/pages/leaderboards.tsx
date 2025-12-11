@@ -144,31 +144,31 @@ export default function Leaderboards() {
                 className={`hover-elevate ${isCurrentUser ? 'border-primary border-2' : ''}`}
                 data-testid={`card-leaderboard-${entry.rank}`}
               >
-                <CardContent className="p-4">
+                <CardContent className="p-3">
                   <Link href={`/user/${entry.userId}`}>
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-1 flex-shrink-0">
-                        <span className="font-mono font-bold text-xl w-10 text-right">
+                        <span className="font-mono font-bold text-sm w-8 text-right">
                           #{entry.rank}
                         </span>
                         {entry.rank <= 3 && (
-                          <Trophy className={`w-4 h-4 ${entry.rank === 1 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
+                          <Trophy className={`w-3 h-3 ${entry.rank === 1 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
                         )}
                       </div>
                       
-                      <Avatar className="w-9 h-9 flex-shrink-0">
+                      <Avatar className="w-7 h-7 flex-shrink-0">
                         <AvatarImage src={entry.profileImageUrl || undefined} />
-                        <AvatarFallback>{entry.username[0].toUpperCase()}</AvatarFallback>
+                        <AvatarFallback className="text-xs">{entry.username[0].toUpperCase()}</AvatarFallback>
                       </Avatar>
                       
                       <div className="flex-1 min-w-0">
-                        <div className={`font-semibold text-sm truncate ${isCurrentUser ? 'text-primary' : ''}`}>
+                        <div className={`font-semibold text-xs truncate ${isCurrentUser ? 'text-primary' : ''}`}>
                           @{entry.username}
                         </div>
                       </div>
                       
                       <div className="text-right flex-shrink-0">
-                        <div className="font-mono font-bold text-base">
+                        <div className="font-mono font-bold text-sm">
                           {valueFormatter(entry.value)}
                         </div>
                       </div>
@@ -192,9 +192,9 @@ export default function Leaderboards() {
               <table className="w-full">
                 <thead className="border-b bg-muted/50">
                   <tr>
-                    <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rank</th>
-                    <th className="text-left p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">User</th>
-                    <th className="text-right p-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Value</th>
+                    <th className="text-left p-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Rank</th>
+                    <th className="text-left p-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">User</th>
+                    <th className="text-right p-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Value</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -208,32 +208,32 @@ export default function Leaderboards() {
                         className={`border-b hover-elevate ${isCurrentUser ? 'bg-primary/5' : ''}`}
                         data-testid={`row-leaderboard-${entry.rank}`}
                       >
-                        <td className="p-4">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-lg">
+                        <td className="p-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono font-bold text-sm">
                               #{entry.rank}
                             </span>
                             {entry.rank <= 3 && (
-                              <Trophy className={`w-4 h-4 ${entry.rank === 1 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
+                              <Trophy className={`w-3 h-3 ${entry.rank === 1 ? 'text-yellow-500' : 'text-muted-foreground'}`} />
                             )}
                           </div>
                         </td>
-                        <td className="p-4">
+                        <td className="p-3">
                           <Link href={`/user/${entry.userId}`}>
-                            <div className="flex items-center gap-3 hover:text-primary hover:underline cursor-pointer">
-                              <Avatar className="w-8 h-8">
+                            <div className="flex items-center gap-2 hover:text-primary hover:underline cursor-pointer">
+                              <Avatar className="w-7 h-7">
                                 <AvatarImage src={entry.profileImageUrl || undefined} />
-                                <AvatarFallback>{entry.username[0].toUpperCase()}</AvatarFallback>
+                                <AvatarFallback className="text-xs">{entry.username[0].toUpperCase()}</AvatarFallback>
                               </Avatar>
                               <div>
-                                <div className="font-semibold">{displayName}</div>
-                                <div className="text-xs text-muted-foreground">@{entry.username}</div>
+                                <div className="font-semibold text-sm">{displayName}</div>
+                                <div className="text-[10px] text-muted-foreground">@{entry.username}</div>
                               </div>
                             </div>
                           </Link>
                         </td>
-                        <td className="p-4 text-right">
-                          <div className="font-mono font-bold text-xl" data-testid={`text-value-${entry.userId}`}>
+                        <td className="p-3 text-right">
+                          <div className="font-mono font-bold text-sm" data-testid={`text-value-${entry.userId}`}>
                             {valueFormatter(entry.value)}
                           </div>
                         </td>
@@ -252,9 +252,9 @@ export default function Leaderboards() {
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-4 sm:mb-4">
-          <h1 className="hidden sm:block text-3xl font-bold mb-2">Global Leaderboards</h1>
-          <p className="text-muted-foreground">See how you rank against all players</p>
+        <div className="mb-3">
+          <h1 className="hidden sm:block text-xl font-bold mb-1">Global Leaderboards</h1>
+          <p className="text-xs text-muted-foreground">See how you rank against all players</p>
         </div>
 
         <Tabs value={category} onValueChange={handleTabChange} className="space-y-3 sm:space-y-3">

@@ -269,8 +269,8 @@ export default function Portfolio() {
   return (
     <div className="min-h-screen bg-background p-3 sm:p-4">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-4 sm:mb-4">
-          <h1 className="hidden sm:block text-3xl font-bold mb-4 sm:mb-6">Portfolio</h1>
+        <div className="mb-3">
+          <h1 className="hidden sm:block text-xl font-bold mb-3">Portfolio</h1>
           
           {/* Portfolio Summary - Mobile: Single row, Desktop: 3 cards */}
           <div className="mb-4 sm:mb-4">
@@ -316,7 +316,7 @@ export default function Portfolio() {
                   <DollarSign className="w-4 h-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-mono font-bold" data-testid="text-cash-balance-desktop">${data?.balance}</div>
+                  <div className="text-lg font-mono font-bold" data-testid="text-cash-balance-desktop">${data?.balance}</div>
                 </CardContent>
               </Card>
 
@@ -326,7 +326,7 @@ export default function Portfolio() {
                   <TrendingUp className="w-4 h-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-3xl font-mono font-bold" data-testid="text-portfolio-value-desktop">${data?.portfolioValue}</div>
+                  <div className="text-lg font-mono font-bold" data-testid="text-portfolio-value-desktop">${data?.portfolioValue}</div>
                 </CardContent>
               </Card>
 
@@ -340,10 +340,10 @@ export default function Portfolio() {
                   )}
                 </CardHeader>
                 <CardContent>
-                  <div className={`text-3xl font-mono font-bold ${parseFloat(data?.totalPnL || "0") >= 0 ? 'text-positive' : 'text-negative'}`} data-testid="text-total-pnl-desktop">
+                  <div className={`text-lg font-mono font-bold ${parseFloat(data?.totalPnL || "0") >= 0 ? 'text-positive' : 'text-negative'}`} data-testid="text-total-pnl-desktop">
                     {parseFloat(data?.totalPnL || "0") >= 0 ? '+' : ''}${data?.totalPnL}
                   </div>
-                  <div className={`text-sm ${parseFloat(data?.totalPnL || "0") >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  <div className={`text-xs ${parseFloat(data?.totalPnL || "0") >= 0 ? 'text-positive' : 'text-negative'}`}>
                     {parseFloat(data?.totalPnL || "0") >= 0 ? '+' : ''}{data?.totalPnLPercent}%
                   </div>
                 </CardContent>
@@ -359,11 +359,11 @@ export default function Portfolio() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-3xl font-mono font-bold text-yellow-500" data-testid="text-premium-shares-desktop">
+                    <div className="text-lg font-mono font-bold text-yellow-500" data-testid="text-premium-shares-desktop">
                       {data?.premiumShares || 0}
                     </div>
                     {data?.isPremium && data?.premiumExpiresAt && (
-                      <div className="text-sm text-muted-foreground">
+                      <div className="text-xs text-muted-foreground">
                         Expires {formatDistanceToNow(new Date(data.premiumExpiresAt), { addSuffix: true })}
                       </div>
                     )}
