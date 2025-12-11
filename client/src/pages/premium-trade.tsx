@@ -13,6 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { Link } from "wouter";
 import type { Order, Trade } from "@shared/schema";
+import { PremiumPriceChart } from "@/components/PremiumPriceChart";
 
 interface PremiumTradeData {
   premiumShares: number;
@@ -175,6 +176,9 @@ export default function PremiumTradePage() {
           <p className="text-muted-foreground">Trade premium shares with other users</p>
         </div>
       </div>
+
+      {/* Price Chart with History and Circulation */}
+      <PremiumPriceChart />
 
       {/* Stats Bar */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
