@@ -121,11 +121,25 @@ export async function matchOrders(playerId: string): Promise<number> {
   }
 
   if (totalMatches > 0 && lastTradePrice > 0) {
+    // Calculate totalShares and marketCap
+    const totalShares = await storage.getTotalSharesForPlayer(playerId);
+    const marketCap = totalShares * lastTradePrice;
+    
+    // Calculate priceChange24h by comparing to price 24h ago
+    const price24hAgo = await storage.getPrice24hAgo(playerId);
+    let priceChange24h = 0;
+    if (price24hAgo !== null && price24hAgo > 0) {
+      priceChange24h = lastTradePrice - price24hAgo;
+    }
+    
     await storage.upsertPlayer({
       ...player,
       currentPrice: lastTradePrice.toFixed(2),
       lastTradePrice: lastTradePrice.toFixed(2),
       volume24h: player.volume24h + totalVolume,
+      totalShares,
+      marketCap: marketCap.toFixed(2),
+      priceChange24h: priceChange24h.toFixed(2),
     });
 
     broadcast({ type: "orderBook", playerId });

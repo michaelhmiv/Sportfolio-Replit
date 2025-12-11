@@ -159,6 +159,10 @@ export interface IStorage {
   
   // Price history methods
   getPriceHistory(playerId: string, days?: number): Promise<PriceHistory[]>;
+  getPrice24hAgo(playerId: string): Promise<number | null>;
+  
+  // Market cap methods
+  getTotalSharesForPlayer(playerId: string): Promise<number>;
   
   // Mining methods
   getMining(userId: string): Promise<Mining | undefined>;
@@ -1222,6 +1226,43 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(priceHistory.timestamp);
+  }
+  
+  async getPrice24hAgo(playerId: string): Promise<number | null> {
+    const twentyFourHoursAgo = new Date();
+    twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
+    
+    // Get the closest price record to 24h ago
+    const [record] = await db
+      .select()
+      .from(priceHistory)
+      .where(
+        and(
+          eq(priceHistory.playerId, playerId),
+          sql`${priceHistory.timestamp} <= ${twentyFourHoursAgo}`
+        )
+      )
+      .orderBy(desc(priceHistory.timestamp))
+      .limit(1);
+    
+    return record ? parseFloat(record.closePrice) : null;
+  }
+  
+  // Market cap methods
+  async getTotalSharesForPlayer(playerId: string): Promise<number> {
+    const [result] = await db
+      .select({
+        totalShares: sql<string>`COALESCE(SUM(${holdings.quantity}), 0)`,
+      })
+      .from(holdings)
+      .where(
+        and(
+          eq(holdings.assetType, 'player'),
+          eq(holdings.assetId, playerId)
+        )
+      );
+    
+    return parseInt(result?.totalShares || '0', 10);
   }
 
   // Mining methods
