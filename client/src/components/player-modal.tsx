@@ -268,7 +268,7 @@ export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) 
                         </div>
                         <div className="text-right flex-shrink-0">
                           <div className="text-[10px] text-muted-foreground">FP</div>
-                          <div className="text-base font-bold text-primary">
+                          <div className="text-sm font-bold text-primary">
                             {game.stats.fantasyPoints.toFixed(1)}
                           </div>
                         </div>
