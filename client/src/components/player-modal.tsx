@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, ArrowRight } from "lucide-react";
 import { format } from "date-fns";
 
 interface PlayerModalProps {
@@ -93,16 +94,26 @@ export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) 
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-3" data-testid="dialog-player-modal">
         <DialogHeader className="pb-1">
-          <DialogTitle className="flex items-center gap-2 text-base" data-testid="text-player-modal-title">
-            {player ? (
-              <>
-                <span>{player.firstName} {player.lastName}</span>
-                {team && <Badge variant="secondary" className="text-xs h-5" data-testid="badge-team">{team.abbreviation}</Badge>}
-              </>
-            ) : (
-              <Skeleton className="h-5 w-48" />
+          <div className="flex items-center justify-between gap-2">
+            <DialogTitle className="flex items-center gap-2 text-base" data-testid="text-player-modal-title">
+              {player ? (
+                <>
+                  <span>{player.firstName} {player.lastName}</span>
+                  {team && <Badge variant="secondary" className="text-xs h-5" data-testid="badge-team">{team.abbreviation}</Badge>}
+                </>
+              ) : (
+                <Skeleton className="h-5 w-48" />
+              )}
+            </DialogTitle>
+            {playerId && (
+              <Link href={`/player/${playerId}`} onClick={() => onOpenChange(false)}>
+                <Button size="sm" data-testid="button-trade-player">
+                  Trade
+                  <ArrowRight className="w-4 h-4 ml-1" />
+                </Button>
+              </Link>
             )}
-          </DialogTitle>
+          </div>
         </DialogHeader>
 
         <div className="space-y-2">

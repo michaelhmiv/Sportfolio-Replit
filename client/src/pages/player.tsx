@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown } from "lucide-react";
+import { TrendingUp, TrendingDown, BarChart2 } from "lucide-react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +17,7 @@ import { SchemaOrg, schemas } from "@/components/schema-org";
 import { AnimatedPrice } from "@/components/ui/animated-price";
 import { Confetti, CelebrationBurst } from "@/components/ui/confetti";
 import { AnimatedButton } from "@/components/ui/animations";
+import { PlayerModal } from "@/components/player-modal";
 
 interface PlayerPageData {
   player: Player;
@@ -44,6 +45,7 @@ export default function PlayerPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>("1D");
   const [celebrationKey, setCelebrationKey] = useState(0);
   const [hasAppliedUrlParams, setHasAppliedUrlParams] = useState(false);
+  const [statsModalOpen, setStatsModalOpen] = useState(false);
 
   const { data, isLoading } = useQuery<PlayerPageData>({
     queryKey: ["/api/player", id],
@@ -340,10 +342,19 @@ export default function PlayerPage() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold mb-1">{player.firstName} {player.lastName}</h1>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge>{player.team}</Badge>
                   <Badge variant="outline">{player.position}</Badge>
                   {player.jerseyNumber && <span className="text-sm text-muted-foreground">#{player.jerseyNumber}</span>}
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => setStatsModalOpen(true)}
+                    data-testid="button-view-stats"
+                  >
+                    <BarChart2 className="w-4 h-4 mr-1" />
+                    View Stats
+                  </Button>
                 </div>
               </div>
             </div>
@@ -620,6 +631,13 @@ export default function PlayerPage() {
           </div>
         </div>
       </div>
+      
+      {/* Stats Modal */}
+      <PlayerModal 
+        playerId={id || null}
+        open={statsModalOpen}
+        onOpenChange={setStatsModalOpen}
+      />
     </div>
   );
 }
