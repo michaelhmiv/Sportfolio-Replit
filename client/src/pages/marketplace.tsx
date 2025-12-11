@@ -214,10 +214,10 @@ export default function Marketplace() {
                     Top Risers
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-2 pb-2 pt-0">
+                <CardContent className="px-2 pb-1.5 pt-0">
                   {topRisers && topRisers.length > 0 ? (
-                    <div className="space-y-0.5">
-                      {topRisers.map((player, index) => (
+                    <div className="space-y-0">
+                      {topRisers.slice(0, 5).map((player, index) => (
                         <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded px-1 py-0.5 cursor-pointer">
                           <div className="flex items-center gap-1 min-w-0">
                             <span className="text-[10px] text-muted-foreground">{index + 1}.</span>
@@ -244,10 +244,10 @@ export default function Marketplace() {
                     Top Market Cap
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="px-2 pb-2 pt-0">
+                <CardContent className="px-2 pb-1.5 pt-0">
                   {topMarketCap && topMarketCap.length > 0 ? (
-                    <div className="space-y-0.5">
-                      {topMarketCap.map((player, index) => (
+                    <div className="space-y-0">
+                      {topMarketCap.slice(0, 5).map((player, index) => (
                         <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded px-1 py-0.5 cursor-pointer">
                           <div className="flex items-center gap-1 min-w-0">
                             <span className="text-[10px] text-muted-foreground">{index + 1}.</span>
