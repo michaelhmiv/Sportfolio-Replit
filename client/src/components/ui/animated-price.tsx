@@ -122,7 +122,7 @@ function AnimatedDigit({ digit }: { digit: string }) {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: -10, opacity: 0 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          className="absolute inset-0 flex items-center justify-center"
+          className="absolute inset-0 flex items-baseline justify-center"
         >
           {digit}
         </motion.span>
