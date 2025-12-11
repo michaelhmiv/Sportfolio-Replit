@@ -189,39 +189,6 @@ function Header() {
     };
   }, [subscribe]);
 
-  const handleAddCash = async () => {
-    // Optimistically update the balance immediately
-    const currentBalance = parseFloat(dashboardData?.user?.balance || "0");
-    const newBalance = (currentBalance + 1).toFixed(2);
-    
-    // Update cache optimistically
-    queryClient.setQueryData(['/api/dashboard'], (old: any) => ({
-      ...old,
-      user: {
-        ...old?.user,
-        balance: newBalance
-      }
-    }));
-
-    try {
-      const response = await fetch('/api/user/add-cash', { method: 'POST' });
-      if (!response.ok) throw new Error('Failed to add cash');
-      
-      // Refetch to ensure we have the correct server value across all pages
-      invalidatePortfolioQueries();
-    } catch (error) {
-      console.error('Failed to add cash:', error);
-      // Rollback on error
-      queryClient.setQueryData(['/api/dashboard'], (old: any) => ({
-        ...old,
-        user: {
-          ...old?.user,
-          balance: dashboardData?.user?.balance
-        }
-      }));
-    }
-  };
-
   const userName = user?.username || user?.email || "User";
   const isPremium = user?.isPremium || false;
 
@@ -255,13 +222,6 @@ function Header() {
                 <span data-testid="text-username">{userName}</span>
               </div>
             </Link>
-            <Button 
-              size="sm" 
-              onClick={handleAddCash}
-              data-testid="button-add-cash"
-            >
-              +$1
-            </Button>
             <Button 
               size="icon"
               variant="ghost"

@@ -230,7 +230,6 @@ export default function Marketplace() {
                           </div>
                         </Link>
                       ))}
-                      <Link href="#all-players" className="text-xs text-primary hover:underline mt-1 px-1 py-1">See More →</Link>
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">No data</p>
@@ -262,7 +261,6 @@ export default function Marketplace() {
                           </div>
                         </Link>
                       ))}
-                      <Link href="#all-players" className="text-xs text-primary hover:underline mt-1 px-1 py-1">See More →</Link>
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">No data</p>
