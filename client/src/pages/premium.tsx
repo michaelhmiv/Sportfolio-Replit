@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Crown, Zap, Check, Loader2, ShoppingCart, Plus, Minus, TrendingUp, X } from "lucide-react";
+import { Crown, Zap, Check, Loader2, ShoppingCart, Plus, Minus, TrendingUp, X, RefreshCw } from "lucide-react";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -71,6 +71,37 @@ export default function Premium() {
     onError: (error: Error) => {
       toast({
         title: "Redemption Failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+  
+  const syncWhopMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/whop/sync");
+      return res.json();
+    },
+    onSuccess: (data: { credited: number; revoked: number; synced: number }) => {
+      if (data.credited > 0) {
+        toast({
+          title: "Premium Shares Credited!",
+          description: `${data.credited} Premium Share${data.credited > 1 ? 's' : ''} from Whop ${data.credited > 1 ? 'have' : 'has'} been added to your account.`,
+        });
+      } else {
+        toast({
+          title: "Sync Complete",
+          description: data.synced > 0 
+            ? `Checked ${data.synced} payment${data.synced > 1 ? 's' : ''} from Whop. No new shares to credit.`
+            : "No Whop payments found for your email.",
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/premium/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Sync Failed",
         description: error.message,
         variant: "destructive",
       });
@@ -158,7 +189,25 @@ export default function Premium() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-card border rounded-lg p-4">
-                <div className="text-sm text-muted-foreground mb-1">Premium Shares Owned</div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-sm text-muted-foreground">Premium Shares Owned</div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => syncWhopMutation.mutate()}
+                    disabled={syncWhopMutation.isPending}
+                    data-testid="button-sync-whop"
+                    className="h-6 px-2 text-xs"
+                    title="Sync purchases from Whop"
+                  >
+                    {syncWhopMutation.isPending ? (
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3 w-3" />
+                    )}
+                    <span className="ml-1">Sync</span>
+                  </Button>
+                </div>
                 <div className="text-3xl font-bold" data-testid="text-premium-shares">
                   {premiumStatus?.premiumShares || 0}
                 </div>

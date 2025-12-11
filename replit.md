@@ -22,6 +22,14 @@ Key tables include `users`, `players`, `holdings`, `orders`, `trades`, `mining`,
 **Premium Share Trading:**
 Users can purchase premium shares via Whop, which can be redeemed for premium access (double vesting rate, no ads) or traded as in-game assets. Dedicated API endpoints and database tables manage premium share orders and trades, with Webhooks from Whop handling payment completion.
 
+**Cross-Platform Whop Sync:**
+The platform implements cross-platform interoperability for premium share purchases. Users who purchase premium shares directly on Whop's website (outside of Sportfolio) will automatically have their shares credited when they log in to Sportfolio, matched by email address. Key components:
+- `whop_payments` table tracks all Whop payments by payment_id (unique key), with email matching and creditedAt/revokedAt timestamps
+- Auto-sync on login: `/api/auth/user?sync=true` triggers payment reconciliation using Whop SDK
+- Manual sync: `/api/whop/sync` endpoint with "Sync" button on premium page
+- Admin sync: `/api/admin/whop/sync` allows admins to sync any user by email/username
+- Refund handling: Detects refunded/disputed/chargedback payments and revokes shares from holdings, creating liability records if shares were already traded
+
 **Timezone Handling:**
 All game scheduling and related queries are critically based on Eastern Time (ET). A centralized time utility library ensures consistency across the platform, converting UTC database timestamps to ET for game day determination and display.
 

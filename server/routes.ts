@@ -138,6 +138,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // If no shares earned yet, DON'T update anything - leave baseline unchanged
   }
 
+  // Helper: Sync Whop payments for a user and credit premium shares
+  async function syncWhopPaymentsForUser(userId: string, userEmail: string): Promise<{
+    credited: number;
+    revoked: number;
+    synced: number;
+  }> {
+    const result = { credited: 0, revoked: 0, synced: 0 };
+    
+    try {
+      const apiKey = process.env.WHOP_API_KEY;
+      const planId = process.env.WHOP_PLAN_ID;
+      
+      if (!apiKey) {
+        console.log("[WHOP SYNC] No API key configured");
+        return result;
+      }
+      
+      const { Whop } = await import("@whop/sdk");
+      const whop = new Whop({ apiKey });
+      
+      // Query payments for this email from Whop
+      // Note: Whop SDK uses payments.list() with filters
+      const payments: any[] = [];
+      
+      try {
+        // Get memberships for this plan to find user's payments
+        const membershipsResponse = await whop.memberships.list({
+          plan_id: planId || undefined,
+          per_page: 100,
+        });
+        
+        // Filter to find memberships with matching email
+        const userMemberships = membershipsResponse.data?.filter((m: any) => 
+          m.user?.email?.toLowerCase() === userEmail.toLowerCase()
+        ) || [];
+        
+        console.log(`[WHOP SYNC] Found ${userMemberships.length} memberships for ${userEmail}`);
+        
+        // For each membership, get payment history
+        for (const membership of userMemberships) {
+          if (membership.id) {
+            try {
+              const membershipPayments = await whop.payments.list({
+                membership_id: membership.id,
+                per_page: 100,
+              });
+              if (membershipPayments.data) {
+                payments.push(...membershipPayments.data);
+              }
+            } catch (payErr: any) {
+              console.log(`[WHOP SYNC] Error fetching payments for membership ${membership.id}:`, payErr.message);
+            }
+          }
+        }
+        
+        console.log(`[WHOP SYNC] Found ${payments.length} total payments for ${userEmail}`);
+      } catch (err: any) {
+        console.error(`[WHOP SYNC] Error querying Whop API:`, err.message);
+        return result;
+      }
+      
+      // Process each payment
+      for (const payment of payments) {
+        result.synced++;
+        
+        const paymentId = payment.id;
+        const status = payment.status || "unknown";
+        const amount = payment.final_amount || payment.subtotal || 500;
+        const quantity = Math.max(1, Math.floor(amount / 500));
+        
+        // Upsert the payment record
+        await storage.upsertWhopPayment({
+          paymentId,
+          email: userEmail.toLowerCase(),
+          userId: null, // Will be set on credit
+          quantity,
+          amountCents: amount,
+          currency: payment.currency || "usd",
+          whopStatus: status,
+          rawPayload: payment,
+        });
+        
+        // Check if this is a paid payment that hasn't been credited yet
+        const existingPayment = await storage.getWhopPaymentByPaymentId(paymentId);
+        
+        if (status === "paid" && existingPayment && !existingPayment.creditedAt && !existingPayment.revokedAt) {
+          // Credit premium shares to user via holdings table (same as webhook handler)
+          const existingHolding = await storage.getHolding(userId, "premium", "premium");
+          const currentQuantity = existingHolding?.quantity || 0;
+          const newQuantity = currentQuantity + quantity;
+          
+          // Preserve existing avgCost or use $5 default for new holdings
+          const currentAvgCost = existingHolding?.avgCostBasis || "5.0000";
+          
+          // Update holding with new quantity preserving cost basis
+          await storage.updateHolding(userId, "premium", "premium", newQuantity, currentAvgCost);
+          
+          // Credit the payment and set user_id - this updates the record created by upsert
+          await storage.creditWhopPayment(paymentId, userId);
+          result.credited += quantity;
+          console.log(`[WHOP SYNC] Credited ${quantity} premium shares to user ${userId} from payment ${paymentId} (${currentQuantity} -> ${newQuantity})`);
+        }
+        
+        // Handle refunds/chargebacks
+        if ((status === "refunded" || status === "disputed" || status === "chargedback") && 
+            existingPayment && existingPayment.creditedAt && !existingPayment.revokedAt) {
+          // Revoke the shares from holdings - preserve avgCost
+          const existingHolding = await storage.getHolding(userId, "premium", "premium");
+          const currentShares = existingHolding?.quantity || 0;
+          const currentAvgCost = existingHolding?.avgCostBasis || "5.0000";
+          
+          if (currentShares >= quantity) {
+            // User has enough shares to fully revoke
+            const newQuantity = currentShares - quantity;
+            await storage.updateHolding(userId, "premium", "premium", newQuantity, currentAvgCost);
+            await storage.revokeWhopPayment(paymentId, quantity, 0);
+            result.revoked += quantity;
+            console.log(`[WHOP SYNC] Revoked ${quantity} premium shares from user ${userId} for payment ${paymentId} (${currentShares} -> ${newQuantity})`);
+          } else {
+            // User doesn't have enough shares - revoke what we can and create liability
+            const toRevoke = currentShares;
+            const liability = quantity - currentShares;
+            await storage.updateHolding(userId, "premium", "premium", 0, currentAvgCost);
+            await storage.revokeWhopPayment(paymentId, toRevoke, liability);
+            result.revoked += toRevoke;
+            console.log(`[WHOP SYNC] Partially revoked ${toRevoke} shares, ${liability} liability for user ${userId}`);
+          }
+        }
+      }
+      
+      return result;
+    } catch (err: any) {
+      console.error("[WHOP SYNC] Error syncing payments:", err.message);
+      return result;
+    }
+  }
+
   // Helper: Match orders (FIFO) - Only for limit orders
   async function matchOrders(playerId: string) {
     const orderBook = await storage.getOrderBook(playerId);
@@ -387,10 +524,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
-      res.json(user);
+      
+      // Auto-sync with Whop on login if user has email
+      let whopSync = null;
+      if (user?.email && req.query.sync === "true") {
+        try {
+          whopSync = await syncWhopPaymentsForUser(userId, user.email);
+          console.log(`[AUTH] Whop sync for ${user.username}: ${whopSync.credited} credited, ${whopSync.synced} synced`);
+        } catch (syncErr: any) {
+          console.error(`[AUTH] Whop sync error:`, syncErr.message);
+        }
+      }
+      
+      // Re-fetch user if shares were credited
+      const finalUser = whopSync?.credited ? await storage.getUser(userId) : user;
+      
+      res.json({
+        ...finalUser,
+        whopSync: whopSync || undefined,
+      });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
+  
+  // Whop payment sync endpoint - manual sync for logged-in users
+  app.post("/api/whop/sync", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      if (!user.email) {
+        return res.status(400).json({ 
+          error: "No email associated with your account. Please update your profile with the email used on Whop." 
+        });
+      }
+      
+      const result = await syncWhopPaymentsForUser(userId, user.email);
+      
+      // Get updated user data
+      const updatedUser = await storage.getUser(userId);
+      
+      res.json({
+        success: true,
+        credited: result.credited,
+        revoked: result.revoked,
+        synced: result.synced,
+        premiumShares: updatedUser?.premiumShares || 0,
+      });
+    } catch (error: any) {
+      console.error("Error syncing Whop payments:", error);
+      res.status(500).json({ error: "Failed to sync with Whop" });
+    }
+  });
+  
+  // Admin endpoint to sync Whop payments for any user
+  app.post("/api/admin/whop/sync", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const currentUser = await storage.getUser(userId);
+      
+      // Check if user is admin
+      if (!currentUser?.isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      
+      const { email, username } = req.body;
+      
+      if (!email && !username) {
+        return res.status(400).json({ error: "Email or username required" });
+      }
+      
+      // Find target user
+      let targetUser;
+      if (username) {
+        targetUser = await storage.getUserByUsername(username);
+      } else if (email) {
+        // Find user by email
+        const allUsers = await storage.getUsers();
+        targetUser = allUsers.find(u => u.email?.toLowerCase() === email.toLowerCase());
+      }
+      
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      if (!targetUser.email) {
+        return res.status(400).json({ error: "Target user has no email configured" });
+      }
+      
+      const result = await syncWhopPaymentsForUser(targetUser.id, targetUser.email);
+      
+      // Get updated user data
+      const updatedUser = await storage.getUser(targetUser.id);
+      
+      res.json({
+        success: true,
+        user: {
+          id: updatedUser?.id,
+          username: updatedUser?.username,
+          email: updatedUser?.email,
+          premiumShares: updatedUser?.premiumShares || 0,
+        },
+        credited: result.credited,
+        revoked: result.revoked,
+        synced: result.synced,
+      });
+    } catch (error: any) {
+      console.error("Error in admin Whop sync:", error);
+      res.status(500).json({ error: "Failed to sync with Whop" });
     }
   });
 
