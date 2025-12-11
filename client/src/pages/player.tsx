@@ -310,7 +310,7 @@ export default function PlayerPage() {
   const playerName = `${player.firstName} ${player.lastName}`;
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-background p-2 sm:p-3 lg:p-4">
       {celebrationKey > 0 && (
         <>
           <Confetti 
@@ -335,45 +335,46 @@ export default function PlayerPage() {
       <div className="max-w-7xl mx-auto">
         {/* Player Header */}
         <div className="mb-4">
-          <div className="flex items-start justify-between mb-4">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">
-              <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center">
-                <span className="text-2xl font-bold">{player.firstName[0]}{player.lastName[0]}</span>
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <span className="text-sm sm:text-base font-bold">{player.firstName[0]}{player.lastName[0]}</span>
               </div>
-              <div>
-                <h1 className="text-3xl font-bold mb-1">{player.firstName} {player.lastName}</h1>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <Badge>{player.team}</Badge>
-                  <Badge variant="outline">{player.position}</Badge>
-                  {player.jerseyNumber && <span className="text-sm text-muted-foreground">#{player.jerseyNumber}</span>}
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-lg font-bold">{player.firstName} {player.lastName}</h1>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <Badge className="text-xs">{player.team}</Badge>
+                  <Badge variant="outline" className="text-xs">{player.position}</Badge>
+                  {player.jerseyNumber && <span className="text-xs text-muted-foreground">#{player.jerseyNumber}</span>}
                   <Button 
-                    variant="outline" 
+                    variant="ghost" 
                     size="sm" 
+                    className="h-6 px-2 text-xs"
                     onClick={() => setStatsModalOpen(true)}
                     data-testid="button-view-stats"
                   >
-                    <BarChart2 className="w-4 h-4 mr-1" />
-                    View Stats
+                    <BarChart2 className="w-3 h-3 mr-1" />
+                    Stats
                   </Button>
                 </div>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-hero font-mono font-bold" data-testid="text-current-price">
+            <div className="text-left sm:text-right flex items-center sm:block gap-2">
+              <div className="font-mono font-bold" data-testid="text-current-price">
                 {player.lastTradePrice ? (
                   <AnimatedPrice 
                     value={parseFloat(player.lastTradePrice)} 
-                    size="lg" 
-                    className="text-4xl justify-end"
+                    size="sm" 
+                    className="text-lg sm:text-xl justify-start sm:justify-end"
                   />
                 ) : (
-                  <span className="text-muted-foreground text-2xl">No market value</span>
+                  <span className="text-muted-foreground text-sm">No market value</span>
                 )}
               </div>
               {player.lastTradePrice && (
-                <div className={`flex items-center justify-end gap-1 ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
-                  {parseFloat(player.priceChange24h) >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-                  <span className="text-xl font-medium">
+                <div className={`flex items-center gap-0.5 ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                  {parseFloat(player.priceChange24h) >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                  <span className="text-xs font-medium">
                     {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
                   </span>
                 </div>
@@ -404,12 +405,12 @@ export default function PlayerPage() {
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-2 sm:p-4">
                 {priceHistory.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ResponsiveContainer width="100%" height={180} className="sm:!h-[240px]">
                     <LineChart data={priceHistory}>
-                      <XAxis dataKey="timestamp" stroke="hsl(var(--muted-foreground))" fontSize={12} />
-                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={12} />
+                      <XAxis dataKey="timestamp" stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
                       <Tooltip 
                         contentStyle={{ 
                           backgroundColor: "hsl(var(--popover))", 
@@ -430,10 +431,10 @@ export default function PlayerPage() {
                     </LineChart>
                   </ResponsiveContainer>
                 ) : (
-                  <div className="h-[300px] flex items-center justify-center text-muted-foreground" data-testid="text-no-price-data">
+                  <div className="h-[180px] sm:h-[240px] flex items-center justify-center text-muted-foreground" data-testid="text-no-price-data">
                     <div className="text-center">
-                      <p className="text-sm">No trade data available</p>
-                      <p className="text-xs mt-1">This player has not been traded yet</p>
+                      <p className="text-xs">No trade data available</p>
+                      <p className="text-xs mt-1 text-muted-foreground/70">This player has not been traded yet</p>
                     </div>
                   </div>
                 )}
@@ -493,7 +494,7 @@ export default function PlayerPage() {
                 <CardContent className="p-0">
                   <div className="divide-y">
                     {recentTrades.slice(0, 8).map((trade) => (
-                      <div key={trade.id} className="p-3 flex justify-between items-center text-sm">
+                      <div key={trade.id} className="p-2 flex justify-between items-center text-xs">
                         <div>
                           <span className="font-mono font-medium">${trade.price}</span>
                           <span className="text-muted-foreground ml-2">{trade.quantity} sh</span>
@@ -513,23 +514,23 @@ export default function PlayerPage() {
               <CardHeader>
                 <CardTitle className="text-sm font-medium uppercase tracking-wide">Contest Performance</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              <CardContent className="p-3">
+                <div className="grid grid-cols-3 gap-2">
                   <div>
-                    <div className="text-xs text-muted-foreground">Appearances</div>
-                    <div className="text-xl font-bold" data-testid="text-contest-appearances">
+                    <div className="text-[10px] text-muted-foreground">Appearances</div>
+                    <div className="text-sm font-bold" data-testid="text-contest-appearances">
                       {contestData?.contestPerformance?.totalAppearances ?? 0}
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Total Earnings</div>
-                    <div className="text-xl font-bold text-positive" data-testid="text-contest-earnings">
+                    <div className="text-[10px] text-muted-foreground">Earnings</div>
+                    <div className="text-sm font-bold text-positive" data-testid="text-contest-earnings">
                       ${contestData?.contestPerformance?.totalEarnings ?? "0.00"}
                     </div>
                   </div>
                   <div>
-                    <div className="text-xs text-muted-foreground">Win Rate</div>
-                    <div className="text-xl font-bold" data-testid="text-contest-winrate">
+                    <div className="text-[10px] text-muted-foreground">Win Rate</div>
+                    <div className="text-sm font-bold" data-testid="text-contest-winrate">
                       {contestData?.contestPerformance?.winRate ?? "0.0"}%
                     </div>
                   </div>
@@ -544,26 +545,26 @@ export default function PlayerPage() {
               <CardHeader>
                 <CardTitle className="text-sm font-medium uppercase tracking-wide">Trade</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3 p-3">
                 {/* Buy/Sell Tabs */}
                 <Tabs value={side} onValueChange={(v) => setSide(v as "buy" | "sell")}>
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="buy" data-testid="tab-buy">Buy</TabsTrigger>
-                    <TabsTrigger value="sell" data-testid="tab-sell">Sell</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-2 h-8">
+                    <TabsTrigger value="buy" className="text-xs" data-testid="tab-buy">Buy</TabsTrigger>
+                    <TabsTrigger value="sell" className="text-xs" data-testid="tab-sell">Sell</TabsTrigger>
                   </TabsList>
                 </Tabs>
 
                 {/* Order Type */}
                 <Tabs value={orderType} onValueChange={(v) => setOrderType(v as "limit" | "market")}>
-                  <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="limit" data-testid="tab-limit">Limit</TabsTrigger>
-                    <TabsTrigger value="market" data-testid="tab-market">Market</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-2 h-8">
+                    <TabsTrigger value="limit" className="text-xs" data-testid="tab-limit">Limit</TabsTrigger>
+                    <TabsTrigger value="market" className="text-xs" data-testid="tab-market">Market</TabsTrigger>
                   </TabsList>
                 </Tabs>
 
                 {/* Quantity */}
-                <div className="space-y-2">
-                  <label className="text-xs font-medium uppercase tracking-wide">Quantity</label>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-medium uppercase tracking-wide">Quantity</label>
                   <div className="flex gap-2">
                     <Input
                       type="number"
@@ -580,17 +581,17 @@ export default function PlayerPage() {
 
                 {/* Limit Price */}
                 {orderType === "limit" && (
-                  <div className="space-y-2">
-                    <label className="text-xs font-medium uppercase tracking-wide">Limit Price</label>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide">Limit Price</label>
                     <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">$</span>
                       <Input
                         type="number"
                         step="0.01"
                         placeholder="0.00"
                         value={limitPrice}
                         onChange={(e) => setLimitPrice(e.target.value)}
-                        className="pl-6 font-mono"
+                        className="pl-6 font-mono h-8 text-sm"
                         data-testid="input-limit-price"
                       />
                     </div>
@@ -598,17 +599,17 @@ export default function PlayerPage() {
                 )}
 
                 {/* Total */}
-                <div className="p-4 bg-muted rounded-md">
+                <div className="p-2 bg-muted rounded-md">
                   <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Total {side === "buy" ? "Cost" : "Credit"}</span>
-                    <span className="text-2xl font-mono font-bold" data-testid="text-total">
+                    <span className="text-xs text-muted-foreground">Total {side === "buy" ? "Cost" : "Credit"}</span>
+                    <span className="text-base font-mono font-bold" data-testid="text-total">
                       ${calculateTotal()}
                     </span>
                   </div>
                 </div>
 
                 {/* Available Balance */}
-                <div className="text-xs text-muted-foreground">
+                <div className="text-[10px] text-muted-foreground">
                   Available: ${data.userBalance}
                   {data.userHolding && ` · ${data.userHolding.quantity} shares owned`}
                 </div>
@@ -616,7 +617,7 @@ export default function PlayerPage() {
                 {/* Submit Button */}
                 <AnimatedButton
                   className="w-full"
-                  size="lg"
+                  size="sm"
                   onClick={handlePlaceOrder}
                   isLoading={placeOrderMutation.isPending}
                   isSuccess={placeOrderMutation.isSuccess}
