@@ -3467,12 +3467,16 @@ ${posts.map(post => `  <url>
 
   // Whop webhook handler - receives payment.succeeded events
   // Uses official @whop/sdk for signature verification
-  app.post("/api/webhooks/whop", express.raw({ type: 'application/json' }), async (req, res) => {
+  // NOTE: We use req.rawBody captured by express.json verify callback in index.ts
+  // This ensures we get the original raw body before JSON parsing
+  app.post("/api/webhooks/whop", async (req, res) => {
     try {
       const webhookSecret = process.env.WHOP_WEBHOOK_SECRET;
       
-      // Safely convert body to string (handles both Buffer and string)
-      const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : String(req.body || '');
+      // Use rawBody captured by express.json verify callback (see index.ts)
+      // This is the actual raw body string needed for signature verification
+      const rawBodyBuffer = (req as any).rawBody;
+      const rawBody = Buffer.isBuffer(rawBodyBuffer) ? rawBodyBuffer.toString('utf8') : String(rawBodyBuffer || '');
       
       // Log that we received a request (helps diagnose if webhook is reaching us)
       console.log("[WHOP WEBHOOK] ========== INCOMING REQUEST ==========");
