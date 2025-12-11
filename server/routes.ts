@@ -3583,10 +3583,31 @@ ${posts.map(post => `  <url>
         return res.status(401).json({ error: "Webhook signature verification failed" });
       }
       
+      // Log the full payload structure for debugging
+      console.log("[WHOP WEBHOOK] === PAYLOAD DEBUG ===");
+      console.log("[WHOP WEBHOOK] Full payload keys:", Object.keys(payload));
+      console.log("[WHOP WEBHOOK] payload.action:", payload.action);
+      console.log("[WHOP WEBHOOK] payload.type:", payload.type);
+      if (payload.data) {
+        console.log("[WHOP WEBHOOK] payload.data keys:", Object.keys(payload.data));
+        console.log("[WHOP WEBHOOK] payload.data.id:", payload.data.id);
+        console.log("[WHOP WEBHOOK] payload.data.checkout_id:", payload.data.checkout_id);
+        console.log("[WHOP WEBHOOK] payload.data.plan_id:", payload.data.plan_id);
+        console.log("[WHOP WEBHOOK] payload.data.user_id:", payload.data.user_id);
+        console.log("[WHOP WEBHOOK] payload.data.final_amount:", payload.data.final_amount);
+        console.log("[WHOP WEBHOOK] payload.data.metadata:", JSON.stringify(payload.data.metadata));
+      }
+      
+      // Whop uses "action" field, not "type" - check both for compatibility
+      const eventAction = payload.action || payload.type;
+      console.log("[WHOP WEBHOOK] Event action:", eventAction);
+      
       // Handle payment.succeeded event
-      if (payload.type === "payment.succeeded") {
+      if (eventAction === "payment.succeeded") {
         const payment = payload.data;
         const receiptId = payment.id;
+        
+        console.log("[WHOP WEBHOOK] Processing payment.succeeded for:", receiptId);
         
         // Check for idempotency - already processed this payment?
         const existingSession = await storage.getPremiumCheckoutSessionByReceipt(receiptId);
@@ -3598,39 +3619,57 @@ ${posts.map(post => `  <url>
         // Get metadata to find our session
         const metadata = payment.metadata || {};
         const sessionId = metadata.sessionId;
-        const userEmail = payment.email;
+        const checkoutId = payment.checkout_id;
+        const planId = payment.plan_id;
+        const finalAmount = payment.final_amount;
+        
+        console.log("[WHOP WEBHOOK] Looking for user - sessionId:", sessionId, "checkoutId:", checkoutId);
         
         let userId: string | null = null;
         let quantity = 1;
         
-        // Try to find user by session ID first
+        // Method 1: Try to find user by our session ID from metadata
         if (sessionId) {
+          console.log("[WHOP WEBHOOK] Trying session ID lookup:", sessionId);
           const session = await storage.getPremiumCheckoutSession(sessionId);
           if (session) {
             userId = session.userId;
             quantity = session.quantity;
             await storage.completePremiumCheckoutSession(session.id, receiptId);
+            console.log("[WHOP WEBHOOK] Found user via sessionId:", userId);
           }
         }
         
-        // Fallback: find user by email
-        if (!userId && userEmail) {
-          const users = await storage.getUsers();
-          const matchedUser = users.find(u => u.email === userEmail);
-          if (matchedUser) {
-            userId = matchedUser.id;
-            // Create a completed session record
-            await storage.createPremiumCheckoutSession({
-              userId,
-              planId: payment.plan_id || process.env.WHOP_PLAN_ID || "unknown",
-              quantity,
-              amountCents: payment.final_amount || 500,
-            });
+        // Method 2: Find most recent pending checkout session for the same plan
+        if (!userId && planId) {
+          console.log("[WHOP WEBHOOK] Trying pending session lookup for plan:", planId);
+          const pendingSessions = await storage.getPendingPremiumCheckoutSessions();
+          // Find most recent session for this plan (within last hour)
+          const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+          const matchingSession = pendingSessions.find(s => 
+            s.planId === planId && 
+            new Date(s.createdAt) > oneHourAgo
+          );
+          if (matchingSession) {
+            userId = matchingSession.userId;
+            quantity = matchingSession.quantity;
+            await storage.completePremiumCheckoutSession(matchingSession.id, receiptId);
+            console.log("[WHOP WEBHOOK] Found user via pending session:", userId);
+          }
+        }
+        
+        // Method 3: Calculate quantity from amount if we find user another way
+        if (!userId) {
+          // Quantity can be inferred from amount ($5 = 500 cents per share)
+          if (finalAmount && finalAmount >= 500) {
+            quantity = Math.floor(finalAmount / 500);
+            console.log("[WHOP WEBHOOK] Inferred quantity from amount:", quantity);
           }
         }
         
         if (!userId) {
           console.error("[WHOP WEBHOOK] Could not identify user for payment:", receiptId);
+          console.error("[WHOP WEBHOOK] Full payment data:", JSON.stringify(payment, null, 2));
           return res.status(200).json({ success: false, message: "User not found" });
         }
         
@@ -3642,7 +3681,7 @@ ${posts.map(post => `  <url>
         // Update holding with new quantity (avgCost is $5 per share)
         await storage.updateHolding(userId, "premium", "premium", newQuantity, "5.0000");
         
-        console.log(`[WHOP WEBHOOK] Credited ${quantity} premium shares to user ${userId}`);
+        console.log(`[WHOP WEBHOOK] SUCCESS! Credited ${quantity} premium shares to user ${userId}. Total: ${newQuantity}`);
         
         // Broadcast portfolio update via WebSocket
         broadcast({ type: "portfolio" });
@@ -3651,6 +3690,7 @@ ${posts.map(post => `  <url>
       }
       
       // Other event types - just acknowledge
+      console.log("[WHOP WEBHOOK] Unhandled event type:", eventAction);
       res.json({ success: true });
     } catch (error: any) {
       console.error("[WHOP WEBHOOK] Error processing webhook:", error);

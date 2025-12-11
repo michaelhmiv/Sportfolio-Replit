@@ -277,6 +277,7 @@ export interface IStorage {
   getPremiumCheckoutSessionByReceipt(receiptId: string): Promise<PremiumCheckoutSession | undefined>;
   completePremiumCheckoutSession(id: string, receiptId: string): Promise<PremiumCheckoutSession | undefined>;
   getUserPremiumCheckoutSessions(userId: string): Promise<PremiumCheckoutSession[]>;
+  getPendingPremiumCheckoutSessions(): Promise<PremiumCheckoutSession[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2787,6 +2788,14 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(premiumCheckoutSessions)
       .where(eq(premiumCheckoutSessions.userId, userId))
+      .orderBy(desc(premiumCheckoutSessions.createdAt));
+  }
+
+  async getPendingPremiumCheckoutSessions(): Promise<PremiumCheckoutSession[]> {
+    return await db
+      .select()
+      .from(premiumCheckoutSessions)
+      .where(eq(premiumCheckoutSessions.status, "pending"))
       .orderBy(desc(premiumCheckoutSessions.createdAt));
   }
 

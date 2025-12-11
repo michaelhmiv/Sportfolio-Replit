@@ -1,0 +1,242 @@
+rview
+
+Logs
+
+Analytics
+
+Resources
+
+Domains
+
+Manage
+Search
+
+
+Errors only
+
+Date
+Time
+Deployment
+Source
+Log
+2025-12-10 19:23:25.05
+9304db3d
+User
+[WebSocket] Broadcasted portfolio to 2 clients
+2025-12-10 19:23:30.08
+9304db3d
+User
+[WebSocket] Broadcasted orderBook to 2 clients
+2025-12-10 19:23:30.08
+9304db3d
+User
+[WebSocket] Broadcasted marketActivity to 2 clients
+2025-12-10 19:23:30.15
+9304db3d
+User
+[WebSocket] Broadcasted portfolio to 2 clients
+2025-12-10 19:23:30.15
+9304db3d
+User
+[WebSocket] Broadcasted portfolio to 2 clients
+2025-12-10 19:23:30.25
+066a818c
+User
+12:23:30 AM [express] GET /api/dashboard 200 in 384ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:30.25
+066a818c
+User
+12:23:30 AM [express] GET /api/dashboard 200 in 387ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:30.29
+066a818c
+User
+12:23:30 AM [express] GET /api/dashboard 200 in 392ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:30.32
+066a818c
+User
+12:23:30 AM [express] GET /api/dashboard 200 in 439ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:30.70
+9304db3d
+User
+[WebSocket] Broadcasted trade to 2 clients
+2025-12-10 19:23:30.70
+9304db3d
+User
+[WebSocket] Broadcasted orderBook to 2 clients
+2025-12-10 19:23:30.70
+9304db3d
+User
+[WebSocket] Broadcasted marketActivity to 2 clients
+2025-12-10 19:23:30.76
+9304db3d
+User
+[WebSocket] Broadcasted portfolio to 2 clients
+2025-12-10 19:23:30.77
+9304db3d
+User
+[WebSocket] Broadcasted portfolio to 2 clients
+2025-12-10 19:23:30.79
+066a818c
+User
+12:23:30 AM [express] GET /api/dashboard 200 in 389ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:31.18
+066a818c
+User
+12:23:31 AM [express] GET /api/dashboard 200 in 422ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:31.21
+066a818c
+User
+12:23:31 AM [express] GET /api/dashboard 200 in 445ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:31.28
+066a818c
+User
+12:23:31 AM [express] GET /api/dashboard 200 in 389ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:31.32
+9304db3d
+User
+[WebSocket] Broadcasted orderBook to 2 clients
+2025-12-10 19:23:31.32
+9304db3d
+User
+[WebSocket] Broadcasted trade to 2 clients
+2025-12-10 19:23:31.32
+9304db3d
+User
+[WebSocket] Broadcasted marketActivity to 2 clients
+2025-12-10 19:23:31.39
+9304db3d
+User
+[WebSocket] Broadcasted portfolio to 2 clients
+2025-12-10 19:23:31.39
+9304db3d
+User
+[WebSocket] Broadcasted portfolio to 2 clients
+
+2025-12-10 19:23:31.81
+066a818c
+User
+12:23:31 AM [express] GET /api/dashboard 200 in 407ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:31.82
+066a818c
+User
+12:23:31 AM [express] GET /api/dashboard 200 in 416ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:31.84
+066a818c
+User
+12:23:31 AM [express] GET /api/dashboard 200 in 417ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:31.84
+066a818c
+User
+12:23:31 AM [express] GET /api/dashboard 200 in 434ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:31.95
+9304db3d
+User
+[WebSocket] Broadcasted orderBook to 2 clients
+2025-12-10 19:23:31.95
+9304db3d
+User
+[WebSocket] Broadcasted trade to 2 clients
+2025-12-10 19:23:31.95
+9304db3d
+User
+[WebSocket] Broadcasted marketActivity to 2 clients
+2025-12-10 19:23:33.06
+066a818c
+User
+12:23:33 AM [express] GET /api/dashboard 200 in 416ms :: {"user":{"balance":"57624.02","portfolioValu…
+2025-12-10 19:23:33.20
+9304db3d
+User
+[WebSocket] Broadcasted orderBook to 2 clients
+2025-12-10 19:23:33.20
+9304db3d
+User
+[WebSocket] Broadcasted marketActivity to 2 clients
+2025-12-10 19:23:33.20
+9304db3d
+User
+[WebSocket] Broadcasted trade to 2 clients
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] Raw body preview: {"id":"msg_sxstpVkn4Vd7wteIb21zwGzL","api_version":"v1","timestamp":"2025-12-11T00:23:33.162Z","data":{"id":"pay_g4iy05mOiAjd4Z","status":"paid","substatus":"succeeded","refundable":true,"retryable":f...
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] body first 100 chars: {"id":"msg_sxstpVkn4Vd7wteIb21zwGzL","api_version":"v1","timestamp":"2025-12-11T00:23:33.162Z","data
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] secret first 10 chars: ws_d31dd50...
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] === VERIFICATION DEBUG ===
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] Has webhook-id header: true
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] Method: POST
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] Content-Type: application/json
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] webhook-id: msg_sxstpVkn4Vd7wteIb21zwGzL
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] secret length: 67
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] webhook-timestamp: 1765412613
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] Has webhook-signature header: true
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] ========== INCOMING REQUEST ==========
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] Has webhook-timestamp header: true
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] webhook-signature: v1,BcLvU90bx//gB7K/WG3YV9rXVYTEMtlP5iUJ6eEz7h0=
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] Body length: 1488
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] Timestamp: 2025-12-11T00:23:33.215Z
+2025-12-10 19:23:33.21
+066a818c
+User
+[WHOP WEBHOOK] standardwebhooks verification SUCCESS with base64-of-raw!
+2025-12-10 19:23:33.25
+066a818c
+User
+[WHOP WEBHOOK] Could not identify user for payment: pay_g4iy05mOiAjd4Z
+2025-12-10 19:23:33.25
+066a818c
+User
+12:23:33 AM [express] POST /api/webhooks/whop 200 in 36ms :: {"success":false,"message":"User not fou…
+2025-12-10 19:23:33.26
+9304db3d
+User
+[WebSocket] Broadcasted portfolio to 2 clients
+2025-12-10 19:23:33.26
+9304db3d
+User
+[WebSocket] Broadcasted portfolio to 2 clients
