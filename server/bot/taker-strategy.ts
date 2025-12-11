@@ -84,6 +84,7 @@ async function getAvailableBalance(userId: string): Promise<number> {
 
 /**
  * Find taking opportunities on the order book
+ * Much more aggressive approach - take orders if they exist at any reasonable price
  */
 async function findTakingOpportunities(
   config: TakerConfig,
@@ -106,8 +107,10 @@ async function findTakingOpportunities(
     const bestAsk = parseFloat(asks[0].limitPrice!);
     const spreadPercent = ((bestAsk - basePrice) / basePrice) * 100;
     
-    // Only take if spread is reasonable (widened tolerance for more trades)
-    if (spreadPercent <= config.spreadThreshold && bestAsk <= fairValue * 1.15) {
+    // AGGRESSIVE: Take any order within 25% of fair value - this creates actual trades
+    // Higher aggressiveness = more willing to overpay slightly
+    const maxPremium = 1.10 + (config.aggressiveness * 0.15); // 10-25% above fair value
+    if (bestAsk <= fairValue * maxPremium) {
       const totalAvailable = asks.reduce((sum, o) => sum + (o.quantity - o.filledQuantity), 0);
       
       opportunities.push({
@@ -131,8 +134,10 @@ async function findTakingOpportunities(
     const bestBid = parseFloat(bids[0].limitPrice!);
     const spreadPercent = ((basePrice - bestBid) / basePrice) * 100;
     
-    // Only take if spread is reasonable (widened tolerance for more trades)
-    if (spreadPercent <= config.spreadThreshold && bestBid >= fairValue * 0.85) {
+    // AGGRESSIVE: Take any order within 25% of fair value - this creates actual trades
+    // Higher aggressiveness = more willing to accept lower prices
+    const minDiscount = 0.90 - (config.aggressiveness * 0.15); // 10-25% below fair value
+    if (bestBid >= fairValue * minDiscount) {
       const totalAvailable = bids.reduce((sum, o) => sum + (o.quantity - o.filledQuantity), 0);
       
       opportunities.push({
@@ -375,8 +380,8 @@ export async function executeTakerStrategy(
     return;
   }
   
-  // Fetch more candidates for better market coverage
-  const candidates = await getMarketMakingCandidates(50);
+  // Fetch ALL active candidates for maximum market coverage
+  const candidates = await getMarketMakingCandidates(100);
   
   if (candidates.length === 0) {
     console.log(`[Taker] ${profile.botName} no candidates found`);
@@ -386,9 +391,10 @@ export async function executeTakerStrategy(
   let totalTrades = 0;
   let totalVolume = 0;
   
-  // Check more candidates for taking opportunities (10-30 based on aggressiveness)
-  const minToCheck = 5;
-  const maxToCheck = 20;
+  // Check MANY candidates - this is where trades actually happen
+  // Higher aggressiveness = check more players
+  const minToCheck = 20;
+  const maxToCheck = 50;
   const numToCheck = Math.max(minToCheck, Math.ceil(Math.min(candidates.length, maxToCheck) * (0.5 + config.aggressiveness * 0.5)));
   const shuffled = candidates.sort(() => Math.random() - 0.5);
   const selected = shuffled.slice(0, numToCheck);
@@ -400,15 +406,12 @@ export async function executeTakerStrategy(
     const opportunities = await findTakingOpportunities(config, candidate);
     
     for (const opportunity of opportunities) {
-      // More aggressive - only skip 30% of opportunities at high aggressiveness
-      const skipChance = 0.3 * (1 - config.aggressiveness);
-      if (Math.random() < skipChance) continue;
-      
+      // TAKE ALL OPPORTUNITIES - no more skipping! This creates actual trades
       const result = await executeTakerTrade(config, opportunity);
       totalTrades += result.tradesExecuted;
       totalVolume += result.volumeTraded;
       
-      // Continue to next player after one successful trade (don't break, trade more!)
+      // Move to next player after successful trade for variety
       if (result.tradesExecuted > 0) break;
     }
   }

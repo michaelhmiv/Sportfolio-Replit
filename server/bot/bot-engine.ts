@@ -225,12 +225,10 @@ async function executeBotStrategies(
       strategiesExecuted.push("trading");
     }
     
-    // 3. TAKER - Additional taker strategy for aggressive market orders
-    // Uses aggressiveness to determine if it should take orders
-    // Also respects the same order limits as trading strategy
-    if (profile.ordersToday < profile.maxDailyOrders && 
-        parseFloat(profile.aggressiveness) > 0.5 && 
-        Math.random() < 0.3) {
+    // 3. TAKER - Aggressive market orders to actually execute trades
+    // Run taker strategy on EVERY tick for active markets - this is what creates trades
+    // Aggressiveness determines HOW aggressive, not WHETHER to run
+    if (profile.ordersToday < profile.maxDailyOrders) {
       await executeTakerStrategy(profile);
       strategiesExecuted.push("taker");
     }

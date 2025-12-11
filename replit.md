@@ -33,8 +33,15 @@ The platform implements cross-platform interoperability for premium share purcha
 **Timezone Handling:**
 All game scheduling and related queries are critically based on Eastern Time (ET). A centralized time utility library ensures consistency across the platform, converting UTC database timestamps to ET for game day determination and display.
 
+### Order Matching Engine
+The platform uses a centralized order matching engine in `server/order-matcher.ts` that handles limit order matching for both API and bot-placed orders:
+- `matchOrders(playerId)`: Matches crossing limit orders using price-time priority (FIFO), executing trades at the sell price
+- `placeBotLimitOrder()`: Used by bots to place orders with proper resource locking and automatic matching
+- Handles cash/share locking, balance updates, holdings updates, player price updates, and real-time WebSocket broadcasts
+- Both routes.ts and bot strategies import from this shared module to ensure consistent matching behavior
+
 ### Background Jobs
-`node-cron` manages background jobs for `roster_sync`, `schedule_sync`, `stats_sync`, `update_contest_statuses`, `settle_contests`, and `create_contests`. A Contest Lifecycle & Settlement System automates contest progression. A Universal Live Logging System provides real-time SSE-based logs for admin operations.
+`node-cron` manages background jobs for `roster_sync`, `schedule_sync`, `stats_sync`, `update_contest_statuses`, `settle_contests`, `create_contests`, and `bot_engine`. A Contest Lifecycle & Settlement System automates contest progression. A Universal Live Logging System provides real-time SSE-based logs for admin operations.
 
 ### Design Principles
 The UI prioritizes information density and compact layouts, similar to professional financial trading platforms. Interactive elements like clickable player names and usernames lead to modals or profile pages. A Player Information System offers a `PlayerModal` and a dedicated `Player Page` for detailed trading with charts and order books. Public marketplace access is available without authentication.

@@ -8,6 +8,7 @@ import { eq, and, sql, lt } from "drizzle-orm";
 import { storage } from "../storage";
 import { getMarketMakingCandidates, getEffectivePrice, type PlayerValuation } from "./player-valuation";
 import { logBotAction, updateBotCounters, type BotProfile } from "./bot-engine";
+import { placeBotLimitOrder } from "../order-matcher";
 
 const STALE_ORDER_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -140,7 +141,7 @@ function calculateOrderSize(
 }
 
 /**
- * Place a limit order for the bot
+ * Place a limit order for the bot using the shared order matcher
  */
 async function placeBotOrder(
   userId: string,
@@ -149,23 +150,8 @@ async function placeBotOrder(
   quantity: number,
   price: number
 ): Promise<string | null> {
-  try {
-    // Use storage's order placement which handles all the locking
-    const order = await storage.createOrder({
-      userId,
-      playerId,
-      orderType: "limit",
-      side,
-      quantity,
-      limitPrice: price.toFixed(2),
-      status: "open",
-    });
-    
-    return order.id;
-  } catch (error: any) {
-    console.error(`[MarketMaker] Failed to place ${side} order:`, error.message);
-    return null;
-  }
+  const result = await placeBotLimitOrder(userId, playerId, side, quantity, price);
+  return result.orderId;
 }
 
 /**
@@ -208,6 +194,7 @@ function calculateDynamicSpread(baseSpread: number, valuation: PlayerValuation):
 
 /**
  * Execute market making strategy for a single player
+ * Now includes AGGRESSIVE CROSSING mode where some orders cross the spread for immediate execution
  */
 async function makeMarketForPlayer(
   config: MarketMakerConfig,
@@ -223,25 +210,63 @@ async function makeMarketForPlayer(
   const spreadMultiplier = dynamicSpreadPercent / 100;
   const halfSpread = basePrice * (spreadMultiplier / 2);
   
-  const bidPrice = parseFloat((basePrice - halfSpread).toFixed(2));
-  const askPrice = parseFloat((basePrice + halfSpread).toFixed(2));
+  // Get current order book to find best bid/ask
+  const orderBook = await storage.getOrderBook(playerId);
+  const bestBid = orderBook.bids.length > 0 
+    ? parseFloat(orderBook.bids.sort((a, b) => parseFloat(b.limitPrice!) - parseFloat(a.limitPrice!))[0].limitPrice!)
+    : null;
+  const bestAsk = orderBook.asks.length > 0
+    ? parseFloat(orderBook.asks.sort((a, b) => parseFloat(a.limitPrice!) - parseFloat(b.limitPrice!))[0].limitPrice!)
+    : null;
   
-  // Get current holdings
+  // AGGRESSIVE CROSSING: 30% of the time, place orders that will execute immediately
+  // This creates actual trades instead of just passive limit orders
+  const shouldCrossSpread = Math.random() < (0.2 + config.aggressiveness * 0.2); // 20-40% chance
+  
+  let bidPrice: number;
+  let askPrice: number;
+  
+  if (shouldCrossSpread) {
+    // CROSSING MODE: Place buy AT or ABOVE best ask, sell AT or BELOW best bid
+    // This WILL execute against existing orders
+    if (bestAsk !== null && bestAsk <= fairValue * 1.15) {
+      bidPrice = parseFloat((bestAsk * 1.001).toFixed(2)); // Slightly above best ask to guarantee fill
+    } else {
+      bidPrice = parseFloat((basePrice + halfSpread * 0.1).toFixed(2)); // Near fair value
+    }
+    
+    if (bestBid !== null && bestBid >= fairValue * 0.85) {
+      askPrice = parseFloat((bestBid * 0.999).toFixed(2)); // Slightly below best bid to guarantee fill
+    } else {
+      askPrice = parseFloat((basePrice - halfSpread * 0.1).toFixed(2)); // Near fair value
+    }
+  } else {
+    // PASSIVE MODE: Standard market making with spread
+    bidPrice = parseFloat((basePrice - halfSpread).toFixed(2));
+    askPrice = parseFloat((basePrice + halfSpread).toFixed(2));
+  }
+  
+  // Get current holdings and FRESH available balance
+  // This must be fetched AFTER determining prices to ensure affordability check is accurate
   const currentHoldings = await getBotHoldings(config.userId, playerId);
   const availableBalance = await getAvailableBalance(config.userId);
   
   let ordersPlaced = 0;
   let volume = 0;
   
-  // Place bid (buy) order
+  // Place bid (buy) order - use FRESH balance with the ACTUAL bid price
   const buySize = calculateOrderSize(
     { ...config, balance: availableBalance },
-    bidPrice,
+    bidPrice, // This is the actual price we'll use, whether crossing or passive
     "buy",
     currentHoldings
   );
   
-  if (buySize > 0 && bidPrice > 0) {
+  // SAFETY CHECK: Ensure we can actually afford this order at crossing price
+  const actualBuyCost = buySize * bidPrice;
+  const canAfford = actualBuyCost <= availableBalance;
+  
+  if (buySize > 0 && bidPrice > 0 && canAfford) {
     const orderId = await placeBotOrder(config.userId, playerId, "buy", buySize, bidPrice);
     if (orderId) {
       ordersPlaced++;
@@ -259,8 +284,9 @@ async function makeMarketForPlayer(
           baseSpread: config.spreadPercent,
           dynamicSpread: dynamicSpreadPercent,
           volume24h: valuation.volume24h,
+          crossingMode: shouldCrossSpread,
         },
-        triggerReason: "Market making - bid placement",
+        triggerReason: shouldCrossSpread ? "Aggressive crossing - bid placement" : "Market making - bid placement",
         success: true,
       });
     }
@@ -287,8 +313,9 @@ async function makeMarketForPlayer(
           baseSpread: config.spreadPercent,
           dynamicSpread: dynamicSpreadPercent,
           volume24h: valuation.volume24h,
+          crossingMode: shouldCrossSpread,
         },
-        triggerReason: "Market making - ask placement",
+        triggerReason: shouldCrossSpread ? "Aggressive crossing - ask placement" : "Market making - ask placement",
         success: true,
       });
     }
