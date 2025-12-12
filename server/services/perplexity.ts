@@ -12,30 +12,29 @@ interface PerplexityResponse {
 }
 
 class PerplexityService {
-  private apiKey: string | null = null;
-  private isConfigured = false;
   private baseUrl = "https://api.perplexity.ai/chat/completions";
 
   constructor() {
-    this.initialize();
-  }
-
-  private initialize() {
-    this.apiKey = process.env.PERPLEXITY_API_KEY || null;
-    this.isConfigured = !!this.apiKey;
-    
-    if (this.isConfigured) {
+    // Log initial status but don't cache the API key
+    if (this.getApiKey()) {
       console.log("[Perplexity] Service initialized successfully");
     } else {
-      console.log("[Perplexity] Not configured - missing API key");
+      console.log("[Perplexity] Not configured at startup - will check API key on each request");
     }
+  }
+
+  /**
+   * Get API key fresh from environment (supports runtime secret injection in production)
+   */
+  private getApiKey(): string | null {
+    return process.env.PERPLEXITY_API_KEY || null;
   }
 
   /**
    * Check if the Perplexity service is properly configured
    */
   isReady(): boolean {
-    return this.isConfigured;
+    return !!this.getApiKey();
   }
 
   /**
@@ -43,7 +42,7 @@ class PerplexityService {
    */
   getStatus(): { configured: boolean } {
     return {
-      configured: this.isConfigured,
+      configured: this.isReady(),
     };
   }
 
@@ -51,7 +50,8 @@ class PerplexityService {
    * Get player news summaries from Perplexity
    */
   async getPlayerSummaries(playerNames: string[], promptTemplate: string): Promise<PerplexityResponse> {
-    if (!this.isReady() || !this.apiKey) {
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
       return {
         success: false,
         error: "Perplexity service not configured. Please add PERPLEXITY_API_KEY.",
@@ -73,7 +73,7 @@ class PerplexityService {
       const response = await fetch(this.baseUrl, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
+          "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
@@ -137,7 +137,8 @@ class PerplexityService {
    * Draft a tweet based on provided context/prompt
    */
   async draftTweet(prompt: string): Promise<PerplexityResponse> {
-    if (!this.isReady() || !this.apiKey) {
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
       return {
         success: false,
         error: "Perplexity service not configured. Please add PERPLEXITY_API_KEY.",
@@ -148,7 +149,7 @@ class PerplexityService {
       const response = await fetch(this.baseUrl, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${this.apiKey}`,
+          "Authorization": `Bearer ${apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
