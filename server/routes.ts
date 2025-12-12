@@ -4029,31 +4029,45 @@ ${posts.map(post => `  <url>
   // Admin endpoint: Get system statistics
   app.get("/api/admin/stats", adminAuth, async (req, res) => {
     try {
-      const [users, players, allContests, jobLogs] = await Promise.all([
+      // All scheduled job types in the system
+      const jobTypes = [
+        'roster_sync',
+        'sync_player_game_logs', 
+        'schedule_sync',
+        'stats_sync',
+        'stats_sync_live',
+        'create_contests',
+        'update_contest_statuses',
+        'settle_contests',
+        'daily_snapshot',
+        'weekly_roundup',
+        'bot_engine',
+      ];
+
+      const [users, players, allContests, recentLogs, latestJobLogs] = await Promise.all([
         storage.getUsers(),
         storage.getPlayers(),
         storage.getContests(),
-        storage.getRecentJobLogs(undefined, 50),
+        storage.getRecentJobLogs(undefined, 200), // For today's API request count
+        storage.getLatestJobLogPerType(jobTypes),
       ]);
       const openContests = allContests.filter((c: any) => c.status === 'open').length;
       const liveContests = allContests.filter((c: any) => c.status === 'live').length;
       const completedContests = allContests.filter((c: any) => c.status === 'completed').length;
 
-      // Get today's API request count from job logs
+      // Get today's API request count from recent logs
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayLogs = jobLogs.filter((log: any) => {
+      const todayLogs = recentLogs.filter((log: any) => {
         const logDate = new Date(log.scheduledFor);
         logDate.setHours(0, 0, 0, 0);
         return logDate.getTime() === today.getTime();
       });
       const apiRequestsToday = todayLogs.reduce((sum: number, log: any) => sum + (log.requestCount || 0), 0);
 
-      // Get last run for each job type
-      const jobTypes = ['roster_sync', 'schedule_sync', 'stats_sync', 'create_contests', 'settle_contests'];
+      // Build last job runs from the per-type query results
       const lastJobRuns = jobTypes.map(jobName => {
-        const logs = jobLogs.filter((log: any) => log.jobName === jobName);
-        const lastLog = logs.length > 0 ? logs[0] : null;
+        const lastLog = latestJobLogs.get(jobName);
         return {
           jobName,
           status: lastLog?.status || 'never_run',

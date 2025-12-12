@@ -199,6 +199,7 @@ export interface IStorage {
   createJobLog(log: InsertJobExecutionLog): Promise<JobExecutionLog>;
   updateJobLog(id: string, updates: Partial<JobExecutionLog>): Promise<void>;
   getRecentJobLogs(jobName?: string, limit?: number): Promise<JobExecutionLog[]>;
+  getLatestJobLogPerType(jobNames: string[]): Promise<Map<string, JobExecutionLog>>;
   
   // Player game stats methods
   upsertPlayerGameStats(stats: InsertPlayerGameStats): Promise<PlayerGameStats>;
@@ -1920,6 +1921,30 @@ export class DatabaseStorage implements IStorage {
     return await query
       .orderBy(desc(jobExecutionLogs.scheduledFor))
       .limit(limit);
+  }
+
+  async getLatestJobLogPerType(jobNames: string[]): Promise<Map<string, JobExecutionLog>> {
+    const result = new Map<string, JobExecutionLog>();
+    
+    // Query the latest log for each job type in parallel
+    const promises = jobNames.map(async (jobName) => {
+      const [log] = await db
+        .select()
+        .from(jobExecutionLogs)
+        .where(eq(jobExecutionLogs.jobName, jobName))
+        .orderBy(desc(jobExecutionLogs.scheduledFor))
+        .limit(1);
+      return { jobName, log };
+    });
+    
+    const logs = await Promise.all(promises);
+    for (const { jobName, log } of logs) {
+      if (log) {
+        result.set(jobName, log);
+      }
+    }
+    
+    return result;
   }
 
   // Player game stats methods
