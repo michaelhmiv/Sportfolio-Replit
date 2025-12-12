@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { LiveLogViewer } from "@/components/live-log-viewer";
+import { Switch } from "@/components/ui/switch";
 import {
   Settings,
   RefreshCw,
@@ -30,6 +31,10 @@ import {
   Trash2,
   Eye,
   EyeOff,
+  Send,
+  Twitter,
+  Sparkles,
+  AlertCircle,
 } from "lucide-react";
 
 interface SystemStats {
@@ -68,6 +73,43 @@ interface BlogPost {
   createdAt: string;
 }
 
+interface TweetSettings {
+  id: number;
+  enabled: boolean;
+  promptTemplate: string | null;
+  includeRisers: boolean;
+  includeVolume: boolean;
+  includeMarketCap: boolean;
+  maxPlayers: number;
+  updatedAt: string;
+}
+
+interface TweetHistory {
+  id: number;
+  content: string;
+  tweetId: string | null;
+  status: string;
+  error: string | null;
+  createdAt: string;
+}
+
+interface TweetData {
+  settings: TweetSettings;
+  history: TweetHistory[];
+  status: {
+    twitter: { configured: boolean; ready: boolean };
+    perplexity: { configured: boolean; ready: boolean };
+  };
+}
+
+interface TweetPreview {
+  content: string;
+  playerData: any;
+  aiSummary: string | null;
+  characterCount: number;
+  settings: TweetSettings;
+}
+
 export default function Admin() {
   const { toast } = useToast();
   const [runningJobs, setRunningJobs] = useState<Set<string>>(new Set());
@@ -85,6 +127,11 @@ export default function Admin() {
   const [blogExcerpt, setBlogExcerpt] = useState("");
   const [blogContent, setBlogContent] = useState("");
   const [blogPublished, setBlogPublished] = useState(false);
+
+  // Tweet automation state
+  const [tweetPreview, setTweetPreview] = useState<TweetPreview | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
 
   const { data: stats, isLoading } = useQuery<SystemStats>({
     queryKey: ["/api/admin/stats"],
@@ -179,6 +226,87 @@ export default function Admin() {
   const { data: blogPostsData } = useQuery<{ posts: BlogPost[]; total: number }>({
     queryKey: ["/api/admin/blog"],
   });
+
+  // Tweet data query
+  const { data: tweetData, refetch: refetchTweets } = useQuery<TweetData>({
+    queryKey: ["/api/admin/tweets"],
+    refetchInterval: 60000,
+  });
+
+  // Tweet mutations
+  const updateTweetSettingsMutation = useMutation({
+    mutationFn: async (data: Partial<TweetSettings>) => {
+      const res = await apiRequest("PATCH", "/api/admin/tweets/settings", data);
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/tweets"] });
+      toast({ title: "Settings updated" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Failed to update settings", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handlePreviewTweet = async () => {
+    setIsPreviewLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/tweets/preview", {});
+      const data = await res.json();
+      setTweetPreview(data);
+    } catch (error: any) {
+      toast({ title: "Preview failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  const handlePostTweet = async () => {
+    setIsPosting(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/tweets/post", {});
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "Tweet posted!", description: `Tweet ID: ${data.tweetId}` });
+        setTweetPreview(null);
+        refetchTweets();
+      } else {
+        toast({ title: "Failed to post", description: data.error, variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Failed to post", description: error.message, variant: "destructive" });
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
+  const handleTestTwitter = async () => {
+    try {
+      const res = await apiRequest("POST", "/api/admin/tweets/test-twitter", {});
+      const data = await res.json();
+      toast({
+        title: data.success ? "Twitter connected!" : "Twitter connection failed",
+        description: data.username ? `Logged in as @${data.username}` : data.error,
+        variant: data.success ? undefined : "destructive",
+      });
+    } catch (error: any) {
+      toast({ title: "Test failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleTestPerplexity = async () => {
+    try {
+      const res = await apiRequest("POST", "/api/admin/tweets/test-perplexity", {});
+      const data = await res.json();
+      toast({
+        title: data.success ? "Perplexity connected!" : "Perplexity connection failed",
+        description: data.success ? "API key is valid" : data.error,
+        variant: data.success ? undefined : "destructive",
+      });
+    } catch (error: any) {
+      toast({ title: "Test failed", description: error.message, variant: "destructive" });
+    }
+  };
 
   // Blog mutations
   const createBlogPostMutation = useMutation({
@@ -687,6 +815,159 @@ export default function Admin() {
             ) : (
               <div className="text-center py-8 text-muted-foreground">
                 No blog posts yet. Create your first post to improve SEO and engage users!
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Twitter Automation */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <CardTitle className="flex items-center gap-2">
+                <Twitter className="w-5 h-5" />
+                Twitter Automation
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="tweet-enabled" className="text-sm">Auto-post</Label>
+                <Switch
+                  id="tweet-enabled"
+                  checked={tweetData?.settings?.enabled ?? false}
+                  onCheckedChange={(checked) => updateTweetSettingsMutation.mutate({ enabled: checked })}
+                  data-testid="switch-tweet-enabled"
+                />
+              </div>
+            </div>
+            <CardDescription>Daily market tweets with AI-powered player insights</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Service Status */}
+            <div className="flex flex-wrap gap-2">
+              <Badge variant={tweetData?.status?.twitter?.configured ? "default" : "secondary"}>
+                <Twitter className="w-3 h-3 mr-1" />
+                X/Twitter: {tweetData?.status?.twitter?.configured ? "Configured" : "Not configured"}
+              </Badge>
+              <Badge variant={tweetData?.status?.perplexity?.configured ? "default" : "secondary"}>
+                <Sparkles className="w-3 h-3 mr-1" />
+                Perplexity: {tweetData?.status?.perplexity?.configured ? "Configured" : "Not configured"}
+              </Badge>
+            </div>
+
+            {/* Test Connections */}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={handleTestTwitter} data-testid="button-test-twitter">
+                Test X Connection
+              </Button>
+              <Button size="sm" variant="outline" onClick={handleTestPerplexity} data-testid="button-test-perplexity">
+                Test Perplexity
+              </Button>
+            </div>
+
+            {/* Tweet Settings */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="include-risers"
+                  checked={tweetData?.settings?.includeRisers ?? true}
+                  onChange={(e) => updateTweetSettingsMutation.mutate({ includeRisers: e.target.checked })}
+                  className="h-4 w-4"
+                  data-testid="checkbox-include-risers"
+                />
+                <Label htmlFor="include-risers" className="text-xs">Top Risers</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="include-volume"
+                  checked={tweetData?.settings?.includeVolume ?? true}
+                  onChange={(e) => updateTweetSettingsMutation.mutate({ includeVolume: e.target.checked })}
+                  className="h-4 w-4"
+                  data-testid="checkbox-include-volume"
+                />
+                <Label htmlFor="include-volume" className="text-xs">Volume</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="include-marketcap"
+                  checked={tweetData?.settings?.includeMarketCap ?? true}
+                  onChange={(e) => updateTweetSettingsMutation.mutate({ includeMarketCap: e.target.checked })}
+                  className="h-4 w-4"
+                  data-testid="checkbox-include-marketcap"
+                />
+                <Label htmlFor="include-marketcap" className="text-xs">Market Cap</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Label htmlFor="max-players" className="text-xs">Max Players:</Label>
+                <Input
+                  id="max-players"
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={tweetData?.settings?.maxPlayers ?? 3}
+                  onChange={(e) => updateTweetSettingsMutation.mutate({ maxPlayers: parseInt(e.target.value) || 3 })}
+                  className="w-14 h-7 text-xs"
+                  data-testid="input-max-players"
+                />
+              </div>
+            </div>
+
+            {/* Preview & Post Actions */}
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" onClick={handlePreviewTweet} disabled={isPreviewLoading} data-testid="button-preview-tweet">
+                {isPreviewLoading ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Eye className="w-4 h-4 mr-1" />}
+                Preview Tweet
+              </Button>
+              <Button size="sm" onClick={handlePostTweet} disabled={isPosting || !tweetData?.status?.twitter?.configured} data-testid="button-post-tweet">
+                {isPosting ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Send className="w-4 h-4 mr-1" />}
+                Post Now
+              </Button>
+            </div>
+
+            {/* Tweet Preview */}
+            {tweetPreview && (
+              <div className="p-3 rounded-lg border bg-muted/30">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold">Preview</span>
+                  <Badge variant={tweetPreview.characterCount <= 280 ? "default" : "destructive"} className="text-xs">
+                    {tweetPreview.characterCount}/280
+                  </Badge>
+                </div>
+                <pre className="text-sm whitespace-pre-wrap font-mono">{tweetPreview.content}</pre>
+                {tweetPreview.aiSummary && (
+                  <div className="mt-2 pt-2 border-t">
+                    <span className="text-xs text-muted-foreground">AI Summary (expanded): {tweetPreview.aiSummary}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Recent Tweet History */}
+            {tweetData?.history && tweetData.history.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-sm font-semibold">Recent Tweets</h4>
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {tweetData.history.slice(0, 5).map((tweet) => (
+                    <div key={tweet.id} className="flex items-center justify-between p-2 rounded border text-xs">
+                      <div className="flex-1 min-w-0 mr-2">
+                        <span className="truncate block">{tweet.content.slice(0, 60)}...</span>
+                        <span className="text-muted-foreground">{new Date(tweet.createdAt).toLocaleString()}</span>
+                      </div>
+                      {tweet.status === "posted" ? (
+                        <Badge variant="default" className="text-xs shrink-0">
+                          <CheckCircle2 className="w-3 h-3 mr-1" />
+                          Posted
+                        </Badge>
+                      ) : (
+                        <Badge variant="destructive" className="text-xs shrink-0">
+                          <AlertCircle className="w-3 h-3 mr-1" />
+                          Failed
+                        </Badge>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </CardContent>
