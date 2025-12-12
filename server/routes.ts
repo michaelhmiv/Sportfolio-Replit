@@ -5,7 +5,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { fetchActivePlayers, calculateFantasyPoints } from "./mysportsfeeds";
 import type { InsertPlayer, Player, User, Holding } from "@shared/schema";
-import { contestLineups, contestEntries, contests, holdings, marketSnapshots, premiumCheckoutSessions } from "@shared/schema";
+import { contestLineups, contestEntries, contests, holdings, marketSnapshots, premiumCheckoutSessions, tweetSettings, tweetHistory } from "@shared/schema";
 import { sql, eq, desc, and, gte, lte } from "drizzle-orm";
 import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
@@ -4418,6 +4418,182 @@ ${posts.map(post => `  <url>
       res.status(500).json({ error: error.message });
     }
   });
+
+  // ========== TWEET MANAGEMENT ENDPOINTS ==========
+  
+  // Admin endpoint: Get tweet settings and history
+  app.get("/api/admin/tweets", adminAuth, async (req, res) => {
+    try {
+      // Get settings (create default if none exist)
+      let settings = await db.select().from(tweetSettings).limit(1);
+      if (settings.length === 0) {
+        const [newSettings] = await db.insert(tweetSettings).values({
+          enabled: false,
+        }).returning();
+        settings = [newSettings];
+      }
+      
+      // Get recent tweet history
+      const history = await db
+        .select()
+        .from(tweetHistory)
+        .orderBy(desc(tweetHistory.createdAt))
+        .limit(20);
+      
+      // Get service status
+      const { twitterService } = await import("./services/twitter");
+      const { perplexityService } = await import("./services/perplexity");
+      
+      res.json({
+        settings: settings[0],
+        history,
+        status: {
+          twitter: twitterService.getStatus(),
+          perplexity: perplexityService.getStatus(),
+        },
+      });
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to get tweet settings:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint: Update tweet settings
+  app.patch("/api/admin/tweets/settings", adminAuth, async (req, res) => {
+    try {
+      const { enabled, promptTemplate, includeRisers, includeVolume, includeMarketCap, maxPlayers } = req.body;
+      
+      // Get existing settings or create new
+      let settings = await db.select().from(tweetSettings).limit(1);
+      
+      if (settings.length === 0) {
+        const [newSettings] = await db.insert(tweetSettings).values({
+          enabled: enabled ?? false,
+          promptTemplate: promptTemplate ?? undefined,
+          includeRisers: includeRisers ?? true,
+          includeVolume: includeVolume ?? true,
+          includeMarketCap: includeMarketCap ?? true,
+          maxPlayers: maxPlayers ?? 3,
+        }).returning();
+        return res.json({ settings: newSettings });
+      }
+      
+      // Update existing settings
+      const updates: any = { updatedAt: new Date() };
+      if (enabled !== undefined) updates.enabled = enabled;
+      if (promptTemplate !== undefined) updates.promptTemplate = promptTemplate;
+      if (includeRisers !== undefined) updates.includeRisers = includeRisers;
+      if (includeVolume !== undefined) updates.includeVolume = includeVolume;
+      if (includeMarketCap !== undefined) updates.includeMarketCap = includeMarketCap;
+      if (maxPlayers !== undefined) updates.maxPlayers = maxPlayers;
+      
+      const [updated] = await db
+        .update(tweetSettings)
+        .set(updates)
+        .where(eq(tweetSettings.id, settings[0].id))
+        .returning();
+      
+      res.json({ settings: updated });
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to update tweet settings:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint: Preview a tweet (without posting)
+  app.post("/api/admin/tweets/preview", adminAuth, async (req, res) => {
+    try {
+      const { generateTweetPreview } = await import("./jobs/daily-tweet");
+      const preview = await generateTweetPreview();
+      
+      res.json({
+        content: preview.content,
+        playerData: preview.playerData,
+        aiSummary: preview.aiSummary,
+        characterCount: preview.content.length,
+        settings: preview.settings,
+      });
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to generate tweet preview:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint: Post a tweet immediately
+  app.post("/api/admin/tweets/post", adminAuth, async (req, res) => {
+    try {
+      const { postDailyTweet } = await import("./jobs/daily-tweet");
+      const result = await postDailyTweet();
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          tweetId: result.tweetId,
+          content: result.content,
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to post tweet:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint: Test Twitter connection
+  app.post("/api/admin/tweets/test-twitter", adminAuth, async (req, res) => {
+    try {
+      const { twitterService } = await import("./services/twitter");
+      const result = await twitterService.verifyCredentials();
+      res.json(result);
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to test Twitter:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint: Test Perplexity connection
+  app.post("/api/admin/tweets/test-perplexity", adminAuth, async (req, res) => {
+    try {
+      const { perplexityService } = await import("./services/perplexity");
+      const result = await perplexityService.testConnection();
+      res.json(result);
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to test Perplexity:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Cron endpoint: Daily tweet (for external cron services like cron-job.net)
+  app.post("/api/cron/daily-tweet", adminAuth, async (req, res) => {
+    try {
+      console.log("[CRON] Daily tweet triggered");
+      const { postDailyTweet } = await import("./jobs/daily-tweet");
+      const result = await postDailyTweet();
+      
+      if (result.success) {
+        console.log("[CRON] Daily tweet posted successfully:", result.tweetId);
+        res.json({
+          success: true,
+          tweetId: result.tweetId,
+        });
+      } else {
+        console.warn("[CRON] Daily tweet failed:", result.error);
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error: any) {
+      console.error("[CRON] Daily tweet error:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== END TWEET MANAGEMENT ==========
 
   // Analytics API - market insights and player analysis
   app.get("/api/analytics", async (req, res) => {
