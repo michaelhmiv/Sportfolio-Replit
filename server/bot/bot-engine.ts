@@ -196,6 +196,29 @@ async function getActiveBots(): Promise<Array<BotProfile & { user: typeof users.
 }
 
 /**
+ * Timeout wrapper to prevent strategies from hanging indefinitely
+ */
+function withTimeout<T>(promise: Promise<T>, ms: number, name: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${name} timed out after ${ms}ms`));
+    }, ms);
+    
+    promise
+      .then((result) => {
+        clearTimeout(timer);
+        resolve(result);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+const STRATEGY_TIMEOUT_MS = 30000; // 30 seconds max per strategy
+
+/**
  * Execute ALL strategies for every bot - mining, trading, and contests
  * Each bot's individual settings (aggressiveness, limits, budgets) determine their behavior
  * The bot_role field now acts as a "persona" hint but doesn't gate any strategies
@@ -214,48 +237,72 @@ async function executeBotStrategies(
   try {
     // 1. MINING - All bots mine to accumulate shares
     // Uses: maxPlayersToMine, miningClaimThreshold
-    await executeMiningStrategy(profile);
-    strategiesExecuted.push("mining");
+    try {
+      await withTimeout(executeMiningStrategy(profile), STRATEGY_TIMEOUT_MS, 'mining');
+      strategiesExecuted.push("mining");
+    } catch (e: any) {
+      console.warn(`[BotEngine] ${profile.botName} mining failed: ${e.message}`);
+    }
     
     // 2. TRADING - All bots can place orders in the marketplace
     // Uses: maxDailyOrders, maxDailyVolume, maxOrderSize, minOrderSize, spreadPercent, aggressiveness
     // Check if bot has trading budget remaining
     if (profile.ordersToday < profile.maxDailyOrders) {
-      await executeMarketMakerStrategy(profile);
-      strategiesExecuted.push("trading");
+      try {
+        await withTimeout(executeMarketMakerStrategy(profile), STRATEGY_TIMEOUT_MS, 'trading');
+        strategiesExecuted.push("trading");
+      } catch (e: any) {
+        console.warn(`[BotEngine] ${profile.botName} trading failed: ${e.message}`);
+      }
     }
     
     // 3. TAKER - Aggressive market orders to actually execute trades
     // Run taker strategy on EVERY tick for active markets - this is what creates trades
     // Aggressiveness determines HOW aggressive, not WHETHER to run
     if (profile.ordersToday < profile.maxDailyOrders) {
-      await executeTakerStrategy(profile);
-      strategiesExecuted.push("taker");
+      try {
+        await withTimeout(executeTakerStrategy(profile), STRATEGY_TIMEOUT_MS, 'taker');
+        strategiesExecuted.push("taker");
+      } catch (e: any) {
+        console.warn(`[BotEngine] ${profile.botName} taker failed: ${e.message}`);
+      }
     }
     
     // 4. CONTESTS - All bots can enter contests
     // Uses: maxContestEntriesPerDay, contestEntryBudget, aggressiveness
     // Check if bot has contest entries remaining
     if (profile.contestEntriesToday < profile.maxContestEntriesPerDay) {
-      await executeContestStrategy(profile);
-      strategiesExecuted.push("contests");
+      try {
+        await withTimeout(executeContestStrategy(profile), STRATEGY_TIMEOUT_MS, 'contests');
+        strategiesExecuted.push("contests");
+      } catch (e: any) {
+        console.warn(`[BotEngine] ${profile.botName} contests failed: ${e.message}`);
+      }
     }
     
     console.log(`[BotEngine] ${profile.botName} executed: [${strategiesExecuted.join(", ")}]`);
     
   } catch (error: any) {
     console.error(`[BotEngine] Error executing strategies for ${profile.botName}:`, error.message);
-    await logBotAction(profile.userId, {
-      actionType: "strategy_error",
-      actionDetails: { 
-        persona: profile.botRole, 
-        strategiesAttempted: strategiesExecuted,
-        error: error.message 
-      },
-      triggerReason: "Strategy execution failed",
-      success: false,
-      errorMessage: error.message,
-    });
+    try {
+      await withTimeout(
+        logBotAction(profile.userId, {
+          actionType: "strategy_error",
+          actionDetails: { 
+            persona: profile.botRole, 
+            strategiesAttempted: strategiesExecuted,
+            error: error.message 
+          },
+          triggerReason: "Strategy execution failed",
+          success: false,
+          errorMessage: error.message,
+        }),
+        5000,
+        'logBotAction'
+      );
+    } catch (logError: any) {
+      console.error(`[BotEngine] Failed to log bot action: ${logError.message}`);
+    }
   }
 }
 
