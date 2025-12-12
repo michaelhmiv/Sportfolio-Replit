@@ -352,9 +352,10 @@ export async function generateTweetPreview(): Promise<{
   
   // Get AI summary if Perplexity is configured and we have players
   if (perplexityService.isReady() && uniqueNames.length > 0) {
+    const defaultPrompt = "Give a brief 1-sentence summary of recent NBA news or game performance for these players: {players}. Focus on their most recent game or any breaking news. Keep each summary under 60 characters.";
     const result = await perplexityService.getPlayerSummaries(
       uniqueNames,
-      settings.promptTemplate
+      settings.promptTemplate || defaultPrompt
     );
     if (result.success && result.content) {
       aiSummary = result.content;
