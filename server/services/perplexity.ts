@@ -134,6 +134,78 @@ class PerplexityService {
   }
 
   /**
+   * Draft a tweet based on provided context/prompt
+   */
+  async draftTweet(prompt: string): Promise<PerplexityResponse> {
+    if (!this.isReady() || !this.apiKey) {
+      return {
+        success: false,
+        error: "Perplexity service not configured. Please add PERPLEXITY_API_KEY.",
+      };
+    }
+
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "llama-3.1-sonar-small-128k-online",
+          messages: [
+            {
+              role: "system",
+              content: "You are a social media manager for Sportfolio, a fantasy sports stock market platform. Your job is to draft engaging tweets about NBA player performance and market activity. Keep tweets concise, use relevant stats, and make them shareable. Always include the sportfolio.market link."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          max_tokens: 400,
+          temperature: 0.7,
+          search_recency_filter: "day",
+          return_images: false,
+          return_related_questions: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("[Perplexity] Draft tweet API error:", response.status, errorData);
+        return {
+          success: false,
+          error: `API error: ${response.status} - ${errorData}`,
+        };
+      }
+
+      const data = await response.json();
+      
+      if (!data.choices || data.choices.length === 0) {
+        return {
+          success: false,
+          error: "No response from Perplexity",
+        };
+      }
+
+      const content = data.choices[0]?.message?.content || "";
+      console.log("[Perplexity] Drafted tweet successfully");
+
+      return {
+        success: true,
+        content: content.trim(),
+      };
+    } catch (error: any) {
+      console.error("[Perplexity] Draft tweet request failed:", error.message);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
    * Test the API connection
    */
   async testConnection(): Promise<{ valid: boolean; error?: string }> {

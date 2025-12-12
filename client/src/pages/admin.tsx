@@ -132,6 +132,9 @@ export default function Admin() {
   const [tweetPreview, setTweetPreview] = useState<TweetPreview | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState("");
+  const [customDraft, setCustomDraft] = useState<string | null>(null);
+  const [isDrafting, setIsDrafting] = useState(false);
 
   const { data: stats, isLoading } = useQuery<SystemStats>({
     queryKey: ["/api/admin/stats"],
@@ -305,6 +308,49 @@ export default function Admin() {
       });
     } catch (error: any) {
       toast({ title: "Test failed", description: error.message, variant: "destructive" });
+    }
+  };
+
+  const handleDraftCustomTweet = async () => {
+    if (!customPrompt.trim()) {
+      toast({ title: "Enter a prompt", description: "Describe what you want to tweet about", variant: "destructive" });
+      return;
+    }
+    setIsDrafting(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/tweets/draft", { prompt: customPrompt });
+      const data = await res.json();
+      if (data.success) {
+        setCustomDraft(data.content);
+        toast({ title: "Draft ready!", description: "Review and edit before posting" });
+      } else {
+        toast({ title: "Draft failed", description: data.error, variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Draft failed", description: error.message, variant: "destructive" });
+    } finally {
+      setIsDrafting(false);
+    }
+  };
+
+  const handlePostCustomDraft = async () => {
+    if (!customDraft) return;
+    setIsPosting(true);
+    try {
+      const res = await apiRequest("POST", "/api/admin/tweets/post", { customContent: customDraft });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: "Tweet posted!", description: `Tweet ID: ${data.tweetId}` });
+        setCustomDraft(null);
+        setCustomPrompt("");
+        refetchTweets();
+      } else {
+        toast({ title: "Failed to post", description: data.error, variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Failed to post", description: error.message, variant: "destructive" });
+    } finally {
+      setIsPosting(false);
     }
   };
 
@@ -913,16 +959,72 @@ export default function Admin() {
               </div>
             </div>
 
-            {/* Preview & Post Actions */}
-            <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={handlePreviewTweet} disabled={isPreviewLoading} data-testid="button-preview-tweet">
-                {isPreviewLoading ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Eye className="w-4 h-4 mr-1" />}
-                Preview Tweet
-              </Button>
-              <Button size="sm" onClick={handlePostTweet} disabled={isPosting || !tweetData?.status?.twitter?.configured} data-testid="button-post-tweet">
-                {isPosting ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Send className="w-4 h-4 mr-1" />}
-                Post Now
-              </Button>
+            {/* Daily Tweet Actions */}
+            <div className="space-y-2">
+              <h4 className="text-sm font-semibold">Daily Auto-Tweet</h4>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={handlePreviewTweet} disabled={isPreviewLoading} data-testid="button-preview-tweet">
+                  {isPreviewLoading ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Eye className="w-4 h-4 mr-1" />}
+                  Preview Daily
+                </Button>
+                <Button size="sm" onClick={handlePostTweet} disabled={isPosting || !tweetData?.status?.twitter?.configured} data-testid="button-post-tweet">
+                  {isPosting ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Send className="w-4 h-4 mr-1" />}
+                  Post Daily
+                </Button>
+              </div>
+            </div>
+
+            {/* Custom AI Tweet Drafting */}
+            <div className="space-y-2 pt-3 border-t">
+              <h4 className="text-sm font-semibold flex items-center gap-2">
+                <Sparkles className="w-4 h-4" />
+                Custom AI Tweet
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Ask Perplexity to draft a tweet using your market data + fantasy stats
+              </p>
+              <Textarea
+                placeholder="e.g. Draft a tweet about the top 5 fantasy performers from last night's games..."
+                value={customPrompt}
+                onChange={(e) => setCustomPrompt(e.target.value)}
+                rows={2}
+                className="text-sm"
+                data-testid="textarea-custom-prompt"
+              />
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={handleDraftCustomTweet} disabled={isDrafting || !tweetData?.status?.perplexity?.configured} data-testid="button-draft-custom">
+                  {isDrafting ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
+                  Draft with AI
+                </Button>
+              </div>
+              
+              {/* Custom Draft Result */}
+              {customDraft && (
+                <div className="p-3 rounded-lg border bg-muted/30 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold">AI Draft</span>
+                    <Badge variant={customDraft.length <= 280 ? "default" : "destructive"} className="text-xs">
+                      {customDraft.length}/280
+                    </Badge>
+                  </div>
+                  <Textarea
+                    value={customDraft}
+                    onChange={(e) => setCustomDraft(e.target.value)}
+                    rows={4}
+                    className="text-sm font-mono"
+                    data-testid="textarea-custom-draft"
+                  />
+                  <div className="flex gap-2">
+                    <Button size="sm" onClick={handlePostCustomDraft} disabled={isPosting || customDraft.length > 280} data-testid="button-post-custom">
+                      {isPosting ? <RefreshCw className="w-4 h-4 mr-1 animate-spin" /> : <Send className="w-4 h-4 mr-1" />}
+                      Post This Tweet
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => setCustomDraft(null)}>
+                      Discard
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Tweet Preview */}

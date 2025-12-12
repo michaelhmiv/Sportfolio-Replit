@@ -4519,23 +4519,52 @@ ${posts.map(post => `  <url>
     }
   });
 
-  // Admin endpoint: Post a tweet immediately
+  // Admin endpoint: Post a tweet immediately (supports custom content)
   app.post("/api/admin/tweets/post", adminAuth, async (req, res) => {
     try {
-      const { postDailyTweet } = await import("./jobs/daily-tweet");
-      const result = await postDailyTweet();
+      const { customContent } = req.body;
       
-      if (result.success) {
-        res.json({
-          success: true,
-          tweetId: result.tweetId,
-          content: result.content,
-        });
+      if (customContent) {
+        // Post custom content directly
+        const { twitterService } = await import("./services/twitter");
+        const tweetResult = await twitterService.postTweet(customContent);
+        
+        if (tweetResult.success) {
+          // Log to tweet history
+          await db.insert(tweetHistory).values({
+            content: customContent,
+            tweetId: tweetResult.tweetId,
+            status: "posted",
+          });
+          
+          res.json({
+            success: true,
+            tweetId: tweetResult.tweetId,
+            content: customContent,
+          });
+        } else {
+          res.status(400).json({
+            success: false,
+            error: tweetResult.error,
+          });
+        }
       } else {
-        res.status(400).json({
-          success: false,
-          error: result.error,
-        });
+        // Use daily tweet generator
+        const { postDailyTweet } = await import("./jobs/daily-tweet");
+        const result = await postDailyTweet();
+        
+        if (result.success) {
+          res.json({
+            success: true,
+            tweetId: result.tweetId,
+            content: result.content,
+          });
+        } else {
+          res.status(400).json({
+            success: false,
+            error: result.error,
+          });
+        }
       }
     } catch (error: any) {
       console.error('[ADMIN] Failed to post tweet:', error.message);
@@ -4563,6 +4592,47 @@ ${posts.map(post => `  <url>
       res.json(result);
     } catch (error: any) {
       console.error('[ADMIN] Failed to test Perplexity:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint: Get market context for custom tweet drafting
+  app.get("/api/admin/tweets/context", adminAuth, async (req, res) => {
+    try {
+      const { getFullMarketContext } = await import("./jobs/daily-tweet");
+      const context = await getFullMarketContext();
+      res.json(context);
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to get market context:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint: Draft a custom tweet using Perplexity
+  app.post("/api/admin/tweets/draft", adminAuth, async (req, res) => {
+    try {
+      const { prompt } = req.body;
+      if (!prompt || typeof prompt !== 'string') {
+        return res.status(400).json({ error: "Prompt is required" });
+      }
+      
+      const { draftCustomTweet } = await import("./jobs/daily-tweet");
+      const result = await draftCustomTweet(prompt);
+      
+      if (result.success) {
+        res.json({
+          success: true,
+          content: result.content,
+          context: result.context,
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: result.error,
+        });
+      }
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to draft custom tweet:', error.message);
       res.status(500).json({ error: error.message });
     }
   });

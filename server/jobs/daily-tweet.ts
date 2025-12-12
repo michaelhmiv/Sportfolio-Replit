@@ -6,11 +6,25 @@
  */
 
 import { db } from "../db";
-import { players, trades, tweetHistory, tweetSettings } from "@shared/schema";
-import { desc, sql, gte, and, eq } from "drizzle-orm";
+import { players, trades, tweetHistory, tweetSettings, playerGameStats } from "@shared/schema";
+import { desc, sql, gte, and, eq, lte } from "drizzle-orm";
 import { twitterService } from "../services/twitter";
 import { perplexityService } from "../services/perplexity";
 import type { JobResult } from "./scheduler";
+
+interface FantasyPerformer {
+  id: string;
+  name: string;
+  team: string;
+  fantasyPoints: number;
+  points: number;
+  rebounds: number;
+  assists: number;
+  steals: number;
+  blocks: number;
+  gameDate: Date;
+  opponentTeam: string | null;
+}
 
 interface PlayerStat {
   id: string;
@@ -110,6 +124,147 @@ async function getTopMarketCap(limit: number): Promise<PlayerStat[]> {
     value: parseFloat(p.marketCap || "0"),
     formattedValue: `$${(parseFloat(p.marketCap || "0") / 1000).toFixed(1)}K`,
   }));
+}
+
+/**
+ * Get top fantasy performers from last night's games
+ */
+export async function getTopFantasyPerformers(limit: number = 5): Promise<FantasyPerformer[]> {
+  // Get yesterday's date range (last night's games)
+  const now = new Date();
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setHours(0, 0, 0, 0);
+  
+  const endOfYesterday = new Date(yesterday);
+  endOfYesterday.setHours(23, 59, 59, 999);
+
+  const result = await db
+    .select({
+      playerId: playerGameStats.playerId,
+      firstName: players.firstName,
+      lastName: players.lastName,
+      team: players.team,
+      fantasyPoints: playerGameStats.fantasyPoints,
+      points: playerGameStats.points,
+      rebounds: playerGameStats.rebounds,
+      assists: playerGameStats.assists,
+      steals: playerGameStats.steals,
+      blocks: playerGameStats.blocks,
+      gameDate: playerGameStats.gameDate,
+      opponentTeam: playerGameStats.opponentTeam,
+    })
+    .from(playerGameStats)
+    .innerJoin(players, eq(players.id, playerGameStats.playerId))
+    .where(and(
+      gte(playerGameStats.gameDate, yesterday),
+      lte(playerGameStats.gameDate, endOfYesterday)
+    ))
+    .orderBy(desc(playerGameStats.fantasyPoints))
+    .limit(limit);
+
+  return result.map(p => ({
+    id: p.playerId,
+    name: `${p.firstName} ${p.lastName}`,
+    team: p.team,
+    fantasyPoints: parseFloat(p.fantasyPoints || "0"),
+    points: p.points,
+    rebounds: p.rebounds,
+    assists: p.assists,
+    steals: p.steals,
+    blocks: p.blocks,
+    gameDate: p.gameDate,
+    opponentTeam: p.opponentTeam,
+  }));
+}
+
+/**
+ * Get all market context data for custom tweet drafting
+ */
+export async function getFullMarketContext(): Promise<{
+  topFantasy: FantasyPerformer[];
+  topRisers: PlayerStat[];
+  topVolume: PlayerStat[];
+  topMarketCap: PlayerStat[];
+}> {
+  const [topFantasy, topRisers, topVolume, topMarketCap] = await Promise.all([
+    getTopFantasyPerformers(5),
+    getTopRisers(5),
+    getTopVolume(5),
+    getTopMarketCap(5),
+  ]);
+
+  return { topFantasy, topRisers, topVolume, topMarketCap };
+}
+
+/**
+ * Draft a custom tweet using Perplexity with full market context
+ */
+export async function draftCustomTweet(userPrompt: string): Promise<{
+  success: boolean;
+  content?: string;
+  context?: any;
+  error?: string;
+}> {
+  try {
+    // Get all market data
+    const context = await getFullMarketContext();
+    
+    // Build context string for Perplexity
+    let contextString = "Here is the current Sportfolio market data:\n\n";
+    
+    if (context.topFantasy.length > 0) {
+      contextString += "TOP FANTASY PERFORMERS (Last Night's Games):\n";
+      context.topFantasy.forEach((p, i) => {
+        contextString += `${i + 1}. ${p.name} (${p.team}) - ${p.fantasyPoints.toFixed(1)} fantasy pts | ${p.points} PTS, ${p.rebounds} REB, ${p.assists} AST`;
+        if (p.opponentTeam) contextString += ` vs ${p.opponentTeam}`;
+        contextString += "\n";
+      });
+      contextString += "\n";
+    }
+    
+    if (context.topRisers.length > 0) {
+      contextString += "TOP MARKET RISERS (24h Price Change):\n";
+      context.topRisers.forEach((p, i) => {
+        contextString += `${i + 1}. ${p.name} (${p.team}) - ${p.formattedValue}\n`;
+      });
+      contextString += "\n";
+    }
+    
+    if (context.topVolume.length > 0) {
+      contextString += "MOST TRADED (24h Volume):\n";
+      context.topVolume.forEach((p, i) => {
+        contextString += `${i + 1}. ${p.name} (${p.team}) - ${p.formattedValue}\n`;
+      });
+      contextString += "\n";
+    }
+    
+    if (context.topMarketCap.length > 0) {
+      contextString += "TOP MARKET CAP:\n";
+      context.topMarketCap.forEach((p, i) => {
+        contextString += `${i + 1}. ${p.name} (${p.team}) - ${p.formattedValue}\n`;
+      });
+      contextString += "\n";
+    }
+
+    // Query Perplexity with context + user prompt
+    const fullPrompt = `${contextString}\n\nBased on this data, ${userPrompt}\n\nRequirements:\n- Keep the tweet under 280 characters\n- Make it engaging and informative\n- Include relevant stats\n- End with "sportfolio.market" link\n- Use relevant emojis sparingly`;
+
+    const result = await perplexityService.draftTweet(fullPrompt);
+    
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return {
+      success: true,
+      content: result.content,
+      context,
+    };
+  } catch (error: any) {
+    console.error("[CustomTweet] Error drafting tweet:", error.message);
+    return { success: false, error: error.message };
+  }
 }
 
 /**
