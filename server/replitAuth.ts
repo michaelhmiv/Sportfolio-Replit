@@ -558,12 +558,23 @@ export async function setupAuth(app: Express) {
 
     ensureStrategy(req.hostname);
     
-    passport.authenticate(`replitauth:${req.hostname}`, {
-      successReturnToOrRedirect: "/",
-      failureRedirect: "/auth/error?error=auth_failed&description=Authentication%20failed%2C%20please%20try%20again",
-    })(req, res, (err: any) => {
+    // Use custom callback for better error handling
+    passport.authenticate(`replitauth:${req.hostname}`, (err: any, user: any, info: any) => {
+      // Log detailed authentication result
+      authLog("CALLBACK", "passport.authenticate result", {
+        hasError: !!err,
+        hasUser: !!user,
+        hasInfo: !!info,
+        errorMessage: err?.message,
+        infoMessage: info?.message || info,
+        sessionID: req.sessionID,
+        isPWA: pwaContext.isPWA,
+        hadLoginContext: !!loginContext,
+      });
+      
+      // Handle explicit errors
       if (err) {
-        authLog("CALLBACK", "Authentication FAILED in callback", {
+        authLog("CALLBACK", "Authentication FAILED with error", {
           error: err.message,
           errorName: err.name,
           errorCode: (err as any).code,
@@ -571,21 +582,77 @@ export async function setupAuth(app: Express) {
           sessionID: req.sessionID,
         });
         
-        // Redirect to error page instead of throwing
         return res.redirect(
           `/auth/error?error=callback_failed&description=${encodeURIComponent(err.message || 'Authentication callback failed')}`
         );
       }
       
-      // Log success but don't call next() - Passport already handled the redirect
-      authLog("CALLBACK", "Authentication successful, redirecting", {
-        sessionID: req.sessionID,
-        isAuthenticated: req.isAuthenticated(),
-        hasUser: !!req.user,
-        userClaims: req.user ? Object.keys((req.user as any).claims || {}) : [],
+      // Handle authentication failure (no user returned)
+      if (!user) {
+        const failureReason = info?.message || info || 'Unknown authentication failure';
+        const sessionLost = !loginContext;
+        const cookieMismatch = loginContext && loginContext.sessionID !== req.sessionID;
+        
+        authLog("CALLBACK", "Authentication FAILED - no user returned", {
+          failureReason,
+          sessionLost,
+          cookieMismatch,
+          loginContextSessionID: loginContext?.sessionID?.substring(0, 20) + '...',
+          currentSessionID: req.sessionID?.substring(0, 20) + '...',
+          hadCookies: cookieInfo.hasSession,
+          isPWA: pwaContext.isPWA,
+          info,
+        });
+        
+        // Provide more specific error messages based on failure type
+        let errorCode = 'auth_failed';
+        let errorDesc = 'Authentication failed, please try again';
+        
+        if (sessionLost || cookieMismatch) {
+          errorCode = 'session_lost';
+          errorDesc = 'Your session was lost during login. This can happen on mobile browsers - please try again.';
+        } else if (typeof failureReason === 'string' && failureReason.includes('state')) {
+          errorCode = 'state_mismatch';
+          errorDesc = 'Security validation failed. Please try logging in again.';
+        }
+        
+        return res.redirect(
+          `/auth/error?error=${errorCode}&description=${encodeURIComponent(errorDesc)}`
+        );
+      }
+      
+      // Authentication successful - log in the user
+      req.logIn(user, (loginErr) => {
+        if (loginErr) {
+          authLog("CALLBACK", "req.logIn FAILED", {
+            error: loginErr.message,
+            sessionID: req.sessionID,
+          });
+          return res.redirect(
+            `/auth/error?error=login_failed&description=${encodeURIComponent('Failed to establish session')}`
+          );
+        }
+        
+        // Clear the login context now that we're done
+        delete (req.session as any).loginContext;
+        
+        // Save session to ensure persistence before redirect
+        req.session.save((saveErr) => {
+          if (saveErr) {
+            authLog("CALLBACK", "Session save warning (non-fatal)", { error: saveErr.message });
+          }
+          
+          authLog("CALLBACK", "Authentication successful, redirecting to /", {
+            sessionID: req.sessionID,
+            isAuthenticated: req.isAuthenticated(),
+            hasUser: !!req.user,
+            userClaims: req.user ? Object.keys((req.user as any).claims || {}) : [],
+          });
+          
+          res.redirect('/');
+        });
       });
-      // Passport's successReturnToOrRedirect will handle the redirect, we just return
-    });
+    })(req, res, next);
   });
 
   app.get("/api/logout", (req, res) => {
