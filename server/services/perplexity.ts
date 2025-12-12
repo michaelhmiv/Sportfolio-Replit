@@ -156,7 +156,7 @@ class PerplexityService {
           messages: [
             {
               role: "system",
-              content: "You are a social media manager for Sportfolio, a fantasy sports stock market platform. Your job is to draft engaging tweets about NBA player performance and market activity. Keep tweets concise, use relevant stats, and make them shareable. Always include the sportfolio.market link."
+              content: "You are a social media manager for Sportfolio, a fantasy sports stock market platform. Your job is to draft engaging tweets about NBA player performance and market activity. Keep tweets concise, use relevant stats, and make them shareable."
             },
             {
               role: "user",
