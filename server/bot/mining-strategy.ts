@@ -1,5 +1,5 @@
 /**
- * MiningBotStrategy - Auto-claim mining shares and select players to mine
+ * VestingBotStrategy - Auto-claim vesting shares and select players to vest
  */
 
 import { db } from "../db";
@@ -71,11 +71,11 @@ function calculateAccruedShares(
 }
 
 /**
- * Claim accumulated mining shares by updating the mining record
+ * Claim accumulated vesting shares - distributes across all split players
  */
 async function claimMiningShares(
   miningId: string,
-  playerId: string | null,
+  fallbackPlayerId: string | null,
   userId: string
 ): Promise<{ sharesClaimed: number }> {
   // Get current state
@@ -88,7 +88,7 @@ async function claimMiningShares(
     return { sharesClaimed: 0 };
   }
   
-  const sharesClaimed = miningRecord.sharesAccumulated;
+  const totalSharesClaimed = miningRecord.sharesAccumulated;
   const now = new Date();
   
   // Reset mining record
@@ -103,37 +103,79 @@ async function claimMiningShares(
     })
     .where(eq(mining.id, miningId));
   
-  // Add shares to holdings (if player is selected)
-  if (playerId) {
-    const existing = await storage.getHolding(userId, "player", playerId);
+  // Check if using multi-player vesting (splits)
+  const splits = await storage.getMiningSplits(userId);
+  
+  if (splits.length > 0) {
+    // Multi-player vesting: distribute shares proportionally across all split players
+    const totalRate = splits.reduce((sum, s) => sum + s.sharesPerHour, 0);
+    
+    // Calculate base distribution with floor
+    const distributions = splits.map(split => {
+      const proportion = split.sharesPerHour / totalRate;
+      const shares = Math.floor(proportion * totalSharesClaimed);
+      return { ...split, shares };
+    });
+    
+    // Distribute remainder deterministically to highest rate players
+    const remainder = totalSharesClaimed - distributions.reduce((sum, d) => sum + d.shares, 0);
+    const sortedByRate = [...distributions].sort((a, b) => b.sharesPerHour - a.sharesPerHour);
+    for (let i = 0; i < remainder; i++) {
+      sortedByRate[i % sortedByRate.length].shares += 1;
+    }
+    
+    // Apply distributions to holdings
+    for (const dist of distributions) {
+      if (dist.shares > 0) {
+        const existing = await storage.getHolding(userId, "player", dist.playerId);
+        if (existing) {
+          await db.update(holdings).set({
+            quantity: existing.quantity + dist.shares,
+            lastUpdated: new Date()
+          }).where(eq(holdings.id, existing.id));
+        } else {
+          await db.insert(holdings).values({
+            userId,
+            assetType: "player",
+            assetId: dist.playerId,
+            quantity: dist.shares,
+            avgCostBasis: "0.0000",
+            totalCostBasis: "0.00",
+          });
+        }
+      }
+    }
+  } else if (fallbackPlayerId) {
+    // Legacy single-player vesting - add all shares to one player
+    const existing = await storage.getHolding(userId, "player", fallbackPlayerId);
     if (existing) {
       await db.update(holdings).set({
-        quantity: existing.quantity + sharesClaimed,
+        quantity: existing.quantity + totalSharesClaimed,
         lastUpdated: new Date()
       }).where(eq(holdings.id, existing.id));
     } else {
       await db.insert(holdings).values({
         userId,
         assetType: "player",
-        assetId: playerId,
-        quantity: sharesClaimed,
+        assetId: fallbackPlayerId,
+        quantity: totalSharesClaimed,
         avgCostBasis: "0.0000",
         totalCostBasis: "0.00",
       });
     }
   }
   
-  return { sharesClaimed };
+  return { sharesClaimed: totalSharesClaimed };
 }
 
 /**
- * Select players for split mining (premium users)
+ * Select players for split vesting (all users - diversified selection)
  */
 async function selectPlayersForMining(
   candidates: PlayerValuation[],
   maxPlayers: number
 ): Promise<string[]> {
-  // Filter to players eligible for mining
+  // Filter to players eligible for vesting
   const eligiblePlayers = await db
     .select({ id: players.id })
     .from(players)
@@ -145,19 +187,64 @@ async function selectPlayersForMining(
   const eligibleIds = new Set(eligiblePlayers.map(p => p.id));
   const filtered = candidates.filter(c => eligibleIds.has(c.playerId));
   
-  // Pick top players by tier and fair value
-  const selected = filtered
-    .sort((a, b) => {
-      if (a.tier !== b.tier) return a.tier - b.tier;
-      return b.fairValue - a.fairValue;
-    })
-    .slice(0, maxPlayers);
+  if (filtered.length === 0) return [];
+  
+  // Diversified selection: Mix of top-tier and random players
+  // This ensures bots hold shares across different players for better liquidity
+  const selected: PlayerValuation[] = [];
+  const usedIds = new Set<string>();
+  
+  // Group by tier for balanced selection
+  const tiers: Map<number, PlayerValuation[]> = new Map();
+  for (const player of filtered) {
+    const tierList = tiers.get(player.tier) || [];
+    tierList.push(player);
+    tiers.set(player.tier, tierList);
+  }
+  
+  // Shuffle function
+  const shuffle = <T>(arr: T[]): T[] => {
+    const result = [...arr];
+    for (let i = result.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+  };
+  
+  // Pick players from each tier with some randomness
+  const tierKeys = Array.from(tiers.keys()).sort((a, b) => a - b);
+  let playersNeeded = Math.min(maxPlayers, filtered.length);
+  
+  // Round-robin selection from tiers with shuffling within each tier
+  while (selected.length < playersNeeded && tierKeys.length > 0) {
+    for (const tier of tierKeys) {
+      if (selected.length >= playersNeeded) break;
+      
+      const tierPlayers = tiers.get(tier) || [];
+      const available = shuffle(tierPlayers.filter(p => !usedIds.has(p.playerId)));
+      
+      if (available.length > 0) {
+        const pick = available[0];
+        selected.push(pick);
+        usedIds.add(pick.playerId);
+      }
+    }
+    
+    // Remove empty tiers
+    for (const tier of [...tierKeys]) {
+      const tierPlayers = tiers.get(tier) || [];
+      if (tierPlayers.every(p => usedIds.has(p.playerId))) {
+        tierKeys.splice(tierKeys.indexOf(tier), 1);
+      }
+    }
+  }
   
   return selected.map(p => p.playerId);
 }
 
 /**
- * Update mining splits for premium bot
+ * Update vesting splits for bot (all bots can use multi-player vesting)
  */
 async function updateMiningSplits(
   userId: string,
@@ -204,7 +291,7 @@ async function initializeBotMining(userId: string): Promise<void> {
   });
   
   if (selectedPlayerId) {
-    console.log(`[MiningBot] Initialized mining for user ${userId} with player ${selectedPlayerId}`);
+    console.log(`[VestingBot] Initialized vesting for user ${userId} with player ${selectedPlayerId}`);
   }
 }
 
@@ -226,7 +313,7 @@ export async function executeMiningStrategy(
   let miningState = await getBotMiningState(config.userId);
   
   if (!miningState) {
-    console.log(`[MiningBot] ${profile.botName} has no mining record, initializing...`);
+    console.log(`[VestingBot] ${profile.botName} has no vesting record, initializing...`);
     await initializeBotMining(config.userId);
     return;
   }
@@ -241,7 +328,7 @@ export async function executeMiningStrategy(
         .update(mining)
         .set({ playerId: currentPlayerId, updatedAt: new Date() })
         .where(eq(mining.id, miningState.id));
-      console.log(`[MiningBot] ${profile.botName} selected player ${currentPlayerId} for mining`);
+      console.log(`[VestingBot] ${profile.botName} selected player ${currentPlayerId} for vesting`);
     }
   }
   
@@ -269,7 +356,7 @@ export async function executeMiningStrategy(
   
   // Check if we should claim
   if (accrued.newTotal >= claimThresholdShares) {
-    console.log(`[MiningBot] ${profile.botName} claiming ${accrued.newTotal} shares (threshold: ${claimThresholdShares})`);
+    console.log(`[VestingBot] ${profile.botName} claiming ${accrued.newTotal} shares (threshold: ${claimThresholdShares})`);
     
     const result = await claimMiningShares(
       miningState.id,
@@ -289,12 +376,13 @@ export async function executeMiningStrategy(
     });
     
     if (result.sharesClaimed > 0) {
-      console.log(`[MiningBot] ${profile.botName} successfully claimed ${result.sharesClaimed} mining shares`);
+      console.log(`[VestingBot] ${profile.botName} successfully claimed ${result.sharesClaimed} vesting shares`);
     }
   }
   
-  // For premium bots, occasionally update mining selections
-  if (config.isPremium && Math.random() < 0.1) { // 10% chance each tick
+  // All bots can use multi-player vesting - occasionally update selections
+  // This ensures bots accumulate diverse holdings for better market liquidity
+  if (Math.random() < 0.1) { // 10% chance each tick
     const candidates = await getMiningCandidates(20);
     const selectedPlayers = await selectPlayersForMining(
       candidates,
@@ -302,20 +390,21 @@ export async function executeMiningStrategy(
     );
     
     if (selectedPlayers.length > 0) {
-      // Premium users get 100 shares/hour split across players
-      await updateMiningSplits(config.userId, selectedPlayers, SHARES_PER_HOUR_PREMIUM);
+      // Use appropriate shares per hour based on premium status
+      const sharesPerHour = config.isPremium ? SHARES_PER_HOUR_PREMIUM : SHARES_PER_HOUR_FREE;
+      await updateMiningSplits(config.userId, selectedPlayers, sharesPerHour);
       
       await logBotAction(config.userId, {
-        actionType: "mining_selection",
+        actionType: "vesting_selection",
         actionDetails: {
           playerIds: selectedPlayers,
           playerCount: selectedPlayers.length,
         },
-        triggerReason: "Periodic mining selection update",
+        triggerReason: "Periodic vesting selection update",
         success: true,
       });
       
-      console.log(`[MiningBot] ${profile.botName} updated mining splits to ${selectedPlayers.length} players`);
+      console.log(`[VestingBot] ${profile.botName} updated vesting splits to ${selectedPlayers.length} players`);
     }
   }
 }

@@ -35,7 +35,7 @@ interface CheckoutSession {
 const PRICE_PER_SHARE = 5;
 
 const premiumBenefits = [
-  { icon: Zap, title: "Double Mining Power", description: "Earn shares 2x faster during daily mining sessions" },
+  { icon: Zap, title: "Double Vesting Power", description: "Earn shares 2x faster during daily vesting sessions" },
   { icon: Crown, title: "Ad-Free Experience", description: "Browse and trade without any advertisements" },
 ];
 

@@ -1054,7 +1054,7 @@ function ActivityFeed() {
                     <span>•</span>
                     <span>{formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}</span>
                     
-                    {/* Show shares for mining */}
+                    {/* Show shares for vesting */}
                     {activity.shareDelta && activity.shareDelta > 0 && (
                       <>
                         <span>•</span>
