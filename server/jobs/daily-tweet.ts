@@ -7,10 +7,11 @@
 
 import { db } from "../db";
 import { players, trades, tweetHistory, tweetSettings, playerGameStats } from "@shared/schema";
-import { desc, sql, gte, and, eq, lte } from "drizzle-orm";
+import { desc, sql, gte, and, eq, lt } from "drizzle-orm";
 import { twitterService } from "../services/twitter";
 import { perplexityService } from "../services/perplexity";
 import type { JobResult } from "./scheduler";
+import { getGameDay, getETDayBoundaries } from "../lib/time";
 
 interface FantasyPerformer {
   id: string;
@@ -128,16 +129,23 @@ async function getTopMarketCap(limit: number): Promise<PlayerStat[]> {
 
 /**
  * Get top fantasy performers from last night's games
+ * Uses Eastern Time for proper game day detection
  */
 export async function getTopFantasyPerformers(limit: number = 5): Promise<FantasyPerformer[]> {
-  // Get yesterday's date range (last night's games)
+  // Get yesterday's date range in Eastern Time (last night's games)
   const now = new Date();
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  yesterday.setHours(0, 0, 0, 0);
+  const todayET = getGameDay(now);
   
-  const endOfYesterday = new Date(yesterday);
-  endOfYesterday.setHours(23, 59, 59, 999);
+  // Calculate yesterday in ET
+  const [year, month, day] = todayET.split('-').map(Number);
+  const yesterdayDate = new Date(year, month - 1, day - 1);
+  const yesterdayYear = yesterdayDate.getFullYear();
+  const yesterdayMonth = String(yesterdayDate.getMonth() + 1).padStart(2, '0');
+  const yesterdayDay = String(yesterdayDate.getDate()).padStart(2, '0');
+  const yesterdayET = `${yesterdayYear}-${yesterdayMonth}-${yesterdayDay}`;
+  
+  // Get UTC boundaries for yesterday in ET
+  const { startOfDay, endOfDay } = getETDayBoundaries(yesterdayET);
 
   const result = await db
     .select({
@@ -157,8 +165,8 @@ export async function getTopFantasyPerformers(limit: number = 5): Promise<Fantas
     .from(playerGameStats)
     .innerJoin(players, eq(players.id, playerGameStats.playerId))
     .where(and(
-      gte(playerGameStats.gameDate, yesterday),
-      lte(playerGameStats.gameDate, endOfYesterday)
+      gte(playerGameStats.gameDate, startOfDay),
+      lt(playerGameStats.gameDate, endOfDay)
     ))
     .orderBy(desc(playerGameStats.fantasyPoints))
     .limit(limit);

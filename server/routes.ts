@@ -4614,6 +4614,40 @@ ${posts.map(post => `  <url>
     }
   });
 
+  // Admin endpoint: Verify Twitter credentials
+  app.post("/api/admin/tweets/verify", adminAuth, async (req, res) => {
+    try {
+      const { twitterService } = await import("./services/twitter");
+      
+      if (!twitterService.isReady()) {
+        return res.status(400).json({
+          success: false,
+          error: "Twitter service not configured - missing API credentials",
+          status: twitterService.getStatus(),
+        });
+      }
+      
+      const verification = await twitterService.verifyCredentials();
+      
+      if (verification.valid) {
+        res.json({
+          success: true,
+          username: verification.username,
+          message: `Successfully connected to Twitter account @${verification.username}`,
+        });
+      } else {
+        res.status(400).json({
+          success: false,
+          error: verification.error,
+          hint: "Make sure your Twitter Developer App has 'Read and Write' permissions enabled, and you've regenerated your Access Token & Secret AFTER enabling those permissions.",
+        });
+      }
+    } catch (error: any) {
+      console.error('[ADMIN] Failed to verify Twitter credentials:', error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Admin endpoint: Preview a tweet (without posting)
   app.post("/api/admin/tweets/preview", adminAuth, async (req, res) => {
     try {

@@ -101,16 +101,20 @@ class TwitterService {
         tweetId: result.data.id,
       };
     } catch (error: any) {
-      console.error("[Twitter] Failed to post tweet:", error.message);
+      console.error("[Twitter] Failed to post tweet:", error.message, error);
       
-      // Handle specific Twitter API errors
+      // Handle specific Twitter API errors - twitter-api-v2 uses different error formats
       let errorMessage = error.message;
-      if (error.code === 403) {
-        errorMessage = "Access forbidden - check API permissions";
-      } else if (error.code === 429) {
+      const statusCode = error.code || error.statusCode || (error.data?.status);
+      
+      if (statusCode === 403 || error.message?.includes('403') || error.message?.includes('Forbidden')) {
+        errorMessage = "Access forbidden - ensure your Twitter Developer App has 'Read and Write' permissions enabled, and that you've regenerated your Access Token & Secret AFTER enabling those permissions. Also verify the app is using OAuth 1.0a User Context.";
+      } else if (statusCode === 429 || error.message?.includes('429')) {
         errorMessage = "Rate limit exceeded - try again later";
-      } else if (error.code === 401) {
-        errorMessage = "Authentication failed - check API credentials";
+      } else if (statusCode === 401 || error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+        errorMessage = "Authentication failed - check that all 4 Twitter API credentials (API Key, API Secret, Access Token, Access Token Secret) are correct and haven't expired";
+      } else if (statusCode === 400 || error.message?.includes('400')) {
+        errorMessage = `Bad request: ${error.message}. This often means incorrect OAuth credentials or missing 'Read and Write' app permissions.`;
       }
 
       return {
