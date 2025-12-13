@@ -19,7 +19,6 @@ export function useAuth() {
   const { data: user, isLoading } = useQuery<AuthUserResponse>({
     queryKey: ["/api/auth/user?sync=true"],
     queryFn: getQueryFn({ on401: "returnNull" }),
-    retry: false,
   });
   
   useEffect(() => {
