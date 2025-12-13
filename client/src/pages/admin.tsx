@@ -136,6 +136,10 @@ export default function Admin() {
   const [customDraft, setCustomDraft] = useState<string | null>(null);
   const [isDrafting, setIsDrafting] = useState(false);
 
+  // Premium grant state
+  const [grantUsername, setGrantUsername] = useState("");
+  const [grantQuantity, setGrantQuantity] = useState("");
+
   const { data: stats, isLoading } = useQuery<SystemStats>({
     queryKey: ["/api/admin/stats"],
     refetchInterval: 30000, // Refresh every 30 seconds
@@ -352,6 +356,42 @@ export default function Admin() {
     } finally {
       setIsPosting(false);
     }
+  };
+
+  // Premium grant mutation
+  const grantPremiumMutation = useMutation({
+    mutationFn: async (data: { username: string; quantity: number }) => {
+      const res = await apiRequest("POST", "/api/admin/premium/grant", data);
+      return await res.json();
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Premium shares granted",
+        description: `Granted ${data.granted} shares to ${data.user.username} (${data.previousQuantity} → ${data.newQuantity})`,
+      });
+      setGrantUsername("");
+      setGrantQuantity("");
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Failed to grant shares",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGrantPremium = () => {
+    if (!grantUsername.trim()) {
+      toast({ title: "Username required", variant: "destructive" });
+      return;
+    }
+    const qty = parseInt(grantQuantity, 10);
+    if (isNaN(qty) || qty <= 0) {
+      toast({ title: "Quantity must be a positive number", variant: "destructive" });
+      return;
+    }
+    grantPremiumMutation.mutate({ username: grantUsername.trim(), quantity: qty });
   };
 
   // Blog mutations
@@ -580,6 +620,68 @@ export default function Admin() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Premium Shares Grant */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5" />
+              Grant Premium Shares
+            </CardTitle>
+            <CardDescription>
+              Manually grant premium shares to a user by username.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="grant-username">Username</Label>
+                  <Input
+                    id="grant-username"
+                    type="text"
+                    placeholder="Enter username"
+                    value={grantUsername}
+                    onChange={(e) => setGrantUsername(e.target.value)}
+                    disabled={grantPremiumMutation.isPending}
+                    data-testid="input-grant-username"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="grant-quantity">Quantity</Label>
+                  <Input
+                    id="grant-quantity"
+                    type="number"
+                    min="1"
+                    placeholder="Number of shares"
+                    value={grantQuantity}
+                    onChange={(e) => setGrantQuantity(e.target.value)}
+                    disabled={grantPremiumMutation.isPending}
+                    data-testid="input-grant-quantity"
+                  />
+                </div>
+              </div>
+              <Button
+                onClick={handleGrantPremium}
+                disabled={grantPremiumMutation.isPending}
+                className="gap-2"
+                data-testid="button-grant-premium"
+              >
+                {grantPremiumMutation.isPending ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Granting...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    Grant Shares
+                  </>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Backfill Controls */}
         <Card>

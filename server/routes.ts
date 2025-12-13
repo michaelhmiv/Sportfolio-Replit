@@ -172,7 +172,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         while (hasMore && page <= maxPages) {
           const response = await fetch(
-            `https://api.whop.com/api/v1/payments?company_id=${companyId}&per_page=100&page=${page}`,
+            `https://api.whop.com/api/v1/payments?company_id=${companyId}&per_page=100&page=${page}&include=line_items`,
             {
               headers: {
                 "Authorization": `Bearer ${apiKey}`,
@@ -216,20 +216,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const paymentId = payment.id;
         const status = payment.status || "unknown";
-        // v1 API returns `total` in dollars (e.g., 5.0 = $5 = 1 share)
+        
+        // Check if payment already credited BEFORE any processing
+        // Only skip if status is still "paid" (to allow refund/chargeback processing)
+        const existingPayment = await storage.getWhopPaymentByPaymentId(paymentId);
+        if (existingPayment?.creditedAt && status === "paid") {
+          console.log(`[WHOP SYNC] Payment ${paymentId} already credited and still paid, skipping`);
+          continue;
+        }
+        
+        // Extract quantity from line_items first (preferred), fallback to total/5
+        let quantity = 0;
+        if (payment.line_items && Array.isArray(payment.line_items)) {
+          quantity = payment.line_items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+        }
+        // Fallback to total/5 if no line_items or zero quantity
+        if (quantity === 0) {
+          const totalDollars = payment.total || 0;
+          quantity = totalDollars >= 5 ? Math.floor(totalDollars / 5) : 0;
+        }
+        
+        // v1 API returns `total` in dollars for amountCents calculation
         const totalDollars = payment.total || 0;
         const amountCents = Math.round(totalDollars * 100);
-        // Each $5 payment = 1 premium share, guard against zero/negative
-        const quantity = totalDollars >= 5 ? Math.floor(totalDollars / 5) : 0;
         
         // Skip payments with no value (refunds, zero-dollar invoices)
         if (quantity === 0 && status === "paid") {
           console.log(`[WHOP SYNC] Skipping zero-value payment ${paymentId}`);
           continue;
         }
-        
-        // Check if payment already exists in our database BEFORE upserting
-        // (not used directly, but upsert behavior differs for new vs existing)
         
         // Upsert the payment record
         await storage.upsertWhopPayment({
@@ -548,6 +563,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error in admin Whop sync:", error);
       res.status(500).json({ error: "Failed to sync with Whop" });
+    }
+  });
+
+  // Admin endpoint to manually grant premium shares
+  app.post("/api/admin/premium/grant", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const currentUser = await storage.getUser(userId);
+      
+      // Check if user is admin
+      if (!currentUser?.isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+      
+      const { username, quantity } = req.body;
+      
+      if (!username) {
+        return res.status(400).json({ error: "Username is required" });
+      }
+      
+      const parsedQuantity = parseInt(quantity, 10);
+      if (isNaN(parsedQuantity) || parsedQuantity <= 0) {
+        return res.status(400).json({ error: "Quantity must be a positive number" });
+      }
+      
+      // Find target user by username
+      const targetUser = await storage.getUserByUsername(username);
+      if (!targetUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      
+      // Get existing premium holding
+      const existingHolding = await storage.getHolding(targetUser.id, "premium", "premium");
+      const currentQuantity = existingHolding?.quantity || 0;
+      const newQuantity = currentQuantity + parsedQuantity;
+      
+      // Preserve existing avgCost or use $5 default for new holdings
+      const currentAvgCost = existingHolding?.avgCostBasis || "5.0000";
+      
+      // Update holding with new quantity
+      await storage.updateHolding(targetUser.id, "premium", "premium", newQuantity, currentAvgCost);
+      
+      console.log(`[ADMIN] Granted ${parsedQuantity} premium shares to user ${targetUser.username} (${currentQuantity} -> ${newQuantity}) by admin ${currentUser.username}`);
+      
+      res.json({
+        success: true,
+        user: {
+          id: targetUser.id,
+          username: targetUser.username,
+        },
+        granted: parsedQuantity,
+        previousQuantity: currentQuantity,
+        newQuantity: newQuantity,
+      });
+    } catch (error: any) {
+      console.error("Error granting premium shares:", error);
+      res.status(500).json({ error: "Failed to grant premium shares" });
     }
   });
 
