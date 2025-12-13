@@ -149,7 +149,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       const apiKey = process.env.WHOP_API_KEY;
-      const planId = process.env.WHOP_PLAN_ID;
       const companyId = process.env.WHOP_COMPANY_ID;
       
       if (!apiKey) {
@@ -162,48 +161,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return result;
       }
       
-      const { Whop } = await import("@whop/sdk");
-      const whop = new Whop({ apiKey });
-      
-      // Query payments for this email from Whop
-      // Note: Whop SDK uses payments.list() with filters
+      // Use Whop v1 API directly - the SDK uses v5 which returns empty results
+      // v1 API: GET https://api.whop.com/api/v1/payments?company_id=...
       const payments: any[] = [];
       
       try {
-        // Get memberships for this plan to find user's payments
-        const membershipsResponse = await whop.memberships.list({
-          company_id: companyId,
-          plan_ids: planId ? [planId] : undefined,
-          per_page: 100,
-        });
+        let page = 1;
+        let hasMore = true;
+        const maxPages = 10; // Safety limit to prevent infinite loops
         
-        // Filter to find memberships with matching email
-        const userMemberships = membershipsResponse.data?.filter((m: any) => 
-          m.user?.email?.toLowerCase() === userEmail.toLowerCase()
-        ) || [];
-        
-        console.log(`[WHOP SYNC] Found ${userMemberships.length} memberships for ${userEmail}`);
-        
-        // For each membership, get payment history
-        for (const membership of userMemberships) {
-          if (membership.id) {
-            try {
-              const membershipPayments = await whop.payments.list({
-                membership_ids: [membership.id],
-                per_page: 100,
-              });
-              if (membershipPayments.data) {
-                payments.push(...membershipPayments.data);
-              }
-            } catch (payErr: any) {
-              console.log(`[WHOP SYNC] Error fetching payments for membership ${membership.id}:`, payErr.message);
+        while (hasMore && page <= maxPages) {
+          const response = await fetch(
+            `https://api.whop.com/api/v1/payments?company_id=${companyId}&per_page=100&page=${page}`,
+            {
+              headers: {
+                "Authorization": `Bearer ${apiKey}`,
+                "Content-Type": "application/json",
+              },
             }
+          );
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`[WHOP SYNC] API error ${response.status}: ${errorText}`);
+            return result;
           }
+          
+          const data = await response.json();
+          const pagePayments = data.data || [];
+          
+          console.log(`[WHOP SYNC] Page ${page}: fetched ${pagePayments.length} payments`);
+          
+          // Filter payments matching this user's email (case-insensitive)
+          const userPayments = pagePayments.filter((p: any) => 
+            p.user?.email?.toLowerCase() === userEmail.toLowerCase()
+          );
+          
+          payments.push(...userPayments);
+          
+          // Check if there are more pages
+          hasMore = pagePayments.length === 100;
+          page++;
         }
         
-        console.log(`[WHOP SYNC] Found ${payments.length} total payments for ${userEmail}`);
+        console.log(`[WHOP SYNC] Found ${payments.length} payments for ${userEmail} (${page - 1} pages)`);
       } catch (err: any) {
-        console.error(`[WHOP SYNC] Error querying Whop API:`, err.message);
+        console.error(`[WHOP SYNC] Error querying Whop v1 API:`, err.message);
         return result;
       }
       
@@ -213,8 +216,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         const paymentId = payment.id;
         const status = payment.status || "unknown";
-        const amount = payment.final_amount || payment.subtotal || 500;
-        const quantity = Math.max(1, Math.floor(amount / 500));
+        // v1 API returns `total` in dollars (e.g., 5.0 = $5 = 1 share)
+        const totalDollars = payment.total || 0;
+        const amountCents = Math.round(totalDollars * 100);
+        // Each $5 payment = 1 premium share, guard against zero/negative
+        const quantity = totalDollars >= 5 ? Math.floor(totalDollars / 5) : 0;
+        
+        // Skip payments with no value (refunds, zero-dollar invoices)
+        if (quantity === 0 && status === "paid") {
+          console.log(`[WHOP SYNC] Skipping zero-value payment ${paymentId}`);
+          continue;
+        }
+        
+        // Check if payment already exists in our database BEFORE upserting
+        // (not used directly, but upsert behavior differs for new vs existing)
         
         // Upsert the payment record
         await storage.upsertWhopPayment({
@@ -222,16 +237,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: userEmail.toLowerCase(),
           userId: null, // Will be set on credit
           quantity,
-          amountCents: amount,
+          amountCents,
           currency: payment.currency || "usd",
           whopStatus: status,
           rawPayload: payment,
         });
         
-        // Check if this is a paid payment that hasn't been credited yet
-        const existingPayment = await storage.getWhopPaymentByPaymentId(paymentId);
+        // Re-fetch the payment record after upsert to get latest state
+        const currentPayment = await storage.getWhopPaymentByPaymentId(paymentId);
         
-        if (status === "paid" && existingPayment && !existingPayment.creditedAt && !existingPayment.revokedAt) {
+        // Credit paid payments that haven't been credited yet
+        // For new payments: there's no existingPayment, so check currentPayment
+        // For existing payments: check if they're uncredited
+        const shouldCredit = status === "paid" && quantity > 0 && currentPayment && 
+          !currentPayment.creditedAt && !currentPayment.revokedAt;
+        
+        if (shouldCredit) {
           // Credit premium shares to user via holdings table (same as webhook handler)
           const existingHolding = await storage.getHolding(userId, "premium", "premium");
           const currentQuantity = existingHolding?.quantity || 0;
@@ -249,9 +270,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`[WHOP SYNC] Credited ${quantity} premium shares to user ${userId} from payment ${paymentId} (${currentQuantity} -> ${newQuantity})`);
         }
         
-        // Handle refunds/chargebacks
+        // Handle refunds/chargebacks - only if there's a previously credited payment
         if ((status === "refunded" || status === "disputed" || status === "chargedback") && 
-            existingPayment && existingPayment.creditedAt && !existingPayment.revokedAt) {
+            currentPayment && currentPayment.creditedAt && !currentPayment.revokedAt) {
           // Revoke the shares from holdings - preserve avgCost
           const existingHolding = await storage.getHolding(userId, "premium", "premium");
           const currentShares = existingHolding?.quantity || 0;
