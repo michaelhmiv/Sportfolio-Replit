@@ -127,7 +127,7 @@ class TwitterService {
   /**
    * Verify credentials work correctly
    */
-  async verifyCredentials(): Promise<{ valid: boolean; username?: string; error?: string }> {
+  async verifyCredentials(): Promise<{ valid: boolean; username?: string; error?: string; details?: any }> {
     if (!this.isReady() || !this.client) {
       return {
         valid: false,
@@ -137,14 +137,45 @@ class TwitterService {
 
     try {
       const result = await this.client.v2.me();
+      console.log("[Twitter] Credentials verified successfully for @" + result.data.username);
       return {
         valid: true,
         username: result.data.username,
       };
     } catch (error: any) {
+      // Log full error details for debugging
+      console.error("[Twitter] Credential verification failed:", {
+        message: error.message,
+        code: error.code,
+        statusCode: error.statusCode,
+        data: error.data,
+        errors: error.errors,
+        rateLimit: error.rateLimit,
+        fullError: JSON.stringify(error, null, 2),
+      });
+      
+      // Build detailed error message
+      let errorMessage = error.message;
+      const errorDetails = {
+        code: error.code,
+        statusCode: error.statusCode,
+        data: error.data,
+        errors: error.errors,
+      };
+      
+      // Check for common Twitter API v2 issues
+      if (error.message?.includes('Request') || error.code === 32 || error.code === 89) {
+        errorMessage = `OAuth error: ${error.message}. This typically means your Access Token was not generated with the correct permissions. Go to your Twitter Developer Portal, ensure your app has 'Read and Write' permissions under 'User authentication settings', then regenerate your Access Token and Secret.`;
+      } else if (error.statusCode === 401 || error.code === 401) {
+        errorMessage = `Authentication failed (401): ${error.message}. Your API credentials may be incorrect or expired.`;
+      } else if (error.statusCode === 403 || error.code === 403) {
+        errorMessage = `Forbidden (403): ${error.message}. Your app may not have the required permissions enabled.`;
+      }
+      
       return {
         valid: false,
-        error: error.message,
+        error: errorMessage,
+        details: errorDetails,
       };
     }
   }
