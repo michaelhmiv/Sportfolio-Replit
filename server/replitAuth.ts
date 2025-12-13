@@ -8,6 +8,10 @@ import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 
+// Track if session store is ready
+let sessionStoreReady = false;
+let sessionStoreInstance: any = null;
+
 // Debug logging utility for authentication
 const AUTH_DEBUG = process.env.AUTH_DEBUG === "true" || process.env.NODE_ENV === "development";
 
@@ -134,6 +138,40 @@ const getOidcConfig = memoize(
   { maxAge: 3600 * 1000 }
 );
 
+// Helper to wait for session store to be ready
+async function waitForSessionStore(maxWaitMs: number = 5000): Promise<boolean> {
+  if (sessionStoreReady) return true;
+  
+  const startTime = Date.now();
+  while (!sessionStoreReady && (Date.now() - startTime) < maxWaitMs) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  return sessionStoreReady;
+}
+
+// Helper to save session with retry logic
+async function saveSessionWithRetry(session: any, maxRetries: number = 3): Promise<void> {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      await new Promise<void>((resolve, reject) => {
+        session.save((err: any) => {
+          if (err) reject(err);
+          else resolve();
+        });
+      });
+      authLog("SESSION", `Session saved successfully on attempt ${attempt}`);
+      return;
+    } catch (error: any) {
+      authLog("SESSION", `Session save attempt ${attempt} failed: ${error.message}`);
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, 100 * attempt));
+      } else {
+        throw error;
+      }
+    }
+  }
+}
+
 export function getSession() {
   authLog("SESSION", "Initializing session configuration");
   
@@ -147,14 +185,47 @@ export function getSession() {
     tableName: "sessions",
   });
 
-  // Log session store events
+  // Store reference for warmup
+  sessionStoreInstance = sessionStore;
+
+  // Log session store events and track readiness
   sessionStore.on('connect', () => {
     authLog("SESSION", "Session store connected to database");
+    sessionStoreReady = true;
   });
 
   sessionStore.on('disconnect', () => {
     authLog("SESSION", "Session store disconnected from database");
+    sessionStoreReady = false;
   });
+
+  // Warm up the session store immediately by doing a test query
+  // This ensures the connection is established before the first login attempt
+  setTimeout(async () => {
+    try {
+      authLog("SESSION", "Warming up session store connection...");
+      await new Promise<void>((resolve, reject) => {
+        sessionStore.get('__warmup_test__', (err: any, session: any) => {
+          // Check if error indicates a connection failure (not just "session not found")
+          // Connection errors typically have code like ECONNREFUSED, ETIMEDOUT, etc.
+          if (err && (err.code === 'ECONNREFUSED' || err.code === 'ETIMEDOUT' || 
+                      err.code === 'ENOTFOUND' || err.code === 'ECONNRESET' ||
+                      err.message?.includes('connect') || err.message?.includes('Connection'))) {
+            authLog("SESSION", `Session store warmup failed - connection error: ${err.message}`);
+            reject(err);
+            return;
+          }
+          // No error or just "session not found" - connection is established
+          sessionStoreReady = true;
+          authLog("SESSION", "Session store warmup complete - ready for connections");
+          resolve();
+        });
+      });
+    } catch (err: any) {
+      // Don't mark as ready if warmup truly failed - let connect event or next attempt handle it
+      authLog("SESSION", `Session store warmup error: ${err.message}`);
+    }
+  }, 100);
 
   const sessionConfig = {
     secret: process.env.SESSION_SECRET!,
@@ -414,22 +485,43 @@ export async function setupAuth(app: Express) {
       sessionID: req.sessionID,
     };
     
-    // Ensure session is saved before redirecting to OIDC provider
+    // Ensure session store is ready and session is saved before redirecting
     // This fixes the race condition where the callback fails on first attempt
-    req.session.save((err) => {
-      if (err) {
-        authLog("LOGIN", "Failed to save session before redirect", { error: err.message });
-      } else {
+    (async () => {
+      try {
+        // Wait for session store to be ready (with timeout)
+        const storeReady = await waitForSessionStore(3000);
+        if (!storeReady) {
+          authLog("LOGIN", "Session store not ready after timeout - aborting login");
+          return res.status(503).json({
+            error: "session_store_unavailable",
+            message: "Login service is temporarily unavailable. Please try again in a few seconds.",
+            retryAfter: 5,
+          });
+        }
+        
+        // Save session with retry logic
+        await saveSessionWithRetry(req.session, 3);
+        
         authLog("LOGIN", "Session saved with login context", {
           loginContext: (req.session as any).loginContext,
+          sessionStoreReady: storeReady,
+        });
+        
+        passport.authenticate(`replitauth:${req.hostname}`, {
+          prompt: "login consent",
+          scope: ["openid", "email", "profile", "offline_access"],
+        })(req, res, next);
+      } catch (err: any) {
+        authLog("LOGIN", "Failed to save session after retries - aborting login", { error: err.message });
+        // Return error instead of redirecting - session store not ready
+        return res.status(503).json({
+          error: "session_store_unavailable",
+          message: "Login service is temporarily unavailable. Please try again in a few seconds.",
+          retryAfter: 5,
         });
       }
-      
-      passport.authenticate(`replitauth:${req.hostname}`, {
-        prompt: "login consent",
-        scope: ["openid", "email", "profile", "offline_access"],
-      })(req, res, next);
-    });
+    })();
   });
 
   app.get("/api/callback", (req, res, next) => {

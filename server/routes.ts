@@ -150,9 +150,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const apiKey = process.env.WHOP_API_KEY;
       const planId = process.env.WHOP_PLAN_ID;
+      const companyId = process.env.WHOP_COMPANY_ID;
       
       if (!apiKey) {
         console.log("[WHOP SYNC] No API key configured");
+        return result;
+      }
+      
+      if (!companyId) {
+        console.log("[WHOP SYNC] No Company ID configured");
         return result;
       }
       
@@ -166,7 +172,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         // Get memberships for this plan to find user's payments
         const membershipsResponse = await whop.memberships.list({
-          plan_id: planId || undefined,
+          company_id: companyId,
+          plan_ids: planId ? [planId] : undefined,
           per_page: 100,
         });
         
@@ -182,7 +189,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (membership.id) {
             try {
               const membershipPayments = await whop.payments.list({
-                membership_id: membership.id,
+                membership_ids: [membership.id],
                 per_page: 100,
               });
               if (membershipPayments.data) {
