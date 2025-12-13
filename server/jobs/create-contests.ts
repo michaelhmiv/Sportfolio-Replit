@@ -116,27 +116,23 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
     // Create contests for each game day
     for (const [dateStr, gameDay] of Array.from(gameDays.entries())) {
       try {
-        // Check if a contest already exists for this date using starts_at date (not game_date)
-        // This ensures one contest per calendar day based on when games actually start
+        // Check if a contest already exists for this game_date (the ET calendar day)
+        // This ensures one contest per ET game day, avoiding conflicts with startsAt which can
+        // cross midnight UTC (e.g., Dec 12 7pm ET = Dec 13 00:00 UTC)
         const existingContests = await storage.getContests();
         
-        // Calculate what starts_at would be for this contest (earliest game time)
-        const proposedStartsAt = new Date(gameDay.date);
-        const proposedStartsAtDateStr = proposedStartsAt.toISOString().split('T')[0];
-        
         const contestExists = existingContests.some(c => {
-          const startsAtDate = new Date(c.startsAt);
-          const startsAtDateStr = startsAtDate.toISOString().split('T')[0];
-          return startsAtDateStr === proposedStartsAtDateStr && (c.status === "open" || c.status === "live");
+          const gameDateStr = new Date(c.gameDate).toISOString().split('T')[0];
+          return gameDateStr === dateStr && (c.status === "open" || c.status === "live");
         });
 
         if (contestExists) {
-          console.log(`[create_contests] Contest already exists for starts_at date ${proposedStartsAtDateStr} (game day ${dateStr}), skipping...`);
+          console.log(`[create_contests] Contest already exists for game_date ${dateStr}, skipping...`);
           
           progressCallback?.({
             type: 'debug',
             timestamp: new Date().toISOString(),
-            message: `Contest already exists for starts_at date ${proposedStartsAtDateStr}, skipping`,
+            message: `Contest already exists for game_date ${dateStr}, skipping`,
           });
           
           continue;
