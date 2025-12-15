@@ -561,16 +561,16 @@ export default function Dashboard() {
         <div className="p-3 sm:p-4 max-w-full overflow-x-hidden">
         {/* Balance Header - Only show for authenticated users */}
         {isAuthenticated && data?.user && (
-          <div className="mb-6 p-6 rounded-2xl bg-card/80 backdrop-blur-sm" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.08)' }}>
-            <div className="flex flex-row justify-between gap-4">
-              <div>
+          <div className="mb-4 sm:mb-6 p-3 sm:p-6 rounded-2xl bg-card/80 backdrop-blur-sm" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.08)' }}>
+            <div className="flex flex-col sm:flex-row sm:justify-between gap-4 sm:gap-4">
+              <div className="min-w-0 flex-1">
                 <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1 font-sans">Cash Balance</div>
-                <div className="flex items-center gap-2">
-                  <div className="fintech-balance text-foreground" data-testid="text-balance">${data?.user?.balance || "0.00"}</div>
+                <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                  <div className="fintech-balance text-foreground truncate" data-testid="text-balance">${data?.user?.balance || "0.00"}</div>
                   {data?.user?.cashRank && data?.user.cashRank > 0 && (
                     <button
                       onClick={() => setLocation("/leaderboards#cashBalance")}
-                      className="inline-flex items-center gap-1 border border-border px-2 py-1 rounded-full text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 border border-border px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer flex-shrink-0"
                       data-testid="badge-cash-rank"
                       aria-label={`Cash balance rank #${data?.user.cashRank}, click to view leaderboard`}
                     >
@@ -578,9 +578,9 @@ export default function Dashboard() {
                       {data?.user.cashRankChange !== null && data?.user.cashRankChange !== 0 && (
                         <span className={data?.user.cashRankChange > 0 ? "text-positive" : "text-negative"}>
                           {data?.user.cashRankChange > 0 ? (
-                            <TrendingUp className="w-3 h-3 inline" />
+                            <TrendingUp className="w-2.5 h-2.5 inline" />
                           ) : (
-                            <TrendingDown className="w-3 h-3 inline" />
+                            <TrendingDown className="w-2.5 h-2.5 inline" />
                           )}
                         </span>
                       )}
@@ -588,13 +588,13 @@ export default function Dashboard() {
                   )}
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-right min-w-0 flex-1 sm:flex-none">
                 <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1 font-sans">Portfolio Value</div>
-                <div className="flex items-center gap-2 justify-end">
+                <div className="flex items-center gap-1 sm:gap-2 justify-end flex-wrap sm:flex-nowrap">
                   {data?.user?.portfolioRank && data?.user.portfolioRank > 0 && (
                     <button
                       onClick={() => setLocation("/leaderboards#portfolioValue")}
-                      className="inline-flex items-center gap-1 border border-border px-2 py-1 rounded-full text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 border border-border px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer flex-shrink-0 order-2 sm:order-1"
                       data-testid="badge-portfolio-rank"
                       aria-label={`Portfolio value rank #${data?.user.portfolioRank}, click to view leaderboard`}
                     >
@@ -610,7 +610,7 @@ export default function Dashboard() {
                       )}
                     </button>
                   )}
-                  <div className="fintech-balance text-foreground" data-testid="text-portfolio-value">${data?.user?.portfolioValue || "0.00"}</div>
+                  <div className="fintech-balance text-foreground order-1 sm:order-2" data-testid="text-portfolio-value">${data?.user?.portfolioValue || "0.00"}</div>
                 </div>
               </div>
             </div>

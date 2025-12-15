@@ -360,13 +360,25 @@
   /* Large balance display - Dashboard only */
   .fintech-balance {
     font-family: 'JetBrains Mono', monospace;
-    font-size: 2rem;
+    font-size: 1.5rem;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: 1.1;
     letter-spacing: -0.02em;
   }
   
   @media (min-width: 640px) {
+    .fintech-balance {
+      font-size: 2rem;
+    }
+  }
+  
+  @media (min-width: 768px) {
+    .fintech-balance {
+      font-size: 2.25rem;
+    }
+  }
+  
+  @media (min-width: 1024px) {
     .fintech-balance {
       font-size: 2.5rem;
     }
