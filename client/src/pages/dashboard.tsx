@@ -15,6 +15,7 @@ import { TrendingUp, TrendingDown, Trophy, Clock, DollarSign, Calendar, Search, 
 import { Link, useLocation } from "wouter";
 import type { Player, Vesting, Contest, Trade, DailyGame } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { formatBalance } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
@@ -571,7 +572,7 @@ export default function Dashboard() {
             {/* Values row */}
             <div className="flex justify-between gap-4 items-center">
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <div className="fintech-balance text-foreground truncate" data-testid="text-balance">${data?.user?.balance || "0.00"}</div>
+                <div className="fintech-balance text-foreground truncate" data-testid="text-balance">{formatBalance(data?.user?.balance || "0.00")}</div>
                 {data?.user?.cashRank && data?.user.cashRank > 0 && (
                   <button
                     onClick={() => setLocation("/leaderboards#cashBalance")}
@@ -594,7 +595,7 @@ export default function Dashboard() {
               </div>
               
               <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                <div className="fintech-balance text-foreground" data-testid="text-portfolio-value">${data?.user?.portfolioValue || "0.00"}</div>
+                <div className="fintech-balance text-foreground" data-testid="text-portfolio-value">{formatBalance(data?.user?.portfolioValue || "0.00")}</div>
                 {data?.user?.portfolioRank && data?.user.portfolioRank > 0 && (
                   <button
                     onClick={() => setLocation("/leaderboards#portfolioValue")}
