@@ -561,16 +561,16 @@ export default function Dashboard() {
         <div className="p-3 sm:p-4 max-w-full overflow-x-hidden">
         {/* Balance Header - Only show for authenticated users */}
         {isAuthenticated && data?.user && (
-          <div className="mb-3">
-            <div className="flex flex-row justify-between gap-2">
+          <div className="mb-6 p-6 rounded-2xl bg-card/80 backdrop-blur-sm" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.08)' }}>
+            <div className="flex flex-row justify-between gap-4">
               <div>
-                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Cash Balance</div>
-                <div className="flex items-center gap-1.5">
-                  <div className="text-lg font-mono font-bold" data-testid="text-balance">${data?.user?.balance || "0.00"}</div>
+                <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1 font-sans">Cash Balance</div>
+                <div className="flex items-center gap-2">
+                  <div className="fintech-balance text-foreground" data-testid="text-balance">${data?.user?.balance || "0.00"}</div>
                   {data?.user?.cashRank && data?.user.cashRank > 0 && (
                     <button
                       onClick={() => setLocation("/leaderboards#cashBalance")}
-                      className="inline-flex items-center gap-1 border border-border px-1.5 py-0.5 rounded text-[10px] hover-elevate active-elevate-2 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 border border-border px-2 py-1 rounded-full text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
                       data-testid="badge-cash-rank"
                       aria-label={`Cash balance rank #${data?.user.cashRank}, click to view leaderboard`}
                     >
@@ -589,12 +589,12 @@ export default function Dashboard() {
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Portfolio Value</div>
-                <div className="flex items-center gap-1.5 justify-end">
+                <div className="text-xs text-muted-foreground uppercase tracking-wider mb-1 font-sans">Portfolio Value</div>
+                <div className="flex items-center gap-2 justify-end">
                   {data?.user?.portfolioRank && data?.user.portfolioRank > 0 && (
                     <button
                       onClick={() => setLocation("/leaderboards#portfolioValue")}
-                      className="inline-flex items-center gap-1 border border-border px-1.5 py-0.5 rounded text-[10px] hover-elevate active-elevate-2 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 border border-border px-2 py-1 rounded-full text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer"
                       data-testid="badge-portfolio-rank"
                       aria-label={`Portfolio value rank #${data?.user.portfolioRank}, click to view leaderboard`}
                     >
@@ -610,7 +610,7 @@ export default function Dashboard() {
                       )}
                     </button>
                   )}
-                  <div className="text-lg font-mono font-bold" data-testid="text-portfolio-value">${data?.user?.portfolioValue || "0.00"}</div>
+                  <div className="fintech-balance text-foreground" data-testid="text-portfolio-value">${data?.user?.portfolioValue || "0.00"}</div>
                 </div>
               </div>
             </div>
