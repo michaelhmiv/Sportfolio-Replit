@@ -562,9 +562,15 @@ export default function Dashboard() {
         {/* Balance Header - Only show for authenticated users */}
         {isAuthenticated && data?.user && (
           <div className="mb-4 sm:mb-6 p-3 sm:p-6 rounded-2xl bg-card/80 backdrop-blur-sm" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.08)' }}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center sm:gap-4">
+            {/* Labels row */}
+            <div className="flex justify-between gap-4 mb-4">
+              <div className="text-xs text-muted-foreground uppercase tracking-wider font-sans">Cash Balance</div>
+              <div className="text-xs text-muted-foreground uppercase tracking-wider font-sans">Portfolio Value</div>
+            </div>
+            
+            {/* Values row */}
+            <div className="flex justify-between gap-4 items-center">
               <div className="flex items-center gap-2 min-w-0 flex-1">
-                <div className="text-xs text-muted-foreground uppercase tracking-wider font-sans flex-shrink-0">Cash Balance</div>
                 <div className="fintech-balance text-foreground truncate" data-testid="text-balance">${data?.user?.balance || "0.00"}</div>
                 {data?.user?.cashRank && data?.user.cashRank > 0 && (
                   <button
@@ -586,8 +592,9 @@ export default function Dashboard() {
                   </button>
                 )}
               </div>
-              <div className="flex items-center gap-2 justify-end min-w-0 flex-1 sm:flex-none">
-                <div className="text-xs text-muted-foreground uppercase tracking-wider font-sans flex-shrink-0">Portfolio Value</div>
+              
+              <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
+                <div className="fintech-balance text-foreground" data-testid="text-portfolio-value">${data?.user?.portfolioValue || "0.00"}</div>
                 {data?.user?.portfolioRank && data?.user.portfolioRank > 0 && (
                   <button
                     onClick={() => setLocation("/leaderboards#portfolioValue")}
@@ -607,7 +614,6 @@ export default function Dashboard() {
                     )}
                   </button>
                 )}
-                <div className="fintech-balance text-foreground" data-testid="text-portfolio-value">${data?.user?.portfolioValue || "0.00"}</div>
               </div>
             </div>
           </div>
