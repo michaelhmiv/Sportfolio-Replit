@@ -113,7 +113,7 @@ export function OnboardingModal({ open, onComplete }: OnboardingModalProps) {
                       <div className={`mb-5 ${slide.color}`}>
                         <Icon className="w-14 h-14" />
                       </div>
-                      <h2 className="text-xl font-mono font-bold tracking-tight mb-2 whitespace-nowrap">
+                      <h2 className="text-xl font-sans font-bold tracking-tight mb-2 whitespace-nowrap">
                         {slide.title}
                       </h2>
                       <p className="text-xs text-muted-foreground uppercase tracking-widest mb-4">

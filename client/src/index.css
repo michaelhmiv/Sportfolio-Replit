@@ -43,9 +43,9 @@
   --chart-3: 173 80% 40%;
   --chart-4: 197 37% 24%;
   --chart-5: 271 81% 56%;
-  --font-sans: "JetBrains Mono", monospace;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: Georgia, serif;
-  --font-mono: "JetBrains Mono", monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
   --radius: 0.125rem;
   --tracking-tight: -0.01em;
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
@@ -176,7 +176,7 @@
   }
 
   body {
-    @apply font-mono antialiased bg-background text-foreground tracking-tight;
+    @apply font-sans antialiased bg-background text-foreground tracking-tight;
     transition: 
       background-color 0.3s ease-in-out,
       color 0.2s ease-in-out;
