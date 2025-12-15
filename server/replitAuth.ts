@@ -180,9 +180,16 @@ export function getSession() {
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
     conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
+    createTableIfMissing: true, // Auto-create sessions table if missing (prevents silent failures)
     ttl: sessionTtl / 1000, // connect-pg-simple expects seconds, not milliseconds
     tableName: "sessions",
+    pruneSessionInterval: 60 * 15, // Clean up expired sessions every 15 minutes
+    errorLog: (error: Error) => {
+      authLog("SESSION_STORE_ERROR", "PostgreSQL session store error", {
+        error: error.message,
+        stack: error.stack,
+      });
+    },
   });
 
   // Store reference for warmup
@@ -227,27 +234,38 @@ export function getSession() {
     }
   }, 100);
 
+  const isProduction = process.env.NODE_ENV === "production";
+  
   const sessionConfig = {
+    name: "sportfolio.sid", // Explicit session name to avoid conflicts
     secret: process.env.SESSION_SECRET!,
     store: sessionStore,
     resave: true, // Enable resave to ensure session is updated on each request
     saveUninitialized: true, // Save new sessions immediately (fixes first-login race condition)
     rolling: true, // Refresh session cookie on each request (extends session on activity)
+    proxy: isProduction, // Trust the reverse proxy in production (required for secure cookies behind proxy)
     cookie: {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax" as const,
+      secure: isProduction, // HTTPS only in production
+      // Use 'none' for production OAuth flows (required for cross-origin OAuth redirects)
+      // Use 'lax' for development (more permissive for localhost testing)
+      sameSite: isProduction ? "none" as const : "lax" as const,
       maxAge: sessionTtl,
+      // Don't set domain - let browser determine it automatically
+      // This ensures cookies work on both custom domains and .replit.app domains
     },
   };
 
   authLog("SESSION", "Session configuration created", {
+    name: sessionConfig.name,
     ttlDays: 30,
     ttlMs: sessionTtl,
     secure: sessionConfig.cookie.secure,
     sameSite: sessionConfig.cookie.sameSite,
     httpOnly: sessionConfig.cookie.httpOnly,
     rolling: sessionConfig.rolling,
+    proxy: sessionConfig.proxy,
+    isProduction,
   });
 
   return session(sessionConfig);
@@ -713,35 +731,57 @@ export async function setupAuth(app: Express) {
         );
       }
       
-      // Authentication successful - log in the user
-      req.logIn(user, (loginErr) => {
-        if (loginErr) {
-          authLog("CALLBACK", "req.logIn FAILED", {
-            error: loginErr.message,
-            sessionID: req.sessionID,
+      // Authentication successful - regenerate session for security (prevents session fixation)
+      // Store user data before regeneration
+      const authenticatedUser = user;
+      const oldSessionID = req.sessionID;
+      
+      authLog("CALLBACK", "Regenerating session for security", {
+        oldSessionID: oldSessionID?.substring(0, 20) + '...',
+      });
+      
+      req.session.regenerate((regenErr) => {
+        if (regenErr) {
+          authLog("CALLBACK", "Session regeneration failed - continuing with existing session", {
+            error: regenErr.message,
           });
-          return res.redirect(
-            `/auth/error?error=login_failed&description=${encodeURIComponent('Failed to establish session')}`
-          );
+          // Don't fail - just continue with existing session
         }
         
-        // Clear the login context now that we're done
-        delete (req.session as any).loginContext;
+        const newSessionID = req.sessionID;
+        authLog("CALLBACK", "Session regenerated", {
+          oldSessionID: oldSessionID?.substring(0, 20) + '...',
+          newSessionID: newSessionID?.substring(0, 20) + '...',
+          regenerationSucceeded: !regenErr,
+        });
         
-        // Save session to ensure persistence before redirect
-        req.session.save((saveErr) => {
-          if (saveErr) {
-            authLog("CALLBACK", "Session save warning (non-fatal)", { error: saveErr.message });
+        // Now log in the user with the fresh session
+        req.logIn(authenticatedUser, (loginErr) => {
+          if (loginErr) {
+            authLog("CALLBACK", "req.logIn FAILED", {
+              error: loginErr.message,
+              sessionID: req.sessionID,
+            });
+            return res.redirect(
+              `/auth/error?error=login_failed&description=${encodeURIComponent('Failed to establish session')}`
+            );
           }
           
-          authLog("CALLBACK", "Authentication successful, redirecting to /", {
-            sessionID: req.sessionID,
-            isAuthenticated: req.isAuthenticated(),
-            hasUser: !!req.user,
-            userClaims: req.user ? Object.keys((req.user as any).claims || {}) : [],
+          // Save session to ensure persistence before redirect
+          req.session.save((saveErr) => {
+            if (saveErr) {
+              authLog("CALLBACK", "Session save warning (non-fatal)", { error: saveErr.message });
+            }
+            
+            authLog("CALLBACK", "Authentication successful, redirecting to /", {
+              sessionID: req.sessionID,
+              isAuthenticated: req.isAuthenticated(),
+              hasUser: !!req.user,
+              userClaims: req.user ? Object.keys((req.user as any).claims || {}) : [],
+            });
+            
+            res.redirect('/');
           });
-          
-          res.redirect('/');
         });
       });
     })(req, res, next);
