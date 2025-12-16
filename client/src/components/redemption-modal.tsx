@@ -640,51 +640,44 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
               </ScrollArea>
             )}
 
-            <div className="border rounded-md overflow-hidden" style={{ height: '250px' }}>
-              <div className="h-full overflow-y-auto p-2 space-y-2">
+            <div className="border rounded-md overflow-hidden" style={{ height: '350px' }}>
+              <div className="h-full overflow-y-auto">
                 {distributions.length === 0 ? (
                   <div className="py-8 text-center text-sm text-muted-foreground">
                     Search and add players to allocate shares
                   </div>
                 ) : (
-                  distributions.map(dist => (
-                    <div 
-                      key={dist.player.id} 
-                      className="flex flex-col sm:flex-row sm:items-center gap-2 p-2 border rounded-md bg-card"
-                      data-testid={`distribution-row-${dist.player.id}`}
-                    >
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <span className="font-medium text-sm truncate">
-                          {dist.player.firstName} {dist.player.lastName}
-                        </span>
-                        <Badge variant="secondary" className="text-xs shrink-0">
-                          {dist.player.team}
-                        </Badge>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => removePlayer(dist.player.id)}
-                          className="ml-auto sm:hidden"
-                          data-testid={`button-remove-mobile-${dist.player.id}`}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                  <div className="divide-y">
+                    {distributions.map(dist => (
+                      <div 
+                        key={dist.player.id} 
+                        className="flex items-center gap-2 px-3 py-2 hover:bg-muted/30 transition-colors"
+                        data-testid={`distribution-row-${dist.player.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-xs sm:text-sm truncate">
+                              {dist.player.firstName} {dist.player.lastName}
+                            </span>
+                            <Badge variant="secondary" className="text-xs shrink-0 hidden sm:inline-flex">
+                              {dist.player.team}
+                            </Badge>
+                          </div>
+                        </div>
                         <Input
                           type="number"
                           min={0}
                           max={projectedShares}
                           value={dist.shares}
                           onChange={(e) => setPlayerShares(dist.player.id, parseInt(e.target.value) || 0)}
-                          className="w-16 sm:w-20 h-8 text-right font-mono text-sm"
+                          className="w-14 sm:w-16 h-7 text-right font-mono text-xs"
                           data-testid={`input-shares-${dist.player.id}`}
                         />
                         <Button
                           size="sm"
                           variant="outline"
                           onClick={() => setPlayerMax(dist.player.id)}
-                          className="h-8 px-2 text-xs"
+                          className="h-7 px-1.5 text-xs hidden sm:flex"
                           data-testid={`button-max-${dist.player.id}`}
                         >
                           Max
@@ -695,21 +688,21 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
                           max={projectedShares}
                           step={1}
                           onValueChange={([val]) => setPlayerShares(dist.player.id, val)}
-                          className="flex-1 min-w-[80px] sm:w-24"
+                          className="w-16 sm:w-20 hidden sm:block"
                           data-testid={`slider-${dist.player.id}`}
                         />
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => removePlayer(dist.player.id)}
-                          className="hidden sm:flex"
+                          className="h-7 w-7 shrink-0"
                           data-testid={`button-remove-${dist.player.id}`}
                         >
-                          <X className="h-4 w-4" />
+                          <X className="h-3.5 w-3.5" />
                         </Button>
                       </div>
-                    </div>
-                  ))
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
