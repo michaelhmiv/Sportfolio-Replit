@@ -405,22 +405,23 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 sm:!inset-auto sm:!left-[50%] sm:!top-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] max-w-full sm:max-w-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] !flex !flex-col overflow-hidden rounded-none sm:rounded-md p-4 sm:p-6">
-        <DialogHeader>
-          <DialogTitle>Vest Shares</DialogTitle>
-          <DialogDescription>
-            Allocate your {projectedShares.toLocaleString()} pooled shares to players
-          </DialogDescription>
-        </DialogHeader>
+      <DialogContent className="!inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 sm:!inset-auto sm:!left-[50%] sm:!top-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] max-w-full sm:max-w-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-hidden rounded-none sm:rounded-md p-0 sm:p-6 !flex !flex-col !gap-0">
+          <DialogHeader className="shrink-0 p-4 pb-2 sm:p-0 sm:pb-4">
+            <DialogTitle>Vest Shares</DialogTitle>
+            <DialogDescription>
+              Allocate your {projectedShares.toLocaleString()} pooled shares to players
+            </DialogDescription>
+          </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-3">
+          <div className="flex-1 min-h-0 overflow-hidden px-4 sm:px-0">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
+              <TabsList className="grid w-full grid-cols-3 shrink-0">
             <TabsTrigger value="directory" data-testid="tab-directory">Directory</TabsTrigger>
             <TabsTrigger value="allocate" data-testid="tab-allocate">Allocate</TabsTrigger>
             <TabsTrigger value="presets" data-testid="tab-presets">Presets</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="directory" className="flex-1 flex flex-col min-h-0 mt-4 gap-2">
+          <TabsContent value="directory" className="flex-1 flex flex-col min-h-0 mt-2 gap-2 overflow-hidden">
             <div className="flex flex-col sm:flex-row gap-2 shrink-0">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -590,7 +591,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
             </div>
           </TabsContent>
 
-          <TabsContent value="allocate" className="flex-1 flex flex-col min-h-0 mt-4 gap-2">
+          <TabsContent value="allocate" className="flex-1 flex flex-col min-h-0 mt-2 gap-2 overflow-hidden">
             <div className="flex flex-col gap-2 shrink-0">
               <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md p-2">
                 <span className="text-muted-foreground">Available:</span>
@@ -741,7 +742,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
             </div>
           </TabsContent>
 
-          <TabsContent value="presets" className="flex-1 flex flex-col min-h-0 mt-4">
+          <TabsContent value="presets" className="flex-1 flex flex-col min-h-0 mt-2 overflow-hidden">
             <div className="border rounded-md overflow-hidden flex-1 min-h-0">
               <div className="h-full overflow-y-auto p-2 space-y-2">
                 {!presetsData?.presets || presetsData.presets.length === 0 ? (
@@ -785,21 +786,22 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
                 )}
               </div>
             </div>
-          </TabsContent>
-        </Tabs>
+              </TabsContent>
+            </Tabs>
+          </div>
 
-        <DialogFooter className="mt-4 shrink-0">
-          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleRedeem}
-            disabled={redeemMutation.isPending || totalAllocated === 0}
-            data-testid="button-confirm-vest"
-          >
-            {redeemMutation.isPending ? "Vesting..." : `Vest ${totalAllocated.toLocaleString()} Shares`}
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="shrink-0 p-4 pt-2 sm:p-0 sm:pt-4">
+            <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleRedeem}
+              disabled={redeemMutation.isPending || totalAllocated === 0}
+              data-testid="button-confirm-vest"
+            >
+              {redeemMutation.isPending ? "Vesting..." : `Vest ${totalAllocated.toLocaleString()} Shares`}
+            </Button>
+          </DialogFooter>
       </DialogContent>
     </Dialog>
   );
