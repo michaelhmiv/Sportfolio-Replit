@@ -561,7 +561,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => addPlayer(player, true)}
+                              onClick={() => addPlayer(player)}
                               className="px-2 shrink-0"
                               data-testid={`button-dir-add-${player.id}`}
                             >
