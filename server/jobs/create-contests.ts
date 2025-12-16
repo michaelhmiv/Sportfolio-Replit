@@ -12,6 +12,7 @@ import { fetchDailyGames } from "../mysportsfeeds";
 import type { JobResult } from "./scheduler";
 import type { ProgressCallback } from "../lib/admin-stream";
 import { fromZonedTime, toZonedTime, format } from "date-fns-tz";
+import { addDays } from "date-fns";
 
 interface GameDay {
   date: Date;
@@ -50,9 +51,9 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
     const nowInET = toZonedTime(now, 'America/New_York');
     
     // Fetch games for each of the next 7 days (starting from today in ET)
+    // Using addDays from date-fns to avoid DST issues with setDate()
     for (let i = 0; i < 7; i++) {
-      const date = new Date(nowInET);
-      date.setDate(date.getDate() + i);
+      const date = addDays(nowInET, i);
       // Format as YYYYMMDD for MySportsFeeds API
       const dateStr = format(date, 'yyyyMMdd', { timeZone: 'America/New_York' });
       

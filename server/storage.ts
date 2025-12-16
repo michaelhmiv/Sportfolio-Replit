@@ -337,16 +337,45 @@ export class DatabaseStorage implements IStorage {
   }
 
   async upsertUser(userData: UpsertUser): Promise<User> {
+    // IDEMPOTENCY GUARD: Check if target user ID already exists
+    // This handles duplicate requests/retries where migration already completed
+    const [existingTargetUser] = await db.select().from(users).where(eq(users.id, userData.id));
+    if (existingTargetUser) {
+      console.log(`[LAZY_MIGRATION] User ${userData.email} already exists with ID ${userData.id}, skipping migration`);
+      // Update profile fields if needed and return
+      const [updatedUser] = await db
+        .update(users)
+        .set({
+          email: userData.email || existingTargetUser.email,
+          firstName: userData.firstName ?? existingTargetUser.firstName,
+          lastName: userData.lastName ?? existingTargetUser.lastName,
+          profileImageUrl: userData.profileImageUrl ?? existingTargetUser.profileImageUrl,
+          username: userData.username || existingTargetUser.username,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userData.id))
+        .returning();
+      return updatedUser;
+    }
+    
     // Lazy migration: Look up existing user by email first to preserve their data
     // This handles the case where users have existing accounts with different IDs
     // (e.g., migrating from old auth system to Supabase)
     if (userData.email) {
-      const [existingUserByEmail] = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, userData.email));
-      
-      if (existingUserByEmail && existingUserByEmail.id !== userData.id) {
+      // Use transaction with FOR UPDATE to prevent race conditions
+      const migrationResult = await db.transaction(async (tx) => {
+        // Lock the row to prevent concurrent migrations of the same user
+        const [existingUserByEmail] = await tx
+          .select()
+          .from(users)
+          .where(eq(users.email, userData.email!))
+          .for('update');
+        
+        if (!existingUserByEmail || existingUserByEmail.id === userData.id) {
+          // No migration needed - either no user with this email, or same ID
+          return null;
+        }
+        
         // Found existing user with different ID - update their record with new auth ID
         // This preserves all their holdings, orders, trades, and balances
         console.log(`[LAZY_MIGRATION] Migrating user ${userData.email} from ID ${existingUserByEmail.id} to ${userData.id}`);
@@ -354,155 +383,152 @@ export class DatabaseStorage implements IStorage {
         const oldId = existingUserByEmail.id;
         const newId = userData.id;
         
-        // Wrap entire migration in a transaction to ensure atomicity
-        // If any update fails, all changes are rolled back to prevent data corruption
-        // Strategy: Insert new user row first, repoint FKs, then delete old row
-        // This avoids FK constraint violations since the new ID exists before FK updates
-        const migratedUser = await db.transaction(async (tx) => {
-          // Step 1: Temporarily clear unique constraints on old row to allow new row insert
-          // Email and username have unique constraints, so we clear them first
-          await tx
-            .update(users)
-            .set({ 
-              email: null, 
-              username: `__migrating_${oldId}` 
-            })
-            .where(eq(users.id, oldId));
-          
-          // Step 2: Insert a new user row with the new ID, copying all data from old row
-          await tx.insert(users).values({
-            id: newId,
-            email: existingUserByEmail.email,
-            username: userData.username || existingUserByEmail.username,
-            firstName: userData.firstName ?? existingUserByEmail.firstName,
-            lastName: userData.lastName ?? existingUserByEmail.lastName,
-            profileImageUrl: userData.profileImageUrl ?? existingUserByEmail.profileImageUrl,
-            balance: existingUserByEmail.balance,
-            isAdmin: existingUserByEmail.isAdmin,
-            isPremium: existingUserByEmail.isPremium,
-            premiumExpiresAt: existingUserByEmail.premiumExpiresAt,
-            hasSeenOnboarding: existingUserByEmail.hasSeenOnboarding,
-            isBot: existingUserByEmail.isBot,
-            totalSharesMined: existingUserByEmail.totalSharesMined,
-            totalMarketOrders: existingUserByEmail.totalMarketOrders,
-            totalTradesExecuted: existingUserByEmail.totalTradesExecuted,
-            createdAt: existingUserByEmail.createdAt,
-            updatedAt: new Date(),
-          });
-          
-          // Step 3: Update all FK references to point to the new user ID
-          // (New ID now exists, so FK constraints are satisfied)
-          
-          // Update mining records
-          await tx
-            .update(mining)
-            .set({ userId: newId })
-            .where(eq(mining.userId, oldId));
-          
-          // Update holdings
-          await tx
-            .update(holdings)
-            .set({ userId: newId })
-            .where(eq(holdings.userId, oldId));
-          
-          // Update holdings locks
-          await tx
-            .update(holdingsLocks)
-            .set({ userId: newId })
-            .where(eq(holdingsLocks.userId, oldId));
-          
-          // Update balance locks
-          await tx
-            .update(balanceLocks)
-            .set({ userId: newId })
-            .where(eq(balanceLocks.userId, oldId));
-          
-          // Update orders
-          await tx
-            .update(orders)
-            .set({ userId: newId })
-            .where(eq(orders.userId, oldId));
-          
-          // Update trades (buyer and seller)
-          await tx
-            .update(trades)
-            .set({ buyerId: newId })
-            .where(eq(trades.buyerId, oldId));
-          
-          await tx
-            .update(trades)
-            .set({ sellerId: newId })
-            .where(eq(trades.sellerId, oldId));
-          
-          // Update mining splits
-          await tx
-            .update(miningSplits)
-            .set({ userId: newId })
-            .where(eq(miningSplits.userId, oldId));
-          
-          // Update mining claims
-          await tx
-            .update(miningClaims)
-            .set({ userId: newId })
-            .where(eq(miningClaims.userId, oldId));
-          
-          // Update vesting presets
-          await tx
-            .update(vestingPresets)
-            .set({ userId: newId })
-            .where(eq(vestingPresets.userId, oldId));
-          
-          // Update contest entries
-          await tx
-            .update(contestEntries)
-            .set({ userId: newId })
-            .where(eq(contestEntries.userId, oldId));
-          
-          // Update portfolio snapshots
-          await tx
-            .update(portfolioSnapshots)
-            .set({ userId: newId })
-            .where(eq(portfolioSnapshots.userId, oldId));
-          
-          // Update premium checkout sessions
-          await tx
-            .update(premiumCheckoutSessions)
-            .set({ userId: newId })
-            .where(eq(premiumCheckoutSessions.userId, oldId));
-          
-          // Update premium orders
-          await tx
-            .update(premiumOrders)
-            .set({ userId: newId })
-            .where(eq(premiumOrders.userId, oldId));
-          
-          // Update premium trades (buyer and seller)
-          await tx
-            .update(premiumTrades)
-            .set({ buyerId: newId })
-            .where(eq(premiumTrades.buyerId, oldId));
-          
-          await tx
-            .update(premiumTrades)
-            .set({ sellerId: newId })
-            .where(eq(premiumTrades.sellerId, oldId));
-          
-          // Update whop payments
-          await tx
-            .update(whopPayments)
-            .set({ userId: newId })
-            .where(eq(whopPayments.userId, oldId));
-          
-          // Step 3: Delete the old user row (all FKs now point to new row)
-          await tx.delete(users).where(eq(users.id, oldId));
-          
-          // Return the migrated user
-          const [result] = await tx.select().from(users).where(eq(users.id, newId));
-          return result;
+        // Step 1: Temporarily clear unique constraints on old row to allow new row insert
+        // Email and username have unique constraints, so we clear them first
+        await tx
+          .update(users)
+          .set({ 
+            email: null, 
+            username: `__migrating_${oldId}` 
+          })
+          .where(eq(users.id, oldId));
+        
+        // Step 2: Insert a new user row with the new ID, copying all data from old row
+        await tx.insert(users).values({
+          id: newId,
+          email: existingUserByEmail.email,
+          username: userData.username || existingUserByEmail.username,
+          firstName: userData.firstName ?? existingUserByEmail.firstName,
+          lastName: userData.lastName ?? existingUserByEmail.lastName,
+          profileImageUrl: userData.profileImageUrl ?? existingUserByEmail.profileImageUrl,
+          balance: existingUserByEmail.balance,
+          isAdmin: existingUserByEmail.isAdmin,
+          isPremium: existingUserByEmail.isPremium,
+          premiumExpiresAt: existingUserByEmail.premiumExpiresAt,
+          hasSeenOnboarding: existingUserByEmail.hasSeenOnboarding,
+          isBot: existingUserByEmail.isBot,
+          totalSharesMined: existingUserByEmail.totalSharesMined,
+          totalMarketOrders: existingUserByEmail.totalMarketOrders,
+          totalTradesExecuted: existingUserByEmail.totalTradesExecuted,
+          createdAt: existingUserByEmail.createdAt,
+          updatedAt: new Date(),
         });
         
+        // Step 3: Update all FK references to point to the new user ID
+        // (New ID now exists, so FK constraints are satisfied)
+        
+        // Update mining records
+        await tx
+          .update(mining)
+          .set({ userId: newId })
+          .where(eq(mining.userId, oldId));
+        
+        // Update holdings
+        await tx
+          .update(holdings)
+          .set({ userId: newId })
+          .where(eq(holdings.userId, oldId));
+        
+        // Update holdings locks
+        await tx
+          .update(holdingsLocks)
+          .set({ userId: newId })
+          .where(eq(holdingsLocks.userId, oldId));
+        
+        // Update balance locks
+        await tx
+          .update(balanceLocks)
+          .set({ userId: newId })
+          .where(eq(balanceLocks.userId, oldId));
+        
+        // Update orders
+        await tx
+          .update(orders)
+          .set({ userId: newId })
+          .where(eq(orders.userId, oldId));
+        
+        // Update trades (buyer and seller)
+        await tx
+          .update(trades)
+          .set({ buyerId: newId })
+          .where(eq(trades.buyerId, oldId));
+        
+        await tx
+          .update(trades)
+          .set({ sellerId: newId })
+          .where(eq(trades.sellerId, oldId));
+        
+        // Update mining splits
+        await tx
+          .update(miningSplits)
+          .set({ userId: newId })
+          .where(eq(miningSplits.userId, oldId));
+        
+        // Update mining claims
+        await tx
+          .update(miningClaims)
+          .set({ userId: newId })
+          .where(eq(miningClaims.userId, oldId));
+        
+        // Update vesting presets
+        await tx
+          .update(vestingPresets)
+          .set({ userId: newId })
+          .where(eq(vestingPresets.userId, oldId));
+        
+        // Update contest entries
+        await tx
+          .update(contestEntries)
+          .set({ userId: newId })
+          .where(eq(contestEntries.userId, oldId));
+        
+        // Update portfolio snapshots
+        await tx
+          .update(portfolioSnapshots)
+          .set({ userId: newId })
+          .where(eq(portfolioSnapshots.userId, oldId));
+        
+        // Update premium checkout sessions
+        await tx
+          .update(premiumCheckoutSessions)
+          .set({ userId: newId })
+          .where(eq(premiumCheckoutSessions.userId, oldId));
+        
+        // Update premium orders
+        await tx
+          .update(premiumOrders)
+          .set({ userId: newId })
+          .where(eq(premiumOrders.userId, oldId));
+        
+        // Update premium trades (buyer and seller)
+        await tx
+          .update(premiumTrades)
+          .set({ buyerId: newId })
+          .where(eq(premiumTrades.buyerId, oldId));
+        
+        await tx
+          .update(premiumTrades)
+          .set({ sellerId: newId })
+          .where(eq(premiumTrades.sellerId, oldId));
+        
+        // Update whop payments
+        await tx
+          .update(whopPayments)
+          .set({ userId: newId })
+          .where(eq(whopPayments.userId, oldId));
+        
+        // Step 4: Delete the old user row (all FKs now point to new row)
+        await tx.delete(users).where(eq(users.id, oldId));
+        
+        // Return the migrated user
+        const [result] = await tx.select().from(users).where(eq(users.id, newId));
         console.log(`[LAZY_MIGRATION] Successfully migrated user ${userData.email} to new auth ID`);
-        return migratedUser;
+        return result;
+      });
+      
+      // If migration happened, return the migrated user
+      if (migrationResult) {
+        return migrationResult;
       }
     }
     
