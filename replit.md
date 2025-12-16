@@ -12,8 +12,16 @@ CRITICAL RULE: Never use mock, sample, or placeholder data under any circumstanc
 
 ## System Architecture
 
+### Authentication System
+The platform uses **Supabase Auth** for authentication with JWT tokens. Key components:
+- **Backend Middleware** (`server/supabaseAuth.ts`): Verifies JWT tokens from Supabase using the service role key. Uses `isAuthenticated` and `optionalAuth` middleware functions. User IDs are accessed via `req.user.claims.sub`.
+- **Frontend Hook** (`client/src/hooks/useAuth.ts`): Manages auth state with Supabase session management. Provides `login`, `signup`, `logout`, and `loginWithGoogle` functions. Passes Bearer tokens to API requests.
+- **Login Page** (`client/src/pages/Login.tsx`): Email/password login and signup with Google OAuth option. Routes at `/login` and `/auth/callback`.
+- **Environment Secrets**: Requires `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
+- **Dev Bypass**: In development mode (`NODE_ENV=development`), auth can be bypassed using a mock user for testing.
+
 ### Frontend
-The frontend is built with React, TypeScript, Vite, Wouter for routing, and TanStack Query for server state management. It utilizes Shadcn/ui (Radix UI, Tailwind CSS) for a Bloomberg terminal-inspired aesthetic, featuring JetBrains Mono typography, sharp corners, sidebar navigation, real-time market ticker, and card-based responsive layouts. Mobile experience is prioritized with bottom navigation. Authentication uses a `useAuth()` hook for graceful handling of unauthenticated sessions, allowing public access to market data. Real-time updates are managed via a centralized cache invalidation utility and WebSocket provider, complemented by a notification system for background events.
+The frontend is built with React, TypeScript, Vite, Wouter for routing, and TanStack Query for server state management. It utilizes Shadcn/ui (Radix UI, Tailwind CSS) for a Bloomberg terminal-inspired aesthetic, featuring JetBrains Mono typography, sharp corners, sidebar navigation, real-time market ticker, and card-based responsive layouts. Mobile experience is prioritized with bottom navigation. Authentication uses the `useAuth()` hook for graceful handling of unauthenticated sessions, allowing public access to market data. Real-time updates are managed via a centralized cache invalidation utility and WebSocket provider, complemented by a notification system for background events.
 
 ### Backend
 The backend is an Express.js server developed with TypeScript, supporting both HTTP and WebSockets. It uses Drizzle ORM with a PostgreSQL database (Neon serverless) and Zod for validation. Core domain models include Users, Players, Holdings, Orders, Trades, Mining, Contests, and Price History. The system ensures atomic balance updates and precise timezone handling. API design follows RESTful principles for data and WebSockets for live updates. Player IDs from MySportsFeeds API are used for consistency. A season filtering system provides intelligent season resolution based on the NBA calendar, and game logs are efficiently cached.
@@ -66,4 +74,4 @@ The platform uses Whop for ad monetization, embedding iframes via a reusable `Wh
 -   **Google Fonts CDN:** Typography.
 -   **Google Analytics 4:** Tracking and analytics.
 -   **Whop:** Ad monetization and premium share purchasing.
--   **Replit Auth:** User authentication and secure sessions.
+-   **Supabase Auth:** User authentication with JWT tokens and email/password or Google OAuth.

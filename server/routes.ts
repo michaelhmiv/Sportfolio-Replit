@@ -12,7 +12,7 @@ import { addClient, removeClient, broadcast } from "./websocket";
 import { calculateAccrualUpdate } from "@shared/vesting-utils";
 import { createContests } from "./jobs/create-contests";
 import { calculateContestLeaderboard } from "./contest-scoring";
-import { setupAuth, isAuthenticated, optionalAuth } from "./replitAuth";
+import { setupAuth, isAuthenticated, optionalAuth } from "./supabaseAuth";
 import { getGameDay, getETDayBoundaries, getTodayETBoundaries } from "./lib/time";
 import { matchOrders } from "./order-matcher";
 
@@ -413,29 +413,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // API ROUTES
 
   // Auth endpoints
-  app.get("/api/auth/user", (req: any, res, next) => {
-    // Pre-auth logging to diagnose Chrome issues
-    const userAgent = req.get("user-agent") || "";
-    const isChrome = userAgent.includes("Chrome") && !userAgent.includes("Edg");
-    const cookieHeader = req.get("cookie");
-    const hasSessionCookie = cookieHeader?.includes("connect.sid=");
-    
-    console.log(`[AUTH:USER] Request received`, JSON.stringify({
-      browser: isChrome ? "Chrome" : "Other",
-      sessionID: req.sessionID?.substring(0, 20) + "...",
-      hasSession: !!req.session,
-      isAuthenticated: req.isAuthenticated?.() ?? false,
-      hasUser: !!req.user,
-      hasSessionCookie,
-      cookieCount: cookieHeader ? cookieHeader.split(";").length : 0,
-    }));
-    
-    if (isChrome && !hasSessionCookie) {
-      console.log(`[AUTH:USER] CHROME WARNING: No session cookie in request!`);
-    }
-    
-    next();
-  }, isAuthenticated, async (req: any, res) => {
+  app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);

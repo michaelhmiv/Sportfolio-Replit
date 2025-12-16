@@ -1,3 +1,4 @@
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TrendingUp, Trophy, Pickaxe, ArrowRight, Zap, DollarSign } from "lucide-react";
@@ -88,10 +89,10 @@ export default function Landing() {
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <Button asChild size="lg" className="w-full sm:w-auto">
-              <a href="/api/login" data-testid="button-hero-login" className="flex items-center justify-center gap-2">
-                Sign In with Replit
+              <Link href="/login" data-testid="button-hero-login" className="flex items-center justify-center gap-2">
+                Get Started
                 <ArrowRight className="w-4 h-4" />
-              </a>
+              </Link>
             </Button>
           </div>
         </div>
@@ -179,10 +180,10 @@ export default function Landing() {
             </CardHeader>
             <CardContent className="flex justify-center pb-4 sm:pb-6 relative">
               <Button variant="secondary" size="lg" asChild className="shadow-lg">
-                <a href="/api/login" data-testid="button-cta-login" className="flex items-center gap-2">
+                <Link href="/login" data-testid="button-cta-login" className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
-                  Sign In with Replit
-                </a>
+                  Get Started Free
+                </Link>
               </Button>
             </CardContent>
           </Card>

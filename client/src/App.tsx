@@ -40,6 +40,8 @@ import HowItWorks from "@/pages/how-it-works";
 import Analytics from "@/pages/analytics";
 import Premium from "@/pages/premium";
 import PremiumTrade from "@/pages/premium-trade";
+import Login from "@/pages/Login";
+import AuthCallback from "@/pages/AuthCallback";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
 import { LogOut, User } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
@@ -121,6 +123,10 @@ function Router() {
         className="w-full"
       >
         <Switch>
+          {/* Auth routes */}
+          <Route path="/login" component={Login} />
+          <Route path="/auth/callback" component={AuthCallback} />
+          
           {/* Dashboard is now public - shows live data with login CTAs for non-authenticated users */}
           <Route path="/" component={Dashboard} />
           
@@ -173,7 +179,8 @@ function Router() {
 }
 
 function Header({ onVestShares }: { onVestShares: () => void }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
+  const [, navigate] = useLocation();
   const { subscribe } = useWebSocket();
   const { data: dashboardData } = useQuery<{ user: { balance: string; portfolioValue: string } }>({ 
     queryKey: ['/api/dashboard'],
@@ -247,10 +254,9 @@ function Header({ onVestShares }: { onVestShares: () => void }) {
             <Button 
               size="icon"
               variant="ghost"
-              onClick={() => {
-                // Invalidate auth cache before logout
-                queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-                window.location.href = "/api/logout";
+              onClick={async () => {
+                await logout();
+                navigate("/");
               }}
               data-testid="button-logout"
               title="Logout"
@@ -263,9 +269,9 @@ function Header({ onVestShares }: { onVestShares: () => void }) {
             asChild
             data-testid="button-header-login"
           >
-            <a href="/api/login">
+            <Link href="/login">
               Sign In
-            </a>
+            </Link>
           </Button>
         )}
         <Button

@@ -118,7 +118,7 @@ export default function AuthError() {
             setAutoRetryCount(1);
             // Mark that we've attempted auto-retry in sessionStorage (persists across page loads)
             sessionStorage.setItem('auth_auto_retry_attempted', 'true');
-            window.location.href = '/api/login';
+            window.location.href = '/login';
             return 0;
           }
           return prev - 1;
@@ -136,7 +136,7 @@ export default function AuthError() {
 
   const handleRetry = () => {
     clearRetryFlag(); // Allow auto-retry again on next failure
-    window.location.href = '/api/login';
+    window.location.href = '/login';
   };
 
   const handleGoHome = () => {

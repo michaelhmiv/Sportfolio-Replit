@@ -332,10 +332,10 @@ export default function Dashboard() {
                 className="flex-shrink-0"
                 data-testid="button-banner-login"
               >
-                <a href="/api/login" className="flex items-center gap-2">
+                <Link href="/login" className="flex items-center gap-2">
                   Sign In
                   <LogIn className="w-3 h-3" />
-                </a>
+                </Link>
               </Button>
             </div>
           </div>
@@ -674,10 +674,10 @@ export default function Dashboard() {
               ))}
               {!isAuthenticated ? (
                 <Button className="w-full" asChild data-testid="button-login-contests">
-                  <a href="/api/login" className="flex items-center justify-center gap-2">
+                  <Link href="/login" className="flex items-center justify-center gap-2">
                     <LogIn className="w-4 h-4" />
                     Sign In to Enter
-                  </a>
+                  </Link>
                 </Button>
               ) : (
                 <Link href="/contests">
