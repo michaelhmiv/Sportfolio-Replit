@@ -405,7 +405,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] flex flex-col p-4 sm:p-6">
+      <DialogContent className="!inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 sm:!inset-auto sm:!left-[50%] sm:!top-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] max-w-full sm:max-w-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] !flex !flex-col overflow-hidden rounded-none sm:rounded-md p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle>Vest Shares</DialogTitle>
           <DialogDescription>
