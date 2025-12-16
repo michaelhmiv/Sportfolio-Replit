@@ -21,6 +21,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { calculateVestingShares } from "@shared/vesting-utils";
 import { MarketActivityWidget } from "@/components/market-activity-widget";
+import { useVesting } from "@/lib/vesting-context";
 import { PlayerName } from "@/components/player-name";
 import { WhopAd } from "@/components/whop-ad";
 import { Shimmer, ShimmerCard, ScrollReveal, AnimatedButton, SwipeHint } from "@/components/ui/animations";
@@ -82,27 +83,11 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { isAuthenticated, user } = useAuth();
   const isPremiumUser = user?.isPremium || false;
+  const { openRedemptionModal } = useVesting();
   const [, setLocation] = useLocation();
-  const [showPlayerSelection, setShowPlayerSelection] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
-  const [selectedTeam, setSelectedTeam] = useState("all");
   const [flippedGameId, setFlippedGameId] = useState<string | null>(null);
-  const [expandedPlayerId, setExpandedPlayerId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [selectedPlayers, setSelectedPlayers] = useState<Player[]>([]);
-  const [sortField, setSortField] = useState<'name' | 'fantasyPoints' | 'marketValue'>('name');
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-  
-  // Debounce search input (250ms delay)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearchTerm(searchTerm);
-    }, 250);
-    
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
   
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
@@ -153,26 +138,11 @@ export default function Dashboard() {
         return;
       }
 
-      const usingSplits = vesting.players && vesting.players.length > 0;
-      
-      // If using splits or single player mode, check if configured
-      if (!usingSplits && !vesting.playerId) {
-        setProjectedShares(0);
-        return;
-      }
-
-      // Calculate total shares per hour (from splits or single player)
-      let totalSharesPerHour = 0;
-      if (usingSplits && vesting.players) {
-        // Sum individual player rates for multi-player vesting
-        totalSharesPerHour = vesting.players.reduce((sum, p) => sum + (p.sharesPerHour || 0), 0);
-      } else {
-        // Use single player rate for legacy vesting
-        totalSharesPerHour = vesting.sharesPerHour || 0;
-      }
+      // Pool-based vesting: shares always accrue to pool regardless of player selection
+      const sharesPerHour = vesting.sharesPerHour || (isPremiumUser ? 200 : 100);
 
       // Guard against missing required fields
-      if (!totalSharesPerHour || totalSharesPerHour === 0 || !vesting.lastAccruedAt) {
+      if (!vesting.lastAccruedAt) {
         setProjectedShares(vesting.sharesAccumulated || 0);
         return;
       }
@@ -182,8 +152,8 @@ export default function Dashboard() {
         sharesAccumulated: vesting.sharesAccumulated || 0,
         residualMs: vesting.residualMs || 0,
         lastAccruedAt: vesting.lastAccruedAt,
-        sharesPerHour: totalSharesPerHour,
-        capLimit: vesting.capLimit || 2400,
+        sharesPerHour: sharesPerHour,
+        capLimit: vesting.capLimit || (isPremiumUser ? 4800 : 2400),
       });
 
       setProjectedShares(result.projectedShares);
@@ -195,13 +165,12 @@ export default function Dashboard() {
 
     return () => clearInterval(interval);
   }, [
-    data?.vesting?.playerId,
     data?.vesting?.lastAccruedAt,
     data?.vesting?.residualMs,
     data?.vesting?.sharesAccumulated,
     data?.vesting?.sharesPerHour,
     data?.vesting?.capLimit,
-    data?.vesting?.players,
+    isPremiumUser,
   ]);
 
   // Handle Escape key and click-outside to close flipped card
@@ -230,57 +199,6 @@ export default function Dashboard() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [flippedGameId]);
-
-  const { data: playersResponse } = useQuery<{ players: Player[], total: number }>({
-    queryKey: ["/api/players", debouncedSearchTerm, selectedTeam],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      if (debouncedSearchTerm) params.append("search", debouncedSearchTerm);
-      if (selectedTeam && selectedTeam !== "all") params.append("team", selectedTeam);
-      // Only show vesting-eligible players
-      params.append("limit", "1000"); // Load all eligible players for vesting selection
-      
-      const url = `/api/players?${params.toString()}`;
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Failed to fetch players");
-      const data = await res.json();
-      return data;
-    },
-    enabled: showPlayerSelection,
-  });
-
-  const playersData = playersResponse?.players;
-
-  // Filter only for vesting eligibility (server-side handles search and team filter)
-  const eligiblePlayers = playersData?.filter(p => p.isEligibleForMining) || [];
-  
-  // Sort players based on selected criteria
-  const filteredPlayers = [...eligiblePlayers].sort((a, b) => {
-    let comparison = 0;
-    
-    if (sortField === 'name') {
-      const nameA = `${a.lastName} ${a.firstName}`.toLowerCase();
-      const nameB = `${b.lastName} ${b.firstName}`.toLowerCase();
-      comparison = nameA.localeCompare(nameB);
-    } else if (sortField === 'fantasyPoints') {
-      const fpgA = parseFloat((a as any).avgFantasyPointsPerGame || '0');
-      const fpgB = parseFloat((b as any).avgFantasyPointsPerGame || '0');
-      comparison = fpgA - fpgB; // Ascending order (low to high)
-    } else if (sortField === 'marketValue') {
-      const mvA = parseFloat(a.lastTradePrice || '0');
-      const mvB = parseFloat(b.lastTradePrice || '0');
-      comparison = mvA - mvB; // Ascending order (low to high)
-    }
-    
-    // For desc, reverse the comparison (high to low)
-    return sortDirection === 'desc' ? -comparison : comparison;
-  });
-
-  // Get unique teams for filter
-  const { data: teams } = useQuery<string[]>({
-    queryKey: ["/api/teams"],
-  });
-  const uniqueTeams = teams || [];
 
   // Format date as YYYY-MM-DD
   const formatDateForAPI = (date: Date) => {
@@ -364,107 +282,6 @@ export default function Dashboard() {
       setShowDatePicker(false);
     }
   };
-
-  const startVestingMutation = useMutation({
-    mutationFn: async (playerIds: string[]) => {
-      const res = await apiRequest("POST", "/api/vesting/start", { playerIds });
-      const data = await res.json();
-      // Don't await cache invalidation - let it run in background for instant UI response
-      return data;
-    },
-    onSuccess: (data: any) => {
-      // Invalidate cache in background (non-blocking)
-      invalidatePortfolioQueries();
-      
-      // Close dialog immediately for responsive UX
-      setShowPlayerSelection(false);
-      setSelectedPlayers([]);
-      
-      const playerCount = data?.players?.length || 0;
-      const claimed = data?.claimed;
-      
-      if (claimed) {
-        // Shares were auto-claimed during switch
-        if (claimed.players && claimed.players.length > 0) {
-          // Multi-player claim
-          const playerBreakdown = claimed.players
-            .map((p: any) => `${p.playerName} (${p.sharesClaimed})`)
-            .join(", ");
-          toast({
-            title: "Vesting Updated!",
-            description: `Auto-claimed ${claimed.totalSharesClaimed} shares (${playerBreakdown}). Now vesting ${playerCount} player${playerCount !== 1 ? 's' : ''}.`,
-          });
-        } else if (claimed.player) {
-          // Single-player claim
-          const playerName = `${claimed.player.firstName} ${claimed.player.lastName}`;
-          toast({
-            title: "Vesting Updated!",
-            description: `Auto-claimed ${claimed.sharesClaimed} shares of ${playerName}. Now vesting ${playerCount} player${playerCount !== 1 ? 's' : ''}.`,
-          });
-        } else {
-          // Generic auto-claim message
-          toast({
-            title: "Vesting Updated!",
-            description: `Auto-claimed pending shares and started vesting ${playerCount} player${playerCount !== 1 ? 's' : ''}.`,
-          });
-        }
-      } else {
-        // No auto-claim needed
-        toast({
-          title: "Vesting Started!",
-          description: `Now vesting shares of ${playerCount} player${playerCount !== 1 ? 's' : ''}`,
-        });
-      }
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Failed to Start Vesting",
-        description: error.error || error.message,
-        variant: "destructive",
-      });
-    },
-  });
-
-  const claimVestingMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/vesting/claim");
-      const data = await res.json();
-      // Don't await cache invalidation - let it run in background for instant UI response
-      return data;
-    },
-    onSuccess: (data: any) => {
-      // Invalidate cache in background (non-blocking)
-      invalidatePortfolioQueries();
-      
-      // Multi-player vesting response
-      if (data?.players && data.players.length > 0) {
-        const playerBreakdown = data.players
-          .map((p: any) => `${p.playerName} (${p.sharesClaimed})`)
-          .join(", ");
-        toast({
-          title: `Claimed ${data.totalSharesClaimed} Shares!`,
-          description: `Distribution: ${playerBreakdown}`,
-        });
-      } else {
-        // Single player vesting response
-        const sharesClaimed = data?.sharesClaimed || 0;
-        const playerName = data?.player?.firstName && data?.player?.lastName 
-          ? `${data.player.firstName} ${data.player.lastName}`
-          : "your player";
-        toast({
-          title: "Shares Claimed!",
-          description: `Successfully claimed ${sharesClaimed} shares of ${playerName}`,
-        });
-      }
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Claim Failed",
-        description: error.message,
-        variant: "destructive",
-      });
-    },
-  });
 
   if (isLoading) {
     return (
@@ -853,17 +670,20 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <>
+                  {/* Pool-based vesting: shares accrue automatically to pool */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">Rate: {data?.vesting?.sharesPerHour || 100} sh/hr</span>
+                      <span className="text-xs text-muted-foreground">
+                        Rate: {data?.vesting?.sharesPerHour || (isPremiumUser ? 200 : 100)} sh/hr
+                      </span>
                       <span className="text-xs text-muted-foreground font-mono">
-                        {projectedShares} / {data?.vesting?.capLimit || 2400}
+                        {projectedShares} / {data?.vesting?.capLimit || (isPremiumUser ? 4800 : 2400)}
                       </span>
                     </div>
                     <Progress 
-                      value={(projectedShares / (data?.vesting?.capLimit || 2400)) * 100} 
+                      value={(projectedShares / (data?.vesting?.capLimit || (isPremiumUser ? 4800 : 2400))) * 100} 
                       className={`h-2 transition-all ${
-                        data?.vesting?.player && projectedShares < (data?.vesting?.capLimit || 2400)
+                        projectedShares > 0 && projectedShares < (data?.vesting?.capLimit || (isPremiumUser ? 4800 : 2400))
                           ? 'animate-pulse shadow-[0_0_8px_hsl(var(--primary)_/_0.4)]'
                           : ''
                       }`}
@@ -871,97 +691,20 @@ export default function Dashboard() {
                     />
                   </div>
                   
-                  {data?.vesting?.players && data.vesting.players.length > 0 ? (
-                    <>
-                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
-                        {data.vesting.players.map((entry, idx) => entry.player && (
-                          <div key={entry.player.id} className="flex items-center gap-2 p-1.5 rounded-md bg-muted text-xs">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium truncate">
-                                <PlayerName 
-                                  playerId={entry.player.id} 
-                                  firstName={entry.player.firstName} 
-                                  lastName={entry.player.lastName}
-                                  className="text-xs"
-                                />
-                              </div>
-                              <div className="text-[10px] text-muted-foreground">{entry.sharesPerHour} sh/hr</div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setShowPlayerSelection(true)}
-                          data-testid="button-change-vesting-players"
-                          className="flex-1"
-                        >
-                          Change
-                        </Button>
-                        <AnimatedButton 
-                          className="flex-1" 
-                          size="sm"
-                          disabled={!projectedShares}
-                          isLoading={claimVestingMutation.isPending}
-                          isSuccess={claimVestingMutation.isSuccess}
-                          loadingText="Claiming..."
-                          successText="Claimed!"
-                          onClick={() => claimVestingMutation.mutate()}
-                          data-testid="button-claim-vesting"
-                        >
-                          Claim {projectedShares}
-                        </AnimatedButton>
-                      </div>
-                    </>
-                  ) : data?.vesting?.player ? (
-                    <>
-                      <div className="flex items-center gap-2 p-2 rounded-md bg-muted">
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium truncate">{data.vesting.player.firstName} {data.vesting.player.lastName}</div>
-                          <div className="text-xs text-muted-foreground">{data.vesting.player.team} · {data.vesting.player.position}</div>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setShowPlayerSelection(true)}
-                          data-testid="button-change-vesting-player"
-                          className="flex-shrink-0"
-                        >
-                          Change
-                        </Button>
-                      </div>
-                      
-                      <AnimatedButton 
-                        className="w-full" 
-                        size="lg"
-                        disabled={!projectedShares}
-                        isLoading={claimVestingMutation.isPending}
-                        isSuccess={claimVestingMutation.isSuccess}
-                        loadingText="Claiming..."
-                        successText="Claimed!"
-                        onClick={() => claimVestingMutation.mutate()}
-                        data-testid="button-claim-vesting"
-                      >
-                        Claim {projectedShares} Shares
-                      </AnimatedButton>
-                    </>
-                  ) : (
-                    <div className="text-center py-3">
-                      <Clock className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-xs text-muted-foreground mb-3">No players selected for vesting</p>
-                      <Button 
-                        className="w-full" 
-                        size="lg"
-                        onClick={() => setShowPlayerSelection(true)}
-                        data-testid="button-select-vesting-player"
-                      >
-                        Select Players to Vest
-                      </Button>
-                    </div>
-                  )}
+                  <div className="text-center py-2">
+                    <p className="text-xs text-muted-foreground mb-3">
+                      Shares accrue automatically. Vest them to your favorite players anytime.
+                    </p>
+                    <Button 
+                      className="w-full" 
+                      size="lg"
+                      disabled={projectedShares === 0}
+                      onClick={() => openRedemptionModal()}
+                      data-testid="button-vest-shares-dashboard"
+                    >
+                      Vest {projectedShares} Shares
+                    </Button>
+                  </div>
                 </>
               )}
             </CardContent>
@@ -1060,392 +803,7 @@ export default function Dashboard() {
       </div>
       </div>
 
-      {/* Player Selection Dialog */}
-      <Dialog open={showPlayerSelection} onOpenChange={(open) => {
-        setShowPlayerSelection(open);
-        if (!open) {
-          setSelectedPlayers([]);
-        } else {
-          // Pre-populate selected players when opening dialog
-          if (data?.vesting?.players && data.vesting.players.length > 0) {
-            const activePlayers = data.vesting.players
-              .map(p => p.player)
-              .filter((p): p is Player => p !== undefined);
-            setSelectedPlayers(activePlayers);
-          } else if (data?.vesting?.player) {
-            // Legacy single-player mode - add the single player
-            setSelectedPlayers([data.vesting.player]);
-          }
-        }
-      }}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>Select Players to Vest ({selectedPlayers.length}/10)</DialogTitle>
-            <DialogDescription>
-              Choose up to 10 players to vest shares. Total rate is 100 shares/hour distributed equally across selected players.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {/* Search and Filter */}
-          <div className="flex flex-col sm:flex-row gap-3 px-1">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                placeholder="Search players..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-                data-testid="input-search-players"
-              />
-            </div>
-            <Select value={selectedTeam} onValueChange={setSelectedTeam}>
-              <SelectTrigger className="w-full sm:w-40" data-testid="select-team-filter">
-                <SelectValue placeholder="All Teams" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" data-testid="team-option-all">All Teams</SelectItem>
-                {uniqueTeams.map((team) => (
-                  <SelectItem key={team} value={team} data-testid={`team-option-${team}`}>{team}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Sort Controls */}
-          <div className="px-1">
-            <div className="text-xs font-medium text-muted-foreground mb-1.5">Sort by:</div>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                size="sm"
-                variant={sortField === 'name' ? 'default' : 'outline'}
-                onClick={() => {
-                  if (sortField === 'name') {
-                    setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
-                  } else {
-                    setSortField('name');
-                    setSortDirection('desc');
-                  }
-                }}
-                className="text-xs h-7"
-                data-testid="button-sort-name"
-              >
-                Name {sortField === 'name' && <ArrowUpDown className="w-3 h-3 ml-1" />}
-              </Button>
-              <Button
-                size="sm"
-                variant={sortField === 'fantasyPoints' ? 'default' : 'outline'}
-                onClick={() => {
-                  if (sortField === 'fantasyPoints') {
-                    setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
-                  } else {
-                    setSortField('fantasyPoints');
-                    setSortDirection('desc');
-                  }
-                }}
-                className="text-xs h-7"
-                data-testid="button-sort-fantasy-points"
-              >
-                Fantasy Pts/G {sortField === 'fantasyPoints' && <ArrowUpDown className="w-3 h-3 ml-1" />}
-              </Button>
-              <Button
-                size="sm"
-                variant={sortField === 'marketValue' ? 'default' : 'outline'}
-                onClick={() => {
-                  if (sortField === 'marketValue') {
-                    setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
-                  } else {
-                    setSortField('marketValue');
-                    setSortDirection('desc');
-                  }
-                }}
-                className="text-xs h-7"
-                data-testid="button-sort-market-value"
-              >
-                Market Value {sortField === 'marketValue' && <ArrowUpDown className="w-3 h-3 ml-1" />}
-              </Button>
-            </div>
-          </div>
-
-          {/* Selected Players List */}
-          {selectedPlayers.length > 0 && (
-            <div className="px-1 pb-2 border-b">
-              <div className="text-xs font-medium text-muted-foreground mb-2">Selected Players:</div>
-              <div className="flex flex-wrap gap-1.5">
-                {selectedPlayers.map((player) => (
-                  <Badge 
-                    key={player.id} 
-                    variant="secondary"
-                    className="text-xs px-2 py-1 cursor-pointer hover-elevate"
-                    onClick={() => setSelectedPlayers(prev => prev.filter(p => p.id !== player.id))}
-                    data-testid={`badge-selected-player-${player.id}`}
-                  >
-                    {player.firstName} {player.lastName} ({Math.floor(100 / selectedPlayers.length)} sh/hr) ×
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="overflow-y-auto flex-1 px-1">
-            <div className="space-y-2">
-              {filteredPlayers.map((player, index) => {
-                const isSelected = selectedPlayers.some(p => p.id === player.id);
-                const items = [
-                  <PlayerCard
-                    key={player.id}
-                    player={player}
-                    isExpanded={expandedPlayerId === player.id}
-                    onToggleExpand={() => setExpandedPlayerId(
-                      expandedPlayerId === player.id ? null : player.id
-                    )}
-                    onSelect={() => {
-                      if (isSelected) {
-                        setSelectedPlayers(prev => prev.filter(p => p.id !== player.id));
-                      } else if (selectedPlayers.length < 10) {
-                        setSelectedPlayers(prev => [...prev, player]);
-                      } else {
-                        toast({
-                          title: "Maximum Reached",
-                          description: "You can select up to 10 players",
-                          variant: "destructive",
-                        });
-                      }
-                    }}
-                    isPending={startVestingMutation.isPending}
-                    isSelected={isSelected}
-                  />
-                ];
-                
-                // Insert ad every 6 players
-                if ((index + 1) % 6 === 0 && index < filteredPlayers.length - 1) {
-                  items.push(
-                    <div key={`ad-${index}`} className="my-2">
-                      <WhopAd isPremium={isPremiumUser} />
-                    </div>
-                  );
-                }
-                
-                return items;
-              })}
-            </div>
-            {filteredPlayers.length === 0 && (
-              <div className="text-center py-6 text-muted-foreground">
-                <BarChart3 className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>No players found matching your criteria</p>
-              </div>
-            )}
-          </div>
-
-          {/* Confirm Button */}
-          <div className="px-1 pt-3 border-t">
-            <AnimatedButton
-              className="w-full"
-              disabled={selectedPlayers.length === 0}
-              isLoading={startVestingMutation.isPending}
-              isSuccess={startVestingMutation.isSuccess}
-              loadingText="Starting..."
-              successText="Vesting Started!"
-              onClick={() => startVestingMutation.mutate(selectedPlayers.map(p => p.id))}
-              data-testid="button-confirm-vesting-selection"
-            >
-              Start Vesting {selectedPlayers.length} Player{selectedPlayers.length !== 1 ? 's' : ''}
-            </AnimatedButton>
-          </div>
-        </DialogContent>
-      </Dialog>
     </>
-  );
-}
-
-// Player Card Component with Stats and Recent Games
-function PlayerCard({ 
-  player, 
-  isExpanded, 
-  onToggleExpand, 
-  onSelect, 
-  isPending,
-  isSelected = false,
-}: { 
-  player: Player; 
-  isExpanded: boolean; 
-  onToggleExpand: () => void; 
-  onSelect: () => void; 
-  isPending: boolean;
-  isSelected?: boolean;
-}) {
-  const { data: statsData, isLoading: statsLoading } = useQuery<any>({
-    queryKey: ["/api/player", player.id, "stats"],
-    enabled: isExpanded,
-  });
-
-  const { data: recentGamesData, isLoading: gamesLoading } = useQuery<any>({
-    queryKey: ["/api/player", player.id, "recent-games"],
-    enabled: isExpanded,
-  });
-
-  const stats = statsData?.stats;
-  const recentGames = recentGamesData?.recentGames || [];
-
-  return (
-    <Card className="hover-elevate">
-      <Collapsible open={isExpanded} onOpenChange={onToggleExpand}>
-        <div className="p-4">
-          <div className="flex items-start gap-3">
-            <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-              <span className="text-lg font-bold">{player.firstName[0]}{player.lastName[0]}</span>
-            </div>
-            
-            <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2 mb-1">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{player.firstName} {player.lastName}</div>
-                  <div className="text-sm text-muted-foreground">{player.team} · {player.position}</div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                    <span className="font-mono">
-                      <span className="font-bold">{(player as any).avgFantasyPointsPerGame || "0.0"}</span> FPG
-                    </span>
-                    <span>·</span>
-                    {player.lastTradePrice ? (
-                      <AnimatedPrice 
-                        value={parseFloat(player.lastTradePrice)} 
-                        size="sm" 
-                        className="font-mono font-bold"
-                      />
-                    ) : (
-                      <span className="text-muted-foreground">No value</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-              
-              {/* Season Averages */}
-              {stats && !statsLoading ? (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
-                  <span className="font-mono"><span className="font-bold">{stats.pointsPerGame || "0.0"}</span> PPG</span>
-                  <span className="font-mono"><span className="font-bold">{stats.reboundsPerGame || "0.0"}</span> RPG</span>
-                  <span className="font-mono"><span className="font-bold">{stats.assistsPerGame || "0.0"}</span> APG</span>
-                  <span className="text-muted-foreground/60">·</span>
-                  <span>{stats.gamesPlayed || 0} GP</span>
-                </div>
-              ) : isExpanded && statsLoading ? (
-                <div className="text-xs text-muted-foreground mt-2">Loading stats...</div>
-              ) : null}
-            </div>
-
-            <div className="flex flex-col gap-2 flex-shrink-0">
-              <CollapsibleTrigger asChild>
-                <Button 
-                  size="sm" 
-                  variant="ghost"
-                  className="h-8 w-8 p-0"
-                  data-testid={`button-expand-player-${player.id}`}
-                >
-                  <ChevronDown className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                </Button>
-              </CollapsibleTrigger>
-              <Button
-                size="sm"
-                variant={isSelected ? "default" : "outline"}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelect();
-                }}
-                disabled={isPending}
-                data-testid={`button-select-player-${player.id}`}
-                className="whitespace-nowrap"
-              >
-                {isPending ? "..." : isSelected ? "✓ Added" : "Add"}
-              </Button>
-            </div>
-          </div>
-
-          <CollapsibleContent>
-            {isExpanded && (
-              <div className="mt-4 pt-4 border-t space-y-3">
-                {/* Full Season Stats */}
-                {stats && (
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                      Season Stats
-                    </div>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="text-center p-2 rounded-md bg-muted/50">
-                        <div className="text-xs text-muted-foreground">FG%</div>
-                        <div className="font-mono font-bold">{stats.fieldGoalPct || "0.0"}%</div>
-                      </div>
-                      <div className="text-center p-2 rounded-md bg-muted/50">
-                        <div className="text-xs text-muted-foreground">3P%</div>
-                        <div className="font-mono font-bold">{stats.threePointPct || "0.0"}%</div>
-                      </div>
-                      <div className="text-center p-2 rounded-md bg-muted/50">
-                        <div className="text-xs text-muted-foreground">FT%</div>
-                        <div className="font-mono font-bold">{stats.freeThrowPct || "0.0"}%</div>
-                      </div>
-                      <div className="text-center p-2 rounded-md bg-muted/50">
-                        <div className="text-xs text-muted-foreground">STL</div>
-                        <div className="font-mono font-bold">{stats.steals || 0}</div>
-                      </div>
-                      <div className="text-center p-2 rounded-md bg-muted/50">
-                        <div className="text-xs text-muted-foreground">BLK</div>
-                        <div className="font-mono font-bold">{stats.blocks || 0}</div>
-                      </div>
-                      <div className="text-center p-2 rounded-md bg-muted/50">
-                        <div className="text-xs text-muted-foreground">MPG</div>
-                        <div className="font-mono font-bold">{stats.minutesPerGame || "0.0"}</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Last 5 Games */}
-                {recentGames.length > 0 && (
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-                      Last 5 Games
-                    </div>
-                    <div className="space-y-2">
-                      {recentGames.map((game: any, idx: number) => (
-                        <div 
-                          key={idx} 
-                          className="flex items-center justify-between p-2 rounded-md bg-muted/30 text-xs"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium w-12">{game.game?.isHome ? 'vs' : '@'} {game.game?.opponent || "UNK"}</span>
-                            <span className="text-muted-foreground">
-                              {game.game?.date ? new Date(game.game.date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : "N/A"}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3 font-mono">
-                            <span className="font-bold">{game.stats?.points || 0} PTS</span>
-                            <span className="text-muted-foreground">{game.stats?.rebounds || 0} REB</span>
-                            <span className="text-muted-foreground">{game.stats?.assists || 0} AST</span>
-                            <span className="text-muted-foreground text-[10px]">
-                              {game.stats?.fieldGoalsMade || 0}/{game.stats?.fieldGoalsAttempted || 0} FG
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {gamesLoading && (
-                  <div className="text-xs text-center text-muted-foreground py-4">
-                    Loading recent games...
-                  </div>
-                )}
-                
-                {!gamesLoading && recentGames.length === 0 && isExpanded && (
-                  <div className="text-xs text-center text-muted-foreground py-4">
-                    No recent games available
-                  </div>
-                )}
-              </div>
-            )}
-          </CollapsibleContent>
-        </div>
-        </Collapsible>
-      </Card>
   );
 }
 

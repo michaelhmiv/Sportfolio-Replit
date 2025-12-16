@@ -79,13 +79,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     const miningData = await storage.getMining(userId);
     if (!miningData) return;
-    
-    // Check if using multi-player vesting (splits)
-    const splits = await storage.getMiningSplits(userId);
-    const usingSplits = splits.length > 0;
-    
-    // If using splits but no splits configured, or using single player but no player selected, return
-    if (!usingSplits && !miningData.playerId) return;
 
     const now = new Date();
     // Premium users get double rate (200 shares/hour) and double cap (4800)
@@ -2334,6 +2327,252 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalSharesClaimed: totalDistributed,
         players: claimedPlayers,
       });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // NEW: Pool-based vesting redeem endpoint
+  // Users choose which players to assign their pooled shares to
+  app.post("/api/vesting/redeem", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Accrue any final shares before redeeming
+      await accrueVestingShares(user.id);
+
+      const miningData = await storage.getMining(user.id);
+      if (!miningData || miningData.sharesAccumulated === 0) {
+        return res.status(400).json({ error: "No shares to redeem" });
+      }
+
+      // distributions: [{ playerId: string, shares: number }, ...]
+      const { distributions } = req.body;
+
+      if (!distributions || !Array.isArray(distributions) || distributions.length === 0) {
+        return res.status(400).json({ error: "distributions array required" });
+      }
+
+      // Validate total shares don't exceed available
+      const totalRequested = distributions.reduce((sum: number, d: any) => sum + (d.shares || 0), 0);
+      if (totalRequested > miningData.sharesAccumulated) {
+        return res.status(400).json({ 
+          error: `Cannot redeem ${totalRequested} shares. Only ${miningData.sharesAccumulated} available.` 
+        });
+      }
+
+      if (totalRequested === 0) {
+        return res.status(400).json({ error: "Must redeem at least 1 share" });
+      }
+
+      // Validate all players exist and get their data
+      const playerIds = distributions.map((d: any) => d.playerId);
+      const playersData = await storage.getPlayersByIds(playerIds);
+      const playerMap = new Map(playersData.map(p => [p.id, p]));
+
+      for (const dist of distributions) {
+        if (!playerMap.has(dist.playerId)) {
+          return res.status(400).json({ error: `Player ${dist.playerId} not found` });
+        }
+        if (!Number.isInteger(dist.shares) || dist.shares < 0) {
+          return res.status(400).json({ error: "Shares must be non-negative integers" });
+        }
+      }
+
+      // Get existing holdings for batch update
+      const existingHoldings = await storage.getBatchHoldings(user.id, "player", playerIds);
+      const redeemedPlayers = [];
+      let totalRedeemed = 0;
+
+      // Distribute shares to players
+      for (const dist of distributions) {
+        if (dist.shares === 0) continue;
+
+        const player = playerMap.get(dist.playerId);
+        const holding = existingHoldings.get(dist.playerId);
+
+        if (holding) {
+          const newQuantity = holding.quantity + dist.shares;
+          const newTotalCost = parseFloat(holding.totalCostBasis); // Vested shares have $0 cost
+          const newAvgCost = newQuantity > 0 ? newTotalCost / newQuantity : 0;
+          await storage.updateHolding(user.id, "player", dist.playerId, newQuantity, newAvgCost.toFixed(4));
+        } else {
+          await storage.updateHolding(user.id, "player", dist.playerId, dist.shares, "0.0000");
+        }
+
+        // Record claim for activity timeline
+        await storage.createMiningClaim({
+          userId: user.id,
+          playerId: dist.playerId,
+          sharesClaimed: dist.shares,
+        });
+
+        redeemedPlayers.push({
+          playerId: dist.playerId,
+          playerName: `${player!.firstName} ${player!.lastName}`,
+          sharesRedeemed: dist.shares,
+        });
+        totalRedeemed += dist.shares;
+      }
+
+      // Increment total shares mined counter
+      await storage.incrementTotalSharesMined(user.id, totalRedeemed);
+
+      // Update mining - subtract redeemed shares, keep remaining in pool
+      const now = new Date();
+      const remainingShares = miningData.sharesAccumulated - totalRedeemed;
+      await storage.updateMining(user.id, {
+        sharesAccumulated: remainingShares,
+        lastClaimedAt: now,
+        updatedAt: now,
+        // Only clear cap if we have room now
+        capReachedAt: remainingShares < (user.isPremium ? 4800 : 2400) ? null : miningData.capReachedAt,
+      });
+
+      broadcast({ type: "portfolio", userId: user.id });
+      broadcast({ type: "vesting", userId: user.id, redeemed: totalRedeemed, remaining: remainingShares });
+
+      res.json({
+        success: true,
+        totalSharesRedeemed: totalRedeemed,
+        remainingShares,
+        players: redeemedPlayers,
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Vesting presets CRUD
+  app.get("/api/vesting/presets", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const presets = await storage.getVestingPresets(userId);
+      
+      // Enrich with player data
+      const allPlayerIds = [...new Set(presets.flatMap(p => p.playerIds))];
+      const players = await storage.getPlayersByIds(allPlayerIds);
+      const playerMap = new Map(players.map(p => [p.id, p]));
+
+      const enrichedPresets = presets.map(preset => ({
+        ...preset,
+        players: preset.playerIds.map(id => playerMap.get(id)).filter(Boolean),
+      }));
+
+      res.json({ presets: enrichedPresets });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/vesting/presets", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { name, playerIds } = req.body;
+
+      if (!name || typeof name !== "string" || name.trim().length === 0) {
+        return res.status(400).json({ error: "Preset name required" });
+      }
+
+      if (!playerIds || !Array.isArray(playerIds) || playerIds.length === 0) {
+        return res.status(400).json({ error: "At least one player required" });
+      }
+
+      if (playerIds.length > 20) {
+        return res.status(400).json({ error: "Maximum 20 players per preset" });
+      }
+
+      // Check preset limit
+      const existingCount = await storage.countVestingPresets(userId);
+      if (existingCount >= 20) {
+        return res.status(400).json({ error: "Maximum 20 presets allowed" });
+      }
+
+      // Validate all players exist
+      const players = await storage.getPlayersByIds(playerIds);
+      if (players.length !== playerIds.length) {
+        return res.status(400).json({ error: "One or more players not found" });
+      }
+
+      const preset = await storage.createVestingPreset({
+        userId,
+        name: name.trim(),
+        playerIds,
+      });
+
+      res.json({ 
+        preset: {
+          ...preset,
+          players,
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/vesting/presets/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const presetId = req.params.id;
+      const { name, playerIds } = req.body;
+
+      const existing = await storage.getVestingPreset(presetId);
+      if (!existing || existing.userId !== userId) {
+        return res.status(404).json({ error: "Preset not found" });
+      }
+
+      const updates: any = {};
+      if (name && typeof name === "string") {
+        updates.name = name.trim();
+      }
+      if (playerIds && Array.isArray(playerIds)) {
+        if (playerIds.length === 0) {
+          return res.status(400).json({ error: "At least one player required" });
+        }
+        if (playerIds.length > 20) {
+          return res.status(400).json({ error: "Maximum 20 players per preset" });
+        }
+        const players = await storage.getPlayersByIds(playerIds);
+        if (players.length !== playerIds.length) {
+          return res.status(400).json({ error: "One or more players not found" });
+        }
+        updates.playerIds = playerIds;
+      }
+
+      const updated = await storage.updateVestingPreset(presetId, updates);
+      if (!updated) {
+        return res.status(500).json({ error: "Failed to update preset" });
+      }
+
+      const players = await storage.getPlayersByIds(updated.playerIds);
+      res.json({ 
+        preset: {
+          ...updated,
+          players,
+        }
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/vesting/presets/:id", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const presetId = req.params.id;
+
+      const existing = await storage.getVestingPreset(presetId);
+      if (!existing || existing.userId !== userId) {
+        return res.status(404).json({ error: "Preset not found" });
+      }
+
+      const deleted = await storage.deleteVestingPreset(presetId);
+      res.json({ success: deleted });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }

@@ -44,6 +44,9 @@ import logoUrl from "@assets/Sportfolio png_1763227952318.png";
 import { LogOut, User } from "lucide-react";
 import { SiDiscord } from "react-icons/si";
 import { SchemaOrg, schemas } from "@/components/schema-org";
+import { VestingWidget } from "@/components/vesting-widget";
+import { RedemptionModal } from "@/components/redemption-modal";
+import { VestingProvider, useVesting } from "@/lib/vesting-context";
 
 function OnboardingCheck() {
   const { user, isAuthenticated } = useAuth();
@@ -169,7 +172,7 @@ function Router() {
   );
 }
 
-function Header() {
+function Header({ onVestShares }: { onVestShares: () => void }) {
   const { user, isAuthenticated } = useAuth();
   const { subscribe } = useWebSocket();
   const { data: dashboardData } = useQuery<{ user: { balance: string; portfolioValue: string } }>({ 
@@ -203,9 +206,13 @@ function Header() {
         </div>
         <div className="flex items-center gap-2">
           <img src={logoUrl} alt="Sportfolio" className="w-10 h-10" />
-          <span className="text-xl font-extrabold tracking-tight text-primary">
-            Sportfolio
-          </span>
+          {isAuthenticated ? (
+            <VestingWidget onVestShares={onVestShares} className="hidden sm:flex" />
+          ) : (
+            <span className="text-xl font-extrabold tracking-tight text-primary">
+              Sportfolio
+            </span>
+          )}
         </div>
         <div className="hidden sm:flex items-center gap-2 text-sm">
           <span className="font-medium">Balance:</span>
@@ -274,38 +281,53 @@ function Header() {
   );
 }
 
-function App() {
+function AppContent() {
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
+  
+  const { openRedemptionModal, redemptionModalOpen, setRedemptionModalOpen, preselectedPlayerIds } = useVesting();
 
+  return (
+    <SidebarProvider style={style as React.CSSProperties}>
+      <div className="flex h-screen w-full overflow-x-hidden">
+        <div className="hidden sm:flex">
+          <AppSidebar />
+        </div>
+        <div className="flex flex-col flex-1 overflow-x-hidden">
+          <Header onVestShares={() => openRedemptionModal()} />
+          <main className="flex-1 overflow-y-auto overflow-x-hidden pb-0 sm:pb-0 flex flex-col">
+            <div className="pb-20 sm:pb-0 flex-1">
+              <Router />
+            </div>
+            <Footer />
+          </main>
+        </div>
+      </div>
+      <BottomNav />
+      <OnboardingCheck />
+      <RedemptionModal 
+        open={redemptionModalOpen} 
+        onOpenChange={setRedemptionModalOpen}
+        preselectedPlayerIds={preselectedPlayerIds}
+      />
+    </SidebarProvider>
+  );
+}
+
+function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <SchemaOrg schema={[schemas.organization, schemas.website, schemas.webApplication]} />
       <WebSocketProvider>
         <NotificationProvider>
           <TooltipProvider>
-            <SidebarProvider style={style as React.CSSProperties}>
-            <div className="flex h-screen w-full overflow-x-hidden">
-              <div className="hidden sm:flex">
-                <AppSidebar />
-              </div>
-              <div className="flex flex-col flex-1 overflow-x-hidden">
-                <Header />
-                <main className="flex-1 overflow-y-auto overflow-x-hidden pb-0 sm:pb-0 flex flex-col">
-                  <div className="pb-20 sm:pb-0 flex-1">
-                    <Router />
-                  </div>
-                  <Footer />
-                </main>
-              </div>
-            </div>
-            <BottomNav />
-            <OnboardingCheck />
-          </SidebarProvider>
-          <Toaster />
-        </TooltipProvider>
+            <VestingProvider>
+              <AppContent />
+              <Toaster />
+            </VestingProvider>
+          </TooltipProvider>
         </NotificationProvider>
       </WebSocketProvider>
     </QueryClientProvider>

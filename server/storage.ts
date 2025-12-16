@@ -9,6 +9,7 @@ import {
   mining,
   miningSplits,
   miningClaims,
+  vestingPresets,
   contests,
   contestEntries,
   contestLineups,
@@ -38,6 +39,8 @@ import {
   type InsertMiningSplit,
   type MiningClaim,
   type InsertMiningClaim,
+  type VestingPreset,
+  type InsertVestingPreset,
   type Contest,
   type InsertContest,
   type ContestEntry,
@@ -1315,6 +1318,56 @@ export class DatabaseStorage implements IStorage {
       .values(claim)
       .returning();
     return created;
+  }
+
+  // Vesting presets methods
+  async getVestingPresets(userId: string): Promise<VestingPreset[]> {
+    return await db
+      .select()
+      .from(vestingPresets)
+      .where(eq(vestingPresets.userId, userId))
+      .orderBy(asc(vestingPresets.name));
+  }
+
+  async getVestingPreset(presetId: string): Promise<VestingPreset | undefined> {
+    const [preset] = await db
+      .select()
+      .from(vestingPresets)
+      .where(eq(vestingPresets.id, presetId));
+    return preset || undefined;
+  }
+
+  async createVestingPreset(preset: InsertVestingPreset): Promise<VestingPreset> {
+    const [created] = await db
+      .insert(vestingPresets)
+      .values(preset)
+      .returning();
+    return created;
+  }
+
+  async updateVestingPreset(presetId: string, updates: Partial<InsertVestingPreset>): Promise<VestingPreset | undefined> {
+    const [updated] = await db
+      .update(vestingPresets)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(vestingPresets.id, presetId))
+      .returning();
+    return updated || undefined;
+  }
+
+  async deleteVestingPreset(presetId: string): Promise<boolean> {
+    const result = await db
+      .delete(vestingPresets)
+      .where(eq(vestingPresets.id, presetId))
+      .returning();
+    return result.length > 0;
+  }
+
+  async countVestingPresets(userId: string): Promise<number> {
+    const [result] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(vestingPresets)
+      .where(eq(vestingPresets.userId, userId));
+    return result?.count || 0;
   }
 
   // Activity methods

@@ -5,8 +5,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, ArrowRight } from "lucide-react";
+import { TrendingUp, ArrowRight, Gift } from "lucide-react";
 import { format } from "date-fns";
+import { useAuth } from "@/hooks/useAuth";
+import { useVesting } from "@/lib/vesting-context";
 
 interface PlayerModalProps {
   playerId: string | null;
@@ -59,6 +61,8 @@ interface RecentGame {
 
 export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) {
   const [gamesToShow, setGamesToShow] = useState(5);
+  const { isAuthenticated } = useAuth();
+  const { openRedemptionModal } = useVesting();
   
   // Fetch all player data
   const { data: statsData, isLoading: statsLoading } = useQuery<any>({
@@ -105,14 +109,30 @@ export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) 
                 <Skeleton className="h-5 w-48" />
               )}
             </DialogTitle>
-            {playerId && (
-              <Link href={`/player/${playerId}`} onClick={() => onOpenChange(false)}>
-                <Button size="sm" data-testid="button-trade-player">
-                  Trade
-                  <ArrowRight className="w-4 h-4 ml-1" />
+            <div className="flex items-center gap-2">
+              {playerId && isAuthenticated && (
+                <Button 
+                  size="sm" 
+                  variant="outline"
+                  onClick={() => {
+                    openRedemptionModal([playerId]);
+                    onOpenChange(false);
+                  }}
+                  data-testid="button-vest-player"
+                >
+                  <Gift className="w-4 h-4 mr-1" />
+                  Vest
                 </Button>
-              </Link>
-            )}
+              )}
+              {playerId && (
+                <Link href={`/player/${playerId}`} onClick={() => onOpenChange(false)}>
+                  <Button size="sm" data-testid="button-trade-player">
+                    Trade
+                    <ArrowRight className="w-4 h-4 ml-1" />
+                  </Button>
+                </Link>
+              )}
+            </div>
           </div>
         </DialogHeader>
 
