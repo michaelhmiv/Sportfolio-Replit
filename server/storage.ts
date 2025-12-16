@@ -517,6 +517,12 @@ export class DatabaseStorage implements IStorage {
           .set({ userId: newId })
           .where(eq(whopPayments.userId, oldId));
         
+        // Update blog posts (author)
+        await tx
+          .update(blogPosts)
+          .set({ authorId: newId })
+          .where(eq(blogPosts.authorId, oldId));
+        
         // Step 4: Delete the old user row (all FKs now point to new row)
         await tx.delete(users).where(eq(users.id, oldId));
         
