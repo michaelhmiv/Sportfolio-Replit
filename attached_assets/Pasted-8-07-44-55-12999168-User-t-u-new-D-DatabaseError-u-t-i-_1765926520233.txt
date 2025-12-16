@@ -1,0 +1,165 @@
+8:07:44.55
+12999168
+User
+t,u):new D.DatabaseError(u,t,i);return c.severity=s.S,c.code=s.C,c.detail=s.D,c.
+
+2025-12-16 18:07:44.55
+12999168
+User
+at v.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+2025-12-16 18:07:44.55
+12999168
+User
+file: 'ri_triggers.c',
+2025-12-16 18:07:44.55
+12999168
+User
+at cn.parseErrorMessage (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1182:6)
+2025-12-16 18:07:44.58
+12999168
+System
+command finished with error [npm run start]: exit status 1
+2025-12-16 18:07:47.35
+12999168
+User
+[SUPABASE_AUTH] Error upserting user: update or delete on table "users" violates foreign key constraint "blog_posts_author_id_fkey" on table "blog_posts"
+2025-12-16 18:07:47.35
+12999168
+User
+file: 'ri_triggers.c',
+2025-12-16 18:07:47.35
+12999168
+User
+at Receiver.receiverOnMessage (/home/runner/workspace/node_modules/ws/lib/websocket.js:1220:20) {
+2025-12-16 18:07:47.35
+12999168
+User
+at WebSocket.onMessage (/home/runner/workspace/node_modules/ws/lib/event-target.js:209:9)
+2025-12-16 18:07:47.35
+12999168
+User
+table: 'blog_posts',
+2025-12-16 18:07:47.35
+12999168
+User
+at v.emit (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:397:12)
+2025-12-16 18:07:47.35
+12999168
+User
+length: 297,
+2025-12-16 18:07:47.35
+12999168
+User
+detail: 'Key (id)=(39360579) is still referenced from table "blog_posts".',
+2025-12-16 18:07:47.35
+12999168
+User
+constraint: 'blog_posts_author_id_fkey',
+2025-12-16 18:07:47.35
+12999168
+User
+at cn.parse (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1127:36)
+2025-12-16 18:07:47.35
+12999168
+User
+file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1182
+2025-12-16 18:07:47.35
+12999168
+User
+line: '2621',
+2025-12-16 18:07:47.35
+12999168
+User
+error: update or delete on table "users" violates foreign key constraint "blog_posts_author_id_fkey" on table "blog_posts"
+2025-12-16 18:07:47.35
+12999168
+User
+schema: 'public',
+2025-12-16 18:07:47.35
+12999168
+User
+at cn.handlePacket (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1143:13)
+2025-12-16 18:07:47.35
+12999168
+User
+at WebSocket.emit (node:events:524:28)
+2025-12-16 18:07:47.35
+12999168
+User
+}
+2025-12-16 18:07:47.35
+12999168
+User
+t,u):new D.DatabaseError(u,t,i);return c.severity=s.S,c.code=s.C,c.detail=s.D,c.
+2025-12-16 18:07:47.35
+12999168
+User
+at callListener (/home/runner/workspace/node_modules/ws/lib/event-target.js:290:14)
+2025-12-16 18:07:47.35
+12999168
+User
+hint: undefined,
+2025-12-16 18:07:47.35
+12999168
+User
+routine: 'ri_ReportViolation'
+2025-12-16 18:07:47.35
+12999168
+User
+^
+2025-12-16 18:07:47.35
+12999168
+User
+at cn.parseErrorMessage (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1182:6)
+2025-12-16 18:07:47.35
+12999168
+User
+internalPosition: undefined,
+2025-12-16 18:07:47.35
+12999168
+User
+position: undefined,
+2025-12-16 18:07:47.35
+12999168
+User
+at WebSocket. (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:987:80)
+2025-12-16 18:07:47.35
+12999168
+User
+severity: 'ERROR',
+2025-12-16 18:07:47.35
+12999168
+User
+Node.js v20.19.3
+2025-12-16 18:07:47.35
+12999168
+User
+code: '23503',
+2025-12-16 18:07:47.35
+12999168
+User
+at v. (file:///home/runner/workspace/node_modules/@neondatabase/serverless/index.mjs:1190:16)
+2025-12-16 18:07:47.35
+12999168
+User
+where: undefined,
+2025-12-16 18:07:47.35
+12999168
+User
+internalQuery: undefined,
+2025-12-16 18:07:47.35
+12999168
+User
+column: undefined,
+2025-12-16 18:07:47.35
+12999168
+User
+dataType: undefined,
+2025-12-16 18:07:47.39
+12999168
+System
+command finished with error [npm run start]: exit status 1
+2025-12-16 18:07:53.45
+fcc4e0b5
+User
+[BotEngine] Market Maker Alpha taker failed: taker timed out after 30000ms
