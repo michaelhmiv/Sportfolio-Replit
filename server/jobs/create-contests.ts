@@ -11,7 +11,7 @@ import { storage } from "../storage";
 import { fetchDailyGames } from "../mysportsfeeds";
 import type { JobResult } from "./scheduler";
 import type { ProgressCallback } from "../lib/admin-stream";
-import { fromZonedTime } from "date-fns-tz";
+import { fromZonedTime, toZonedTime, format } from "date-fns-tz";
 
 interface GameDay {
   date: Date;
@@ -44,19 +44,25 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
     const gameDays = new Map<string, GameDay>();
     const now = new Date();
     
-    // Fetch games for each of the next 7 days
+    // Convert to Eastern Time to determine the current ET date
+    // NBA games are scheduled in ET, so we need to iterate from today in ET, not UTC
+    // This prevents skipping game days when the job runs at midnight UTC (7PM ET previous day)
+    const nowInET = toZonedTime(now, 'America/New_York');
+    
+    // Fetch games for each of the next 7 days (starting from today in ET)
     for (let i = 0; i < 7; i++) {
-      const date = new Date(now);
+      const date = new Date(nowInET);
       date.setDate(date.getDate() + i);
-      const dateStr = date.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
+      // Format as YYYYMMDD for MySportsFeeds API
+      const dateStr = format(date, 'yyyyMMdd', { timeZone: 'America/New_York' });
       
       try {
         const games = await fetchDailyGames(dateStr);
         requestCount++;
         
         if (games.length > 0) {
-          // Games exist for this date
-          const gameDateFormatted = date.toISOString().split('T')[0]; // YYYY-MM-DD
+          // Games exist for this date - format as YYYY-MM-DD for storage
+          const gameDateFormatted = format(date, 'yyyy-MM-dd', { timeZone: 'America/New_York' });
           
           // Find the earliest game time (start with high sentinel value)
           let earliestGameTime = new Date('9999-12-31');
