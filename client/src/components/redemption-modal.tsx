@@ -16,8 +16,12 @@ import { cn } from "@/lib/utils";
 import { Search, X, Trash2, Plus, Save, ChevronDown, ChevronUp, ArrowUpDown } from "lucide-react";
 import type { Player, VestingPreset } from "@shared/schema";
 
-type SortField = 'name' | 'price' | 'priceChange' | 'volume' | 'marketCap';
+type SortField = 'name' | 'price' | 'priceChange' | 'volume' | 'marketCap' | 'fantasyPoints';
 type SortDirection = 'asc' | 'desc';
+
+interface PlayerWithStats extends Player {
+  avgFantasyPointsPerGame?: string;
+}
 
 interface VestingData {
   vesting: {
@@ -30,7 +34,7 @@ interface VestingData {
 }
 
 interface PresetWithPlayers extends VestingPreset {
-  players: Player[];
+  players: PlayerWithStats[];
 }
 
 interface RedemptionModalProps {
@@ -40,7 +44,7 @@ interface RedemptionModalProps {
 }
 
 interface PlayerDistribution {
-  player: Player;
+  player: PlayerWithStats;
   shares: number;
   percentage: number;
 }
@@ -57,8 +61,9 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
   
   const [dirSearchQuery, setDirSearchQuery] = useState("");
   const [teamFilter, setTeamFilter] = useState<string>("all");
-  const [sortField, setSortField] = useState<SortField>("volume");
+  const [sortField, setSortField] = useState<SortField>("fantasyPoints");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [visibleLimit, setVisibleLimit] = useState(50);
 
   const isPremium = user?.isPremium || false;
   const capLimit = isPremium ? 4800 : 2400;
@@ -69,8 +74,17 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
     enabled: open,
   });
 
-  const { data: playersData } = useQuery<{ players: Player[] }>({
-    queryKey: ['/api/players'],
+  // Build query URL for server-side filtering - limit=1000 ensures full player access
+  const playerQueryUrl = useMemo(() => {
+    const params = new URLSearchParams();
+    params.set('limit', '1000');
+    if (dirSearchQuery) params.set('search', dirSearchQuery);
+    if (teamFilter !== 'all') params.set('team', teamFilter);
+    return `/api/players?${params.toString()}`;
+  }, [dirSearchQuery, teamFilter]);
+
+  const { data: playersData, isLoading: playersLoading } = useQuery<{ players: PlayerWithStats[], total: number }>({
+    queryKey: [playerQueryUrl],
     enabled: open,
   });
 
@@ -141,10 +155,16 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
       setActiveTab("directory");
       setDirSearchQuery("");
       setTeamFilter("all");
-      setSortField("volume");
+      setSortField("fantasyPoints");
       setSortDirection("desc");
+      setVisibleLimit(50);
     }
   }, [open]);
+
+  // Reset visible limit when search or filter changes
+  useEffect(() => {
+    setVisibleLimit(50);
+  }, [dirSearchQuery, teamFilter, sortField, sortDirection]);
 
   const filteredPlayers = useMemo(() => {
     if (!playersData?.players) return [];
@@ -159,24 +179,15 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
       .slice(0, 50);
   }, [playersData?.players, distributions, searchQuery]);
 
+  // Server-side filtering done via API, client-side sorting only (backend doesn't support fantasy pts sort)
   const directoryPlayers = useMemo(() => {
     if (!playersData?.players) return [];
     const selectedIds = new Set(distributions.map(d => d.player.id));
     
+    // Only filter out already-selected players (search/team done server-side)
     let filtered = playersData.players.filter(p => !selectedIds.has(p.id));
     
-    if (dirSearchQuery.length > 0) {
-      const query = dirSearchQuery.toLowerCase();
-      filtered = filtered.filter(p => 
-        `${p.firstName} ${p.lastName}`.toLowerCase().includes(query) ||
-        p.team?.toLowerCase().includes(query)
-      );
-    }
-    
-    if (teamFilter !== "all") {
-      filtered = filtered.filter(p => p.team === teamFilter);
-    }
-    
+    // Client-side sorting (backend may not support all sort fields like fantasyPoints)
     filtered.sort((a, b) => {
       let aVal: number | string = 0;
       let bVal: number | string = 0;
@@ -202,6 +213,10 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
           aVal = parseFloat(a.marketCap || '0');
           bVal = parseFloat(b.marketCap || '0');
           break;
+        case 'fantasyPoints':
+          aVal = parseFloat(a.avgFantasyPointsPerGame || '0');
+          bVal = parseFloat(b.avgFantasyPointsPerGame || '0');
+          break;
       }
       
       if (typeof aVal === 'string' && typeof bVal === 'string') {
@@ -215,8 +230,8 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
         : (bVal as number) - (aVal as number);
     });
     
-    return filtered.slice(0, 100);
-  }, [playersData?.players, distributions, dirSearchQuery, teamFilter, sortField, sortDirection]);
+    return filtered;
+  }, [playersData?.players, distributions, sortField, sortDirection]);
 
   const redeemMutation = useMutation({
     mutationFn: async (distributionList: { playerId: string; shares: number }[]) => {
@@ -232,6 +247,8 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
       });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
+      // Invalidate auth/user to update totalSharesMined and clear first-time indicator
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user?sync=true'] });
       onOpenChange(false);
     },
     onError: (error: Error) => {
@@ -428,10 +445,11 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
                   </SelectContent>
                 </Select>
                 <Select value={sortField} onValueChange={(v) => setSortField(v as SortField)}>
-                  <SelectTrigger className="w-[110px] h-9" data-testid="select-sort-field">
+                  <SelectTrigger className="w-[100px] h-9" data-testid="select-sort-field">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="fantasyPoints">FPTS</SelectItem>
                     <SelectItem value="volume">Volume</SelectItem>
                     <SelectItem value="price">Price</SelectItem>
                     <SelectItem value="priceChange">Change</SelectItem>
@@ -452,64 +470,87 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
             </div>
 
             <div className="text-xs text-muted-foreground px-1">
-              {directoryPlayers.length} players
-              {distributions.length > 0 && (
-                <span className="ml-2 text-primary font-medium">
-                  {distributions.length} selected
-                </span>
+              {playersLoading ? "Loading..." : (
+                <>
+                  Showing {Math.min(visibleLimit, directoryPlayers.length)} of {playersData?.total || directoryPlayers.length} players
+                  {distributions.length > 0 && (
+                    <span className="ml-2 text-primary font-medium">
+                      ({distributions.length} selected)
+                    </span>
+                  )}
+                </>
               )}
             </div>
 
             <ScrollArea className="flex-1 min-h-[280px] border rounded-md">
               <div className="divide-y">
-                {directoryPlayers.length === 0 ? (
+                {playersLoading ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    Loading players...
+                  </div>
+                ) : directoryPlayers.length === 0 ? (
                   <div className="py-8 text-center text-sm text-muted-foreground">
                     No players found
                   </div>
                 ) : (
-                  directoryPlayers.map(player => {
-                    const price = parseFloat(player.currentPrice || '0');
-                    const change = parseFloat(player.priceChange24h || '0');
-                    const volume = player.volume24h || 0;
-                    
-                    return (
-                      <div 
-                        key={player.id}
-                        className="flex items-center gap-2 px-2 py-1.5 hover-elevate text-sm"
-                        data-testid={`dir-player-${player.id}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <span className="font-medium truncate">
-                            {player.firstName} {player.lastName}
-                          </span>
-                        </div>
-                        <span className="text-xs text-muted-foreground w-10 shrink-0">
-                          {player.team}
-                        </span>
-                        <span className="text-xs font-mono w-14 text-right shrink-0">
-                          ${price.toFixed(2)}
-                        </span>
-                        <span className={cn(
-                          "text-xs font-mono w-12 text-right shrink-0",
-                          change > 0 ? "text-green-500" : change < 0 ? "text-red-500" : "text-muted-foreground"
-                        )}>
-                          {change > 0 ? '+' : ''}{change.toFixed(1)}%
-                        </span>
-                        <span className="text-xs font-mono w-10 text-right shrink-0 text-muted-foreground">
-                          {volume}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => addPlayer(player, true)}
-                          className="h-7 px-2"
-                          data-testid={`button-dir-add-${player.id}`}
+                  <>
+                    {directoryPlayers.slice(0, visibleLimit).map(player => {
+                      const price = parseFloat(player.currentPrice || '0');
+                      const change = parseFloat(player.priceChange24h || '0');
+                      const fpts = parseFloat(player.avgFantasyPointsPerGame || '0');
+                      
+                      return (
+                        <div 
+                          key={player.id}
+                          className="flex items-center gap-2 px-2 py-1.5 hover-elevate text-sm"
+                          data-testid={`dir-player-${player.id}`}
                         >
-                          <Plus className="h-3 w-3" />
+                          <div className="flex-1 min-w-0">
+                            <span className="font-medium truncate">
+                              {player.firstName} {player.lastName}
+                            </span>
+                          </div>
+                          <span className="text-xs text-muted-foreground w-10 shrink-0">
+                            {player.team}
+                          </span>
+                          <span className="text-xs font-mono w-14 text-right shrink-0">
+                            ${price.toFixed(2)}
+                          </span>
+                          <span className={cn(
+                            "text-xs font-mono w-12 text-right shrink-0",
+                            change > 0 ? "text-green-500" : change < 0 ? "text-red-500" : "text-muted-foreground"
+                          )}>
+                            {change > 0 ? '+' : ''}{change.toFixed(1)}%
+                          </span>
+                          <span className="text-xs font-mono w-10 text-right shrink-0 text-muted-foreground" title="Fantasy Points">
+                            {fpts.toFixed(1)}
+                          </span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => addPlayer(player, true)}
+                            className="h-7 px-2"
+                            data-testid={`button-dir-add-${player.id}`}
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                    {visibleLimit < directoryPlayers.length && (
+                      <div className="p-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setVisibleLimit(prev => prev + 50)}
+                          data-testid="button-load-more"
+                        >
+                          Load More ({directoryPlayers.length - visibleLimit} remaining)
                         </Button>
                       </div>
-                    );
-                  })
+                    )}
+                  </>
                 )}
               </div>
             </ScrollArea>

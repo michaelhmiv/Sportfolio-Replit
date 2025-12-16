@@ -18,8 +18,8 @@ const slides = [
     id: "vesting",
     icon: Clock,
     title: "VEST SHARES",
-    subtitle: "Earn player shares over time",
-    description: "Select up to 10 NBA players to vest. You'll automatically earn shares every hour - up to 2,400 shares per day. Claim them before they hit the cap!",
+    subtitle: "Earn player shares automatically",
+    description: "Shares accumulate in your pool automatically - up to 2,400 per day. Click the vesting widget in the nav bar to redeem them to any players you want. The widget will glow green until you vest for the first time!",
     color: "text-yellow-500",
   },
   {

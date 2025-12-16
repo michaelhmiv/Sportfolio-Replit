@@ -1104,8 +1104,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsedLimit = limit ? parseInt(limit as string) : 50;
       const parsedOffset = offset ? parseInt(offset as string) : 0;
       
-      // Guard against invalid numeric input (NaN)
-      const safeLimit = isNaN(parsedLimit) ? 50 : Math.max(1, Math.min(parsedLimit, 200));
+      // Guard against invalid numeric input (NaN) - allow up to 1000 for redemption modal
+      const safeLimit = isNaN(parsedLimit) ? 50 : Math.max(1, Math.min(parsedLimit, 1000));
       const safeOffset = isNaN(parsedOffset) ? 0 : Math.max(0, parsedOffset);
       
       // Parse sorting and filter params

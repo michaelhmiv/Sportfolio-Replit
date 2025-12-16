@@ -643,76 +643,9 @@ export default function Dashboard() {
         )}
 
         {/* Widgets Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-3">
-          {/* Vesting Widget */}
-          <ScrollReveal delay={0.15}>
-          <Card className="lg:col-span-1">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium uppercase tracking-wide">Vesting</CardTitle>
-              <Clock className="w-4 h-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent className="space-y-3 sm:space-y-4">
-              {!isAuthenticated ? (
-                <div className="text-center py-4">
-                  <Clock className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                  <p className="text-xs text-muted-foreground mb-3">Earn shares automatically over time</p>
-                  <Button 
-                    className="w-full" 
-                    size="lg"
-                    asChild
-                    data-testid="button-login-vesting"
-                  >
-                    <a href="/api/login" className="flex items-center justify-center gap-2">
-                      <LogIn className="w-4 h-4" />
-                      Sign In to Start Vesting
-                    </a>
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  {/* Pool-based vesting: shares accrue automatically to pool */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-muted-foreground">
-                        Rate: {data?.vesting?.sharesPerHour || (isPremiumUser ? 200 : 100)} sh/hr
-                      </span>
-                      <span className="text-xs text-muted-foreground font-mono">
-                        {projectedShares} / {data?.vesting?.capLimit || (isPremiumUser ? 4800 : 2400)}
-                      </span>
-                    </div>
-                    <Progress 
-                      value={(projectedShares / (data?.vesting?.capLimit || (isPremiumUser ? 4800 : 2400))) * 100} 
-                      className={`h-2 transition-all ${
-                        projectedShares > 0 && projectedShares < (data?.vesting?.capLimit || (isPremiumUser ? 4800 : 2400))
-                          ? 'animate-pulse shadow-[0_0_8px_hsl(var(--primary)_/_0.4)]'
-                          : ''
-                      }`}
-                      data-testid="progress-vesting"
-                    />
-                  </div>
-                  
-                  <div className="text-center py-2">
-                    <p className="text-xs text-muted-foreground mb-3">
-                      Shares accrue automatically. Vest them to your favorite players anytime.
-                    </p>
-                    <Button 
-                      className="w-full" 
-                      size="lg"
-                      disabled={projectedShares === 0}
-                      onClick={() => openRedemptionModal()}
-                      data-testid="button-vest-shares-dashboard"
-                    >
-                      Vest {projectedShares} Shares
-                    </Button>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
-          </ScrollReveal>
-
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
           {/* Market Activity */}
-          <ScrollReveal delay={0.25}>
+          <ScrollReveal delay={0.15}>
           <MarketActivityWidget />
           </ScrollReveal>
 
