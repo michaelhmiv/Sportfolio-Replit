@@ -420,8 +420,8 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
             <TabsTrigger value="presets" data-testid="tab-presets">Presets</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="directory" className="flex-1 flex flex-col min-h-0 mt-4 space-y-3">
-            <div className="flex flex-col sm:flex-row gap-2">
+          <TabsContent value="directory" className="flex-1 flex flex-col min-h-0 mt-4 gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 shrink-0">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -469,7 +469,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
               </div>
             </div>
 
-            <div className="text-xs text-muted-foreground px-1">
+            <div className="text-xs text-muted-foreground px-1 shrink-0">
               {playersLoading ? "Loading..." : (
                 <>
                   Showing {Math.min(visibleLimit, directoryPlayers.length)} of {playersData?.total || directoryPlayers.length} players
@@ -482,7 +482,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
               )}
             </div>
 
-            <div className="border rounded-md overflow-hidden flex-1" style={{ minHeight: '200px' }}>
+            <div className="border rounded-md overflow-hidden flex-1 min-h-0">
               <div className="h-full overflow-y-auto">
                 <div className="divide-y">
                   {playersLoading ? (
@@ -590,8 +590,8 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
             </div>
           </TabsContent>
 
-          <TabsContent value="allocate" className="flex-1 flex flex-col min-h-0 mt-4">
-            <div className="flex flex-col gap-3 mb-3">
+          <TabsContent value="allocate" className="flex-1 flex flex-col min-h-0 mt-4 gap-2">
+            <div className="flex flex-col gap-2 shrink-0">
               <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md p-2">
                 <span className="text-muted-foreground">Available:</span>
                 <span className="font-mono font-bold">{projectedShares.toLocaleString()}</span>
@@ -642,7 +642,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
               )}
             </div>
 
-            <div className="border rounded-md overflow-hidden flex-1 flex flex-col min-h-0 mb-3">
+            <div className="border rounded-md overflow-hidden flex-1 min-h-0">
               <div className="h-full overflow-y-auto">
                 <div className="divide-y">
                   {distributions.length === 0 ? (
@@ -696,7 +696,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
               </div>
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 shrink-0">
               {distributions.length > 0 && (
                 <div className="flex items-center gap-2">
                   <Button
@@ -742,8 +742,8 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
           </TabsContent>
 
           <TabsContent value="presets" className="flex-1 flex flex-col min-h-0 mt-4">
-            <ScrollArea className="flex-1 border rounded-md">
-              <div className="p-2 space-y-2">
+            <div className="border rounded-md overflow-hidden flex-1 min-h-0">
+              <div className="h-full overflow-y-auto p-2 space-y-2">
                 {!presetsData?.presets || presetsData.presets.length === 0 ? (
                   <div className="py-8 text-center text-sm text-muted-foreground">
                     No presets saved. Create one from the Allocate tab.
@@ -784,11 +784,11 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
                   ))
                 )}
               </div>
-            </ScrollArea>
+            </div>
           </TabsContent>
         </Tabs>
 
-        <DialogFooter className="mt-4">
+        <DialogFooter className="mt-4 shrink-0">
           <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
             Cancel
           </Button>
