@@ -482,78 +482,112 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
               )}
             </div>
 
-            <ScrollArea className="flex-1 h-[300px] sm:h-[350px] border rounded-md">
-              <div className="divide-y">
-                {playersLoading ? (
-                  <div className="py-8 text-center text-sm text-muted-foreground">
-                    Loading players...
-                  </div>
-                ) : directoryPlayers.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-muted-foreground">
-                    No players found
-                  </div>
-                ) : (
-                  <>
-                    {directoryPlayers.slice(0, visibleLimit).map(player => {
-                      const price = parseFloat(player.currentPrice || '0');
-                      const change = parseFloat(player.priceChange24h || '0');
-                      const fpts = parseFloat(player.avgFantasyPointsPerGame || '0');
-                      
-                      return (
-                        <div 
-                          key={player.id}
-                          className="flex items-center gap-1 sm:gap-2 px-2 py-1.5 hover-elevate text-sm"
-                          data-testid={`dir-player-${player.id}`}
-                        >
-                          <div className="flex-1 min-w-0">
-                            <span className="font-medium truncate block">
-                              {player.firstName} {player.lastName}
-                            </span>
-                          </div>
-                          <span className="text-xs text-muted-foreground w-8 sm:w-10 shrink-0 hidden sm:inline">
-                            {player.team}
-                          </span>
-                          <span className="text-xs font-mono w-12 sm:w-14 text-right shrink-0">
-                            ${price.toFixed(2)}
-                          </span>
-                          <span className={cn(
-                            "text-xs font-mono w-10 sm:w-12 text-right shrink-0 hidden sm:inline",
-                            change > 0 ? "text-green-500" : change < 0 ? "text-red-500" : "text-muted-foreground"
-                          )}>
-                            {change > 0 ? '+' : ''}{change.toFixed(1)}%
-                          </span>
-                          <span className="text-xs font-mono w-8 sm:w-10 text-right shrink-0 text-muted-foreground" title="Fantasy Points">
-                            {fpts.toFixed(1)}
-                          </span>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => addPlayer(player, true)}
-                            className="px-2 shrink-0"
-                            data-testid={`button-dir-add-${player.id}`}
+            <div className="border rounded-md overflow-hidden" style={{ height: '300px' }}>
+              <div className="h-full overflow-y-auto">
+                <div className="divide-y">
+                  {playersLoading ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      Loading players...
+                    </div>
+                  ) : directoryPlayers.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      No players found
+                    </div>
+                  ) : (
+                    <>
+                      {directoryPlayers.slice(0, visibleLimit).map(player => {
+                        const price = parseFloat(player.currentPrice || '0');
+                        const change = parseFloat(player.priceChange24h || '0');
+                        const fpts = parseFloat(player.avgFantasyPointsPerGame || '0');
+                        const volume = parseFloat(String(player.volume24h || '0'));
+                        const marketCap = parseFloat(String(player.marketCap || '0'));
+                        
+                        const getSortedStatValue = () => {
+                          switch (sortField) {
+                            case 'fantasyPoints':
+                              return fpts.toFixed(1);
+                            case 'marketCap':
+                              return marketCap >= 1000 ? `${(marketCap / 1000).toFixed(1)}K` : marketCap.toFixed(0);
+                            case 'volume':
+                              return volume >= 1000 ? `${(volume / 1000).toFixed(1)}K` : volume.toFixed(0);
+                            case 'priceChange':
+                              return `${change > 0 ? '+' : ''}${change.toFixed(1)}%`;
+                            case 'price':
+                              return `$${price.toFixed(2)}`;
+                            default:
+                              return fpts.toFixed(1);
+                          }
+                        };
+                        
+                        const getSortedStatColor = () => {
+                          if (sortField === 'priceChange') {
+                            return change > 0 ? "text-green-500" : change < 0 ? "text-red-500" : "text-muted-foreground";
+                          }
+                          return "text-green-500";
+                        };
+                        
+                        return (
+                          <div 
+                            key={player.id}
+                            className="flex items-center gap-1 sm:gap-2 px-2 py-1.5 hover-elevate text-sm"
+                            data-testid={`dir-player-${player.id}`}
                           >
-                            <Plus className="h-4 w-4" />
+                            <div className="flex-1 min-w-0">
+                              <span className="font-medium truncate block">
+                                {player.firstName} {player.lastName}
+                              </span>
+                            </div>
+                            <span className="text-xs text-muted-foreground w-8 sm:w-10 shrink-0 hidden sm:inline">
+                              {player.team}
+                            </span>
+                            <span className="text-xs font-mono w-12 sm:w-14 text-right shrink-0">
+                              ${price.toFixed(2)}
+                            </span>
+                            <span className={cn(
+                              "text-xs font-mono w-10 sm:w-12 text-right shrink-0 hidden sm:inline",
+                              change > 0 ? "text-green-500" : change < 0 ? "text-red-500" : "text-muted-foreground"
+                            )}>
+                              {change > 0 ? '+' : ''}{change.toFixed(1)}%
+                            </span>
+                            <span 
+                              className={cn(
+                                "text-xs font-mono w-10 sm:w-12 text-right shrink-0",
+                                getSortedStatColor()
+                              )} 
+                              title={sortField === 'fantasyPoints' ? 'Fantasy Points' : sortField === 'marketCap' ? 'Market Cap' : sortField === 'volume' ? 'Volume' : sortField}
+                            >
+                              {getSortedStatValue()}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => addPlayer(player, true)}
+                              className="px-2 shrink-0"
+                              data-testid={`button-dir-add-${player.id}`}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        );
+                      })}
+                      {visibleLimit < directoryPlayers.length && (
+                        <div className="p-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="w-full"
+                            onClick={() => setVisibleLimit(prev => prev + 50)}
+                            data-testid="button-load-more"
+                          >
+                            Load More ({directoryPlayers.length - visibleLimit} remaining)
                           </Button>
                         </div>
-                      );
-                    })}
-                    {visibleLimit < directoryPlayers.length && (
-                      <div className="p-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="w-full"
-                          onClick={() => setVisibleLimit(prev => prev + 50)}
-                          data-testid="button-load-more"
-                        >
-                          Load More ({directoryPlayers.length - visibleLimit} remaining)
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                )}
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-            </ScrollArea>
+            </div>
           </TabsContent>
 
           <TabsContent value="allocate" className="flex-1 flex flex-col min-h-0 mt-4 space-y-4">
@@ -606,8 +640,8 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
               </ScrollArea>
             )}
 
-            <ScrollArea className="flex-1 h-[250px] sm:h-[300px] border rounded-md">
-              <div className="p-2 space-y-2">
+            <div className="border rounded-md overflow-hidden" style={{ height: '250px' }}>
+              <div className="h-full overflow-y-auto p-2 space-y-2">
                 {distributions.length === 0 ? (
                   <div className="py-8 text-center text-sm text-muted-foreground">
                     Search and add players to allocate shares
@@ -678,7 +712,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
                   ))
                 )}
               </div>
-            </ScrollArea>
+            </div>
 
             {distributions.length > 0 && (
               <div className="flex items-center gap-2">
