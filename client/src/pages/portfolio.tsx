@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, authenticatedFetch } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import type { Holding, Order, Player } from "@shared/schema";
@@ -118,9 +118,7 @@ export default function Portfolio() {
   const { data: chartData } = useQuery<{ history: Array<{ date: string; cashBalance: number; portfolioValue: number; netWorth: number }>; timeRange: string }>({
     queryKey: ["/api/user/portfolio-history", chartTimeRange],
     queryFn: async () => {
-      const res = await fetch(`/api/user/portfolio-history?timeRange=${chartTimeRange}`, {
-        credentials: 'include'
-      });
+      const res = await authenticatedFetch(`/api/user/portfolio-history?timeRange=${chartTimeRange}`);
       if (!res.ok) throw new Error('Failed to fetch portfolio history');
       return res.json();
     },

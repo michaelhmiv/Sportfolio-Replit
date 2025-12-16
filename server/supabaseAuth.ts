@@ -44,15 +44,23 @@ async function upsertSupabaseUser(supabaseUser: SupabaseUser): Promise<void> {
     const firstName = supabaseUser.user_metadata?.first_name || nameParts[0] || null;
     const lastName = supabaseUser.user_metadata?.last_name || nameParts.slice(1).join(' ') || null;
     
+    // Check for existing user by ID or email to preserve their username
+    const existingUserById = await storage.getUser(supabaseUser.id);
+    const existingUserByEmail = supabaseUser.email ? await storage.getUserByEmail(supabaseUser.email) : null;
+    const existingUser = existingUserById || existingUserByEmail;
+    
+    // Only generate a new username for truly new users - preserve existing usernames
+    const username = existingUser?.username || supabaseUser.email?.split('@')[0] || `user_${supabaseUser.id.substring(0, 8)}`;
+    
     await storage.upsertUser({
       id: supabaseUser.id,
       email: supabaseUser.email || null,
       firstName,
       lastName,
       profileImageUrl: supabaseUser.user_metadata?.avatar_url || null,
-      username: supabaseUser.email?.split('@')[0] || `user_${supabaseUser.id.substring(0, 8)}`,
+      username,
     });
-    console.log(`[SUPABASE_AUTH] Upserted user: ${supabaseUser.email}`);
+    console.log(`[SUPABASE_AUTH] Upserted user: ${supabaseUser.email} (username: ${username}, preserved: ${!!existingUser?.username})`);
   } catch (error: any) {
     console.error('[SUPABASE_AUTH] Error upserting user:', error.message);
     throw error;

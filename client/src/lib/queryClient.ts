@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import { getSupabase } from "./supabase";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -7,14 +8,43 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+async function getAuthHeaders(): Promise<HeadersInit> {
+  try {
+    const supabase = await getSupabase();
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      return { 'Authorization': `Bearer ${session.access_token}` };
+    }
+  } catch (error) {
+    console.error('[AUTH] Failed to get auth headers:', error);
+  }
+  return {};
+}
+
+export async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  const authHeaders = await getAuthHeaders();
+  return fetch(url, {
+    ...options,
+    headers: {
+      ...authHeaders,
+      ...options.headers,
+    },
+    credentials: 'include',
+  });
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  const authHeaders = await getAuthHeaders();
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: {
+      ...authHeaders,
+      ...(data ? { "Content-Type": "application/json" } : {}),
+    },
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -35,6 +65,7 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const url = queryKey.join("/") as string;
+    const authHeaders = await getAuthHeaders();
     
     // For returnNull behavior, retry a few times with delays to let session sync up
     if (unauthorizedBehavior === "returnNull") {
@@ -42,7 +73,10 @@ export const getQueryFn: <T>(options: {
       const retryDelays = [500, 1000, 1500];
       
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        const res = await fetch(url, { credentials: "include" });
+        const res = await fetch(url, { 
+          credentials: "include",
+          headers: authHeaders,
+        });
         
         if (res.status === 401) {
           if (attempt < maxRetries) {
@@ -59,7 +93,10 @@ export const getQueryFn: <T>(options: {
     }
     
     // Standard behavior - no retry
-    const res = await fetch(url, { credentials: "include" });
+    const res = await fetch(url, { 
+      credentials: "include",
+      headers: authHeaders,
+    });
     await throwIfResNotOk(res);
     return await res.json();
   };
