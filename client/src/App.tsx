@@ -207,7 +207,10 @@ function Header({ onVestShares }: { onVestShares: () => void }) {
         <div className="flex items-center gap-2">
           <img src={logoUrl} alt="Sportfolio" className="w-10 h-10" />
           {isAuthenticated ? (
-            <VestingWidget onVestShares={onVestShares} className="hidden sm:flex" />
+            <>
+              <VestingWidget onVestShares={onVestShares} className="hidden sm:flex" />
+              <VestingWidget onVestShares={onVestShares} compact className="flex sm:hidden" />
+            </>
           ) : (
             <span className="text-xl font-extrabold tracking-tight text-primary">
               Sportfolio

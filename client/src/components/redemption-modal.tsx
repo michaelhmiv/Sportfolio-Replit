@@ -7,13 +7,17 @@ import { Slider } from "@/components/ui/slider";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { calculateVestingShares } from "@shared/vesting-utils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import { Search, X, Trash2, Plus, Save, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, X, Trash2, Plus, Save, ChevronDown, ChevronUp, ArrowUpDown } from "lucide-react";
 import type { Player, VestingPreset } from "@shared/schema";
+
+type SortField = 'name' | 'price' | 'priceChange' | 'volume' | 'marketCap';
+type SortDirection = 'asc' | 'desc';
 
 interface VestingData {
   vesting: {
@@ -49,6 +53,12 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
   const [projectedShares, setProjectedShares] = useState(0);
   const [newPresetName, setNewPresetName] = useState("");
   const [showPresetSave, setShowPresetSave] = useState(false);
+  const [activeTab, setActiveTab] = useState("directory");
+  
+  const [dirSearchQuery, setDirSearchQuery] = useState("");
+  const [teamFilter, setTeamFilter] = useState<string>("all");
+  const [sortField, setSortField] = useState<SortField>("volume");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const isPremium = user?.isPremium || false;
   const capLimit = isPremium ? 4800 : 2400;
@@ -61,6 +71,11 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
 
   const { data: playersData } = useQuery<{ players: Player[] }>({
     queryKey: ['/api/players'],
+    enabled: open,
+  });
+
+  const { data: teamsData } = useQuery<string[]>({
+    queryKey: ['/api/teams'],
     enabled: open,
   });
 
@@ -123,6 +138,11 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
       setSearchQuery("");
       setNewPresetName("");
       setShowPresetSave(false);
+      setActiveTab("directory");
+      setDirSearchQuery("");
+      setTeamFilter("all");
+      setSortField("volume");
+      setSortDirection("desc");
     }
   }, [open]);
 
@@ -138,6 +158,65 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
       )
       .slice(0, 50);
   }, [playersData?.players, distributions, searchQuery]);
+
+  const directoryPlayers = useMemo(() => {
+    if (!playersData?.players) return [];
+    const selectedIds = new Set(distributions.map(d => d.player.id));
+    
+    let filtered = playersData.players.filter(p => !selectedIds.has(p.id));
+    
+    if (dirSearchQuery.length > 0) {
+      const query = dirSearchQuery.toLowerCase();
+      filtered = filtered.filter(p => 
+        `${p.firstName} ${p.lastName}`.toLowerCase().includes(query) ||
+        p.team?.toLowerCase().includes(query)
+      );
+    }
+    
+    if (teamFilter !== "all") {
+      filtered = filtered.filter(p => p.team === teamFilter);
+    }
+    
+    filtered.sort((a, b) => {
+      let aVal: number | string = 0;
+      let bVal: number | string = 0;
+      
+      switch (sortField) {
+        case 'name':
+          aVal = `${a.firstName} ${a.lastName}`.toLowerCase();
+          bVal = `${b.firstName} ${b.lastName}`.toLowerCase();
+          break;
+        case 'price':
+          aVal = parseFloat(a.currentPrice || '0');
+          bVal = parseFloat(b.currentPrice || '0');
+          break;
+        case 'priceChange':
+          aVal = parseFloat(a.priceChange24h || '0');
+          bVal = parseFloat(b.priceChange24h || '0');
+          break;
+        case 'volume':
+          aVal = a.volume24h || 0;
+          bVal = b.volume24h || 0;
+          break;
+        case 'marketCap':
+          aVal = parseFloat(a.marketCap || '0');
+          bVal = parseFloat(b.marketCap || '0');
+          break;
+      }
+      
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDirection === 'asc' 
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      }
+      
+      return sortDirection === 'asc' 
+        ? (aVal as number) - (bVal as number)
+        : (bVal as number) - (aVal as number);
+    });
+    
+    return filtered.slice(0, 100);
+  }, [playersData?.players, distributions, dirSearchQuery, teamFilter, sortField, sortDirection]);
 
   const redeemMutation = useMutation({
     mutationFn: async (distributionList: { playerId: string; shares: number }[]) => {
@@ -202,9 +281,12 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
     },
   });
 
-  const addPlayer = (player: Player) => {
+  const addPlayer = (player: Player, switchToAllocate = false) => {
     const newDistributions = [...distributions, { player, shares: 0, percentage: 0 }];
     redistributeEvenly(newDistributions);
+    if (switchToAllocate) {
+      setActiveTab("allocate");
+    }
   };
 
   const removePlayer = (playerId: string) => {
@@ -262,6 +344,11 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
       shares: sharesPerPlayer + (index === 0 ? remainder : 0),
       percentage: 100 / preset.players.length,
     })));
+    setActiveTab("allocate");
+  };
+
+  const toggleSortDirection = () => {
+    setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
   };
 
   const handleRedeem = () => {
@@ -309,11 +396,124 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs defaultValue="allocate" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="allocate" data-testid="tab-allocate">Allocate Shares</TabsTrigger>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="directory" data-testid="tab-directory">Directory</TabsTrigger>
+            <TabsTrigger value="allocate" data-testid="tab-allocate">Allocate</TabsTrigger>
             <TabsTrigger value="presets" data-testid="tab-presets">Presets</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="directory" className="flex-1 flex flex-col min-h-0 mt-4 space-y-3">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search players..."
+                  value={dirSearchQuery}
+                  onChange={(e) => setDirSearchQuery(e.target.value)}
+                  className="pl-9 h-9"
+                  data-testid="input-dir-search"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Select value={teamFilter} onValueChange={setTeamFilter}>
+                  <SelectTrigger className="w-[120px] h-9" data-testid="select-team-filter">
+                    <SelectValue placeholder="Team" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Teams</SelectItem>
+                    {teamsData?.map(team => (
+                      <SelectItem key={team} value={team}>{team}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={sortField} onValueChange={(v) => setSortField(v as SortField)}>
+                  <SelectTrigger className="w-[110px] h-9" data-testid="select-sort-field">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="volume">Volume</SelectItem>
+                    <SelectItem value="price">Price</SelectItem>
+                    <SelectItem value="priceChange">Change</SelectItem>
+                    <SelectItem value="marketCap">Mkt Cap</SelectItem>
+                    <SelectItem value="name">Name</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={toggleSortDirection}
+                  className="h-9 w-9 shrink-0"
+                  data-testid="button-sort-direction"
+                >
+                  <ArrowUpDown className={cn("h-4 w-4", sortDirection === "asc" && "rotate-180")} />
+                </Button>
+              </div>
+            </div>
+
+            <div className="text-xs text-muted-foreground px-1">
+              {directoryPlayers.length} players
+              {distributions.length > 0 && (
+                <span className="ml-2 text-primary font-medium">
+                  {distributions.length} selected
+                </span>
+              )}
+            </div>
+
+            <ScrollArea className="flex-1 min-h-[280px] border rounded-md">
+              <div className="divide-y">
+                {directoryPlayers.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    No players found
+                  </div>
+                ) : (
+                  directoryPlayers.map(player => {
+                    const price = parseFloat(player.currentPrice || '0');
+                    const change = parseFloat(player.priceChange24h || '0');
+                    const volume = player.volume24h || 0;
+                    
+                    return (
+                      <div 
+                        key={player.id}
+                        className="flex items-center gap-2 px-2 py-1.5 hover-elevate text-sm"
+                        data-testid={`dir-player-${player.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <span className="font-medium truncate">
+                            {player.firstName} {player.lastName}
+                          </span>
+                        </div>
+                        <span className="text-xs text-muted-foreground w-10 shrink-0">
+                          {player.team}
+                        </span>
+                        <span className="text-xs font-mono w-14 text-right shrink-0">
+                          ${price.toFixed(2)}
+                        </span>
+                        <span className={cn(
+                          "text-xs font-mono w-12 text-right shrink-0",
+                          change > 0 ? "text-green-500" : change < 0 ? "text-red-500" : "text-muted-foreground"
+                        )}>
+                          {change > 0 ? '+' : ''}{change.toFixed(1)}%
+                        </span>
+                        <span className="text-xs font-mono w-10 text-right shrink-0 text-muted-foreground">
+                          {volume}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => addPlayer(player, true)}
+                          className="h-7 px-2"
+                          data-testid={`button-dir-add-${player.id}`}
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </ScrollArea>
+          </TabsContent>
 
           <TabsContent value="allocate" className="flex-1 flex flex-col min-h-0 mt-4 space-y-4">
             <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md p-2">

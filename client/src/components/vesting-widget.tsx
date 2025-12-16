@@ -21,9 +21,10 @@ interface VestingData {
 interface VestingWidgetProps {
   onVestShares?: () => void;
   className?: string;
+  compact?: boolean;
 }
 
-export function VestingWidget({ onVestShares, className }: VestingWidgetProps) {
+export function VestingWidget({ onVestShares, className, compact = false }: VestingWidgetProps) {
   const { openRedemptionModal } = useVesting();
   const { isAuthenticated, user } = useAuth();
   const [projectedShares, setProjectedShares] = useState(0);
@@ -79,6 +80,35 @@ export function VestingWidget({ onVestShares, className }: VestingWidgetProps) {
 
   const progress = (projectedShares / capLimit) * 100;
   const isAtCap = projectedShares >= capLimit;
+  const glowClass = isPremium ? "vesting-glow-premium" : "vesting-glow";
+
+  if (compact) {
+    return (
+      <button
+        onClick={() => {
+          if (onVestShares) onVestShares();
+          else openRedemptionModal();
+        }}
+        className={cn(
+          "flex items-center gap-2 px-2 py-1 rounded-md cursor-pointer",
+          glowClass,
+          className
+        )}
+        data-testid="button-vesting-widget-mobile"
+      >
+        <Progress 
+          value={progress} 
+          className={cn(
+            "h-2 w-16",
+            isAtCap && "bg-yellow-500/20"
+          )}
+        />
+        <span className="text-xs font-mono font-bold" data-testid="text-vesting-shares-mobile">
+          {projectedShares.toLocaleString()}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <Popover>

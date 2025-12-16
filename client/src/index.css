@@ -521,3 +521,30 @@
     background-color: hsl(0 0% 97%);
   }
 }
+
+/* 7. VESTING GLOW ANIMATION */
+@keyframes vesting-glow {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(34, 197, 94, 0.4), 0 0 8px rgba(34, 197, 94, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.6), 0 0 16px rgba(34, 197, 94, 0.3);
+  }
+}
+
+.vesting-glow {
+  animation: vesting-glow 2s ease-in-out infinite;
+}
+
+.vesting-glow-premium {
+  animation: vesting-glow-premium 2s ease-in-out infinite;
+}
+
+@keyframes vesting-glow-premium {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(234, 179, 8, 0.4), 0 0 8px rgba(234, 179, 8, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 8px rgba(234, 179, 8, 0.6), 0 0 16px rgba(234, 179, 8, 0.3);
+  }
+}
