@@ -590,57 +590,59 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
             </div>
           </TabsContent>
 
-          <TabsContent value="allocate" className="flex-1 flex flex-col min-h-0 mt-4 space-y-4">
-            <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md p-2">
-              <span className="text-muted-foreground">Available:</span>
-              <span className="font-mono font-bold">{projectedShares.toLocaleString()}</span>
-              <span className="text-muted-foreground ml-auto">Allocated:</span>
-              <span className={cn(
-                "font-mono font-bold",
-                remainingToAllocate > 0 && "text-yellow-500"
-              )}>{totalAllocated.toLocaleString()}</span>
-              {remainingToAllocate > 0 && (
-                <Badge variant="secondary" className="text-xs">
-                  {remainingToAllocate} remaining
-                </Badge>
+          <TabsContent value="allocate" className="flex-1 flex flex-col min-h-0 mt-4">
+            <div className="flex flex-col gap-3 mb-3">
+              <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md p-2">
+                <span className="text-muted-foreground">Available:</span>
+                <span className="font-mono font-bold">{projectedShares.toLocaleString()}</span>
+                <span className="text-muted-foreground ml-auto">Allocated:</span>
+                <span className={cn(
+                  "font-mono font-bold",
+                  remainingToAllocate > 0 && "text-yellow-500"
+                )}>{totalAllocated.toLocaleString()}</span>
+                {remainingToAllocate > 0 && (
+                  <Badge variant="secondary" className="text-xs">
+                    {remainingToAllocate} remaining
+                  </Badge>
+                )}
+              </div>
+
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search players..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-9"
+                  data-testid="input-search-players"
+                />
+              </div>
+
+              {searchQuery && (
+                <ScrollArea className="h-24 border rounded-md">
+                  <div className="p-1">
+                    {filteredPlayers.map(player => (
+                      <button
+                        key={player.id}
+                        onClick={() => addPlayer(player)}
+                        className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover-elevate rounded-sm text-left"
+                        data-testid={`button-add-player-${player.id}`}
+                      >
+                        <Plus className="h-3 w-3 text-muted-foreground" />
+                        <span className="font-medium">{player.firstName} {player.lastName}</span>
+                        <span className="text-xs text-muted-foreground">{player.team}</span>
+                        <span className="text-xs text-muted-foreground ml-auto">{player.position}</span>
+                      </button>
+                    ))}
+                    {filteredPlayers.length === 0 && (
+                      <div className="px-2 py-4 text-sm text-muted-foreground text-center">No players found</div>
+                    )}
+                  </div>
+                </ScrollArea>
               )}
             </div>
 
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search players..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-                data-testid="input-search-players"
-              />
-            </div>
-
-            {searchQuery && (
-              <ScrollArea className="h-32 border rounded-md">
-                <div className="p-1">
-                  {filteredPlayers.map(player => (
-                    <button
-                      key={player.id}
-                      onClick={() => addPlayer(player)}
-                      className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover-elevate rounded-sm text-left"
-                      data-testid={`button-add-player-${player.id}`}
-                    >
-                      <Plus className="h-3 w-3 text-muted-foreground" />
-                      <span className="font-medium">{player.firstName} {player.lastName}</span>
-                      <span className="text-xs text-muted-foreground">{player.team}</span>
-                      <span className="text-xs text-muted-foreground ml-auto">{player.position}</span>
-                    </button>
-                  ))}
-                  {filteredPlayers.length === 0 && (
-                    <div className="px-2 py-4 text-sm text-muted-foreground text-center">No players found</div>
-                  )}
-                </div>
-              </ScrollArea>
-            )}
-
-            <div className="border rounded-md overflow-hidden flex-1" style={{ minHeight: '200px' }}>
+            <div className="border rounded-md overflow-hidden flex-1 flex flex-col min-h-0 mb-3">
               <div className="h-full overflow-y-auto">
                 <div className="divide-y">
                   {distributions.length === 0 ? (
@@ -694,51 +696,53 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
               </div>
             </div>
 
-            {distributions.length > 0 && (
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => redistributeEvenly(distributions)}
-                  data-testid="button-even-split"
-                >
-                  Even Split
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowPresetSave(!showPresetSave)}
-                  data-testid="button-toggle-save-preset"
-                >
-                  <Save className="h-4 w-4 mr-1" />
-                  Save as Preset
-                </Button>
-              </div>
-            )}
+            <div className="flex flex-col gap-2">
+              {distributions.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => redistributeEvenly(distributions)}
+                    data-testid="button-even-split"
+                  >
+                    Even Split
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowPresetSave(!showPresetSave)}
+                    data-testid="button-toggle-save-preset"
+                  >
+                    <Save className="h-4 w-4 mr-1" />
+                    Save as Preset
+                  </Button>
+                </div>
+              )}
 
-            {showPresetSave && (
-              <div className="flex items-center gap-2">
-                <Input
-                  placeholder="Preset name..."
-                  value={newPresetName}
-                  onChange={(e) => setNewPresetName(e.target.value)}
-                  className="flex-1"
-                  data-testid="input-preset-name"
-                />
-                <Button
-                  size="sm"
-                  onClick={handleSavePreset}
-                  disabled={createPresetMutation.isPending}
-                  data-testid="button-save-preset"
-                >
-                  Save
-                </Button>
-              </div>
-            )}
+              {showPresetSave && (
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="Preset name..."
+                    value={newPresetName}
+                    onChange={(e) => setNewPresetName(e.target.value)}
+                    className="flex-1 h-9"
+                    data-testid="input-preset-name"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSavePreset}
+                    disabled={createPresetMutation.isPending}
+                    data-testid="button-save-preset"
+                  >
+                    Save
+                  </Button>
+                </div>
+              )}
+            </div>
           </TabsContent>
 
-          <TabsContent value="presets" className="flex-1 min-h-0 mt-4">
-            <ScrollArea className="h-[300px] border rounded-md">
+          <TabsContent value="presets" className="flex-1 flex flex-col min-h-0 mt-4">
+            <ScrollArea className="flex-1 border rounded-md">
               <div className="p-2 space-y-2">
                 {!presetsData?.presets || presetsData.presets.length === 0 ? (
                   <div className="py-8 text-center text-sm text-muted-foreground">
