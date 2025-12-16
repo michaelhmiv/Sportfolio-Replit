@@ -49,10 +49,16 @@ async function upsertSupabaseUser(supabaseUser: SupabaseUser): Promise<void> {
     const existingUserByEmail = supabaseUser.email ? await storage.getUserByEmail(supabaseUser.email) : null;
     const existingUser = existingUserById || existingUserByEmail;
     
+    // Log migration detection for debugging
+    console.log(`[SUPABASE_AUTH] Auth check for ${supabaseUser.email}:`);
+    console.log(`  - Supabase ID: ${supabaseUser.id}`);
+    console.log(`  - Existing by ID: ${existingUserById?.id || 'none'} (admin: ${existingUserById?.isAdmin})`);
+    console.log(`  - Existing by email: ${existingUserByEmail?.id || 'none'} (admin: ${existingUserByEmail?.isAdmin})`);
+    
     // Only generate a new username for truly new users - preserve existing usernames
     const username = existingUser?.username || supabaseUser.email?.split('@')[0] || `user_${supabaseUser.id.substring(0, 8)}`;
     
-    await storage.upsertUser({
+    const upsertedUser = await storage.upsertUser({
       id: supabaseUser.id,
       email: supabaseUser.email || null,
       firstName,
@@ -60,7 +66,7 @@ async function upsertSupabaseUser(supabaseUser: SupabaseUser): Promise<void> {
       profileImageUrl: supabaseUser.user_metadata?.avatar_url || null,
       username,
     });
-    console.log(`[SUPABASE_AUTH] Upserted user: ${supabaseUser.email} (username: ${username}, preserved: ${!!existingUser?.username})`);
+    console.log(`[SUPABASE_AUTH] Upserted user: ${supabaseUser.email} (id: ${upsertedUser.id}, admin: ${upsertedUser.isAdmin}, preserved: ${!!existingUser?.username})`);
   } catch (error: any) {
     console.error('[SUPABASE_AUTH] Error upserting user:', error.message);
     throw error;

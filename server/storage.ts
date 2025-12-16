@@ -320,7 +320,8 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    // Use case-insensitive email matching for consistency with OAuth providers
+    const [user] = await db.select().from(users).where(sql`LOWER(${users.email}) = LOWER(${email})`);
     return user || undefined;
   }
 
@@ -371,10 +372,11 @@ export class DatabaseStorage implements IStorage {
       // Use transaction with FOR UPDATE to prevent race conditions
       const migrationResult = await db.transaction(async (tx) => {
         // Lock the row to prevent concurrent migrations of the same user
+        // Use case-insensitive email matching to handle OAuth providers returning different cases
         const [existingUserByEmail] = await tx
           .select()
           .from(users)
-          .where(eq(users.email, userData.email!))
+          .where(sql`LOWER(${users.email}) = LOWER(${userData.email})`)
           .for('update');
         
         if (!existingUserByEmail || existingUserByEmail.id === userData.id) {
