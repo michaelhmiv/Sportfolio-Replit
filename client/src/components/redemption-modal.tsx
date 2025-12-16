@@ -421,7 +421,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
             <TabsTrigger value="presets" data-testid="tab-presets">Presets</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="directory" className="flex-1 flex flex-col min-h-0 mt-2 gap-2 overflow-hidden">
+          <TabsContent value="directory" className="flex-1 min-h-0 mt-2 gap-2 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
             <div className="flex flex-col sm:flex-row gap-2 shrink-0">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -591,7 +591,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
             </div>
           </TabsContent>
 
-          <TabsContent value="allocate" className="flex-1 flex flex-col min-h-0 mt-2 gap-2 overflow-hidden">
+          <TabsContent value="allocate" className="flex-1 min-h-0 mt-2 gap-2 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
             <div className="flex flex-col gap-2 shrink-0">
               <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md p-2">
                 <span className="text-muted-foreground">Available:</span>
@@ -742,7 +742,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
             </div>
           </TabsContent>
 
-          <TabsContent value="presets" className="flex-1 flex flex-col min-h-0 mt-2 overflow-hidden">
+          <TabsContent value="presets" className="flex-1 min-h-0 mt-2 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
             <div className="border rounded-md overflow-hidden flex-1 min-h-0">
               <div className="h-full overflow-y-auto p-2 space-y-2">
                 {!presetsData?.presets || presetsData.presets.length === 0 ? (
