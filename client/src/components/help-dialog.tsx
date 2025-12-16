@@ -43,23 +43,32 @@ export function HelpDialog() {
 
               <div className="space-y-4">
                 <div>
-                  <h4 className="font-semibold mb-2">1. Vest Player Shares</h4>
+                  <h4 className="font-semibold mb-2">1. Accumulate Shares (Vesting Pool)</h4>
                   <ul className="list-disc pl-6 space-y-1">
-                    <li><strong>What it is:</strong> Vesting is the <em>only</em> way to create new shares of active players.</li>
-                    <li><strong>How it works:</strong> You simply select active players to vest, and your account will generate shares of those players over time at a set rate of 100 shares per hour (distributed across your selected players).</li>
-                    <li><strong>The Strategy:</strong> You must decide which players to invest your vesting time in. Do you vest a superstar, or an underrated rookie you think will break out?</li>
+                    <li><strong>What it is:</strong> Vesting is the <em>only</em> way to create new shares in the game.</li>
+                    <li><strong>How it works:</strong> Your account automatically generates shares into a pool over time at a set rate of 100 shares per hour (200 for premium users). These shares are not tied to any specific player yet.</li>
+                    <li><strong>The Cap:</strong> Your vesting pool has a maximum capacity (2,400 shares for free users, 4,800 for premium). Once full, vesting stops until you redeem shares.</li>
                   </ul>
                 </div>
 
                 <div>
-                  <h4 className="font-semibold mb-2">2. Use Your Shares (Trade or Compete)</h4>
-                  <p className="mb-2">Once shares are in your portfolio, you have two main options:</p>
+                  <h4 className="font-semibold mb-2">2. Redeem Shares to Players</h4>
+                  <ul className="list-disc pl-6 space-y-1">
+                    <li><strong>What it is:</strong> Once you've accumulated shares in your vesting pool, you can redeem them to specific players.</li>
+                    <li><strong>How it works:</strong> Open the Redemption modal and distribute your pooled shares across any active players you choose. You can create presets to save your preferred distribution strategies.</li>
+                    <li><strong>The Strategy:</strong> You must decide <em>when</em> and <em>to which players</em> to redeem your shares. Do you vest a superstar, or an underrated rookie you think will break out?</li>
+                  </ul>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold mb-2">3. Use Your Shares (Trade or Compete)</h4>
+                  <p className="mb-2">Once shares are redeemed to players in your portfolio, you have two main options:</p>
                   
                   <div className="pl-4 space-y-3">
                     <div>
                       <p className="font-medium mb-1">Option A: Trade on the Player Exchange</p>
                       <p className="text-muted-foreground">
-                        You can immediately sell your vested shares on the "Player Exchange," which functions just like a real-world stock market. You can set your price, and other users can buy your shares, allowing you to speculate and build your in-game wealth.
+                        You can immediately sell your redeemed shares on the "Player Exchange," which functions just like a real-world stock market. You can set your price, and other users can buy your shares, allowing you to speculate and build your in-game wealth.
                       </p>
                     </div>
 
@@ -73,7 +82,7 @@ export function HelpDialog() {
                 </div>
 
                 <div>
-                  <h4 className="font-semibold mb-2">3. The "Burn" Mechanic</h4>
+                  <h4 className="font-semibold mb-2">4. The "Burn" Mechanic</h4>
                   <p className="mb-2">This is the most important part of the economy:</p>
                   <ul className="list-disc pl-6 space-y-1">
                     <li>When you submit shares into a contest, they are <strong>permanently removed (or "burned")</strong> from the game after the contest ends.</li>
@@ -95,7 +104,7 @@ export function HelpDialog() {
             </div>
 
             <p className="text-center font-medium pt-4">
-              In short, your goal is to <strong>Vest</strong> shares of players you believe in, and then decide whether to <strong>Trade</strong> them for profit or <strong>Compete</strong> with them in contests to win prizes.
+              In short, your goal is to <strong>Accumulate</strong> shares through vesting, <strong>Redeem</strong> them to players you believe in, and then decide whether to <strong>Trade</strong> them for profit or <strong>Compete</strong> with them in contests to win prizes.
             </p>
           </div>
         </DialogContent>
