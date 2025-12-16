@@ -482,7 +482,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
               )}
             </div>
 
-            <ScrollArea className="flex-1 min-h-[280px] border rounded-md">
+            <ScrollArea className="flex-1 h-[300px] sm:h-[350px] border rounded-md">
               <div className="divide-y">
                 {playersLoading ? (
                   <div className="py-8 text-center text-sm text-muted-foreground">
@@ -502,37 +502,37 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
                       return (
                         <div 
                           key={player.id}
-                          className="flex items-center gap-2 px-2 py-1.5 hover-elevate text-sm"
+                          className="flex items-center gap-1 sm:gap-2 px-2 py-1.5 hover-elevate text-sm"
                           data-testid={`dir-player-${player.id}`}
                         >
                           <div className="flex-1 min-w-0">
-                            <span className="font-medium truncate">
+                            <span className="font-medium truncate block">
                               {player.firstName} {player.lastName}
                             </span>
                           </div>
-                          <span className="text-xs text-muted-foreground w-10 shrink-0">
+                          <span className="text-xs text-muted-foreground w-8 sm:w-10 shrink-0 hidden sm:inline">
                             {player.team}
                           </span>
-                          <span className="text-xs font-mono w-14 text-right shrink-0">
+                          <span className="text-xs font-mono w-12 sm:w-14 text-right shrink-0">
                             ${price.toFixed(2)}
                           </span>
                           <span className={cn(
-                            "text-xs font-mono w-12 text-right shrink-0",
+                            "text-xs font-mono w-10 sm:w-12 text-right shrink-0 hidden sm:inline",
                             change > 0 ? "text-green-500" : change < 0 ? "text-red-500" : "text-muted-foreground"
                           )}>
                             {change > 0 ? '+' : ''}{change.toFixed(1)}%
                           </span>
-                          <span className="text-xs font-mono w-10 text-right shrink-0 text-muted-foreground" title="Fantasy Points">
+                          <span className="text-xs font-mono w-8 sm:w-10 text-right shrink-0 text-muted-foreground" title="Fantasy Points">
                             {fpts.toFixed(1)}
                           </span>
                           <Button
                             size="sm"
                             variant="ghost"
                             onClick={() => addPlayer(player, true)}
-                            className="h-7 px-2"
+                            className="px-2 shrink-0"
                             data-testid={`button-dir-add-${player.id}`}
                           >
-                            <Plus className="h-3 w-3" />
+                            <Plus className="h-4 w-4" />
                           </Button>
                         </div>
                       );
@@ -606,7 +606,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
               </ScrollArea>
             )}
 
-            <ScrollArea className="flex-1 min-h-[200px] border rounded-md">
+            <ScrollArea className="flex-1 h-[250px] sm:h-[300px] border rounded-md">
               <div className="p-2 space-y-2">
                 {distributions.length === 0 ? (
                   <div className="py-8 text-center text-sm text-muted-foreground">
@@ -616,18 +616,25 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
                   distributions.map(dist => (
                     <div 
                       key={dist.player.id} 
-                      className="flex items-center gap-2 p-2 border rounded-md bg-card"
+                      className="flex flex-col sm:flex-row sm:items-center gap-2 p-2 border rounded-md bg-card"
                       data-testid={`distribution-row-${dist.player.id}`}
                     >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm truncate">
-                            {dist.player.firstName} {dist.player.lastName}
-                          </span>
-                          <Badge variant="secondary" className="text-xs shrink-0">
-                            {dist.player.team}
-                          </Badge>
-                        </div>
+                      <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <span className="font-medium text-sm truncate">
+                          {dist.player.firstName} {dist.player.lastName}
+                        </span>
+                        <Badge variant="secondary" className="text-xs shrink-0">
+                          {dist.player.team}
+                        </Badge>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => removePlayer(dist.player.id)}
+                          className="ml-auto sm:hidden"
+                          data-testid={`button-remove-mobile-${dist.player.id}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         <Input
@@ -636,7 +643,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
                           max={projectedShares}
                           value={dist.shares}
                           onChange={(e) => setPlayerShares(dist.player.id, parseInt(e.target.value) || 0)}
-                          className="w-20 h-8 text-right font-mono text-sm"
+                          className="w-16 sm:w-20 h-8 text-right font-mono text-sm"
                           data-testid={`input-shares-${dist.player.id}`}
                         />
                         <Button
@@ -654,14 +661,14 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
                           max={projectedShares}
                           step={1}
                           onValueChange={([val]) => setPlayerShares(dist.player.id, val)}
-                          className="w-24"
+                          className="flex-1 min-w-[80px] sm:w-24"
                           data-testid={`slider-${dist.player.id}`}
                         />
                         <Button
                           size="icon"
                           variant="ghost"
                           onClick={() => removePlayer(dist.player.id)}
-                          className="h-8 w-8"
+                          className="hidden sm:flex"
                           data-testid={`button-remove-${dist.player.id}`}
                         >
                           <X className="h-4 w-4" />
