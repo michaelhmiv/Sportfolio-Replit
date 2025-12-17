@@ -40,8 +40,8 @@ export function VestingWidget({ onVestShares, className, compact = false }: Vest
   const hasNeverVested = (user?.totalSharesMined || 0) === 0;
 
   useEffect(() => {
+    // Don't reset to 0 when data is loading/refetching - preserve previous value
     if (!data?.vesting) {
-      setProjectedShares(0);
       return;
     }
 
