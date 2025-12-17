@@ -9,9 +9,9 @@ async function initializeSupabase(): Promise<SupabaseClient> {
   }
 
   try {
-    // Add 5-second timeout to prevent infinite loading in production
+    // Add 2-second timeout to prevent infinite loading in production
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+    const timeoutId = setTimeout(() => controller.abort(), 2000);
     
     const response = await fetch('/api/auth/config', {
       signal: controller.signal,
@@ -34,7 +34,7 @@ async function initializeSupabase(): Promise<SupabaseClient> {
     return supabaseInstance;
   } catch (error) {
     if (error instanceof Error && error.name === 'AbortError') {
-      console.error('Supabase config fetch timed out after 5 seconds');
+      console.error('Supabase config fetch timed out after 2 seconds');
     } else {
       console.error('Failed to initialize Supabase:', error);
     }
