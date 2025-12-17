@@ -78,8 +78,16 @@ const pageTransitionSettings = {
   ease: "easeOut" as const,
 };
 
+function ProfileRedirect({ userId }: { userId: string }) {
+  const [, navigate] = useLocation();
+  useEffect(() => {
+    navigate(`/user/${userId}`, { replace: true });
+  }, [userId, navigate]);
+  return null;
+}
+
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [location] = useLocation();
 
   // Ensure viewport is properly set after OAuth redirect on mobile
@@ -166,6 +174,9 @@ function Router() {
           </Route>
           <Route path="/premium/trade">
             {isAuthenticated ? <PremiumTrade /> : <Dashboard />}
+          </Route>
+          <Route path="/profile">
+            {isAuthenticated && user ? <ProfileRedirect userId={user.id} /> : <Dashboard />}
           </Route>
           
           {/* Auth error page - public, always accessible */}

@@ -4274,18 +4274,9 @@ ${posts.map(post => `  <url>
     const token = req.headers.authorization?.replace('Bearer ', '');
     const expectedToken = process.env.ADMIN_API_TOKEN;
     
-    // Check 1: Token-based auth (for external cron jobs)
-    if (token) {
-      if (!expectedToken) {
-        console.warn('[ADMIN] ADMIN_API_TOKEN not configured - admin endpoints disabled for external access');
-        return res.status(503).json({ error: 'Admin endpoints not configured' });
-      }
-      if (token === expectedToken) {
-        return next();
-      }
-      const clientIp = req.ip || req.connection.remoteAddress;
-      console.warn(`[ADMIN] Invalid token from ${clientIp} to ${req.path}`);
-      return res.status(401).json({ error: 'Unauthorized - invalid token' });
+    // Check 1: Token-based auth (for external cron jobs - using ADMIN_API_TOKEN)
+    if (token && expectedToken && token === expectedToken) {
+      return next();
     }
     
     // Check 2: Dev mode bypass - create mock user if needed
@@ -4318,7 +4309,47 @@ ${posts.map(post => `  <url>
       return; // Prevent falling through to Check 3
     }
     
-    // Check 3: Admin role check with req.user
+    // Check 3: Verify Supabase JWT token and check isAdmin flag
+    if (token) {
+      try {
+        // Import supabase admin client to verify JWT tokens
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseUrl = process.env.SUPABASE_URL;
+        const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        
+        if (supabaseUrl && supabaseServiceRoleKey) {
+          const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+            auth: { autoRefreshToken: false, persistSession: false }
+          });
+          
+          const { data: { user: supabaseUser }, error } = await supabaseAdmin.auth.getUser(token);
+          
+          if (!error && supabaseUser) {
+            // Token is valid, check if user is admin
+            const user = await storage.getUser(supabaseUser.id);
+            if (user?.isAdmin) {
+              // Set req.user for downstream use
+              req.user = {
+                claims: {
+                  sub: supabaseUser.id,
+                  email: supabaseUser.email,
+                }
+              };
+              console.log(`[ADMIN] Admin access granted for user ${supabaseUser.email} (${supabaseUser.id})`);
+              return next();
+            } else {
+              console.warn(`[ADMIN] User ${supabaseUser.email} is not an admin (isAdmin: ${user?.isAdmin})`);
+            }
+          } else if (error) {
+            console.log(`[ADMIN] Supabase token verification failed: ${error.message}`);
+          }
+        }
+      } catch (error: any) {
+        console.error('[ADMIN] Error verifying Supabase token:', error.message);
+      }
+    }
+    
+    // Check 4: Fallback - check if req.user is already set (from session or other middleware)
     try {
       let userId: string | null = null;
       
