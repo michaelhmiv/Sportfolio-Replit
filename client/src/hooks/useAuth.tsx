@@ -88,7 +88,6 @@ export function useAuth() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { session, isInitialized, supabaseClient } = useContext(AuthContext);
-  const hasShownSyncToast = useRef(false);
 
   const fetchUserWithToken = useCallback(async (): Promise<AuthUserResponse | null> => {
     try {
@@ -102,6 +101,8 @@ export function useAuth() {
         return null;
       }
 
+      // Sync on first load after login/redirect - use sync=true always
+      // The server-side atomic crediting prevents double-credits even with multiple sync calls
       const response = await fetch('/api/auth/user?sync=true', {
         headers: {
           'Authorization': `Bearer ${currentSession.access_token}`,
@@ -130,8 +131,10 @@ export function useAuth() {
   });
 
   useEffect(() => {
-    if (user?.whopSync?.credited && user.whopSync.credited > 0 && !hasShownSyncToast.current) {
-      hasShownSyncToast.current = true;
+    // Only show toast if shares were credited in THIS response (credited > 0)
+    // The server only returns non-zero credited count when shares are newly credited
+    // So we don't need to track shown toasts - if credited > 0, it's a new credit
+    if (user?.whopSync?.credited && user.whopSync.credited > 0) {
       toast({
         title: "Premium Shares Credited!",
         description: `${user.whopSync.credited} Premium Share${user.whopSync.credited > 1 ? 's' : ''} from your Whop purchase${user.whopSync.credited > 1 ? 's' : ''} ${user.whopSync.credited > 1 ? 'have' : 'has'} been added to your account.`,

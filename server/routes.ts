@@ -255,27 +255,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const currentPayment = await storage.getWhopPaymentByPaymentId(paymentId);
         
         // Credit paid payments that haven't been credited yet
-        // For new payments: there's no existingPayment, so check currentPayment
-        // For existing payments: check if they're uncredited
-        const shouldCredit = status === "paid" && quantity > 0 && currentPayment && 
-          !currentPayment.creditedAt && !currentPayment.revokedAt;
-        
-        if (shouldCredit) {
-          // Credit premium shares to user via holdings table (same as webhook handler)
-          const existingHolding = await storage.getHolding(userId, "premium", "premium");
-          const currentQuantity = existingHolding?.quantity || 0;
-          const newQuantity = currentQuantity + quantity;
+        // Use atomic credit-first approach: creditWhopPayment returns undefined if already credited
+        // This prevents race conditions where multiple syncs credit the same payment
+        if (status === "paid" && quantity > 0 && currentPayment && 
+          !currentPayment.creditedAt && !currentPayment.revokedAt) {
           
-          // Preserve existing avgCost or use $5 default for new holdings
-          const currentAvgCost = existingHolding?.avgCostBasis || "5.0000";
+          // ATOMIC: Credit the payment FIRST - this returns undefined if already credited (race protection)
+          const creditedPayment = await storage.creditWhopPayment(paymentId, userId);
           
-          // Update holding with new quantity preserving cost basis
-          await storage.updateHolding(userId, "premium", "premium", newQuantity, currentAvgCost);
-          
-          // Credit the payment and set user_id - this updates the record created by upsert
-          await storage.creditWhopPayment(paymentId, userId);
-          result.credited += quantity;
-          console.log(`[WHOP SYNC] Credited ${quantity} premium shares to user ${userId} from payment ${paymentId} (${currentQuantity} -> ${newQuantity})`);
+          // Only update holdings if we successfully credited (won the race)
+          if (creditedPayment) {
+            const existingHolding = await storage.getHolding(userId, "premium", "premium");
+            const currentQuantity = existingHolding?.quantity || 0;
+            const newQuantity = currentQuantity + quantity;
+            
+            // Preserve existing avgCost or use $5 default for new holdings
+            const currentAvgCost = existingHolding?.avgCostBasis || "5.0000";
+            
+            // Update holding with new quantity preserving cost basis
+            await storage.updateHolding(userId, "premium", "premium", newQuantity, currentAvgCost);
+            result.credited += quantity;
+            console.log(`[WHOP SYNC] Credited ${quantity} premium shares to user ${userId} from payment ${paymentId} (${currentQuantity} -> ${newQuantity})`);
+          } else {
+            console.log(`[WHOP SYNC] Payment ${paymentId} already credited by another process, skipping`);
+          }
         }
         
         // Handle refunds/chargebacks - only if there's a previously credited payment
