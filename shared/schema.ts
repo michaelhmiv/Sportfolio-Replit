@@ -495,33 +495,6 @@ export const whopPayments = pgTable("whop_payments", {
   creditedIdx: index("whop_payments_credited_idx").on(table.creditedAt),
 }));
 
-// Tweet settings table - stores configuration for automated tweets
-export const tweetSettings = pgTable("tweet_settings", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  enabled: boolean("enabled").notNull().default(false),
-  promptTemplate: text("prompt_template").notNull().default("Give a brief 1-sentence summary of recent NBA news or game performance for these players: {players}. Focus on their most recent game or any breaking news. Keep each summary under 60 characters."),
-  includeRisers: boolean("include_risers").notNull().default(true),
-  includeVolume: boolean("include_volume").notNull().default(true),
-  includeMarketCap: boolean("include_market_cap").notNull().default(true),
-  maxPlayers: integer("max_players").notNull().default(3),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-});
-
-// Tweet history table - logs of all tweets sent
-export const tweetHistory = pgTable("tweet_history", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  content: text("content").notNull(),
-  tweetId: varchar("tweet_id"), // X's tweet ID if successfully posted
-  status: text("status").notNull().default("pending"), // "pending", "success", "failed"
-  errorMessage: text("error_message"),
-  playerData: jsonb("player_data"), // Snapshot of player stats used
-  aiSummary: text("ai_summary"), // Perplexity response
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-}, (table) => ({
-  statusIdx: index("tweet_history_status_idx").on(table.status),
-  createdAtIdx: index("tweet_history_created_idx").on(table.createdAt),
-}));
-
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   holdings: many(holdings),
@@ -813,20 +786,3 @@ export const insertWhopPaymentSchema = createInsertSchema(whopPayments).omit({
 export type WhopPayment = typeof whopPayments.$inferSelect;
 export type InsertWhopPayment = z.infer<typeof insertWhopPaymentSchema>;
 
-// Tweet settings schemas and types
-export const insertTweetSettingsSchema = createInsertSchema(tweetSettings).omit({
-  id: true,
-  updatedAt: true,
-});
-
-export type TweetSettings = typeof tweetSettings.$inferSelect;
-export type InsertTweetSettings = z.infer<typeof insertTweetSettingsSchema>;
-
-// Tweet history schemas and types
-export const insertTweetHistorySchema = createInsertSchema(tweetHistory).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type TweetHistory = typeof tweetHistory.$inferSelect;
-export type InsertTweetHistory = z.infer<typeof insertTweetHistorySchema>;
