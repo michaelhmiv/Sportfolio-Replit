@@ -19,13 +19,43 @@ interface GameDay {
   gameCount: number;
 }
 
+/**
+ * Helper to get current ET date as YYYY-MM-DD string
+ * This is the canonical "today" for NBA games
+ */
+function getTodayET(): string {
+  const now = new Date();
+  const etTime = toZonedTime(now, 'America/New_York');
+  const year = etTime.getFullYear();
+  const month = String(etTime.getMonth() + 1).padStart(2, '0');
+  const day = String(etTime.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Extract YYYY-MM-DD date string from a contest's gameDate
+ * Handles both Date objects and ISO strings, converting to ET
+ */
+function getContestDateString(gameDate: Date | string): string {
+  const date = typeof gameDate === 'string' ? new Date(gameDate) : gameDate;
+  const etTime = toZonedTime(date, 'America/New_York');
+  const year = etTime.getFullYear();
+  const month = String(etTime.getMonth() + 1).padStart(2, '0');
+  const day = String(etTime.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export async function createContests(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[create_contests] Starting contest creation...");
+  
+  const todayET = getTodayET();
+  console.log(`[create_contests] Current ET date: ${todayET}`);
+  console.log(`[create_contests] Current UTC time: ${new Date().toISOString()}`);
   
   progressCallback?.({
     type: 'info',
     timestamp: new Date().toISOString(),
-    message: 'Starting contest creation job',
+    message: `Starting contest creation job (Today ET: ${todayET})`,
   });
   
   let requestCount = 0;
@@ -55,16 +85,19 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
     for (let i = 0; i < 7; i++) {
       const date = addDays(nowInET, i);
       // Format as YYYYMMDD for MySportsFeeds API
-      const dateStr = format(date, 'yyyyMMdd', { timeZone: 'America/New_York' });
+      const apiDateStr = format(date, 'yyyyMMdd', { timeZone: 'America/New_York' });
+      // Format as YYYY-MM-DD for storage and comparison
+      const gameDateFormatted = format(date, 'yyyy-MM-dd', { timeZone: 'America/New_York' });
+      
+      console.log(`[create_contests] Checking date: ${gameDateFormatted} (API: ${apiDateStr})`);
       
       try {
-        const games = await fetchDailyGames(dateStr);
+        const games = await fetchDailyGames(apiDateStr);
         requestCount++;
         
+        console.log(`[create_contests] Found ${games.length} games for ${gameDateFormatted}`);
+        
         if (games.length > 0) {
-          // Games exist for this date - format as YYYY-MM-DD for storage
-          const gameDateFormatted = format(date, 'yyyy-MM-dd', { timeZone: 'America/New_York' });
-          
           // Find the earliest game time (start with high sentinel value)
           let earliestGameTime = new Date('9999-12-31');
           for (const game of games) {
@@ -76,18 +109,27 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
             }
           }
           
-          // If no valid game time found, default to noon on that day
+          // If no valid game time found, default to 7 PM ET on that day (typical first game time)
           if (earliestGameTime.getFullYear() === 9999) {
-            earliestGameTime = new Date(gameDateFormatted + 'T12:00:00Z');
+            // Create 7 PM ET as the default start time
+            const defaultStartETString = `${gameDateFormatted}T19:00:00`;
+            earliestGameTime = fromZonedTime(defaultStartETString, 'America/New_York');
+            console.log(`[create_contests] No game times found, using default 7 PM ET: ${earliestGameTime.toISOString()}`);
           }
           
           gameDays.set(gameDateFormatted, {
             date: earliestGameTime,
             gameCount: games.length
           });
+          
+          progressCallback?.({
+            type: 'debug',
+            timestamp: new Date().toISOString(),
+            message: `Found ${games.length} games for ${gameDateFormatted}, earliest: ${earliestGameTime.toISOString()}`,
+          });
         }
       } catch (error: any) {
-        console.log(`[create_contests] No games found for ${dateStr}`);
+        console.log(`[create_contests] No games found for ${apiDateStr}: ${error.message}`);
       }
     }
 
@@ -128,9 +170,15 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
         // cross midnight UTC (e.g., Dec 12 7pm ET = Dec 13 00:00 UTC)
         const existingContests = await storage.getContests();
         
+        // Use proper ET timezone conversion for comparison
+        // The gameDate is stored as midnight ET in UTC, so we need to convert back to ET
         const contestExists = existingContests.some(c => {
-          const gameDateStr = new Date(c.gameDate).toISOString().split('T')[0];
-          return gameDateStr === dateStr && (c.status === "open" || c.status === "live");
+          const contestDateStr = getContestDateString(c.gameDate);
+          const matches = contestDateStr === dateStr && (c.status === "open" || c.status === "live");
+          if (matches) {
+            console.log(`[create_contests] Found existing contest for ${dateStr}: ${c.name} (gameDate: ${c.gameDate}, status: ${c.status})`);
+          }
+          return matches;
         });
 
         if (contestExists) {
@@ -144,6 +192,8 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
           
           continue;
         }
+        
+        console.log(`[create_contests] No existing contest for ${dateStr}, creating new one...`);
 
         // Create a new 50/50 contest for this game day
         // NBA games are scheduled in Eastern Time, so use ET for contest dates
@@ -161,6 +211,13 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
         const endOfDayETString = `${dateStr}T23:59:59.999`;
         const endsAt = fromZonedTime(endOfDayETString, 'America/New_York');
 
+        console.log(`[create_contests] Creating contest with:`, {
+          name: `NBA 50/50 - ${dateStr.replace(/-/g, '/')}`,
+          gameDate: contestDate.toISOString(),
+          startsAt: startsAt.toISOString(),
+          endsAt: endsAt.toISOString(),
+        });
+
         const contest = await storage.createContest({
           name: `NBA 50/50 - ${dateStr.replace(/-/g, '/')}`,
           sport: "NBA",
@@ -173,7 +230,7 @@ export async function createContests(progressCallback?: ProgressCallback): Promi
         });
 
         contestsCreated++;
-        console.log(`[create_contests] ✓ Created contest for ${dateStr} (${gameDay.gameCount} games)`);
+        console.log(`[create_contests] ✓ Created contest ${contest.id} for ${dateStr} (${gameDay.gameCount} games)`);
         
         progressCallback?.({
           type: 'info',

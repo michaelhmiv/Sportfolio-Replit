@@ -4279,34 +4279,13 @@ ${posts.map(post => `  <url>
       return next();
     }
     
-    // Check 2: Dev mode bypass - create mock user if needed
+    // Check 2: Dev mode bypass - allow all admin requests in development
     const isDev = process.env.NODE_ENV === 'development';
     const bypassAuth = process.env.DEV_BYPASS_AUTH !== 'false';
     
-    if (isDev && bypassAuth && !req.user) {
-      // Create a mock dev user session (same as in replitAuth.ts)
-      const mockUser = {
-        claims: {
-          sub: 'dev-user-12345678',
-          email: 'dev@example.com',
-          first_name: 'Dev',
-          last_name: 'User',
-        },
-        expires_at: Math.floor(Date.now() / 1000) + 86400,
-        access_token: 'dev-mock-token',
-        refresh_token: 'dev-mock-refresh',
-      };
-      
-      // Use passport's login to properly serialize and persist the session
-      req.login(mockUser, (err: any) => {
-        if (err) {
-          console.error('[ADMIN] Failed to establish mock session:', err);
-          return res.status(500).json({ error: 'Session initialization failed' });
-        }
-        console.log(`[ADMIN] Dev bypass: ${req.method} ${req.path} - mock session established`);
-        next();
-      });
-      return; // Prevent falling through to Check 3
+    if (isDev && bypassAuth) {
+      console.log(`[ADMIN] Dev bypass: ${req.method} ${req.path}`);
+      return next();
     }
     
     // Check 3: Verify Supabase JWT token and check isAdmin flag
