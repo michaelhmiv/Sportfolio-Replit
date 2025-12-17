@@ -14,34 +14,62 @@ interface AuthUserResponse extends User {
 }
 
 let supabaseClient: SupabaseClient | null = null;
+let globalSession: Session | null = null;
+let globalIsInitialized = false;
 
 export function useAuth() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const hasShownSyncToast = useRef(false);
-  const [session, setSession] = useState<Session | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [session, setSession] = useState<Session | null>(globalSession);
+  const [isInitialized, setIsInitialized] = useState(globalIsInitialized);
   
   useEffect(() => {
     let subscription: { unsubscribe: () => void } | null = null;
     
     async function initializeAuth() {
+      if (globalIsInitialized && supabaseClient) {
+        setSession(globalSession);
+        setIsInitialized(true);
+        
+        const { data: { subscription: authSubscription } } = supabaseClient.auth.onAuthStateChange(
+          async (event, newSession) => {
+            console.log('[AUTH] Auth state changed:', event);
+            globalSession = newSession;
+            setSession(newSession);
+            
+            if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+            } else if (event === 'SIGNED_OUT') {
+              globalSession = null;
+              queryClient.setQueryData(['/api/auth/user'], null);
+            }
+          }
+        );
+        subscription = authSubscription;
+        return;
+      }
+      
       try {
         const client = await getSupabase();
         supabaseClient = client;
         
         const { data: { session: initialSession } } = await client.auth.getSession();
+        globalSession = initialSession;
+        globalIsInitialized = true;
         setSession(initialSession);
         setIsInitialized(true);
         
         const { data: { subscription: authSubscription } } = client.auth.onAuthStateChange(
           async (event, newSession) => {
             console.log('[AUTH] Auth state changed:', event);
+            globalSession = newSession;
             setSession(newSession);
             
             if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
               queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
             } else if (event === 'SIGNED_OUT') {
+              globalSession = null;
               queryClient.setQueryData(['/api/auth/user'], null);
             }
           }
@@ -50,6 +78,7 @@ export function useAuth() {
         subscription = authSubscription;
       } catch (error) {
         console.error('[AUTH] Failed to initialize auth:', error);
+        globalIsInitialized = true;
         setIsInitialized(true);
       }
     }
