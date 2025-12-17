@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { WebSocketProvider, useWebSocket } from "@/lib/websocket";
 import { NotificationProvider } from "@/lib/notification-context";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, AuthProvider } from "@/hooks/useAuth";
 import { OnboardingModal } from "@/components/onboarding-modal";
 import { AnimatePresence, motion } from "framer-motion";
 import Dashboard from "@/pages/dashboard";
@@ -339,17 +339,19 @@ function AppContent() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <SchemaOrg schema={[schemas.organization, schemas.website, schemas.webApplication]} />
-      <WebSocketProvider>
-        <NotificationProvider>
-          <TooltipProvider>
-            <VestingProvider>
-              <AppContent />
-              <Toaster />
-            </VestingProvider>
-          </TooltipProvider>
-        </NotificationProvider>
-      </WebSocketProvider>
+      <AuthProvider>
+        <SchemaOrg schema={[schemas.organization, schemas.website, schemas.webApplication]} />
+        <WebSocketProvider>
+          <NotificationProvider>
+            <TooltipProvider>
+              <VestingProvider>
+                <AppContent />
+                <Toaster />
+              </VestingProvider>
+            </TooltipProvider>
+          </NotificationProvider>
+        </WebSocketProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }
