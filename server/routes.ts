@@ -4139,11 +4139,11 @@ ${posts.map(post => `  <url>
         
         console.log("[WHOP WEBHOOK] Processing payment.succeeded for:", receiptId);
         
-        // Check for idempotency - already processed this payment?
-        const existingSession = await storage.getPremiumCheckoutSessionByReceipt(receiptId);
-        if (existingSession) {
-          console.log("[WHOP WEBHOOK] Payment already processed:", receiptId);
-          return res.json({ success: true, message: "Already processed" });
+        // Check if payment already exists in whop_payments table
+        const existingPayment = await storage.getWhopPaymentByPaymentId(receiptId);
+        if (existingPayment?.creditedAt) {
+          console.log("[WHOP WEBHOOK] Payment already credited:", receiptId);
+          return res.json({ success: true, message: "Already credited" });
         }
         
         // Get all available identifiers from webhook payload
@@ -4239,13 +4239,41 @@ ${posts.map(post => `  <url>
           return res.status(200).json({ success: false, message: "User not found" });
         }
         
+        // Get user's email for whop_payments record
+        const user = await storage.getUser(userId);
+        const userEmail = user?.email || payment.user?.email || "unknown@webhook.local";
+        
+        // ATOMIC APPROACH: First record payment to whop_payments table
+        // This ensures both webhook AND sync use the same atomic crediting system
+        console.log("[WHOP WEBHOOK] Recording payment to whop_payments table...");
+        await storage.upsertWhopPayment({
+          paymentId: receiptId,
+          email: userEmail,
+          userId: null, // Will be set by creditWhopPayment
+          quantity: quantity,
+          amountCents: finalAmount || (quantity * 500),
+          currency: "usd",
+          whopStatus: "paid",
+          rawPayload: payment,
+        });
+        
+        // ATOMIC CREDIT: Use creditWhopPayment which has WHERE creditedAt IS NULL
+        // This prevents double-crediting even if webhook and sync race
+        const creditedPayment = await storage.creditWhopPayment(receiptId, userId);
+        
+        if (!creditedPayment) {
+          // Payment already credited by another process (sync or duplicate webhook)
+          console.log("[WHOP WEBHOOK] Payment already credited by another process, skipping:", receiptId);
+          return res.json({ success: true, message: "Already credited" });
+        }
+        
         // Mark the matched session as completed
         if (matchedSession) {
           await storage.completePremiumCheckoutSession(matchedSession.id, receiptId);
           console.log("[WHOP WEBHOOK] Marked session", matchedSession.id, "as completed");
         }
         
-        // Credit premium shares to user
+        // Credit premium shares to user - only happens if we won the atomic credit race
         const existingHolding = await storage.getHolding(userId, "premium", "premium");
         const currentQuantity = existingHolding?.quantity || 0;
         const newQuantity = currentQuantity + quantity;
