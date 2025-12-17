@@ -2556,8 +2556,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Contests (public - anyone can view)
-  app.get("/api/contests", async (req, res) => {
+  // Contests (public - anyone can view, optionalAuth to check for user entries)
+  app.get("/api/contests", optionalAuth, async (req: any, res) => {
     try {
       const { date } = req.query;
       
@@ -2585,7 +2585,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If user is authenticated, include their entries
       let enrichedEntries: any[] = [];
-      if (req.isAuthenticated() && req.user) {
+      if (req.user?.claims?.sub) {
         try {
           const userId = (req.user as any).claims.sub;
           const user = await storage.getUser(userId);
@@ -3071,7 +3071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contest leaderboard with proportional scoring (public - anyone can view)
-  app.get("/api/contest/:id/leaderboard", async (req, res) => {
+  app.get("/api/contest/:id/leaderboard", optionalAuth, async (req: any, res) => {
     try {
       const contest = await storage.getContest(req.params.id);
 
@@ -3085,7 +3085,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // If user is authenticated, find their entry
       let myEntry = undefined;
-      if (req.isAuthenticated() && req.user) {
+      if (req.user?.claims?.sub) {
         try {
           const userId = (req.user as any).claims.sub;
           const user = await storage.getUser(userId);
