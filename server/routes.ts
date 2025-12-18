@@ -2404,12 +2404,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.incrementTotalSharesMined(user.id, totalRedeemed);
 
       // Update mining - subtract redeemed shares, keep remaining in pool
+      // CRITICAL: Reset lastAccruedAt to prevent frontend from projecting phantom shares
       const now = new Date();
       const remainingShares = miningData.sharesAccumulated - totalRedeemed;
       await storage.updateMining(user.id, {
         sharesAccumulated: remainingShares,
         lastClaimedAt: now,
         updatedAt: now,
+        // Reset accrual baseline so frontend projections start fresh
+        lastAccruedAt: now,
+        // Only reset residualMs on full redemption - preserve fractional progress for partial redemptions
+        residualMs: remainingShares === 0 ? 0 : miningData.residualMs,
         // Only clear cap if we have room now
         capReachedAt: remainingShares < (user.isPremium ? 4800 : 2400) ? null : miningData.capReachedAt,
       });
