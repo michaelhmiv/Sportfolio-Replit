@@ -91,23 +91,31 @@ export function useAuth() {
 
   const fetchUserWithToken = useCallback(async (): Promise<AuthUserResponse | null> => {
     try {
-      if (!supabaseClient) {
+      console.log('[AUTH] fetchUserWithToken called, session:', !!session, 'supabaseClient:', !!supabaseClient);
+      
+      // Use session from context instead of calling getSession() again
+      // This avoids potential hangs from duplicate getSession calls in production
+      if (!session?.access_token) {
+        console.log('[AUTH] No session or access token, returning null');
         return null;
       }
 
-      const { data: { session: currentSession } } = await supabaseClient.auth.getSession();
-
-      if (!currentSession?.access_token) {
-        return null;
-      }
-
-      // Sync on first load after login/redirect - use sync=true always
-      // The server-side atomic crediting prevents double-credits even with multiple sync calls
+      console.log('[AUTH] Fetching /api/auth/user...');
+      
+      // Add timeout to prevent infinite hang
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      
       const response = await fetch('/api/auth/user?sync=true', {
         headers: {
-          'Authorization': `Bearer ${currentSession.access_token}`,
+          'Authorization': `Bearer ${session.access_token}`,
         },
+        signal: controller.signal,
       });
+      
+      clearTimeout(timeoutId);
+
+      console.log('[AUTH] /api/auth/user response status:', response.status);
 
       if (!response.ok) {
         if (response.status === 401) {
@@ -116,17 +124,23 @@ export function useAuth() {
         throw new Error('Failed to fetch user');
       }
 
-      return response.json();
+      const userData = await response.json();
+      console.log('[AUTH] User data received:', userData?.username);
+      return userData;
     } catch (error) {
-      console.error('Error fetching user:', error);
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('[AUTH] Fetch user timed out after 10 seconds');
+      } else {
+        console.error('[AUTH] Error fetching user:', error);
+      }
       return null;
     }
-  }, [supabaseClient]);
+  }, [session, supabaseClient]);
 
   const { data: user, isLoading: isQueryLoading } = useQuery<AuthUserResponse | null>({
     queryKey: ['/api/auth/user'],
     queryFn: fetchUserWithToken,
-    enabled: isInitialized && !!supabaseClient,
+    enabled: isInitialized && !!supabaseClient && !!session,
     staleTime: 5 * 60 * 1000,
   });
 
