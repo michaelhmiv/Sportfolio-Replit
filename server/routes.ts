@@ -424,24 +424,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log successful auth
       console.log(`[AUTH:USER] Authenticated user: ${user?.username} (${userId.substring(0, 8)}...)`);
       
-      // Auto-sync with Whop on login if user has email
-      let whopSync = null;
+      // Return user data immediately - don't block on Whop sync
+      res.json(user);
+      
+      // Fire-and-forget: Trigger Whop sync in background if user has email and sync is requested
       if (user?.email && req.query.sync === "true") {
-        try {
-          whopSync = await syncWhopPaymentsForUser(userId, user.email);
-          console.log(`[AUTH] Whop sync for ${user.username}: ${whopSync.credited} credited, ${whopSync.synced} synced`);
-        } catch (syncErr: any) {
-          console.error(`[AUTH] Whop sync error:`, syncErr.message);
-        }
+        syncWhopPaymentsForUser(userId, user.email)
+          .then((whopSync) => {
+            console.log(`[AUTH] Whop sync for ${user.username}: ${whopSync.credited} credited, ${whopSync.synced} synced`);
+          })
+          .catch((syncErr: any) => {
+            console.error(`[AUTH] Whop sync error:`, syncErr.message);
+          });
       }
-      
-      // Re-fetch user if shares were credited
-      const finalUser = whopSync?.credited ? await storage.getUser(userId) : user;
-      
-      res.json({
-        ...finalUser,
-        whopSync: whopSync || undefined,
-      });
     } catch (error) {
       console.error("Error fetching user:", error);
       res.status(500).json({ error: "Failed to fetch user" });
