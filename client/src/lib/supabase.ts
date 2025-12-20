@@ -3,10 +3,47 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 let supabaseInstance: SupabaseClient | null = null;
 let initializationPromise: Promise<SupabaseClient> | null = null;
 
+const CONFIG_CACHE_KEY = 'supabase_config';
+const CONFIG_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+interface CachedConfig {
+  url: string;
+  anonKey: string;
+  cachedAt: number;
+}
+
 function debugLog(stage: string, message: string, data?: any) {
   const timestamp = new Date().toISOString();
   const elapsed = performance.now().toFixed(0);
   console.log(`[SUPABASE ${elapsed}ms] ${stage}: ${message}`, data || '');
+}
+
+function getCachedConfig(): CachedConfig | null {
+  try {
+    const cached = localStorage.getItem(CONFIG_CACHE_KEY);
+    if (!cached) return null;
+    
+    const config: CachedConfig = JSON.parse(cached);
+    const age = Date.now() - config.cachedAt;
+    
+    if (age > CONFIG_CACHE_TTL_MS) {
+      localStorage.removeItem(CONFIG_CACHE_KEY);
+      return null;
+    }
+    
+    return config;
+  } catch {
+    return null;
+  }
+}
+
+function setCachedConfig(url: string, anonKey: string): void {
+  try {
+    const config: CachedConfig = { url, anonKey, cachedAt: Date.now() };
+    localStorage.setItem(CONFIG_CACHE_KEY, JSON.stringify(config));
+  } catch {
+    // Ignore localStorage errors
+  }
 }
 
 async function initializeSupabase(): Promise<SupabaseClient> {
@@ -14,6 +51,21 @@ async function initializeSupabase(): Promise<SupabaseClient> {
   
   if (supabaseInstance) {
     debugLog('INIT', 'Returning cached Supabase instance');
+    return supabaseInstance;
+  }
+
+  // Try localStorage cache first for instant initialization
+  const cachedConfig = getCachedConfig();
+  if (cachedConfig) {
+    debugLog('CONFIG', 'Using cached config from localStorage');
+    supabaseInstance = createClient(cachedConfig.url, cachedConfig.anonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: true,
+      },
+    });
+    debugLog('CLIENT', 'Supabase client created from cache');
     return supabaseInstance;
   }
 
@@ -41,6 +93,9 @@ async function initializeSupabase(): Promise<SupabaseClient> {
     
     const config = await response.json();
     debugLog('CONFIG', 'Config parsed successfully', { url: config.url?.substring(0, 30) + '...' });
+    
+    // Cache config for future visits
+    setCachedConfig(config.url, config.anonKey);
     
     debugLog('CLIENT', 'Creating Supabase client...');
     supabaseInstance = createClient(config.url, config.anonKey, {
