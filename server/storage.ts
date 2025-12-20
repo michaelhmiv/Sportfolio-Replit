@@ -171,6 +171,7 @@ export interface IStorage {
   
   // Mining methods
   getMining(userId: string): Promise<Mining | undefined>;
+  getAllActiveMiningUserIds(): Promise<string[]>;
   updateMining(userId: string, updates: Partial<Mining>): Promise<void>;
   getMiningSplits(userId: string): Promise<MiningSplit[]>;
   setMiningSplits(userId: string, splits: InsertMiningSplit[]): Promise<void>;
@@ -1496,6 +1497,15 @@ export class DatabaseStorage implements IStorage {
       .from(mining)
       .where(eq(mining.userId, userId));
     return miningData || undefined;
+  }
+
+  async getAllActiveMiningUserIds(): Promise<string[]> {
+    // Get all users with active mining (has lastAccruedAt set)
+    const results = await db
+      .select({ userId: mining.userId })
+      .from(mining)
+      .where(isNotNull(mining.lastAccruedAt));
+    return results.map(r => r.userId);
   }
 
   async updateMining(userId: string, updates: Partial<Mining>): Promise<void> {

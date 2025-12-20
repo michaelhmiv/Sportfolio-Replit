@@ -15,6 +15,7 @@ import { syncPlayerGameLogs } from "./sync-player-game-logs";
 import { settleContests } from "./settle-contests";
 import { createContests } from "./create-contests";
 import { updateContestStatuses } from "./update-contest-statuses";
+import { accrueVestingForAllUsers } from "./vesting-accrual";
 import { dailySnapshot } from "./daily-snapshot";
 import { backfillContestStats } from "./backfill-contest-stats";
 import { generateWeeklyRoundup } from "./weekly-roundup";
@@ -130,6 +131,12 @@ export class JobScheduler {
             errorCount: result.errors,
           };
         },
+      },
+      {
+        name: "vesting_accrual",
+        schedule: "*/5 * * * *", // Every 5 minutes - accrue vesting shares for all users
+        enabled: true,
+        handler: accrueVestingForAllUsers,
       },
     ];
 

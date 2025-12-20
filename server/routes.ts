@@ -424,8 +424,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Log successful auth
       console.log(`[AUTH:USER] Authenticated user: ${user?.username} (${userId.substring(0, 8)}...)`);
       
-      // Return user data immediately - don't block on Whop sync
+      // Return user data immediately - don't block on Whop sync or vesting
       res.json(user);
+      
+      // Fire-and-forget: Trigger vesting accrual in background on login
+      if (user) {
+        accrueVestingShares(userId).catch(err => console.error('[Vesting] Login accrual error:', err));
+      }
       
       // Fire-and-forget: Trigger Whop sync in background if user has email and sync is requested
       if (user?.email && req.query.sync === "true") {
@@ -2067,6 +2072,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get vesting status with fresh accrual (for vesting modal)
+  app.get("/api/vesting/status", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      // Trigger fresh accrual calculation
+      await accrueVestingShares(userId);
+
+      // Fetch updated vesting data
+      const [miningData, miningSplits] = await Promise.all([
+        storage.getMining(userId),
+        storage.getMiningSplits(userId),
+      ]);
+
+      // Get player data for splits
+      const playerIds = new Set<string>();
+      if (miningData?.playerId) playerIds.add(miningData.playerId);
+      miningSplits.forEach(s => playerIds.add(s.playerId));
+
+      const players = await storage.getPlayersByIds(Array.from(playerIds));
+      const playerMap = new Map(players.map(p => [p.id, p]));
+
+      const isPremiumUser = user.premiumExpiresAt && user.premiumExpiresAt > new Date();
+
+      res.json({
+        vesting: miningData ? {
+          ...miningData,
+          player: miningData.playerId ? playerMap.get(miningData.playerId) : null,
+          splits: miningSplits.map(s => ({
+            ...s,
+            player: playerMap.get(s.playerId),
+          })),
+          sharesPerHour: isPremiumUser ? 200 : 100,
+          capLimit: isPremiumUser ? 4800 : 2400,
+        } : null,
+      });
+    } catch (error: any) {
+      console.error("Error fetching vesting status:", error);
+      res.status(500).json({ error: "Failed to fetch vesting status" });
     }
   });
 
