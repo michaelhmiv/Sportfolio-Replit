@@ -15,6 +15,7 @@ import { calculateContestLeaderboard } from "./contest-scoring";
 import { setupAuth, isAuthenticated, optionalAuth } from "./supabaseAuth";
 import { getGameDay, getETDayBoundaries, getTodayETBoundaries } from "./lib/time";
 import { matchOrders } from "./order-matcher";
+import { getOrCompute } from "./cache";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication middleware
@@ -3280,103 +3281,112 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Global leaderboards (public)
+  // Global leaderboards (public) - cached for 60s
   app.get("/api/leaderboards", async (req, res) => {
     try {
       const category = req.query.category as string || "netWorth";
-
-      if (category === "sharesMined") {
-        // Sort by total shares mined
-        const allUsers = await storage.getUsers();
-        const ranked = allUsers
-          .sort((a: User, b: User) => b.totalSharesMined - a.totalSharesMined)
-          .map((u: User, index: number) => ({
-            rank: index + 1,
-            userId: u.id,
-            username: u.username,
-            profileImageUrl: u.profileImageUrl,
-            value: u.totalSharesMined,
-          }));
-        
-        return res.json({ category: "sharesMined", leaderboard: ranked });
-      }
-
-      if (category === "marketOrders") {
-        // Sort by total market orders
-        const allUsers = await storage.getUsers();
-        const ranked = allUsers
-          .sort((a: User, b: User) => b.totalMarketOrders - a.totalMarketOrders)
-          .map((u: User, index: number) => ({
-            rank: index + 1,
-            userId: u.id,
-            username: u.username,
-            profileImageUrl: u.profileImageUrl,
-            value: u.totalMarketOrders,
-          }));
-        
-        return res.json({ category: "marketOrders", leaderboard: ranked });
-      }
-
-      if (category === "cashBalance" || category === "portfolioValue" || category === "netWorth") {
-        // Use optimized method to get all users with rankings in one query
-        const usersWithPortfolio = await storage.getAllUsersForRanking();
-        
-        // Get user details for profile images and usernames
-        const allUsers = await storage.getUsers();
-        const userMap = new Map(allUsers.map(u => [u.id, u]));
-
-        let sortedUsers: any[];
-        
-        if (category === "cashBalance") {
-          sortedUsers = usersWithPortfolio
-            .sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance))
-            .map((data, index) => {
-              const user = userMap.get(data.userId);
-              return {
+      const cacheKey = `leaderboard:${category}`;
+      
+      // Use cache for all leaderboard categories (60s TTL)
+      const result = await getOrCompute(cacheKey, async () => {
+        if (category === "sharesMined") {
+          const allUsers = await storage.getUsers();
+          return {
+            category: "sharesMined",
+            leaderboard: allUsers
+              .sort((a: User, b: User) => b.totalSharesMined - a.totalSharesMined)
+              .map((u: User, index: number) => ({
                 rank: index + 1,
-                userId: data.userId,
-                username: user?.username || "Unknown",
-                profileImageUrl: user?.profileImageUrl || null,
-                value: parseFloat(data.balance).toFixed(2),
-              };
-            });
-        } else if (category === "portfolioValue") {
-          sortedUsers = usersWithPortfolio
-            .sort((a, b) => b.portfolioValue - a.portfolioValue)
-            .map((data, index) => {
-              const user = userMap.get(data.userId);
-              return {
-                rank: index + 1,
-                userId: data.userId,
-                username: user?.username || "Unknown",
-                profileImageUrl: user?.profileImageUrl || null,
-                value: data.portfolioValue.toFixed(2),
-              };
-            });
-        } else {
-          // netWorth
-          sortedUsers = usersWithPortfolio
-            .map(data => ({
-              ...data,
-              netWorth: parseFloat(data.balance) + data.portfolioValue,
-            }))
-            .sort((a, b) => b.netWorth - a.netWorth)
-            .map((data, index) => {
-              const user = userMap.get(data.userId);
-              return {
-                rank: index + 1,
-                userId: data.userId,
-                username: user?.username || "Unknown",
-                profileImageUrl: user?.profileImageUrl || null,
-                value: data.netWorth.toFixed(2),
-              };
-            });
+                userId: u.id,
+                username: u.username,
+                profileImageUrl: u.profileImageUrl,
+                value: u.totalSharesMined,
+              })),
+          };
         }
 
-        return res.json({ category, leaderboard: sortedUsers });
-      }
+        if (category === "marketOrders") {
+          const allUsers = await storage.getUsers();
+          return {
+            category: "marketOrders",
+            leaderboard: allUsers
+              .sort((a: User, b: User) => b.totalMarketOrders - a.totalMarketOrders)
+              .map((u: User, index: number) => ({
+                rank: index + 1,
+                userId: u.id,
+                username: u.username,
+                profileImageUrl: u.profileImageUrl,
+                value: u.totalMarketOrders,
+              })),
+          };
+        }
 
-      res.status(400).json({ error: "Invalid category" });
+        if (category === "cashBalance" || category === "portfolioValue" || category === "netWorth") {
+          const [usersWithPortfolio, allUsers] = await Promise.all([
+            storage.getAllUsersForRanking(),
+            storage.getUsers(),
+          ]);
+          const userMap = new Map(allUsers.map(u => [u.id, u]));
+
+          let sortedUsers: any[];
+          
+          if (category === "cashBalance") {
+            sortedUsers = usersWithPortfolio
+              .sort((a, b) => parseFloat(b.balance) - parseFloat(a.balance))
+              .map((data, index) => {
+                const user = userMap.get(data.userId);
+                return {
+                  rank: index + 1,
+                  userId: data.userId,
+                  username: user?.username || "Unknown",
+                  profileImageUrl: user?.profileImageUrl || null,
+                  value: parseFloat(data.balance).toFixed(2),
+                };
+              });
+          } else if (category === "portfolioValue") {
+            sortedUsers = usersWithPortfolio
+              .sort((a, b) => b.portfolioValue - a.portfolioValue)
+              .map((data, index) => {
+                const user = userMap.get(data.userId);
+                return {
+                  rank: index + 1,
+                  userId: data.userId,
+                  username: user?.username || "Unknown",
+                  profileImageUrl: user?.profileImageUrl || null,
+                  value: data.portfolioValue.toFixed(2),
+                };
+              });
+          } else {
+            // netWorth
+            sortedUsers = usersWithPortfolio
+              .map(data => ({
+                ...data,
+                netWorth: parseFloat(data.balance) + data.portfolioValue,
+              }))
+              .sort((a, b) => b.netWorth - a.netWorth)
+              .map((data, index) => {
+                const user = userMap.get(data.userId);
+                return {
+                  rank: index + 1,
+                  userId: data.userId,
+                  username: user?.username || "Unknown",
+                  profileImageUrl: user?.profileImageUrl || null,
+                  value: data.netWorth.toFixed(2),
+                };
+              });
+          }
+
+          return { category, leaderboard: sortedUsers };
+        }
+
+        return null;
+      }, 60_000);
+      
+      if (result === null) {
+        return res.status(400).json({ error: "Invalid category" });
+      }
+      
+      res.json(result);
     } catch (error: any) {
       console.error("[leaderboards] Error:", error);
       res.status(500).json({ error: error.message });
