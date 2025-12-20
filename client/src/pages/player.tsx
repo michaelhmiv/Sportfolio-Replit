@@ -63,7 +63,14 @@ export default function PlayerPage() {
   const [statsModalOpen, setStatsModalOpen] = useState(false);
 
   const { data, isLoading } = useQuery<PlayerPageData>({
-    queryKey: ["/api/player", id],
+    queryKey: ["/api/player", id, timeRange],
+    queryFn: async () => {
+      const res = await fetch(`/api/player/${id}?range=${timeRange}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch player data");
+      return res.json();
+    },
   });
 
   // Read URL query parameters to pre-fill order form (from portfolio bid/ask clicks)
@@ -122,20 +129,21 @@ export default function PlayerPage() {
     // Subscribe to trade events for this player
     const unsubTrade = subscribe('trade', (data) => {
       if (data.playerId === id) {
-        queryClient.invalidateQueries({ queryKey: ["/api/player", id] });
+        // Invalidate current time range query
+        queryClient.invalidateQueries({ queryKey: ["/api/player", id, timeRange] });
       }
     });
 
     // Subscribe to order book changes for this player
     const unsubOrderBook = subscribe('orderBook', (data) => {
       if (data.playerId === id) {
-        queryClient.invalidateQueries({ queryKey: ["/api/player", id] });
+        queryClient.invalidateQueries({ queryKey: ["/api/player", id, timeRange] });
       }
     });
 
     // Subscribe to portfolio events (affects user balance and holdings)
     const unsubPortfolio = subscribe('portfolio', () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/player", id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/player", id, timeRange] });
     });
 
     return () => {
@@ -143,7 +151,7 @@ export default function PlayerPage() {
       unsubOrderBook();
       unsubPortfolio();
     };
-  }, [id, subscribe]);
+  }, [id, subscribe, timeRange]);
 
   // SEO: Update meta tags when player data loads
   useEffect(() => {
