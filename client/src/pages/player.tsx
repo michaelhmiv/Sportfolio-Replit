@@ -345,11 +345,17 @@ export default function PlayerPage() {
   
   // Calculate Y-axis domain with 5% padding for better chart visualization
   const chartDomain = (() => {
-    if (priceHistory.length === 0) return [0, 100];
+    if (priceHistory.length === 0) return undefined; // Let recharts auto-calculate
     const prices = priceHistory.map(p => typeof p.price === 'string' ? parseFloat(p.price) : p.price);
     const minPrice = Math.min(...prices);
     const maxPrice = Math.max(...prices);
-    const padding = (maxPrice - minPrice) * 0.05 || maxPrice * 0.05 || 1;
+    // Handle flat or zero data gracefully
+    if (minPrice === maxPrice) {
+      const value = minPrice || 1; // Default to 1 if all zeros
+      return [Math.max(0, value * 0.9), value * 1.1];
+    }
+    const range = maxPrice - minPrice;
+    const padding = range * 0.05;
     return [Math.max(0, minPrice - padding), maxPrice + padding];
   })();
 
@@ -459,6 +465,7 @@ export default function PlayerPage() {
                         fontSize={10}
                         tickFormatter={(val) => {
                           const d = new Date(val);
+                          if (isNaN(d.getTime())) return '';
                           return timeRange === "1D" 
                             ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                             : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
