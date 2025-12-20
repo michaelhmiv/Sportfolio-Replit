@@ -670,8 +670,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (miningData?.playerId) playerIds.add(miningData.playerId);
       miningSplits.forEach(s => playerIds.add(s.playerId));
       
-      // Batch fetch all needed players in one query
-      const players = await storage.getPlayersByIds(Array.from(playerIds));
+      // Parallel fetch: players, ranks, and yesterday's snapshot
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      
+      const [players, latestRanks, yesterdaySnapshot] = await Promise.all([
+        storage.getPlayersByIds(Array.from(playerIds)),
+        storage.getLatestSnapshotRanks(),
+        storage.getPortfolioSnapshot(user.id, yesterday),
+      ]);
       const playerMap = new Map(players.map(p => [p.id, p]));
 
       // Calculate portfolio value using pre-fetched players
@@ -686,8 +693,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      // Enrich hot players with market values
-      const hotPlayers = await Promise.all(hotPlayersRaw.map(enrichPlayerWithMarketValue));
+      // Enrich hot players with market values (sync operation using pre-fetched data)
+      const hotPlayers = hotPlayersRaw.map(enrichPlayerWithMarketValue);
 
       // Get top 3 holdings by value using pre-fetched players
       const topHoldings = [];
@@ -734,8 +741,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         miningPlayer = playerMap.get(miningData.playerId);
       }
 
-      // Try to get ranks from latest snapshot for performance
-      const latestRanks = await storage.getLatestSnapshotRanks();
+      // Get ranks from cached snapshot or calculate real-time
       const cachedRank = latestRanks.get(user.id);
       
       let currentCashRank = cachedRank?.cashRank || 1;
@@ -755,12 +761,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         );
         currentPortfolioRank = portfolioSorted.findIndex(u => u.userId === user.id) + 1;
       }
-      
-      // Get yesterday's snapshot to calculate rank changes
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      
-      const yesterdaySnapshot = await storage.getPortfolioSnapshot(user.id, yesterday);
       
       const cashRankChange = yesterdaySnapshot?.cashRank 
         ? yesterdaySnapshot.cashRank - currentCashRank 
