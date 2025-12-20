@@ -1,6 +1,11 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import { getSupabase } from "./supabase";
 
+function debugLog(stage: string, message: string, data?: any) {
+  const elapsed = performance.now().toFixed(0);
+  console.log(`[QUERY ${elapsed}ms] ${stage}: ${message}`, data || '');
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -16,7 +21,7 @@ async function getAuthHeaders(): Promise<HeadersInit> {
       return { 'Authorization': `Bearer ${session.access_token}` };
     }
   } catch (error) {
-    console.error('[AUTH] Failed to get auth headers:', error);
+    debugLog('AUTH_HEADERS', 'Failed to get auth headers', { error: (error as Error).message });
   }
   return {};
 }
@@ -65,40 +70,86 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const url = queryKey.join("/") as string;
-    const authHeaders = await getAuthHeaders();
+    const startTime = performance.now();
+    debugLog('FETCH', `Starting request: ${url}`);
     
-    // For returnNull behavior, retry a few times with delays to let session sync up
-    if (unauthorizedBehavior === "returnNull") {
-      const maxRetries = 3;
-      const retryDelays = [500, 1000, 1500];
+    try {
+      const authHeaders = await getAuthHeaders();
       
-      for (let attempt = 0; attempt <= maxRetries; attempt++) {
-        const res = await fetch(url, { 
-          credentials: "include",
-          headers: authHeaders,
-        });
+      if (unauthorizedBehavior === "returnNull") {
+        const maxRetries = 3;
+        const retryDelays = [500, 1000, 1500];
         
-        if (res.status === 401) {
-          if (attempt < maxRetries) {
-            await sleep(retryDelays[attempt]);
-            continue;
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+            debugLog('FETCH', `TIMEOUT on attempt ${attempt + 1}: ${url}`);
+            controller.abort();
+          }, 15000);
+          
+          try {
+            const res = await fetch(url, { 
+              credentials: "include",
+              headers: authHeaders,
+              signal: controller.signal,
+            });
+            clearTimeout(timeoutId);
+            
+            const elapsed = (performance.now() - startTime).toFixed(0);
+            
+            if (res.status === 401) {
+              debugLog('FETCH', `Got 401 on attempt ${attempt + 1}, ${attempt < maxRetries ? 'retrying...' : 'giving up'}`);
+              if (attempt < maxRetries) {
+                await sleep(retryDelays[attempt]);
+                continue;
+              }
+              return null;
+            }
+            
+            debugLog('FETCH', `Completed in ${elapsed}ms: ${url}`, { status: res.status });
+            await throwIfResNotOk(res);
+            return await res.json();
+          } catch (error) {
+            clearTimeout(timeoutId);
+            if (error instanceof Error && error.name === 'AbortError') {
+              debugLog('FETCH', `Request aborted (timeout) on attempt ${attempt + 1}: ${url}`);
+              if (attempt < maxRetries) {
+                await sleep(retryDelays[attempt]);
+                continue;
+              }
+            }
+            throw error;
           }
-          return null;
         }
-        
-        await throwIfResNotOk(res);
-        return await res.json();
+        return null;
       }
-      return null;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        debugLog('FETCH', `TIMEOUT: ${url}`);
+        controller.abort();
+      }, 15000);
+      
+      const res = await fetch(url, { 
+        credentials: "include",
+        headers: authHeaders,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      
+      const elapsed = (performance.now() - startTime).toFixed(0);
+      debugLog('FETCH', `Completed in ${elapsed}ms: ${url}`, { status: res.status });
+      
+      await throwIfResNotOk(res);
+      return await res.json();
+    } catch (error) {
+      const elapsed = (performance.now() - startTime).toFixed(0);
+      debugLog('FETCH', `FAILED after ${elapsed}ms: ${url}`, { 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        isAbort: error instanceof Error && error.name === 'AbortError'
+      });
+      throw error;
     }
-    
-    // Standard behavior - no retry
-    const res = await fetch(url, { 
-      credentials: "include",
-      headers: authHeaders,
-    });
-    await throwIfResNotOk(res);
-    return await res.json();
   };
 
 export const queryClient = new QueryClient({
@@ -107,8 +158,14 @@ export const queryClient = new QueryClient({
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: 10000, // 10 seconds default - balance between freshness and performance
-      retry: false,
+      staleTime: 10000,
+      retry: (failureCount, error) => {
+        if (error instanceof Error && error.name === 'AbortError') {
+          return failureCount < 2;
+        }
+        return false;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
     },
     mutations: {
       retry: false,

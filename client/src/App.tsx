@@ -87,8 +87,22 @@ function ProfileRedirect({ userId }: { userId: string }) {
 }
 
 function Router() {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, initError, retryInit } = useAuth();
   const [location] = useLocation();
+  const [loadingTime, setLoadingTime] = useState(0);
+
+  // Track how long we've been loading
+  useEffect(() => {
+    if (isLoading) {
+      const startTime = Date.now();
+      const interval = setInterval(() => {
+        setLoadingTime(Math.floor((Date.now() - startTime) / 1000));
+      }, 1000);
+      return () => clearInterval(interval);
+    } else {
+      setLoadingTime(0);
+    }
+  }, [isLoading]);
 
   // Ensure viewport is properly set after OAuth redirect on mobile
   useEffect(() => {
@@ -106,6 +120,35 @@ function Router() {
     }
   }, []);
 
+  // Show error state with retry option
+  if (initError) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center max-w-md px-4">
+          <div className="flex justify-center mb-4">
+            <div className="w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
+              <svg className="w-6 h-6 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            </div>
+          </div>
+          <h2 className="text-xl font-bold mb-2">Connection Issue</h2>
+          <p className="text-muted-foreground mb-4">
+            Unable to connect to the server. This may happen after a site update.
+          </p>
+          <p className="text-sm text-muted-foreground mb-4 font-mono bg-muted p-2 rounded">
+            {initError}
+          </p>
+          <Button onClick={retryInit} data-testid="button-retry-connection">
+            Retry Connection
+          </Button>
+          <p className="text-xs text-muted-foreground mt-4">
+            If this persists, try refreshing the page or clearing your browser cache.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -113,6 +156,22 @@ function Router() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
+          {loadingTime > 3 && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Taking longer than usual... ({loadingTime}s)
+            </p>
+          )}
+          {loadingTime > 10 && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="mt-4"
+              onClick={() => window.location.reload()}
+              data-testid="button-refresh-page"
+            >
+              Refresh Page
+            </Button>
+          )}
         </div>
       </div>
     );

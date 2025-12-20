@@ -6,7 +6,28 @@ import { db } from "./db";
 import { botProfiles } from "@shared/schema";
 import { sql } from "drizzle-orm";
 
+const serverStartTime = Date.now();
+let serverReady = false;
+
+function startupLog(stage: string, message: string) {
+  const elapsed = Date.now() - serverStartTime;
+  console.log(`[STARTUP +${elapsed}ms] ${stage}: ${message}`);
+}
+
+startupLog('INIT', 'Server starting...');
+
 const app = express();
+
+// Health check endpoint - always available, even during startup
+app.get('/api/health', (_req, res) => {
+  const uptime = Date.now() - serverStartTime;
+  res.json({
+    status: serverReady ? 'ready' : 'starting',
+    uptime,
+    uptimeSeconds: Math.floor(uptime / 1000),
+    timestamp: new Date().toISOString(),
+  });
+});
 
 declare module 'http' {
   interface IncomingMessage {
@@ -51,7 +72,9 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  startupLog('ROUTES', 'Registering routes...');
   const server = await registerRoutes(app);
+  startupLog('ROUTES', 'Routes registered');
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
@@ -65,9 +88,13 @@ app.use((req, res, next) => {
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
   if (app.get("env") === "development") {
+    startupLog('VITE', 'Setting up Vite dev server...');
     await setupVite(app, server);
+    startupLog('VITE', 'Vite dev server ready');
   } else {
+    startupLog('STATIC', 'Setting up static file serving');
     serveStatic(app);
+    startupLog('STATIC', 'Static file serving ready');
   }
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
@@ -75,11 +102,13 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
+  startupLog('LISTEN', `Starting server on port ${port}...`);
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, async () => {
+    startupLog('LISTEN', `Server listening on port ${port}`);
     log(`serving on port ${port}`);
     
     // Startup migration: Ensure all bot profiles have unlimited daily limits
@@ -116,5 +145,9 @@ app.use((req, res, next) => {
       log("Skipping API-dependent jobs - MYSPORTSFEEDS_API_KEY not set");
       log("Contest jobs will still process data from the database when available");
     }
+    
+    // Mark server as fully ready
+    serverReady = true;
+    startupLog('READY', 'Server fully initialized and ready to serve requests');
   });
 })();
