@@ -712,8 +712,8 @@ export default function Marketplace() {
                       </tr>
                       );
 
-                      // Insert ad after every 6 players (but not after the last player)
-                      if ((index + 1) % 6 === 0 && index < players.length - 1) {
+                      // Insert ad after every 10 players (but not after the last player)
+                      if ((index + 1) % 10 === 0 && index < players.length - 1) {
                         return [
                           playerRow,
                           <tr key={`ad-${index}`} className="border-b">
