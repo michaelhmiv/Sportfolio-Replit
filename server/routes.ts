@@ -1497,6 +1497,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Market order preview - simulates matching without executing
+  app.get("/api/orders/:playerId/preview", optionalAuth, async (req, res) => {
+    try {
+      const { side, quantity: quantityStr } = req.query;
+      const quantity = parseInt(quantityStr as string);
+      
+      if (!side || (side !== "buy" && side !== "sell")) {
+        return res.status(400).json({ error: "Invalid side - must be 'buy' or 'sell'" });
+      }
+      
+      if (!quantity || quantity <= 0 || isNaN(quantity)) {
+        return res.status(400).json({ error: "Invalid quantity" });
+      }
+      
+      const player = await storage.getPlayer(req.params.playerId);
+      if (!player) {
+        return res.status(404).json({ error: "Player not found" });
+      }
+      
+      const orderBook = await storage.getOrderBook(req.params.playerId);
+      const availableOrders = side === "buy" ? orderBook.asks : orderBook.bids;
+      
+      // Sort by price: asks ascending (best first), bids descending (best first)
+      const sortedOrders = [...availableOrders]
+        .filter(o => o.limitPrice && parseFloat(o.limitPrice) > 0 && (o.quantity - o.filledQuantity) > 0)
+        .sort((a, b) => {
+          const priceA = parseFloat(a.limitPrice!);
+          const priceB = parseFloat(b.limitPrice!);
+          return side === "buy" ? priceA - priceB : priceB - priceA;
+        });
+      
+      if (sortedOrders.length === 0) {
+        return res.json({
+          canFill: false,
+          fillableQuantity: 0,
+          requestedQuantity: quantity,
+          fills: [],
+          avgPrice: null,
+          totalCost: null,
+          message: "No liquidity available"
+        });
+      }
+      
+      // Simulate walking through the book
+      let remainingQuantity = quantity;
+      const fills: { price: string; quantity: number; total: string }[] = [];
+      let totalCost = 0;
+      let totalFilled = 0;
+      
+      for (const order of sortedOrders) {
+        if (remainingQuantity <= 0) break;
+        
+        const orderPrice = parseFloat(order.limitPrice!);
+        const orderAvailable = order.quantity - order.filledQuantity;
+        const fillQuantity = Math.min(remainingQuantity, orderAvailable);
+        const fillCost = fillQuantity * orderPrice;
+        
+        fills.push({
+          price: orderPrice.toFixed(2),
+          quantity: fillQuantity,
+          total: fillCost.toFixed(2)
+        });
+        
+        totalCost += fillCost;
+        totalFilled += fillQuantity;
+        remainingQuantity -= fillQuantity;
+      }
+      
+      const avgPrice = totalFilled > 0 ? totalCost / totalFilled : 0;
+      const bestPrice = sortedOrders.length > 0 ? parseFloat(sortedOrders[0].limitPrice!) : 0;
+      const worstFillPrice = fills.length > 0 ? parseFloat(fills[fills.length - 1].price) : 0;
+      
+      // Calculate slippage as percentage from best price
+      const slippage = bestPrice > 0 && worstFillPrice > 0 
+        ? Math.abs((worstFillPrice - bestPrice) / bestPrice * 100)
+        : 0;
+      
+      res.json({
+        canFill: totalFilled >= quantity,
+        fillableQuantity: totalFilled,
+        requestedQuantity: quantity,
+        fills,
+        avgPrice: avgPrice.toFixed(2),
+        totalCost: totalCost.toFixed(2),
+        bestPrice: bestPrice.toFixed(2),
+        worstFillPrice: worstFillPrice.toFixed(2),
+        slippage: slippage.toFixed(2),
+        side,
+        message: totalFilled < quantity 
+          ? `Only ${totalFilled} of ${quantity} shares available` 
+          : `Full fill available at avg $${avgPrice.toFixed(2)}`
+      });
+    } catch (error: any) {
+      console.error("[API] Error generating order preview:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Place order
   app.post("/api/orders/:playerId", isAuthenticated, async (req, res) => {
     try {

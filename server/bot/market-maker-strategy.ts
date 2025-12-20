@@ -115,10 +115,10 @@ function calculateOrderSize(
     return 0;
   }
   
-  // Use smaller order sizes to enable more player coverage
-  // Minimum is 1 share, max capped at configured limit and 5 shares for diversification
-  const effectiveMinSize = 1; // Always allow at least 1 share orders
-  const effectiveMaxSize = Math.min(5, config.maxOrderSize); // Cap to encourage diversification
+  // Use order sizes from bot profile configuration
+  // Removed artificial 5-share cap - bots should trade at their configured levels
+  const effectiveMinSize = config.minOrderSize;
+  const effectiveMaxSize = config.maxOrderSize;
   
   // Base size influenced by aggressiveness (smaller orders = more players covered)
   const baseSize = Math.floor(

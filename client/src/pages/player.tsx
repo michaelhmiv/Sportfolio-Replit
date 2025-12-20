@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, BarChart2 } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { TrendingUp, TrendingDown, BarChart2, HelpCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { LineChart, Line, XAxis, YAxis, Tooltip as RechartsTooltip, ResponsiveContainer } from "recharts";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
@@ -32,6 +33,20 @@ interface PlayerPageData {
 }
 
 type TimeRange = "1D" | "1W" | "1M" | "1Y";
+
+interface MarketOrderPreview {
+  canFill: boolean;
+  fillableQuantity: number;
+  requestedQuantity: number;
+  fills: { price: string; quantity: number; total: string }[];
+  avgPrice: string | null;
+  totalCost: string | null;
+  bestPrice: string;
+  worstFillPrice: string;
+  slippage: string;
+  side: "buy" | "sell";
+  message: string;
+}
 
 export default function PlayerPage() {
   const { id } = useParams<{ id: string }>();
@@ -87,6 +102,17 @@ export default function PlayerPage() {
   }>({
     queryKey: ["/api/player", id, "contest-earnings"],
     enabled: !!id,
+  });
+
+  // Market order preview - fetches estimated fills when market order selected
+  const parsedQuantity = parseInt(quantity) || 0;
+  const previewUrl = id && parsedQuantity > 0 ? `/api/orders/${id}/preview?side=${side}&quantity=${parsedQuantity}` : null;
+  const { data: marketPreview, isLoading: previewLoading, isError: previewError } = useQuery<MarketOrderPreview>({
+    queryKey: [previewUrl],
+    enabled: !!previewUrl && orderType === "market",
+    staleTime: 5000,
+    refetchOnWindowFocus: false,
+    retry: false,
   });
 
   // WebSocket listener for real-time player page updates
@@ -411,7 +437,7 @@ export default function PlayerPage() {
                     <LineChart data={priceHistory}>
                       <XAxis dataKey="timestamp" stroke="hsl(var(--muted-foreground))" fontSize={10} />
                       <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                      <Tooltip 
+                      <RechartsTooltip 
                         contentStyle={{ 
                           backgroundColor: "hsl(var(--popover))", 
                           border: "1px solid hsl(var(--border))",
@@ -554,13 +580,35 @@ export default function PlayerPage() {
                   </TabsList>
                 </Tabs>
 
-                {/* Order Type */}
-                <Tabs value={orderType} onValueChange={(v) => setOrderType(v as "limit" | "market")}>
-                  <TabsList className="grid w-full grid-cols-2 h-8">
-                    <TabsTrigger value="limit" className="text-xs" data-testid="tab-limit">Limit</TabsTrigger>
-                    <TabsTrigger value="market" className="text-xs" data-testid="tab-market">Market</TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                {/* Order Type with Help Tooltips */}
+                <div className="space-y-1">
+                  <div className="flex items-center gap-1">
+                    <label className="text-[10px] font-medium uppercase tracking-wide">Order Type</label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="h-3 w-3 text-muted-foreground cursor-help" data-testid="help-order-type" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[280px] text-xs p-3">
+                        <div className="space-y-2">
+                          <div>
+                            <span className="font-semibold">Limit Order:</span> Set your own price. Your order waits in the book until someone matches it.
+                            <div className="text-muted-foreground mt-1">Example: "Buy 10 LeBron shares at $45" - only fills if someone sells at $45 or less.</div>
+                          </div>
+                          <div>
+                            <span className="font-semibold">Market Order:</span> Execute immediately at the best available prices. May fill across multiple price levels.
+                            <div className="text-muted-foreground mt-1">Example: "Buy 50 Curry shares now" - fills instantly at current ask prices, but large orders may move the price.</div>
+                          </div>
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <Tabs value={orderType} onValueChange={(v) => setOrderType(v as "limit" | "market")}>
+                    <TabsList className="grid w-full grid-cols-2 h-8">
+                      <TabsTrigger value="limit" className="text-xs" data-testid="tab-limit">Limit</TabsTrigger>
+                      <TabsTrigger value="market" className="text-xs" data-testid="tab-market">Market</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
 
                 {/* Quantity */}
                 <div className="space-y-1">
@@ -595,6 +643,69 @@ export default function PlayerPage() {
                         data-testid="input-limit-price"
                       />
                     </div>
+                  </div>
+                )}
+
+                {/* Market Order Preview */}
+                {orderType === "market" && parsedQuantity > 0 && (
+                  <div className="p-2 bg-muted/50 rounded-md space-y-2 border border-border/50" data-testid="market-order-preview">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-medium uppercase tracking-wide">Order Preview</span>
+                      {previewLoading && <span className="text-[10px] text-muted-foreground animate-pulse">Loading...</span>}
+                    </div>
+                    
+                    {/* Error state */}
+                    {previewError && !previewLoading && (
+                      <div className="text-[10px] text-muted-foreground">
+                        Unable to load preview. Place order to see actual execution.
+                      </div>
+                    )}
+                    
+                    {marketPreview && !previewLoading && !previewError && (
+                      <>
+                        {/* Fill breakdown */}
+                        {marketPreview.fills.length > 0 ? (
+                          <div className="space-y-1">
+                            <div className="text-[10px] text-muted-foreground">Fill breakdown:</div>
+                            <div className="max-h-20 overflow-y-auto space-y-0.5">
+                              {marketPreview.fills.map((fill, i) => (
+                                <div key={i} className="flex justify-between text-[10px] font-mono">
+                                  <span>{fill.quantity} @ ${fill.price}</span>
+                                  <span className="text-muted-foreground">${fill.total}</span>
+                                </div>
+                              ))}
+                            </div>
+                            
+                            {/* Summary stats */}
+                            <div className="pt-1 border-t border-border/50 space-y-0.5">
+                              <div className="flex justify-between text-[10px]">
+                                <span className="text-muted-foreground">Avg Price:</span>
+                                <span className="font-mono font-medium">${marketPreview.avgPrice}</span>
+                              </div>
+                              {parseFloat(marketPreview.slippage) > 0.1 && (
+                                <div className="flex justify-between text-[10px]">
+                                  <span className="text-muted-foreground">Slippage:</span>
+                                  <span className={`font-mono ${parseFloat(marketPreview.slippage) > 2 ? 'text-destructive' : 'text-warning'}`}>
+                                    {marketPreview.slippage}%
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Partial fill warning */}
+                            {!marketPreview.canFill && (
+                              <div className="text-[10px] text-warning bg-warning/10 p-1 rounded">
+                                Only {marketPreview.fillableQuantity} of {marketPreview.requestedQuantity} shares available
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-muted-foreground">
+                            No liquidity available for this order
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
 

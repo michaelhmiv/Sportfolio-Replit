@@ -49,6 +49,17 @@ The platform uses a centralized order matching engine in `server/order-matcher.t
 - `placeBotLimitOrder()`: Used by bots to place orders with proper resource locking and automatic matching
 - Handles cash/share locking, balance updates, holdings updates, player price updates, and real-time WebSocket broadcasts
 - Both routes.ts and bot strategies import from this shared module to ensure consistent matching behavior
+- Order book includes both "open" and "partial" status orders to allow continued matching of partially filled orders
+
+**Market Order Preview:**
+The `/api/orders/:playerId/preview` endpoint simulates market order execution before placing:
+- Accepts `side` (buy/sell) and `quantity` as query parameters
+- Returns fill breakdown (price levels, quantities, costs), average price, slippage percentage, and total cost
+- Helps users understand price impact before executing large market orders
+- Player page shows live preview when entering market order quantities
+
+**Trading UI Help:**
+Order type tooltips explain the difference between Limit and Market orders with Sportfolio-specific examples to help new users understand trading mechanics.
 
 ### Background Jobs
 `node-cron` manages background jobs for `roster_sync`, `schedule_sync`, `stats_sync`, `update_contest_statuses`, `settle_contests`, `create_contests`, and `bot_engine`. A Contest Lifecycle & Settlement System automates contest progression. A Universal Live Logging System provides real-time SSE-based logs for admin operations.

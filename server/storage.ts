@@ -1202,7 +1202,7 @@ export class DatabaseStorage implements IStorage {
     const allOrders = await db
       .select()
       .from(orders)
-      .where(and(eq(orders.playerId, playerId), eq(orders.status, "open")));
+      .where(and(eq(orders.playerId, playerId), or(eq(orders.status, "open"), eq(orders.status, "partial"))));
     
     const bids = allOrders
       .filter(o => o.side === "buy" && o.orderType === "limit")
@@ -1222,13 +1222,13 @@ export class DatabaseStorage implements IStorage {
       return new Map();
     }
 
-    // Fetch all open orders for ALL players in one query
+    // Fetch all open and partial orders for ALL players in one query
     const allOrders = await db
       .select()
       .from(orders)
       .where(and(
         inArray(orders.playerId, playerIds),
-        eq(orders.status, "open")
+        or(eq(orders.status, "open"), eq(orders.status, "partial"))
       ));
 
     // Group orders by player and calculate order book data
