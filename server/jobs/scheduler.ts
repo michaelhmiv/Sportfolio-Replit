@@ -108,7 +108,7 @@ export class JobScheduler {
     const contestJobs: JobConfig[] = [
       {
         name: "update_contest_statuses",
-        schedule: "* * * * *", // Every minute - transition contests from open to live
+        schedule: "*/5 * * * *", // Every 5 minutes - transition contests from open to live
         enabled: true,
         handler: updateContestStatuses,
       },
@@ -120,7 +120,7 @@ export class JobScheduler {
       },
       {
         name: "bot_engine",
-        schedule: "*/2 * * * *", // Every 2 minutes - run market maker bots
+        schedule: "*/10 * * * *", // Every 10 minutes - run market maker bots
         enabled: true,
         handler: async () => {
           const result = await runBotEngineTick();
@@ -173,7 +173,7 @@ export class JobScheduler {
       },
       {
         name: "stats_sync_live",
-        schedule: "* * * * *", // Every minute for live games
+        schedule: "*/5 * * * *", // Every 5 minutes for live games
         enabled: true,
         handler: syncStatsLive,
       },

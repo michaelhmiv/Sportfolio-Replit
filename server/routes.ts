@@ -639,8 +639,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
       
-      // Accrue mining shares based on elapsed time
-      await accrueVestingShares(user.id);
+      // Accrue mining shares in background (fire-and-forget for dashboard speed)
+      // Vesting is also triggered by: cron job, vesting modal, claim, redeem, login
+      accrueVestingShares(user.id).catch(err => console.error('[Vesting] Background accrual error:', err));
       
       // Fetch user-specific data in parallel
       const [userHoldings, miningData, miningSplits] = await Promise.all([
