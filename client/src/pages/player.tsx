@@ -342,6 +342,16 @@ export default function PlayerPage() {
 
   const { player, priceHistory, orderBook, recentTrades } = data;
   const playerName = `${player.firstName} ${player.lastName}`;
+  
+  // Calculate Y-axis domain with 5% padding for better chart visualization
+  const chartDomain = (() => {
+    if (priceHistory.length === 0) return [0, 100];
+    const prices = priceHistory.map(p => typeof p.price === 'string' ? parseFloat(p.price) : p.price);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const padding = (maxPrice - minPrice) * 0.05 || maxPrice * 0.05 || 1;
+    return [Math.max(0, minPrice - padding), maxPrice + padding];
+  })();
 
   return (
     <div className="min-h-screen bg-background p-2 sm:p-3 lg:p-4">
@@ -443,8 +453,23 @@ export default function PlayerPage() {
                 {priceHistory.length > 0 ? (
                   <ResponsiveContainer width="100%" height={180} className="sm:!h-[240px]">
                     <LineChart data={priceHistory}>
-                      <XAxis dataKey="timestamp" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                      <YAxis stroke="hsl(var(--muted-foreground))" fontSize={10} />
+                      <XAxis 
+                        dataKey="timestamp" 
+                        stroke="hsl(var(--muted-foreground))" 
+                        fontSize={10}
+                        tickFormatter={(val) => {
+                          const d = new Date(val);
+                          return timeRange === "1D" 
+                            ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                            : d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                        }}
+                      />
+                      <YAxis 
+                        stroke="hsl(var(--muted-foreground))" 
+                        fontSize={10} 
+                        domain={chartDomain}
+                        tickFormatter={(val) => `$${val.toFixed(2)}`}
+                      />
                       <RechartsTooltip 
                         contentStyle={{ 
                           backgroundColor: "hsl(var(--popover))", 
