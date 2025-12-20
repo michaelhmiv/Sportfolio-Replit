@@ -1220,17 +1220,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Enrich with market value
       const player = await enrichPlayerWithMarketValue(playerRaw);
       
+      // Parse time range for chart data (1D, 1W, 1M, 1Y)
+      const range = (req.query.range as string) || "1D";
+      const rangeHours: Record<string, number> = {
+        "1D": 24,
+        "1W": 24 * 7,
+        "1M": 24 * 30,
+        "1Y": 24 * 365,
+      };
+      const hoursBack = rangeHours[range] || 24;
+      const cutoffDate = new Date(Date.now() - hoursBack * 60 * 60 * 1000);
+      
+      // Get trades within time range for chart (more trades for longer ranges)
+      const tradesLimit = range === "1Y" ? 500 : range === "1M" ? 200 : range === "1W" ? 100 : 50;
+      const allTrades = await storage.getRecentTrades(player.id, tradesLimit);
+      
+      // Filter trades within time range
+      const tradesInRange = allTrades.filter(t => new Date(t.executedAt) >= cutoffDate);
+      
+      // Build priceHistory from actual trades (sorted oldest to newest for chart)
+      const priceHistory = tradesInRange
+        .map(trade => ({
+          timestamp: trade.executedAt.toISOString(),
+          price: parseFloat(trade.price),
+        }))
+        .reverse(); // Oldest first for proper chart display
+      
       const orderBook = await storage.getOrderBook(player.id);
-      const recentTrades = await storage.getRecentTrades(player.id, 20);
+      const recentTrades = allTrades.slice(0, 20); // Always show 20 most recent trades in the list
       const userHolding = await storage.getHolding(user.id, "player", player.id);
-
-      // Price history: empty array if no trades, flat line at last trade price if trades exist
-      const priceHistory = player.lastTradePrice
-        ? Array.from({ length: 24 }, (_, i) => ({
-            timestamp: new Date(Date.now() - (23 - i) * 3600000).toISOString(),
-            price: player.lastTradePrice,
-          }))
-        : [];
 
       // Calculate available balance (excluding locked cash for buy orders)
       const availableBalance = await storage.getAvailableBalance(user.id);
