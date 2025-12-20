@@ -14,7 +14,7 @@ export function WhopAd({ className = "", isPremium = false }: WhopAdProps) {
         src="https://whop.com/embedded/ads/v1/user_y0gCgIDxLqIdE/Sports?size=300x250"
         width="300"
         height="250"
-        style={{ border: "none", borderRadius: "8px" }}
+        style={{ border: "none", borderRadius: "4px" }}
         title="Whop Ads - Sports"
       />
     </div>
