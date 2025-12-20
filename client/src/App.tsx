@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { WebSocketProvider, useWebSocket } from "@/lib/websocket";
+import { ConnectionStatus } from "@/components/connection-status";
 import { NotificationProvider } from "@/lib/notification-context";
 import { useAuth, AuthProvider } from "@/hooks/useAuth";
 import { OnboardingModal } from "@/components/onboarding-modal";
@@ -401,6 +402,7 @@ function App() {
       <AuthProvider>
         <SchemaOrg schema={[schemas.organization, schemas.website, schemas.webApplication]} />
         <WebSocketProvider>
+          <ConnectionStatus />
           <NotificationProvider>
             <TooltipProvider>
               <VestingProvider>
