@@ -56,7 +56,8 @@ export function invalidate(key: string): void {
  * Invalidate all keys matching a pattern.
  */
 export function invalidatePattern(pattern: RegExp): void {
-  for (const key of cache.keys()) {
+  const keys = Array.from(cache.keys());
+  for (const key of keys) {
     if (pattern.test(key)) {
       cache.delete(key);
     }

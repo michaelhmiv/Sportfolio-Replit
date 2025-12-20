@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer } from "ws";
+import { performance } from "node:perf_hooks";
 import { storage } from "./storage";
 import { db } from "./db";
 import { fetchActivePlayers, calculateFantasyPoints } from "./mysportsfeeds";
@@ -601,16 +602,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Dashboard - Now public for unauthenticated users (with limited data)
   app.get("/api/dashboard", optionalAuth, async (req, res) => {
     try {
+      const startTime = performance.now();
+      const timings: Record<string, number> = {};
+      
       // Check if user is authenticated
       const isUserAuthenticated = !!req.user;
       const userId = isUserAuthenticated ? getUserId(req) : null;
       
       // Fetch public data (always available)
+      const publicStart = performance.now();
       const [allContests, recentTrades, hotPlayersRaw] = await Promise.all([
         storage.getContests("open"),
         storage.getRecentTrades(undefined, 10),
         storage.getTopPlayersByVolume(5), // Get top 5 players by 24h volume directly from DB
       ]);
+      timings.publicData = performance.now() - publicStart;
       
       // If not authenticated, return public data only
       if (!isUserAuthenticated || !userId) {
@@ -619,11 +625,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recentTrades.forEach(t => playerIds.add(t.playerId));
         
         // Batch fetch needed players
+        const batchStart = performance.now();
         const players = await storage.getPlayersByIds(Array.from(playerIds));
+        timings.playerBatch = performance.now() - batchStart;
         const playerMap = new Map(players.map(p => [p.id, p]));
         
-        // Enrich hot players
-        const hotPlayers = await Promise.all(hotPlayersRaw.map(enrichPlayerWithMarketValue));
+        // Enrich hot players (sync operation, no await needed)
+        const hotPlayers = hotPlayersRaw.map(enrichPlayerWithMarketValue);
+        
+        timings.total = performance.now() - startTime;
+        console.log(`[Dashboard] Unauthenticated: ${timings.total.toFixed(0)}ms (public: ${timings.publicData.toFixed(0)}ms, playerBatch: ${timings.playerBatch.toFixed(0)}ms)`);
         
         return res.json({
           user: null, // No user data for anonymous visitors
@@ -2604,7 +2615,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const presets = await storage.getVestingPresets(userId);
       
       // Enrich with player data
-      const allPlayerIds = [...new Set(presets.flatMap(p => p.playerIds))];
+      const allPlayerIds = Array.from(new Set(presets.flatMap(p => p.playerIds)));
       const players = await storage.getPlayersByIds(allPlayerIds);
       const playerMap = new Map(players.map(p => [p.id, p]));
 
