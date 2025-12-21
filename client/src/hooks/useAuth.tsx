@@ -143,12 +143,41 @@ export function AuthProvider({ children }: AuthProviderProps) {
   );
 }
 
+// Dev mode bypass - automatically authenticate with mock user
+const DEV_BYPASS_ENABLED = import.meta.env.DEV;
+const DEV_MOCK_USER: User = {
+  id: 'dev-user-12345678',
+  email: 'dev@example.com',
+  firstName: 'Dev',
+  lastName: 'User',
+  username: 'dev_user',
+  profileImageUrl: null,
+  balance: "10000.00",
+  isAdmin: true,
+  isPremium: false,
+  premiumExpiresAt: null,
+  hasSeenOnboarding: true,
+  isBot: false,
+  totalSharesMined: 0,
+  totalMarketOrders: 0,
+  totalTradesExecuted: 0,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+};
+
 export function useAuth() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { session, isInitialized, supabaseClient, initError, retryInit } = useContext(AuthContext);
 
+  // In dev mode, return mock user immediately
   const fetchUserWithToken = useCallback(async (): Promise<AuthUserResponse | null> => {
+    // DEV BYPASS: Skip Supabase auth in development
+    if (DEV_BYPASS_ENABLED) {
+      debugLog('DEV_BYPASS', 'Development mode - returning mock user');
+      return DEV_MOCK_USER as AuthUserResponse;
+    }
+
     debugLog('FETCH_USER', 'fetchUserWithToken called', { 
       hasSession: !!session, 
       hasClient: !!supabaseClient,
@@ -205,7 +234,8 @@ export function useAuth() {
   const { data: user, isLoading: isQueryLoading, error: queryError } = useQuery<AuthUserResponse | null>({
     queryKey: ['/api/auth/user'],
     queryFn: fetchUserWithToken,
-    enabled: isInitialized && !!supabaseClient && !!session,
+    // In dev mode, always enable the query; in production, require session
+    enabled: DEV_BYPASS_ENABLED || (isInitialized && !!supabaseClient && !!session),
     staleTime: 5 * 60 * 1000,
     retry: 2,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
@@ -322,13 +352,15 @@ export function useAuth() {
     }
   }, [supabaseClient]);
 
-  const isLoading = !isInitialized || isQueryLoading;
+  // In dev mode, we're never loading and always authenticated
+  const isLoading = DEV_BYPASS_ENABLED ? false : (!isInitialized || isQueryLoading);
 
   return {
     user: user as User | undefined,
     session,
     isLoading,
-    isAuthenticated: !!session && !!user,
+    // In dev mode, authenticated once user query returns; in production, require session
+    isAuthenticated: DEV_BYPASS_ENABLED ? !!user : (!!session && !!user),
     login,
     signup,
     logout,
