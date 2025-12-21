@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useParams, useSearch } from "wouter";
 import { useWebSocket } from "@/lib/websocket";
+import { useAuth } from "@/hooks/useAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,6 +54,7 @@ export default function PlayerPage() {
   const searchString = useSearch();
   const { toast } = useToast();
   const { subscribe } = useWebSocket();
+  const { isAuthenticated, isLoading: authLoading, session } = useAuth();
   const [orderType, setOrderType] = useState<"limit" | "market">("limit");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [quantity, setQuantity] = useState("");
@@ -65,12 +67,18 @@ export default function PlayerPage() {
   const { data, isLoading, isError } = useQuery<PlayerPageData>({
     queryKey: ["/api/player", id, timeRange],
     queryFn: async () => {
+      const headers: HeadersInit = {};
+      if (session?.access_token) {
+        headers['Authorization'] = `Bearer ${session.access_token}`;
+      }
       const res = await fetch(`/api/player/${id}?range=${timeRange}`, {
         credentials: "include",
+        headers,
       });
       if (!res.ok) throw new Error("Failed to fetch player data");
       return res.json();
     },
+    enabled: !!id && !authLoading,
   });
 
   // Read URL query parameters to pre-fill order form (from portfolio bid/ask clicks)
@@ -348,7 +356,7 @@ export default function PlayerPage() {
     );
   }
 
-  if (isLoading || !data) {
+  if (authLoading || isLoading || !data) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-muted-foreground">Loading player...</div>
