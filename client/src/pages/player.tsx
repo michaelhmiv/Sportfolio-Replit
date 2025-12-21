@@ -62,7 +62,7 @@ export default function PlayerPage() {
   const [hasAppliedUrlParams, setHasAppliedUrlParams] = useState(false);
   const [statsModalOpen, setStatsModalOpen] = useState(false);
 
-  const { data, isLoading } = useQuery<PlayerPageData>({
+  const { data, isLoading, isError } = useQuery<PlayerPageData>({
     queryKey: ["/api/player", id, timeRange],
     queryFn: async () => {
       const res = await fetch(`/api/player/${id}?range=${timeRange}`, {
@@ -331,6 +331,22 @@ export default function PlayerPage() {
       duration: 3000
     });
   };
+
+  if (isError) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Card className="w-96">
+          <CardHeader>
+            <CardTitle>Player Not Found</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-muted-foreground mb-4">The player you're looking for doesn't exist or has been removed.</p>
+            <Button onClick={() => window.location.href = "/"}>Back to Dashboard</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   if (isLoading || !data) {
     return (
