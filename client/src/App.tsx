@@ -89,8 +89,17 @@ function ProfileRedirect({ userId }: { userId: string }) {
 
 function Router() {
   const { user, isAuthenticated, isLoading, initError, retryInit } = useAuth();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [loadingTime, setLoadingTime] = useState(0);
+
+  // Handle OAuth redirect hash tokens - redirect to /auth/callback if access_token is in hash
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes('access_token=')) {
+      // Preserve the hash and redirect to auth callback
+      navigate(`/auth/callback${hash}`, { replace: true });
+    }
+  }, [navigate]);
 
   // Track how long we've been loading
   useEffect(() => {
@@ -163,9 +172,9 @@ function Router() {
             </p>
           )}
           {loadingTime > 10 && (
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="mt-4"
               onClick={() => window.location.reload()}
               data-testid="button-refresh-page"
@@ -194,10 +203,10 @@ function Router() {
           {/* Auth routes */}
           <Route path="/login" component={Login} />
           <Route path="/auth/callback" component={AuthCallback} />
-          
+
           {/* Dashboard is now public - shows live data with login CTAs for non-authenticated users */}
           <Route path="/" component={Dashboard} />
-          
+
           {/* Public routes - contests and leaderboards */}
           <Route path="/contests" component={Contests} />
           <Route path="/contest/:id/leaderboard" component={ContestLeaderboard} />
@@ -212,7 +221,7 @@ function Router() {
           <Route path="/contact" component={Contact} />
           <Route path="/how-it-works" component={HowItWorks} />
           <Route path="/analytics" component={Analytics} />
-          
+
           {/* Protected routes - require authentication, redirect to dashboard if not logged in */}
           <Route path="/player/:id">
             {isAuthenticated ? <PlayerPage /> : <Dashboard />}
@@ -238,10 +247,10 @@ function Router() {
           <Route path="/profile">
             {isAuthenticated && user ? <ProfileRedirect userId={user.id} /> : <Dashboard />}
           </Route>
-          
+
           {/* Auth error page - public, always accessible */}
           <Route path="/auth/error" component={AuthError} />
-          
+
           <Route component={NotFound} />
         </Switch>
       </motion.div>
@@ -253,7 +262,7 @@ function Header({ onVestShares }: { onVestShares: () => void }) {
   const { user, isAuthenticated, logout } = useAuth();
   const [, navigate] = useLocation();
   const { subscribe } = useWebSocket();
-  const { data: dashboardData } = useQuery<{ user: { balance: string; portfolioValue: string } }>({ 
+  const { data: dashboardData } = useQuery<{ user: { balance: string; portfolioValue: string } }>({
     queryKey: ['/api/dashboard'],
   });
 
@@ -310,7 +319,7 @@ function Header({ onVestShares }: { onVestShares: () => void }) {
                 <span data-testid="text-username">{userName}</span>
               </div>
             </Link>
-            <Button 
+            <Button
               size="icon"
               variant="ghost"
               asChild
@@ -322,7 +331,7 @@ function Header({ onVestShares }: { onVestShares: () => void }) {
                 <User className="h-4 w-4" />
               </Link>
             </Button>
-            <Button 
+            <Button
               size="icon"
               variant="ghost"
               onClick={async () => {
@@ -336,7 +345,7 @@ function Header({ onVestShares }: { onVestShares: () => void }) {
             </Button>
           </>
         ) : (
-          <Button 
+          <Button
             asChild
             data-testid="button-header-login"
           >
@@ -366,7 +375,7 @@ function AppContent() {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
-  
+
   const { openRedemptionModal, redemptionModalOpen, setRedemptionModalOpen, preselectedPlayerIds } = useVesting();
 
   return (
@@ -387,8 +396,8 @@ function AppContent() {
       </div>
       <BottomNav />
       <OnboardingCheck />
-      <RedemptionModal 
-        open={redemptionModalOpen} 
+      <RedemptionModal
+        open={redemptionModalOpen}
         onOpenChange={setRedemptionModalOpen}
         preselectedPlayerIds={preselectedPlayerIds}
       />
