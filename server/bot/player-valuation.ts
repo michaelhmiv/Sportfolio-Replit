@@ -91,7 +91,7 @@ async function calculatePlayerFairValue(playerId: string): Promise<{
     const older7Avg =
       recentStats.slice(3).reduce((sum, s) => sum + parseFloat(s.fantasyPoints || "0"), 0) /
       recentStats.slice(3).length;
-    
+
     if (older7Avg > 0) {
       // Clamp momentum factor between 0.7 and 1.3
       recentFormFactor = Math.max(0.7, Math.min(1.3, recent3Avg / older7Avg));
@@ -167,11 +167,11 @@ export async function getAllPlayerValuations(): Promise<ValuationSummary> {
     fairValues.length > 0
       ? fairValues.reduce((a, b) => a + b, 0) / fairValues.length
       : DEFAULT_FAIR_VALUE;
-  
+
   const variance =
     fairValues.length > 1
       ? fairValues.reduce((sum, v) => sum + Math.pow(v - meanFairValue, 2), 0) /
-        (fairValues.length - 1)
+      (fairValues.length - 1)
       : 1;
   const stdDevFairValue = Math.sqrt(variance);
 
@@ -326,15 +326,15 @@ async function getPlayersWithNoOrders(): Promise<Set<string>> {
         isNotNull(orders.playerId)
       )
     );
-  
+
   const playersWithOrdersSet = new Set(playersWithOrders.map(p => p.playerId).filter(Boolean) as string[]);
-  
+
   // Get all active players
   const allActivePlayers = await db
     .select({ id: players.id })
     .from(players)
     .where(eq(players.isActive, true));
-  
+
   // Return players that DON'T have orders
   const coldPlayers = new Set<string>();
   for (const player of allActivePlayers) {
@@ -342,7 +342,7 @@ async function getPlayersWithNoOrders(): Promise<Set<string>> {
       coldPlayers.add(player.id);
     }
   }
-  
+
   return coldPlayers;
 }
 
@@ -361,22 +361,22 @@ export async function getMarketMakingCandidates(
     minGamesPlayed: 1, // Lower threshold to include newer players
     limit: Math.max(limit * 2, 200), // Fetch more to allow for prioritization
   });
-  
+
   // Get players that have no orders (need liquidity bootstrapping)
   const coldPlayers = await getPlayersWithNoOrders();
-  
+
   // Separate cold players (priority) from players with existing orders
   const coldCandidates = allCandidates.filter(c => coldPlayers.has(c.playerId));
   const warmCandidates = allCandidates.filter(c => !coldPlayers.has(c.playerId));
-  
-  // Prioritize cold players (50% of results), then fill with warm players
-  const coldLimit = Math.floor(limit * 0.5);
+
+  // Prioritize cold players (70% of results) to bootstrap liquidity for neglected players
+  const coldLimit = Math.floor(limit * 0.7);
   const warmLimit = limit - Math.min(coldCandidates.length, coldLimit);
-  
+
   // Shuffle both groups for variety
   const shuffledCold = coldCandidates.sort(() => Math.random() - 0.5).slice(0, coldLimit);
   const shuffledWarm = warmCandidates.sort(() => Math.random() - 0.5).slice(0, warmLimit);
-  
+
   // Combine: cold first, then warm
   return [...shuffledCold, ...shuffledWarm];
 }
