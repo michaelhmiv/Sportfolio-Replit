@@ -80,7 +80,7 @@ function getCurrentCompetitiveSeasons(): string[] {
   const now = new Date();
   const currentMonth = now.getMonth(); // 0-11 (0=Jan, 6=Jul, 9=Oct)
   const currentYear = now.getFullYear();
-  
+
   // Determine season start year based on NBA calendar:
   // - July-December (months 6-11): Use current year as season start
   // - January-June (months 0-5): Use previous year as season start
@@ -92,7 +92,7 @@ function getCurrentCompetitiveSeasons(): string[] {
   // - Jun 2025 → 2024-2025 (playoffs for season that started Oct 2024)
   const seasonStartYear = currentMonth >= 6 ? currentYear : currentYear - 1;
   const seasonEndYear = seasonStartYear + 1;
-  
+
   // Include both regular season and playoffs for rolling competitive average
   // Preseason is explicitly EXCLUDED per user requirements
   // Note: MySportsFeeds uses "playoff" (singular) not "playoffs"
@@ -115,7 +115,7 @@ export interface IStorage {
   incrementTotalSharesMined(userId: string, amount: number): Promise<void>;
   markOnboardingComplete(userId: string): Promise<void>;
   updateUserPremiumStatus(userId: string, isPremium: boolean, premiumExpiresAt: Date | null): Promise<void>;
-  
+
   // Player methods
   getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]>;
   getPlayersPaginated(filters?: { search?: string; team?: string; position?: string; limit?: number; offset?: number }): Promise<{ players: Player[]; total: number }>;
@@ -124,13 +124,13 @@ export interface IStorage {
   getTopPlayersByVolume(limit: number): Promise<Player[]>;
   upsertPlayer(player: InsertPlayer): Promise<Player>;
   getDistinctTeams(): Promise<string[]>;
-  
+
   // Holdings methods
   getHolding(userId: string, assetType: string, assetId: string): Promise<Holding | undefined>;
   getUserHoldings(userId: string): Promise<Holding[]>;
   getUserHoldingsWithPlayers(userId: string): Promise<any[]>;
   updateHolding(userId: string, assetType: string, assetId: string, quantity: number, avgCost: string): Promise<void>;
-  
+
   // Holdings lock methods - prevent double-spending of shares
   reserveShares(userId: string, assetType: string, assetId: string, lockType: string, lockReferenceId: string, quantity: number): Promise<HoldingsLock>;
   releaseShares(lockId: string): Promise<void>;
@@ -139,7 +139,7 @@ export interface IStorage {
   getLockedShares(userId: string, assetType: string, assetId: string): Promise<HoldingsLock[]>;
   getTotalLockedQuantity(userId: string, assetType: string, assetId: string): Promise<number>;
   adjustLockQuantity(lockReferenceId: string, newQuantity: number): Promise<void>;
-  
+
   // Balance lock methods - prevent double-spending of cash
   reserveCash(userId: string, lockType: string, lockReferenceId: string, amount: string): Promise<BalanceLock>;
   releaseCash(lockId: string): Promise<void>;
@@ -147,7 +147,7 @@ export interface IStorage {
   getAvailableBalance(userId: string): Promise<number>;
   getTotalLockedBalance(userId: string): Promise<number>;
   adjustLockAmount(lockReferenceId: string, newAmount: string): Promise<void>;
-  
+
   // Order methods
   createOrder(order: any): Promise<Order>;
   getOrder(id: string): Promise<Order | undefined>;
@@ -155,20 +155,20 @@ export interface IStorage {
   getOrderBook(playerId: string): Promise<{ bids: Order[]; asks: Order[] }>;
   updateOrder(orderId: string, updates: Partial<Order>): Promise<void>;
   cancelOrder(orderId: string): Promise<void>;
-  
+
   // Trade methods
   createTrade(trade: any): Promise<Trade>;
   getRecentTrades(playerId?: string, limit?: number): Promise<Trade[]>;
   getMarketActivity(filters?: { playerId?: string; userId?: string; limit?: number }): Promise<any[]>;
-  
+
   // Price history methods
   getPriceHistory(playerId: string, days?: number): Promise<PriceHistory[]>;
   getPrice24hAgo(playerId: string): Promise<number | null>;
   createPriceHistoryRecord(playerId: string, price: string, volume: number): Promise<void>;
-  
+
   // Market cap methods
   getTotalSharesForPlayer(playerId: string): Promise<number>;
-  
+
   // Mining methods
   getMining(userId: string): Promise<Mining | undefined>;
   getAllActiveMiningUserIds(): Promise<string[]>;
@@ -176,10 +176,10 @@ export interface IStorage {
   getMiningSplits(userId: string): Promise<MiningSplit[]>;
   setMiningSplits(userId: string, splits: InsertMiningSplit[]): Promise<void>;
   createMiningClaim(claim: InsertMiningClaim): Promise<MiningClaim>;
-  
+
   // Activity methods
   getUserActivity(userId: string, filters?: { types?: string[]; limit?: number; offset?: number }): Promise<any[]>;
-  
+
   // Contest methods
   getContests(status?: string): Promise<Contest[]>;
   getContest(id: string): Promise<Contest | undefined>;
@@ -193,19 +193,19 @@ export interface IStorage {
   updateContestLineup(lineupId: string, updates: any): Promise<void>;
   updateContestEntry(entryId: string, updates: Partial<ContestEntry>): Promise<void>;
   getContestEntryDetail(contestId: string, entryId: string): Promise<any>;
-  
+
   // Daily games methods
   upsertDailyGame(game: InsertDailyGame): Promise<DailyGame>;
   getDailyGames(startDate: Date, endDate: Date): Promise<DailyGame[]>;
   updateDailyGameStatus(gameId: string, status: string): Promise<void>;
   getGamesByTeam(teamAbbreviation: string, startDate: Date, endDate: Date): Promise<DailyGame[]>;
-  
+
   // Job execution log methods
   createJobLog(log: InsertJobExecutionLog): Promise<JobExecutionLog>;
   updateJobLog(id: string, updates: Partial<JobExecutionLog>): Promise<void>;
   getRecentJobLogs(jobName?: string, limit?: number): Promise<JobExecutionLog[]>;
   getLatestJobLogPerType(jobNames: string[]): Promise<Map<string, JobExecutionLog>>;
-  
+
   // Player game stats methods
   upsertPlayerGameStats(stats: InsertPlayerGameStats): Promise<PlayerGameStats>;
   getPlayerGameStats(playerId: string, gameId: string): Promise<PlayerGameStats | undefined>;
@@ -226,21 +226,21 @@ export interface IStorage {
     minutesPerGame: string;
   } | null>;
   getPlayerRecentGamesFromLogs(playerId: string, limit: number): Promise<any[]>;
-  
+
   // Blog post methods
   getBlogPosts(options: { limit: number; offset: number; publishedOnly: boolean }): Promise<{ posts: BlogPost[]; total: number }>;
   getBlogPostBySlug(slug: string): Promise<BlogPost | undefined>;
   createBlogPost(post: InsertBlogPost): Promise<BlogPost>;
   updateBlogPost(id: string, updates: Partial<BlogPost>): Promise<BlogPost | undefined>;
   deleteBlogPost(id: string): Promise<void>;
-  
+
   // Portfolio snapshot methods
   getAllUsersForRanking(): Promise<Array<{ userId: string; balance: string; portfolioValue: number }>>;
   getPortfolioSnapshot(userId: string, date: Date): Promise<PortfolioSnapshot | undefined>;
   getLatestSnapshotRanks(): Promise<Map<string, { cashRank: number; portfolioRank: number }>>;
   getPortfolioSnapshotsInRange(userId: string, startDate: Date, endDate: Date): Promise<PortfolioSnapshot[]>;
   createPortfolioSnapshot(snapshot: InsertPortfolioSnapshot): Promise<PortfolioSnapshot>;
-  
+
   // Analytics methods
   getMarketHealthStats(startDate: Date, endDate: Date): Promise<{
     transactionCount: number;
@@ -284,7 +284,7 @@ export interface IStorage {
     sharesMined: number;
     sharesBurned: number;
   }>>;
-  
+
   // Premium checkout session methods
   createPremiumCheckoutSession(session: { userId: string; planId: string; quantity: number; amountCents: number; whopSessionId?: string }): Promise<PremiumCheckoutSession>;
   getPremiumCheckoutSession(id: string): Promise<PremiumCheckoutSession | undefined>;
@@ -292,7 +292,7 @@ export interface IStorage {
   completePremiumCheckoutSession(id: string, receiptId: string): Promise<PremiumCheckoutSession | undefined>;
   getUserPremiumCheckoutSessions(userId: string): Promise<PremiumCheckoutSession[]>;
   getPendingPremiumCheckoutSessions(): Promise<PremiumCheckoutSession[]>;
-  
+
   // Whop payment sync methods
   getWhopPaymentByPaymentId(paymentId: string): Promise<WhopPayment | undefined>;
   getWhopPaymentsByEmail(email: string): Promise<WhopPayment[]>;
@@ -334,13 +334,14 @@ export class DatabaseStorage implements IStorage {
         balance: "10000.00", // Starting balance
       })
       .returning();
-    
-    // Initialize mining for new user
+
+    // Initialize mining for new user with lastAccruedAt set so vesting job processes them
     await db.insert(mining).values({
       userId: user.id,
       sharesAccumulated: 0,
+      lastAccruedAt: new Date(),
     });
-    
+
     return user;
   }
 
@@ -365,7 +366,7 @@ export class DatabaseStorage implements IStorage {
         .returning();
       return updatedUser;
     }
-    
+
     // Lazy migration: Look up existing user by email first to preserve their data
     // This handles the case where users have existing accounts with different IDs
     // (e.g., migrating from old auth system to Supabase)
@@ -379,29 +380,29 @@ export class DatabaseStorage implements IStorage {
           .from(users)
           .where(sql`LOWER(${users.email}) = LOWER(${userData.email})`)
           .for('update');
-        
+
         if (!existingUserByEmail || existingUserByEmail.id === userData.id) {
           // No migration needed - either no user with this email, or same ID
           return null;
         }
-        
+
         // Found existing user with different ID - update their record with new auth ID
         // This preserves all their holdings, orders, trades, and balances
         console.log(`[LAZY_MIGRATION] Migrating user ${userData.email} from ID ${existingUserByEmail.id} to ${userData.id}`);
-        
+
         const oldId = existingUserByEmail.id;
         const newId = userData.id;
-        
+
         // Step 1: Temporarily clear unique constraints on old row to allow new row insert
         // Email and username have unique constraints, so we clear them first
         await tx
           .update(users)
-          .set({ 
-            email: null, 
-            username: `__migrating_${oldId}` 
+          .set({
+            email: null,
+            username: `__migrating_${oldId}`
           })
           .where(eq(users.id, oldId));
-        
+
         // Step 2: Insert a new user row with the new ID, copying all data from old row
         await tx.insert(users).values({
           id: newId,
@@ -422,131 +423,131 @@ export class DatabaseStorage implements IStorage {
           createdAt: existingUserByEmail.createdAt,
           updatedAt: new Date(),
         });
-        
+
         // Step 3: Update all FK references to point to the new user ID
         // (New ID now exists, so FK constraints are satisfied)
-        
+
         // Update mining records
         await tx
           .update(mining)
           .set({ userId: newId })
           .where(eq(mining.userId, oldId));
-        
+
         // Update holdings
         await tx
           .update(holdings)
           .set({ userId: newId })
           .where(eq(holdings.userId, oldId));
-        
+
         // Update holdings locks
         await tx
           .update(holdingsLocks)
           .set({ userId: newId })
           .where(eq(holdingsLocks.userId, oldId));
-        
+
         // Update balance locks
         await tx
           .update(balanceLocks)
           .set({ userId: newId })
           .where(eq(balanceLocks.userId, oldId));
-        
+
         // Update orders
         await tx
           .update(orders)
           .set({ userId: newId })
           .where(eq(orders.userId, oldId));
-        
+
         // Update trades (buyer and seller)
         await tx
           .update(trades)
           .set({ buyerId: newId })
           .where(eq(trades.buyerId, oldId));
-        
+
         await tx
           .update(trades)
           .set({ sellerId: newId })
           .where(eq(trades.sellerId, oldId));
-        
+
         // Update mining splits
         await tx
           .update(miningSplits)
           .set({ userId: newId })
           .where(eq(miningSplits.userId, oldId));
-        
+
         // Update mining claims
         await tx
           .update(miningClaims)
           .set({ userId: newId })
           .where(eq(miningClaims.userId, oldId));
-        
+
         // Update vesting presets
         await tx
           .update(vestingPresets)
           .set({ userId: newId })
           .where(eq(vestingPresets.userId, oldId));
-        
+
         // Update contest entries
         await tx
           .update(contestEntries)
           .set({ userId: newId })
           .where(eq(contestEntries.userId, oldId));
-        
+
         // Update portfolio snapshots
         await tx
           .update(portfolioSnapshots)
           .set({ userId: newId })
           .where(eq(portfolioSnapshots.userId, oldId));
-        
+
         // Update premium checkout sessions
         await tx
           .update(premiumCheckoutSessions)
           .set({ userId: newId })
           .where(eq(premiumCheckoutSessions.userId, oldId));
-        
+
         // Update premium orders
         await tx
           .update(premiumOrders)
           .set({ userId: newId })
           .where(eq(premiumOrders.userId, oldId));
-        
+
         // Update premium trades (buyer and seller)
         await tx
           .update(premiumTrades)
           .set({ buyerId: newId })
           .where(eq(premiumTrades.buyerId, oldId));
-        
+
         await tx
           .update(premiumTrades)
           .set({ sellerId: newId })
           .where(eq(premiumTrades.sellerId, oldId));
-        
+
         // Update whop payments
         await tx
           .update(whopPayments)
           .set({ userId: newId })
           .where(eq(whopPayments.userId, oldId));
-        
+
         // Update blog posts (author)
         await tx
           .update(blogPosts)
           .set({ authorId: newId })
           .where(eq(blogPosts.authorId, oldId));
-        
+
         // Step 4: Delete the old user row (all FKs now point to new row)
         await tx.delete(users).where(eq(users.id, oldId));
-        
+
         // Return the migrated user
         const [result] = await tx.select().from(users).where(eq(users.id, newId));
         console.log(`[LAZY_MIGRATION] Successfully migrated user ${userData.email} to new auth ID`);
         return result;
       });
-      
+
       // If migration happened, return the migrated user
       if (migrationResult) {
         return migrationResult;
       }
     }
-    
+
     // Standard upsert: either new user or same ID (no migration needed)
     const [user] = await db
       .insert(users)
@@ -566,16 +567,17 @@ export class DatabaseStorage implements IStorage {
         },
       })
       .returning();
-    
-    // Initialize mining for new user if it doesn't exist
+
+    // Initialize mining for new user if it doesn't exist (with lastAccruedAt so vesting job processes them)
     const existingMining = await db.select().from(mining).where(eq(mining.userId, user.id));
     if (existingMining.length === 0) {
       await db.insert(mining).values({
         userId: user.id,
         sharesAccumulated: 0,
+        lastAccruedAt: new Date(),
       });
     }
-    
+
     return user;
   }
 
@@ -589,7 +591,7 @@ export class DatabaseStorage implements IStorage {
   async incrementTotalSharesMined(userId: string, amount: number): Promise<void> {
     await db
       .update(users)
-      .set({ 
+      .set({
         totalSharesMined: sql`${users.totalSharesMined} + ${amount}`
       })
       .where(eq(users.id, userId));
@@ -600,12 +602,12 @@ export class DatabaseStorage implements IStorage {
     // Drizzle handles numeric values correctly when passed directly
     await db
       .update(users)
-      .set({ 
+      .set({
         // PostgreSQL handles the arithmetic atomically with proper precision
         balance: sql`${users.balance} + ${delta}`
       })
       .where(eq(users.id, userId));
-    
+
     return await this.getUser(userId);
   }
 
@@ -614,7 +616,7 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set({ username, updatedAt: new Date() })
       .where(eq(users.id, userId));
-    
+
     return await this.getUser(userId);
   }
 
@@ -628,8 +630,8 @@ export class DatabaseStorage implements IStorage {
   async updateUserPremiumStatus(userId: string, isPremium: boolean, premiumExpiresAt: Date | null): Promise<void> {
     await db
       .update(users)
-      .set({ 
-        isPremium, 
+      .set({
+        isPremium,
         premiumExpiresAt,
         updatedAt: new Date()
       })
@@ -639,7 +641,7 @@ export class DatabaseStorage implements IStorage {
   // Helper: Build player query conditions (reused by getPlayers and getPlayersPaginated)
   private buildPlayerQueryConditions(filters?: { search?: string; team?: string; position?: string }) {
     const conditions = [];
-    
+
     if (filters?.team && filters.team !== "all") {
       conditions.push(eq(players.team, filters.team));
     }
@@ -653,18 +655,18 @@ export class DatabaseStorage implements IStorage {
         sql`(${players.firstName} ILIKE ${searchTerm} OR ${players.lastName} ILIKE ${searchTerm})`
       );
     }
-    
+
     return conditions;
   }
 
   // Player methods - returns full list (legacy API for backward compatibility)
-  async getPlayers(filters?: { 
-    search?: string; 
-    team?: string; 
+  async getPlayers(filters?: {
+    search?: string;
+    team?: string;
     position?: string;
   }): Promise<Player[]> {
     const conditions = this.buildPlayerQueryConditions(filters);
-    
+
     // Build query in one shot to avoid type reassignment issues
     if (conditions.length > 0) {
       return await db.select().from(players).where(and(...conditions));
@@ -673,9 +675,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Paginated players - returns subset with total count (new API for performance)
-  async getPlayersPaginated(filters?: { 
-    search?: string; 
-    team?: string; 
+  async getPlayersPaginated(filters?: {
+    search?: string;
+    team?: string;
     position?: string;
     limit?: number;
     offset?: number;
@@ -685,8 +687,8 @@ export class DatabaseStorage implements IStorage {
     hasSellOrders?: boolean;
     teamsPlayingOnDate?: string[];
   }): Promise<{ players: Player[]; total: number }> {
-    const { 
-      search, team, position, 
+    const {
+      search, team, position,
       limit = 50, offset = 0,
       sortBy = 'volume',
       sortOrder = 'desc',
@@ -694,14 +696,14 @@ export class DatabaseStorage implements IStorage {
       hasSellOrders,
       teamsPlayingOnDate
     } = filters || {};
-    
+
     const conditions = this.buildPlayerQueryConditions({ search, team, position });
-    
+
     // Add teams playing on date filter
     if (teamsPlayingOnDate && teamsPlayingOnDate.length > 0) {
       conditions.push(inArray(players.team, teamsPlayingOnDate));
     }
-    
+
     // Add order book filters using EXISTS subqueries
     // Include both 'open' and 'partial' statuses (partially filled orders are still active)
     if (hasBuyOrders) {
@@ -714,7 +716,7 @@ export class DatabaseStorage implements IStorage {
         )`
       );
     }
-    
+
     if (hasSellOrders) {
       conditions.push(
         sql`EXISTS (
@@ -725,13 +727,13 @@ export class DatabaseStorage implements IStorage {
         )`
       );
     }
-    
+
     // Determine sort column based on sortBy parameter
     // For price/bid/ask sorts, always use NULLS LAST so real market data appears before empty values
     let orderByClause;
     if (sortBy === 'price') {
       // Sort by lastTradePrice with NULL handling (real prices first, then NULLs)
-      orderByClause = sortOrder === 'asc' 
+      orderByClause = sortOrder === 'asc'
         ? sql`${players.lastTradePrice} ASC NULLS LAST`
         : sql`${players.lastTradePrice} DESC NULLS LAST`;
     } else if (sortBy === 'volume') {
@@ -766,7 +768,7 @@ export class DatabaseStorage implements IStorage {
       // Default to volume desc
       orderByClause = desc(players.volume24h);
     }
-    
+
     // Run count and data fetch in parallel for performance
     const [countResult, playersData] = await Promise.all([
       // Count query
@@ -778,9 +780,9 @@ export class DatabaseStorage implements IStorage {
         ? db.select().from(players).where(and(...conditions)).orderBy(orderByClause).limit(limit).offset(offset)
         : db.select().from(players).orderBy(orderByClause).limit(limit).offset(offset),
     ]);
-    
+
     const total = countResult[0].count;
-    
+
     return { players: playersData, total };
   }
 
@@ -803,7 +805,7 @@ export class DatabaseStorage implements IStorage {
 
   async upsertPlayer(player: InsertPlayer): Promise<Player> {
     const existing = await this.getPlayer(player.id);
-    
+
     if (existing) {
       const [updated] = await db
         .update(players)
@@ -826,7 +828,7 @@ export class DatabaseStorage implements IStorage {
       .from(players)
       .where(eq(players.isActive, true))
       .orderBy(asc(players.team));
-    
+
     return result.map(r => r.team);
   }
 
@@ -901,7 +903,7 @@ export class DatabaseStorage implements IStorage {
 
   async updateHolding(userId: string, assetType: string, assetId: string, quantity: number, avgCost: string): Promise<void> {
     const existing = await this.getHolding(userId, assetType, assetId);
-    
+
     if (existing) {
       if (quantity <= 0) {
         // Remove holding - normalize to zero to avoid NaN
@@ -919,7 +921,7 @@ export class DatabaseStorage implements IStorage {
         const avgCostParsed = parseFloat(avgCost);
         const avgCostNormalized = isNaN(avgCostParsed) ? "0.0000" : avgCostParsed.toFixed(4);
         const totalCost = (parseFloat(avgCostNormalized) * quantity).toFixed(2);
-        
+
         await db
           .update(holdings)
           .set({
@@ -941,7 +943,7 @@ export class DatabaseStorage implements IStorage {
       const avgCostParsed = parseFloat(avgCost);
       const avgCostNormalized = isNaN(avgCostParsed) ? "0.0000" : avgCostParsed.toFixed(4);
       const totalCost = (parseFloat(avgCostNormalized) * quantity).toFixed(2);
-      
+
       await db.insert(holdings).values({
         userId,
         assetType,
@@ -1033,7 +1035,7 @@ export class DatabaseStorage implements IStorage {
   async getAvailableShares(userId: string, assetType: string, assetId: string): Promise<number> {
     const holding = await this.getHolding(userId, assetType, assetId);
     if (!holding) return 0;
-    
+
     const lockedQuantity = await this.getTotalLockedQuantity(userId, assetType, assetId);
     return Math.max(0, holding.quantity - lockedQuantity);
   }
@@ -1062,7 +1064,7 @@ export class DatabaseStorage implements IStorage {
           eq(holdingsLocks.assetId, assetId)
         )
       );
-    
+
     return Number(result[0]?.total || 0);
   }
 
@@ -1141,9 +1143,9 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .where(eq(users.id, userId));
-    
+
     if (!user) return 0;
-    
+
     const lockedAmount = await this.getTotalLockedBalance(userId, tx);
     return Math.max(0, parseFloat(user.balance) - lockedAmount);
   }
@@ -1154,7 +1156,7 @@ export class DatabaseStorage implements IStorage {
       .select({ total: sql<number>`COALESCE(SUM(${balanceLocks.lockedAmount}), 0)` })
       .from(balanceLocks)
       .where(eq(balanceLocks.userId, userId));
-    
+
     return Number(result[0]?.total || 0);
   }
 
@@ -1204,15 +1206,15 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(orders)
       .where(and(eq(orders.playerId, playerId), or(eq(orders.status, "open"), eq(orders.status, "partial"))));
-    
+
     const bids = allOrders
       .filter(o => o.side === "buy" && o.orderType === "limit")
       .sort((a, b) => parseFloat(b.limitPrice || "0") - parseFloat(a.limitPrice || "0"));
-    
+
     const asks = allOrders
       .filter(o => o.side === "sell" && o.orderType === "limit")
       .sort((a, b) => parseFloat(a.limitPrice || "0") - parseFloat(b.limitPrice || "0"));
-    
+
     return { bids, asks };
   }
 
@@ -1234,14 +1236,14 @@ export class DatabaseStorage implements IStorage {
 
     // Group orders by player and calculate order book data
     const orderBookMap = new Map();
-    
+
     for (const playerId of playerIds) {
       const playerOrders = allOrders.filter(o => o.playerId === playerId);
-      
+
       const bids = playerOrders
         .filter(o => o.side === "buy" && o.orderType === "limit")
         .sort((a, b) => parseFloat(b.limitPrice || "0") - parseFloat(a.limitPrice || "0"));
-      
+
       const asks = playerOrders
         .filter(o => o.side === "sell" && o.orderType === "limit")
         .sort((a, b) => parseFloat(a.limitPrice || "0") - parseFloat(b.limitPrice || "0"));
@@ -1249,15 +1251,15 @@ export class DatabaseStorage implements IStorage {
       // Calculate best bid, best ask, and sizes (same logic as /api/players endpoint)
       const bestBid = bids.length > 0 && bids[0].limitPrice ? bids[0].limitPrice : null;
       const bestAsk = asks.length > 0 && asks[0].limitPrice ? asks[0].limitPrice : null;
-      
+
       const bidSize = bids.length > 0 && bids[0].limitPrice
         ? bids.filter(b => b.limitPrice === bids[0].limitPrice)
-            .reduce((sum, b) => sum + (b.quantity - b.filledQuantity), 0)
+          .reduce((sum, b) => sum + (b.quantity - b.filledQuantity), 0)
         : 0;
-      
+
       const askSize = asks.length > 0 && asks[0].limitPrice
         ? asks.filter(a => a.limitPrice === asks[0].limitPrice)
-            .reduce((sum, a) => sum + (a.quantity - a.filledQuantity), 0)
+          .reduce((sum, a) => sum + (a.quantity - a.filledQuantity), 0)
         : 0;
 
       orderBookMap.set(playerId, {
@@ -1285,10 +1287,10 @@ export class DatabaseStorage implements IStorage {
       .update(orders)
       .set({ status: "cancelled" })
       .where(eq(orders.id, orderId));
-    
+
     // Release any locked shares for this order (sell orders)
     await this.releaseSharesByReference(orderId);
-    
+
     // Release any locked cash for this order (buy orders)
     await this.releaseCashByReference(orderId);
   }
@@ -1320,15 +1322,15 @@ export class DatabaseStorage implements IStorage {
 
   async getMarketActivity(filters?: { playerId?: string; userId?: string; playerSearch?: string; limit?: number }): Promise<any[]> {
     const { playerId, userId, playerSearch, limit = 50 } = filters || {};
-    
+
     // Create aliases for buyer and seller users
     const buyer = alias(users, "buyer");
     const seller = alias(users, "seller");
-    
+
     // Fetch recent trades with player and user info
     // Use a larger limit to ensure we get enough rows after merging
     const fetchLimit = limit * 2;
-    
+
     let tradesQuery = db
       .select({
         activityType: sql<string>`'trade'`,
@@ -1354,7 +1356,7 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(players, eq(trades.playerId, players.id))
       .innerJoin(buyer, eq(trades.buyerId, buyer.id))
       .innerJoin(seller, eq(trades.sellerId, seller.id));
-    
+
     // Build and apply where conditions for trades (after joins)
     const tradeConditions = [];
     if (playerId) tradeConditions.push(eq(trades.playerId, playerId));
@@ -1370,11 +1372,11 @@ export class DatabaseStorage implements IStorage {
     if (tradeConditions.length > 0) {
       tradesQuery = tradesQuery.where(and(...tradeConditions));
     }
-    
+
     const recentTrades = await tradesQuery
       .orderBy(desc(trades.executedAt))
       .limit(fetchLimit);
-    
+
     // Fetch recent orders (placed and cancelled) with player and user info
     let ordersQuery = db
       .select({
@@ -1400,7 +1402,7 @@ export class DatabaseStorage implements IStorage {
       .from(orders)
       .innerJoin(players, eq(orders.playerId, players.id))
       .innerJoin(users, eq(orders.userId, users.id));
-    
+
     // Build and apply where conditions for orders (after joins)
     const orderConditions = [];
     if (playerId) orderConditions.push(eq(orders.playerId, playerId));
@@ -1414,16 +1416,16 @@ export class DatabaseStorage implements IStorage {
     if (orderConditions.length > 0) {
       ordersQuery = ordersQuery.where(and(...orderConditions));
     }
-    
+
     const recentOrders = await ordersQuery
       .orderBy(desc(orders.createdAt))
       .limit(fetchLimit);
-    
+
     // Combine, sort by timestamp, and apply the final limit
     const combined = [...recentTrades, ...recentOrders]
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, limit); // Apply final limit after sorting
-    
+
     return combined;
   }
 
@@ -1431,7 +1433,7 @@ export class DatabaseStorage implements IStorage {
   async getPriceHistory(playerId: string, days: number = 30): Promise<PriceHistory[]> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
-    
+
     return await db
       .select()
       .from(priceHistory)
@@ -1443,11 +1445,11 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(priceHistory.timestamp);
   }
-  
+
   async getPrice24hAgo(playerId: string): Promise<number | null> {
     const twentyFourHoursAgo = new Date();
     twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
-    
+
     // Get the closest price record to 24h ago
     const [record] = await db
       .select()
@@ -1460,10 +1462,10 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(desc(priceHistory.timestamp))
       .limit(1);
-    
+
     return record ? parseFloat(record.price) : null;
   }
-  
+
   async createPriceHistoryRecord(playerId: string, price: string, volume: number): Promise<void> {
     await db.insert(priceHistory).values({
       playerId,
@@ -1472,7 +1474,7 @@ export class DatabaseStorage implements IStorage {
       timestamp: new Date(),
     });
   }
-  
+
   // Market cap methods
   async getTotalSharesForPlayer(playerId: string): Promise<number> {
     const [result] = await db
@@ -1486,7 +1488,7 @@ export class DatabaseStorage implements IStorage {
           eq(holdings.assetId, playerId)
         )
       );
-    
+
     return parseInt(result?.totalShares || '0', 10);
   }
 
@@ -1525,7 +1527,7 @@ export class DatabaseStorage implements IStorage {
   async setMiningSplits(userId: string, splits: InsertMiningSplit[]): Promise<void> {
     // Delete existing splits
     await db.delete(miningSplits).where(eq(miningSplits.userId, userId));
-    
+
     // Insert new splits
     if (splits.length > 0) {
       await db.insert(miningSplits).values(splits);
@@ -1595,7 +1597,7 @@ export class DatabaseStorage implements IStorage {
     const limit = filters?.limit || 50;
     const offset = filters?.offset || 0;
     const types = filters?.types || ['mining', 'market', 'contest'];
-    
+
     const activities: any[] = [];
 
     // 1. Mining claims
@@ -1615,7 +1617,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(miningClaims.userId, userId))
         .orderBy(desc(miningClaims.claimedAt))
         .limit(limit);
-      
+
       claims.forEach(claim => {
         activities.push({
           id: `mining-${claim.id}`,
@@ -1656,7 +1658,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(orders.userId, userId))
         .orderBy(desc(orders.createdAt))
         .limit(limit);
-      
+
       userOrders.forEach(order => {
         activities.push({
           id: `order-${order.id}`,
@@ -1697,7 +1699,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(trades.buyerId, userId))
         .orderBy(desc(trades.executedAt))
         .limit(limit);
-      
+
       userBuyTrades.forEach(trade => {
         const totalCost = parseFloat(trade.price) * trade.quantity;
         activities.push({
@@ -1735,7 +1737,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(trades.sellerId, userId))
         .orderBy(desc(trades.executedAt))
         .limit(limit);
-      
+
       userSellTrades.forEach(trade => {
         const totalRevenue = parseFloat(trade.price) * trade.quantity;
         activities.push({
@@ -1779,7 +1781,7 @@ export class DatabaseStorage implements IStorage {
         .where(eq(contestEntries.userId, userId))
         .orderBy(desc(contestEntries.createdAt))
         .limit(limit);
-      
+
       userEntries.forEach(entry => {
         // Entry creation (fee charged)
         activities.push({
@@ -1821,28 +1823,28 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Sort all activities by timestamp (most recent first) and apply pagination
-    const sorted = activities.sort((a, b) => 
+    const sorted = activities.sort((a, b) =>
       new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime()
     );
 
     // Get current user balance for balance-after calculations
     const user = await this.getUser(userId);
     if (!user) return [];
-    
+
     let currentBalance = parseFloat(user.balance);
-    
+
     // Process activities from most recent to oldest, adding descriptions and balance-after
     const enrichedActivities = sorted.slice(offset, offset + limit).map((activity: any) => {
       const cashDelta = activity.cashDelta ? parseFloat(activity.cashDelta) : 0;
       const balanceAfter = currentBalance;
-      
+
       // Move backwards through history (we're going DESC)
       currentBalance -= cashDelta;
-      
+
       // Build description
       let description = '';
       const meta = activity.metadata;
-      
+
       if (activity.category === 'mining') {
         description = `Claimed ${meta.sharesClaimed} shares${meta.playerName ? ` of ${meta.playerName}` : ''}`;
       } else if (activity.category === 'market') {
@@ -1866,7 +1868,7 @@ export class DatabaseStorage implements IStorage {
           description = `${meta.contestName} - Rank ${meta.rank} Payout`;
         }
       }
-      
+
       return {
         id: activity.id,
         timestamp: activity.occurredAt,
@@ -1973,7 +1975,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(contests)
       .where(eq(contests.id, contestId));
-    
+
     if (!current) return;
 
     // Calculate new values
@@ -1998,7 +2000,7 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(contestEntries)
       .where(and(eq(contestEntries.id, entryId), eq(contestEntries.userId, userId)));
-    
+
     if (!entry) return null;
 
     const lineup = await this.getContestLineups(entryId);
@@ -2045,7 +2047,7 @@ export class DatabaseStorage implements IStorage {
     // Only show lineups after contest locks (status is "live" or "completed")
     // Before that, return empty lineup to hide other users' entries
     let lineupWithPercentages: any[] = [];
-    
+
     if (contest.status === "live" || contest.status === "completed") {
       // Get the lineup with player details
       const lineup = await db
@@ -2080,7 +2082,7 @@ export class DatabaseStorage implements IStorage {
             ));
 
           const totalPlayerShares = totalSharesResult?.totalShares || 0;
-          const percentage = totalPlayerShares > 0 
+          const percentage = totalPlayerShares > 0
             ? ((lineupItem.sharesEntered / totalPlayerShares) * 100).toFixed(2)
             : "0.00";
 
@@ -2186,11 +2188,11 @@ export class DatabaseStorage implements IStorage {
 
   async getRecentJobLogs(jobName?: string, limit: number = 50): Promise<JobExecutionLog[]> {
     let query = db.select().from(jobExecutionLogs);
-    
+
     if (jobName) {
       query = query.where(eq(jobExecutionLogs.jobName, jobName));
     }
-    
+
     return await query
       .orderBy(desc(jobExecutionLogs.scheduledFor))
       .limit(limit);
@@ -2198,7 +2200,7 @@ export class DatabaseStorage implements IStorage {
 
   async getLatestJobLogPerType(jobNames: string[]): Promise<Map<string, JobExecutionLog>> {
     const result = new Map<string, JobExecutionLog>();
-    
+
     // Query the latest log for each job type in parallel
     const promises = jobNames.map(async (jobName) => {
       const [log] = await db
@@ -2209,14 +2211,14 @@ export class DatabaseStorage implements IStorage {
         .limit(1);
       return { jobName, log };
     });
-    
+
     const logs = await Promise.all(promises);
     for (const { jobName, log } of logs) {
       if (log) {
         result.set(jobName, log);
       }
     }
-    
+
     return result;
   }
 
@@ -2281,7 +2283,7 @@ export class DatabaseStorage implements IStorage {
     const startOfDay = new Date(dateStr);
     const endOfDay = new Date(dateStr);
     endOfDay.setHours(23, 59, 59, 999);
-    
+
     const result = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(playerGameStats)
@@ -2292,7 +2294,7 @@ export class DatabaseStorage implements IStorage {
           lte(playerGameStats.gameDate, endOfDay)
         )
       );
-    
+
     return result[0]?.count || 0;
   }
 
@@ -2311,7 +2313,7 @@ export class DatabaseStorage implements IStorage {
   } | null> {
     // Filter by current competitive season (regular + playoffs combined for rolling average)
     const currentSeasons = getCurrentCompetitiveSeasons();
-    
+
     const gameLogs = await db
       .select()
       .from(playerGameStats)
@@ -2328,7 +2330,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     const gamesPlayed = gameLogs.length;
-    
+
     // Sum all stats
     let totalFantasyPoints = 0;
     let totalPoints = 0;
@@ -2360,7 +2362,7 @@ export class DatabaseStorage implements IStorage {
       totalFreeThrowsAttempted += log.freeThrowsAttempted || 0;
     }
 
-    const fieldGoalPct = totalFieldGoalsAttempted > 0 
+    const fieldGoalPct = totalFieldGoalsAttempted > 0
       ? ((totalFieldGoalsMade / totalFieldGoalsAttempted) * 100).toFixed(1)
       : "0.0";
     const threePointPct = totalThreePointersAttempted > 0
@@ -2396,7 +2398,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     const currentSeasons = getCurrentCompetitiveSeasons();
-    
+
     // Fetch game logs for ALL players in one query
     const allGameLogs = await db
       .select()
@@ -2410,10 +2412,10 @@ export class DatabaseStorage implements IStorage {
 
     // Group logs by player and compute stats
     const statsMap = new Map();
-    
+
     for (const playerId of playerIds) {
       const playerLogs = allGameLogs.filter(log => log.playerId === playerId);
-      
+
       if (playerLogs.length === 0) {
         statsMap.set(playerId, {
           gamesPlayed: 0,
@@ -2470,25 +2472,25 @@ export class DatabaseStorage implements IStorage {
   // Blog post methods
   async getBlogPosts(options: { limit: number; offset: number; publishedOnly: boolean }): Promise<{ posts: BlogPost[]; total: number }> {
     const { limit, offset, publishedOnly } = options;
-    
+
     let query = db.select().from(blogPosts);
-    
+
     if (publishedOnly) {
       query = query.where(isNotNull(blogPosts.publishedAt));
     }
-    
+
     const posts = await query
       .orderBy(desc(blogPosts.publishedAt), desc(blogPosts.createdAt))
       .limit(limit)
       .offset(offset);
-    
+
     // Get total count
     let countQuery = db.select({ count: count() }).from(blogPosts);
     if (publishedOnly) {
       countQuery = countQuery.where(isNotNull(blogPosts.publishedAt));
     }
     const [{ count: total }] = await countQuery;
-    
+
     return { posts, total };
   }
 
@@ -2551,7 +2553,7 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .groupBy(users.id, users.balance);
-    
+
     return result.map(row => ({
       userId: row.userId,
       balance: row.balance,
@@ -2563,7 +2565,7 @@ export class DatabaseStorage implements IStorage {
     // Normalize to start of day to handle timezone differences
     const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const endOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59);
-    
+
     const [snapshot] = await db
       .select()
       .from(portfolioSnapshots)
@@ -2586,17 +2588,17 @@ export class DatabaseStorage implements IStorage {
       .from(portfolioSnapshots)
       .orderBy(desc(portfolioSnapshots.snapshotDate))
       .limit(1);
-    
+
     if (!latestSnapshot) {
       return new Map();
     }
-    
+
     // Get all snapshots from that date
     const snapshots = await db
       .select()
       .from(portfolioSnapshots)
       .where(eq(portfolioSnapshots.snapshotDate, latestSnapshot.date));
-    
+
     const rankMap = new Map();
     for (const snapshot of snapshots) {
       rankMap.set(snapshot.userId, {
@@ -2604,7 +2606,7 @@ export class DatabaseStorage implements IStorage {
         portfolioRank: snapshot.portfolioRank,
       });
     }
-    
+
     return rankMap;
   }
 
@@ -2717,7 +2719,7 @@ export class DatabaseStorage implements IStorage {
       .from(holdings)
       .innerJoin(players, eq(holdings.assetId, players.id))
       .where(eq(holdings.assetType, 'player'));
-    
+
     const currentMarketCap = parseFloat(marketCapResult[0]?.marketCap || "0");
 
     return dailyStats.map(row => ({
@@ -2789,7 +2791,7 @@ export class DatabaseStorage implements IStorage {
 
     const usageResults = await usageQuery;
     const usageMap = new Map<string, { timesUsed: number; totalEntries: number; usagePercent: number }>();
-    
+
     for (const row of usageResults) {
       const usagePercent = totalEntries > 0 ? (row.timesUsed / totalEntries) * 100 : 0;
       usageMap.set(row.playerId, {
@@ -2798,7 +2800,7 @@ export class DatabaseStorage implements IStorage {
         usagePercent,
       });
     }
-    
+
     return usageMap;
   }
 
@@ -2822,7 +2824,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(priceHistory.playerId, priceHistory.timestamp);
 
     const historyMap = new Map<string, Array<{ timestamp: Date; price: number }>>();
-    
+
     for (const row of history) {
       if (!historyMap.has(row.playerId)) {
         historyMap.set(row.playerId, []);
@@ -2832,7 +2834,7 @@ export class DatabaseStorage implements IStorage {
         price: parseFloat(row.price),
       });
     }
-    
+
     return historyMap;
   }
 
@@ -2931,7 +2933,7 @@ export class DatabaseStorage implements IStorage {
     // Weights: 40% price momentum, 30% volume, 30% fantasy points
     const rankings = activePlayers.map(player => {
       const fantasyData = fantasyMap.get(player.id) || { avgFantasy: 0, gamesPlayed: 0 };
-      
+
       // Normalize values (0-100 scale)
       const priceChange = parseFloat(player.priceChange24h || "0");
       const volume = player.volume24h || 0;
@@ -3179,14 +3181,14 @@ export class DatabaseStorage implements IStorage {
       // Calculate remaining quantity
       const remainingQty = order.quantity - (order.filledQuantity || 0);
       if (remainingQty <= 0) continue;
-      
+
       const orderData = {
         price: order.limitPrice || "5.00",
         quantity: remainingQty,
         userId: order.userId,
         orderId: order.id,
       };
-      
+
       if (order.side === "buy") {
         bids.push(orderData);
       } else {
@@ -3215,7 +3217,7 @@ export class DatabaseStorage implements IStorage {
       .from(premiumTrades)
       .orderBy(desc(premiumTrades.executedAt))
       .limit(limit);
-    
+
     // Enrich with usernames
     const enriched = await Promise.all(recentTrades.map(async (trade) => {
       const buyer = await this.getUser(trade.buyerId);
@@ -3230,7 +3232,7 @@ export class DatabaseStorage implements IStorage {
         seller: seller ? { username: seller.username || "Unknown" } : null,
       };
     }));
-    
+
     return enriched;
   }
 
@@ -3249,7 +3251,7 @@ export class DatabaseStorage implements IStorage {
         lte(premiumTrades.executedAt, endDate)
       ))
       .orderBy(desc(premiumTrades.executedAt));
-    
+
     return trades;
   }
 
@@ -3258,7 +3260,7 @@ export class DatabaseStorage implements IStorage {
       .select({ total: sql<number>`COALESCE(SUM(quantity), 0)` })
       .from(holdings)
       .where(eq(holdings.assetType, "premium"));
-    
+
     return result[0]?.total || 0;
   }
 
@@ -3281,7 +3283,7 @@ export class DatabaseStorage implements IStorage {
         status: order.status,
       })
       .returning();
-    
+
     return createdOrder;
   }
 
@@ -3298,24 +3300,24 @@ export class DatabaseStorage implements IStorage {
     // Called after a match: newRemainingQty = oldRemainingQty - matchQuantity
     const order = await this.getPremiumOrder(orderId);
     if (!order) return;
-    
+
     // Calculate how many have been filled: original - remaining
     const newFilledQuantity = order.quantity - remainingQuantity;
-    
+
     if (remainingQuantity <= 0) {
       // Order is fully filled
       await db
         .update(premiumOrders)
-        .set({ 
-          filledQuantity: order.quantity, 
-          status: "filled" 
+        .set({
+          filledQuantity: order.quantity,
+          status: "filled"
         })
         .where(eq(premiumOrders.id, orderId));
     } else if (newFilledQuantity > 0) {
       // Order is partially filled
       await db
         .update(premiumOrders)
-        .set({ 
+        .set({
           filledQuantity: newFilledQuantity,
           status: "partial"
         })
@@ -3342,7 +3344,7 @@ export class DatabaseStorage implements IStorage {
         price: trade.price,
       })
       .returning();
-    
+
     return createdTrade;
   }
 
