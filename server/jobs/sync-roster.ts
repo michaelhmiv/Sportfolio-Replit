@@ -13,13 +13,13 @@ import type { ProgressCallback } from "../lib/admin-stream";
 
 export async function syncRoster(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[roster_sync] Starting player roster sync...");
-  
+
   progressCallback?.({
     type: 'info',
     timestamp: new Date().toISOString(),
     message: 'Starting roster sync job',
   });
-  
+
   let requestCount = 0;
   let recordsProcessed = 0;
   let errorCount = 0;
@@ -31,14 +31,14 @@ export async function syncRoster(progressCallback?: ProgressCallback): Promise<J
       timestamp: new Date().toISOString(),
       message: 'Fetching active players from MySportsFeeds API',
     });
-    
+
     const players = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
       requestCount++;
       return await fetchActivePlayers();
     });
 
     console.log(`[roster_sync] Fetched ${players.length} players from MySportsFeeds`);
-    
+
     progressCallback?.({
       type: 'info',
       timestamp: new Date().toISOString(),
@@ -53,7 +53,8 @@ export async function syncRoster(progressCallback?: ProgressCallback): Promise<J
         const isEligibleForMining = isActive && player.currentRosterStatus !== "INJURED";
 
         await storage.upsertPlayer({
-          id: player.id,
+          id: `nba_${player.id}`, // Prefix with sport for multi-sport support
+          sport: "NBA",
           firstName: player.firstName,
           lastName: player.lastName,
           team: player.currentTeam?.abbreviation || "UNK",
@@ -67,7 +68,7 @@ export async function syncRoster(progressCallback?: ProgressCallback): Promise<J
         });
 
         recordsProcessed++;
-        
+
         // Progress update every 50 players
         if (recordsProcessed % 50 === 0) {
           progressCallback?.({
@@ -85,7 +86,7 @@ export async function syncRoster(progressCallback?: ProgressCallback): Promise<J
       } catch (error: any) {
         console.error(`[roster_sync] Failed to update player ${player.id}:`, error.message);
         errorCount++;
-        
+
         if (errorCount <= 5) { // Only log first 5 errors to avoid spam
           progressCallback?.({
             type: 'warning',
@@ -98,7 +99,7 @@ export async function syncRoster(progressCallback?: ProgressCallback): Promise<J
 
     console.log(`[roster_sync] Successfully processed ${recordsProcessed}/${players.length} players, ${errorCount} errors`);
     console.log(`[roster_sync] API requests made: ${requestCount}`);
-    
+
     progressCallback?.({
       type: 'complete',
       timestamp: new Date().toISOString(),
@@ -114,18 +115,18 @@ export async function syncRoster(progressCallback?: ProgressCallback): Promise<J
         },
       },
     });
-    
+
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {
     console.error("[roster_sync] Failed:", error.message);
-    
+
     progressCallback?.({
       type: 'error',
       timestamp: new Date().toISOString(),
       message: `Roster sync failed: ${error.message}`,
       data: { error: error.message, stack: error.stack },
     });
-    
+
     progressCallback?.({
       type: 'complete',
       timestamp: new Date().toISOString(),
@@ -140,7 +141,7 @@ export async function syncRoster(progressCallback?: ProgressCallback): Promise<J
         },
       },
     });
-    
+
     return { requestCount, recordsProcessed, errorCount: errorCount + 1 };
   }
 }

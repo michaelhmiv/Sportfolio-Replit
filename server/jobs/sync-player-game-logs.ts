@@ -46,16 +46,16 @@ const SEASON = getCurrentSeason(); // Dynamically resolves to current competitiv
 
 export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<JobResult> {
   const { mode = 'daily', startDate, endDate, progressCallback } = options;
-  
+
   console.log(`[sync_player_game_logs] Starting in ${mode.toUpperCase()} mode...`);
-  
+
   // Emit start event if callback provided
   progressCallback?.({
     type: 'info',
     timestamp: new Date().toISOString(),
     message: `Starting game logs sync in ${mode.toUpperCase()} mode`,
   });
-  
+
   let requestCount = 0;
   let recordsProcessed = 0;
   let errorCount = 0;
@@ -66,7 +66,7 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
     // Calculate date range based on mode
     let rangeStart: Date;
     let rangeEnd: Date;
-    
+
     if (mode === 'daily') {
       // DAILY MODE: Only fetch yesterday's games
       const yesterday = new Date();
@@ -93,7 +93,7 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
         rangeStart = new Date(seasonStartYear, 9, 1); // Oct 1
         rangeEnd = now;
       }
-      
+
       console.log(`[sync_player_game_logs] BACKFILL mode: Processing dates from ${rangeStart.toDateString()} to ${rangeEnd.toDateString()}`);
       progressCallback?.({
         type: 'info',
@@ -105,16 +105,16 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
 
     const currentDate = new Date(rangeStart);
     const totalDays = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-    
+
     // Iterate through each date in the range
     while (currentDate <= rangeEnd) {
       datesProcessed++;
       const dateStr = currentDate.toISOString().split('T')[0];
-      
+
       // Progress logging every 5 dates (only in backfill mode)
       if (mode === 'backfill' && datesProcessed % 5 === 0) {
         console.log(`[sync_player_game_logs] Progress: ${datesProcessed}/${totalDays} dates processed (${skippedDates} skipped, ${requestCount} API calls, ${recordsProcessed} games cached)`);
-        
+
         // Emit progress event
         progressCallback?.({
           type: 'progress',
@@ -134,7 +134,7 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
           },
         });
       }
-      
+
       try {
         if (mode === 'daily') {
           console.log(`[sync_player_game_logs] Fetching games for date ${dateStr}`);
@@ -151,14 +151,14 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
             message: `[${datesProcessed}/${totalDays}] Processing ${dateStr}...`,
           });
         }
-        
+
         // Fetch ALL players' games for this date using Daily endpoint (5-second backoff)
         // Note: Upsert handles duplicates efficiently, so no resume logic needed
         const dayGameLogs = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
           requestCount++;
           return await fetchDailyPlayerGameLogs(currentDate);
         });
-        
+
         // Wait 5 seconds between date requests (Daily endpoint backoff requirement)
         // Skip wait on last iteration in daily mode for faster execution
         if (mode === 'backfill' || currentDate < rangeEnd) {
@@ -229,20 +229,21 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
             // Determine home/away
             const playerTeamAbbr = gameLog.team?.abbreviation;
             const isHome = game.homeTeamAbbreviation === playerTeamAbbr;
-            const opponentTeam = isHome 
-              ? game.awayTeamAbbreviation 
+            const opponentTeam = isHome
+              ? game.awayTeamAbbreviation
               : game.homeTeamAbbreviation;
 
             // Store in database (upsert handles duplicates)
             await storage.upsertPlayerGameStats({
-              playerId: player.id,
+              playerId: `nba_${player.id}`, // Prefix with sport for multi-sport support
               gameId: game.id.toString(),
+              sport: "NBA",
               gameDate: new Date(game.startTime),
               season: SEASON,
               opponentTeam: opponentTeam || "UNK",
               homeAway: isHome ? "home" : "away",
-              minutes: stats.miscellaneous?.minSeconds 
-                ? Math.floor(stats.miscellaneous.minSeconds / 60) 
+              minutes: stats.miscellaneous?.minSeconds
+                ? Math.floor(stats.miscellaneous.minSeconds / 60)
                 : 0,
               points: offense.pts || 0,
               fieldGoalsMade: fieldGoals.fgMade || 0,
@@ -284,7 +285,7 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
         errorCount++;
         // Continue with next date instead of failing entire job
       }
-      
+
       // Move to next date
       currentDate.setDate(currentDate.getDate() + 1);
     }
@@ -292,7 +293,7 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
     console.log(`[sync_player_game_logs] Completed: ${recordsProcessed} game logs synced`);
     console.log(`[sync_player_game_logs] Dates: ${datesProcessed} total, ${skippedDates} skipped (no games)`);
     console.log(`[sync_player_game_logs] API requests: ${requestCount}, Errors: ${errorCount}`);
-    
+
     // In daily mode, if we processed 1 date and got 0 games AND made an API call, treat as degraded
     // This catches the case where API returned empty results when we expected data
     if (mode === 'daily' && recordsProcessed === 0 && requestCount > 0) {
@@ -306,13 +307,13 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
       });
       // Don't increment errorCount since this might be legitimate, but log the concern
     }
-    
+
     // Emit completion event
     const success = errorCount === 0;
     progressCallback?.({
       type: 'complete',
       timestamp: new Date().toISOString(),
-      message: success 
+      message: success
         ? `✓ Sync completed successfully: ${recordsProcessed} games cached`
         : `⚠ Sync completed with errors: ${recordsProcessed} games cached, ${errorCount} errors`,
       data: {
@@ -326,11 +327,11 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
         },
       },
     });
-    
+
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {
     console.error("[sync_player_game_logs] Failed:", error.message);
-    
+
     // Emit fatal error event
     progressCallback?.({
       type: 'error',
@@ -338,7 +339,7 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
       message: `Fatal error: ${error.message}`,
       data: { error: error.message, stack: error.stack },
     });
-    
+
     progressCallback?.({
       type: 'complete',
       timestamp: new Date().toISOString(),
@@ -354,7 +355,7 @@ export async function syncPlayerGameLogs(options: SyncOptions = {}): Promise<Job
         },
       },
     });
-    
+
     return { requestCount, recordsProcessed, errorCount: errorCount + 1 };
   }
 }

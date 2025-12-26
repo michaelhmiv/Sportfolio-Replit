@@ -50,6 +50,7 @@ import { SchemaOrg, schemas } from "@/components/schema-org";
 import { VestingWidget } from "@/components/vesting-widget";
 import { RedemptionModal } from "@/components/redemption-modal";
 import { VestingProvider, useVesting } from "@/lib/vesting-context";
+import { SportProvider } from "@/lib/sport-context";
 
 function OnboardingCheck() {
   const { user, isAuthenticated } = useAuth();
@@ -415,7 +416,9 @@ function App() {
           <NotificationProvider>
             <TooltipProvider>
               <VestingProvider>
-                <AppContent />
+                <SportProvider>
+                  <AppContent />
+                </SportProvider>
                 <Toaster />
               </VestingProvider>
             </TooltipProvider>

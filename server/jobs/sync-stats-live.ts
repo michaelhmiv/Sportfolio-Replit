@@ -15,13 +15,13 @@ import { broadcast } from "../websocket";
 
 export async function syncStatsLive(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[stats_sync_live] Starting live game stats sync...");
-  
+
   progressCallback?.({
     type: 'info',
     timestamp: new Date().toISOString(),
     message: 'Starting live stats sync job',
   });
-  
+
   let requestCount = 0;
   let recordsProcessed = 0;
   let errorCount = 0;
@@ -39,7 +39,7 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
     // Short-circuit if no live games
     if (liveGames.length === 0) {
       console.log(`[stats_sync_live] No live games in progress, skipping`);
-      
+
       progressCallback?.({
         type: 'complete',
         timestamp: new Date().toISOString(),
@@ -54,12 +54,12 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
           },
         },
       });
-      
+
       return { requestCount: 0, recordsProcessed: 0, errorCount: 0 };
     }
 
     console.log(`[stats_sync_live] Found ${liveGames.length} live games to process`);
-    
+
     progressCallback?.({
       type: 'info',
       timestamp: new Date().toISOString(),
@@ -70,7 +70,7 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
     // Rate limit budget: if >6 concurrent games, we might need to back off
     if (liveGames.length > 6) {
       console.warn(`[stats_sync_live] Warning: ${liveGames.length} concurrent live games may strain rate limits`);
-      
+
       progressCallback?.({
         type: 'warning',
         timestamp: new Date().toISOString(),
@@ -80,13 +80,13 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
 
     for (let i = 0; i < liveGames.length; i++) {
       const game = liveGames[i];
-      
+
       // MySportsFeeds requires 5-second backoff between Daily Player Gamelogs requests
       if (i > 0) {
         console.log(`[stats_sync_live] Waiting 5 seconds before next request (backoff)...`);
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
-      
+
       try {
         progressCallback?.({
           type: 'info',
@@ -98,7 +98,7 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
             gameId: game.gameId,
           },
         });
-        
+
         const gamelogs = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
           requestCount++;
           return await fetchPlayerGameStats(game.gameId, new Date(game.date));
@@ -126,13 +126,13 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
             const assists = offense.ast || 0;
             const steals = defense?.stl || 0;
             const blocks = defense?.blk || 0;
-            
+
             // Calculate double-double and triple-double
             const categories = [points, rebounds, assists, steals, blocks];
             const doubleDigitCategories = categories.filter(c => c >= 10).length;
             const isDoubleDouble = doubleDigitCategories >= 2;
             const isTripleDouble = doubleDigitCategories >= 3;
-            
+
             const fantasyPoints = calculateFantasyPoints({
               points,
               threePointersMade: fieldGoals?.fg3PtMade || 0,
@@ -144,8 +144,9 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
             });
 
             await storage.upsertPlayerGameStats({
-              playerId: gamelog.player.id,
+              playerId: `nba_${gamelog.player.id}`, // Prefix with sport for multi-sport support
               gameId: game.gameId,
+              sport: "NBA",
               gameDate: game.date,
               season: "2024-2025-regular",
               opponentTeam: gamelog.team.abbreviation === game.homeTeam ? game.awayTeam : game.homeTeam,
@@ -200,7 +201,7 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
 
     console.log(`[stats_sync_live] ✓ Processed ${recordsProcessed} player stats from ${liveGames.length} live games, ${errorCount} errors`);
     console.log(`[stats_sync_live] API requests made: ${requestCount}`);
-    
+
     progressCallback?.({
       type: 'complete',
       timestamp: new Date().toISOString(),
@@ -218,18 +219,18 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
         },
       },
     });
-    
+
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {
     console.error("[stats_sync_live] Failed:", error.message);
-    
+
     progressCallback?.({
       type: 'error',
       timestamp: new Date().toISOString(),
       message: `Live stats sync failed: ${error.message}`,
       data: { error: error.message, stack: error.stack },
     });
-    
+
     progressCallback?.({
       type: 'complete',
       timestamp: new Date().toISOString(),
@@ -244,7 +245,7 @@ export async function syncStatsLive(progressCallback?: ProgressCallback): Promis
         },
       },
     });
-    
+
     // Degrade gracefully - log but don't throw hard
     return { requestCount, recordsProcessed, errorCount: errorCount + 1 };
   }

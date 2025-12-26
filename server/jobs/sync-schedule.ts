@@ -16,13 +16,13 @@ import { getGameDay, getETDayBoundaries } from "../lib/time";
 
 export async function syncSchedule(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[schedule_sync] Starting game schedule sync...");
-  
+
   progressCallback?.({
     type: 'info',
     timestamp: new Date().toISOString(),
     message: 'Starting schedule sync job',
   });
-  
+
   let requestCount = 0;
   let recordsProcessed = 0;
   let errorCount = 0;
@@ -32,7 +32,7 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
     // Fetch games for a wider range: 7 days back to 14 days forward (covers contests and historical data)
     const today = new Date();
     const dates: string[] = [];
-    
+
     for (let i = -7; i <= 14; i++) {
       const date = new Date(today);
       date.setDate(today.getDate() + i);
@@ -40,7 +40,7 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
     }
 
     console.log(`[schedule_sync] Fetching games for dates range`);
-    
+
     progressCallback?.({
       type: 'info',
       timestamp: new Date().toISOString(),
@@ -55,7 +55,7 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
           requestCount++;
           return await fetchDailyGames(date);
         });
-        
+
         // Progress update every 5 dates
         if ((i + 1) % 5 === 0) {
           progressCallback?.({
@@ -77,21 +77,22 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
             const rawStatus = game.schedule.playedStatus || "scheduled";
             const gameId = game.schedule.id.toString();
             const startTime = new Date(game.schedule.startTime);
-            
+
             // Calculate game day in Eastern Time for the date field
             // NOTE: All queries should use start_time, not this date field
             const gameDay = getGameDay(startTime); // e.g., "2025-11-22"
             const { startOfDay } = getETDayBoundaries(gameDay);
-            
+
             // Extract scores for completed/in-progress games
             const homeScore = game.score?.homeScoreTotal != null ? parseInt(game.score.homeScoreTotal) : null;
             const awayScore = game.score?.awayScoreTotal != null ? parseInt(game.score.awayScoreTotal) : null;
-            
+
             // Normalize status based on what MySportsFeeds API returns
             const normalizedStatus = normalizeGameStatus(rawStatus);
-            
+
             await storage.upsertDailyGame({
               gameId,
+              sport: "NBA", // Multi-sport support
               date: startOfDay, // Store midnight UTC on the game's ET day (for auditing only)
               homeTeam: game.schedule?.homeTeam?.abbreviation || "UNK",
               awayTeam: game.schedule?.awayTeam?.abbreviation || "UNK",
@@ -103,7 +104,7 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
             });
 
             recordsProcessed++;
-            
+
             // Track games that have scores (live or completed) for broadcasting
             if ((normalizedStatus === 'inprogress' || normalizedStatus === 'completed') && (homeScore !== null || awayScore !== null)) {
               gamesWithUpdates.add(gameId);
@@ -122,14 +123,14 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
     // Broadcast updates for games with scores
     if (gamesWithUpdates.size > 0) {
       console.log(`[schedule_sync] Broadcasting updates for ${gamesWithUpdates.size} games with scores`);
-      
+
       progressCallback?.({
         type: 'info',
         timestamp: new Date().toISOString(),
         message: `Broadcasting updates for ${gamesWithUpdates.size} games with score changes`,
         data: { gamesWithUpdates: gamesWithUpdates.size },
       });
-      
+
       const gameIds = Array.from(gamesWithUpdates);
       for (const gameId of gameIds) {
         broadcast({
@@ -137,7 +138,7 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
           gameId,
           timestamp: new Date().toISOString(),
         });
-        
+
         // Also broadcast contest update since scores affect contest rankings
         broadcast({
           type: "contestUpdate",
@@ -149,7 +150,7 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
 
     console.log(`[schedule_sync] Successfully processed ${recordsProcessed} games, ${errorCount} errors`);
     console.log(`[schedule_sync] API requests made: ${requestCount}`);
-    
+
     progressCallback?.({
       type: 'complete',
       timestamp: new Date().toISOString(),
@@ -166,18 +167,18 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
         },
       },
     });
-    
+
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {
     console.error("[schedule_sync] Failed:", error.message);
-    
+
     progressCallback?.({
       type: 'error',
       timestamp: new Date().toISOString(),
       message: `Schedule sync failed: ${error.message}`,
       data: { error: error.message, stack: error.stack },
     });
-    
+
     progressCallback?.({
       type: 'complete',
       timestamp: new Date().toISOString(),
@@ -192,7 +193,7 @@ export async function syncSchedule(progressCallback?: ProgressCallback): Promise
         },
       },
     });
-    
+
     return { requestCount, recordsProcessed, errorCount: errorCount + 1 };
   }
 }

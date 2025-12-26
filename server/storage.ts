@@ -121,9 +121,13 @@ export interface IStorage {
   getPlayersPaginated(filters?: { search?: string; team?: string; position?: string; limit?: number; offset?: number }): Promise<{ players: Player[]; total: number }>;
   getPlayer(id: string): Promise<Player | undefined>;
   getPlayersByIds(ids: string[]): Promise<Player[]>;
+  getPlayersBySport(sport: string): Promise<Player[]>;
   getTopPlayersByVolume(limit: number): Promise<Player[]>;
   upsertPlayer(player: InsertPlayer): Promise<Player>;
+  updatePlayer(playerId: string, updates: Partial<InsertPlayer>): Promise<void>;
   getDistinctTeams(): Promise<string[]>;
+  getDistinctTeamsBySport(sport: string): Promise<string[]>;
+
 
   // Holdings methods
   getHolding(userId: string, assetType: string, assetId: string): Promise<Holding | undefined>;
@@ -197,6 +201,10 @@ export interface IStorage {
   // Daily games methods
   upsertDailyGame(game: InsertDailyGame): Promise<DailyGame>;
   getDailyGames(startDate: Date, endDate: Date): Promise<DailyGame[]>;
+  getDailyGamesBySport(sport: string, startDate: Date, endDate: Date): Promise<DailyGame[]>;
+  getDailyGameByGameId(gameId: string): Promise<DailyGame | undefined>;
+  createDailyGame(game: InsertDailyGame): Promise<DailyGame>;
+  updateDailyGame(id: string, updates: Partial<InsertDailyGame>): Promise<void>;
   updateDailyGameStatus(gameId: string, status: string): Promise<void>;
   getGamesByTeam(teamAbbreviation: string, startDate: Date, endDate: Date): Promise<DailyGame[]>;
 
@@ -830,6 +838,36 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(players.team));
 
     return result.map(r => r.team);
+  }
+
+  async getDistinctTeamsBySport(sport: string): Promise<string[]> {
+    const result = await db
+      .selectDistinct({ team: players.team })
+      .from(players)
+      .where(and(
+        eq(players.isActive, true),
+        eq(players.sport, sport)
+      ))
+      .orderBy(asc(players.team));
+
+    return result.map(r => r.team);
+  }
+
+  async getPlayersBySport(sport: string): Promise<Player[]> {
+    return await db
+      .select()
+      .from(players)
+      .where(eq(players.sport, sport));
+  }
+
+  async updatePlayer(playerId: string, updates: Partial<InsertPlayer>): Promise<void> {
+    await db
+      .update(players)
+      .set({
+        ...updates,
+        lastUpdated: new Date(),
+      })
+      .where(eq(players.id, playerId));
   }
 
   // Holdings methods
@@ -2168,6 +2206,46 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(asc(dailyGames.startTime));
+  }
+
+  async getDailyGamesBySport(sport: string, startDate: Date, endDate: Date): Promise<DailyGame[]> {
+    return await db
+      .select()
+      .from(dailyGames)
+      .where(
+        and(
+          eq(dailyGames.sport, sport),
+          sql`${dailyGames.startTime} >= ${startDate}`,
+          sql`${dailyGames.startTime} < ${endDate}`
+        )
+      )
+      .orderBy(asc(dailyGames.startTime));
+  }
+
+  async getDailyGameByGameId(gameId: string): Promise<DailyGame | undefined> {
+    const [game] = await db
+      .select()
+      .from(dailyGames)
+      .where(eq(dailyGames.gameId, gameId));
+    return game || undefined;
+  }
+
+  async createDailyGame(game: InsertDailyGame): Promise<DailyGame> {
+    const [created] = await db
+      .insert(dailyGames)
+      .values(game)
+      .returning();
+    return created;
+  }
+
+  async updateDailyGame(id: string, updates: Partial<InsertDailyGame>): Promise<void> {
+    await db
+      .update(dailyGames)
+      .set({
+        ...updates,
+        lastFetchedAt: new Date(),
+      })
+      .where(eq(dailyGames.id, id));
   }
 
   // Job execution log methods

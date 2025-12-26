@@ -13,13 +13,13 @@ import type { ProgressCallback } from "../lib/admin-stream";
 
 export async function syncStats(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[stats_sync] Starting game stats sync...");
-  
+
   progressCallback?.({
     type: 'info',
     timestamp: new Date().toISOString(),
     message: 'Starting stats sync job',
   });
-  
+
   let requestCount = 0;
   let recordsProcessed = 0;
   let errorCount = 0;
@@ -28,19 +28,19 @@ export async function syncStats(progressCallback?: ProgressCallback): Promise<Jo
     // Get games from last 24 hours (catches late-night games from previous day)
     const startDate = new Date();
     startDate.setHours(startDate.getHours() - 24);
-    
+
     const endDate = new Date();
     endDate.setHours(endDate.getHours() + 6); // Include upcoming games
 
     const games = await storage.getDailyGames(startDate, endDate);
     // Process games with scores (completed OR in-progress)
-    const relevantGames = games.filter(g => 
-      (g.status === "inprogress" || g.status === "completed" || 
-       (g.status === "scheduled" && g.homeScore !== null && g.awayScore !== null))
+    const relevantGames = games.filter(g =>
+    (g.status === "inprogress" || g.status === "completed" ||
+      (g.status === "scheduled" && g.homeScore !== null && g.awayScore !== null))
     );
 
     console.log(`[stats_sync] Found ${relevantGames.length} games to process`);
-    
+
     progressCallback?.({
       type: 'info',
       timestamp: new Date().toISOString(),
@@ -50,13 +50,13 @@ export async function syncStats(progressCallback?: ProgressCallback): Promise<Jo
 
     for (let i = 0; i < relevantGames.length; i++) {
       const game = relevantGames[i];
-      
+
       // MySportsFeeds requires 5-second backoff between Daily Player Gamelogs requests
       if (i > 0) {
         console.log(`[stats_sync] Waiting 5 seconds before next request (backoff)...`);
         await new Promise(resolve => setTimeout(resolve, 5000));
       }
-      
+
       try {
         progressCallback?.({
           type: 'info',
@@ -68,7 +68,7 @@ export async function syncStats(progressCallback?: ProgressCallback): Promise<Jo
             gameId: game.gameId,
           },
         });
-        
+
         const gamelogs = await mysportsfeedsRateLimiter.executeWithRetry(async () => {
           requestCount++;
           return await fetchPlayerGameStats(game.gameId, new Date(game.date));
@@ -96,13 +96,13 @@ export async function syncStats(progressCallback?: ProgressCallback): Promise<Jo
             const assists = offense.ast || 0;
             const steals = defense?.stl || 0;
             const blocks = defense?.blk || 0;
-            
+
             // Calculate double-double and triple-double
             const categories = [points, rebounds, assists, steals, blocks];
             const doubleDigitCategories = categories.filter(c => c >= 10).length;
             const isDoubleDouble = doubleDigitCategories >= 2;
             const isTripleDouble = doubleDigitCategories >= 3;
-            
+
             const fantasyPoints = calculateFantasyPoints({
               points,
               threePointersMade: fieldGoals?.fg3PtMade || 0,
@@ -114,8 +114,9 @@ export async function syncStats(progressCallback?: ProgressCallback): Promise<Jo
             });
 
             await storage.upsertPlayerGameStats({
-              playerId: gamelog.player.id,
+              playerId: `nba_${gamelog.player.id}`, // Prefix with sport for multi-sport support
               gameId: game.gameId,
+              sport: "NBA",
               gameDate: game.date,
               season: "2024-2025-regular",
               opponentTeam: gamelog.team.abbreviation === game.homeTeam ? game.awayTeam : game.homeTeam,
@@ -152,7 +153,7 @@ export async function syncStats(progressCallback?: ProgressCallback): Promise<Jo
 
     console.log(`[stats_sync] Successfully processed ${recordsProcessed} player stats, ${errorCount} errors`);
     console.log(`[stats_sync] API requests made: ${requestCount}`);
-    
+
     progressCallback?.({
       type: 'complete',
       timestamp: new Date().toISOString(),
@@ -169,18 +170,18 @@ export async function syncStats(progressCallback?: ProgressCallback): Promise<Jo
         },
       },
     });
-    
+
     return { requestCount, recordsProcessed, errorCount };
   } catch (error: any) {
     console.error("[stats_sync] Failed:", error.message);
-    
+
     progressCallback?.({
       type: 'error',
       timestamp: new Date().toISOString(),
       message: `Stats sync failed: ${error.message}`,
       data: { error: error.message, stack: error.stack },
     });
-    
+
     progressCallback?.({
       type: 'complete',
       timestamp: new Date().toISOString(),
@@ -195,7 +196,7 @@ export async function syncStats(progressCallback?: ProgressCallback): Promise<Jo
         },
       },
     });
-    
+
     return { requestCount, recordsProcessed, errorCount: errorCount + 1 };
   }
 }

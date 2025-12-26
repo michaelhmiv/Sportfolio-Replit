@@ -38,9 +38,11 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Players table - NBA players from MySportsFeeds
+// Players table - players from all sports (NBA, NFL, etc.)
+// Player IDs are prefixed with sport: nba_12345, nfl_67890
 export const players = pgTable("players", {
-  id: varchar("id").primaryKey(), // MySportsFeeds player ID
+  id: varchar("id").primaryKey(), // Prefixed player ID (e.g., nba_12345, nfl_67890)
+  sport: text("sport").notNull().default("NBA"), // NBA, NFL, etc.
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
   team: text("team").notNull(),
@@ -56,6 +58,9 @@ export const players = pgTable("players", {
   totalShares: integer("total_shares").notNull().default(0), // Total shares held by all users, updated on each trade
   lastUpdated: timestamp("last_updated").notNull().defaultNow(),
 }, (table) => ({
+  sportIdx: index("player_sport_idx").on(table.sport),
+  sportTeamIdx: index("player_sport_team_idx").on(table.sport, table.team),
+  sportPositionIdx: index("player_sport_position_idx").on(table.sport, table.position),
   teamIdx: index("team_idx").on(table.team),
   activeIdx: index("active_idx").on(table.isActive),
   positionIdx: index("position_idx").on(table.position),
@@ -199,6 +204,8 @@ export const contests = pgTable("contests", {
   sport: text("sport").notNull().default("NBA"),
   contestType: text("contest_type").notNull().default("50/50"),
   gameDate: timestamp("game_date").notNull(), // Date of games this contest covers
+  week: integer("week"), // NFL week number (null for NBA)
+  gameDay: text("game_day"), // NFL: "thursday", "sunday", "monday" (null for NBA)
   status: text("status").notNull().default("open"), // "open", "live", "completed"
   entryFee: decimal("entry_fee", { precision: 20, scale: 2 }).notNull().default("0.00"), // Entry fee per contest
   totalSharesEntered: integer("total_shares_entered").notNull().default(0),
@@ -208,6 +215,9 @@ export const contests = pgTable("contests", {
   endsAt: timestamp("ends_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
+  sportIdx: index("contest_sport_idx").on(table.sport),
+  sportStatusIdx: index("contest_sport_status_idx").on(table.sport, table.status),
+  sportWeekIdx: index("contest_sport_week_idx").on(table.sport, table.week),
   statusIdx: index("contest_status_idx").on(table.status),
 }));
 
@@ -237,15 +247,22 @@ export const contestLineups = pgTable("contest_lineups", {
   entryIdx: index("entry_idx").on(table.entryId),
 }));
 
-// Player game stats table - from MySportsFeeds
+// Player game stats table - for all sports
+// NBA: uses dedicated columns for backwards compatibility
+// NFL: uses statsJson for flexible stat storage
 export const playerGameStats = pgTable("player_game_stats", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   playerId: varchar("player_id").notNull().references(() => players.id),
-  gameId: text("game_id").notNull(), // MySportsFeeds game ID
+  gameId: text("game_id").notNull(), // API game ID
+  sport: text("sport").notNull().default("NBA"), // NBA, NFL, etc.
   gameDate: timestamp("game_date").notNull(),
+  week: integer("week"), // NFL week number (null for NBA)
   season: text("season").notNull().default("2024-2025-regular"), // Track season for historical data
   opponentTeam: text("opponent_team"), // Opponent abbreviation
   homeAway: text("home_away"), // "home" or "away"
+  // Sport-specific stats stored as JSON (used for NFL and future sports)
+  statsJson: jsonb("stats_json").notNull().default("{}"),
+  // NBA-specific columns (kept for backward compatibility)
   minutes: integer("minutes").notNull().default(0), // Minutes played
   points: integer("points").notNull().default(0),
   fieldGoalsMade: integer("field_goals_made").notNull().default(0),
@@ -261,9 +278,13 @@ export const playerGameStats = pgTable("player_game_stats", {
   turnovers: integer("turnovers").notNull().default(0),
   isDoubleDouble: boolean("is_double_double").notNull().default(false),
   isTripleDouble: boolean("is_triple_double").notNull().default(false),
+  // Common field
   fantasyPoints: decimal("fantasy_points", { precision: 10, scale: 2 }).notNull().default("0.00"),
   lastFetchedAt: timestamp("last_fetched_at").notNull().defaultNow(), // Track ingestion time
 }, (table) => ({
+  sportIdx: index("game_stats_sport_idx").on(table.sport),
+  sportWeekIdx: index("game_stats_sport_week_idx").on(table.sport, table.week),
+  sportPlayerIdx: index("game_stats_sport_player_idx").on(table.sport, table.playerId),
   playerGameIdx: index("player_game_idx").on(table.playerId, table.gameId),
 }));
 
@@ -278,11 +299,13 @@ export const priceHistory = pgTable("price_history", {
   playerTimeIdx: index("player_time_idx").on(table.playerId, table.timestamp),
 }));
 
-// Daily games table - cached game schedules from MySportsFeeds
+// Daily games table - cached game schedules for all sports
 export const dailyGames = pgTable("daily_games", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  gameId: text("game_id").notNull().unique(), // MySportsFeeds game ID
+  gameId: text("game_id").notNull().unique(), // API game ID (prefixed for clarity)
+  sport: text("sport").notNull().default("NBA"), // NBA, NFL, etc.
   date: timestamp("date").notNull(), // Game date
+  week: integer("week"), // NFL week number (1-18 for regular season, null for NBA)
   homeTeam: text("home_team").notNull(), // Team abbreviation
   awayTeam: text("away_team").notNull(), // Team abbreviation
   venue: text("venue"),
@@ -292,6 +315,9 @@ export const dailyGames = pgTable("daily_games", {
   awayScore: integer("away_score"), // null for scheduled games
   lastFetchedAt: timestamp("last_fetched_at").notNull().defaultNow(),
 }, (table) => ({
+  sportIdx: index("daily_games_sport_idx").on(table.sport),
+  sportDateIdx: index("daily_games_sport_date_idx").on(table.sport, table.date),
+  sportWeekIdx: index("daily_games_sport_week_idx").on(table.sport, table.week),
   dateIdx: index("daily_games_date_idx").on(table.date),
   statusIdx: index("daily_games_status_idx").on(table.status),
   gameIdDateIdx: index("daily_games_game_date_idx").on(table.gameId, table.date),
