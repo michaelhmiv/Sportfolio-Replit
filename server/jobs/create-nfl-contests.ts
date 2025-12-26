@@ -130,19 +130,6 @@ export async function createNFLContests(): Promise<{ contestsCreated: number; er
     return { contestsCreated, errors: errorCount };
 }
 
-/**
- * Run the job if executed directly
- */
-if (require.main === module) {
-    createNFLContests()
-        .then((result) => {
-            console.log("\nResult:", JSON.stringify(result, null, 2));
-            process.exit(result.errors === 0 ? 0 : 1);
-        })
-        .catch((error) => {
-            console.error("Failed:", error);
-            process.exit(1);
-        });
-}
+
 
 export default createNFLContests;

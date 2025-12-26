@@ -162,19 +162,6 @@ export async function syncNFLRoster(): Promise<SyncResult> {
     return result;
 }
 
-/**
- * Run the sync job if executed directly
- */
-if (require.main === module) {
-    syncNFLRoster()
-        .then((result) => {
-            console.log("\nSync Result:", JSON.stringify(result, null, 2));
-            process.exit(result.success ? 0 : 1);
-        })
-        .catch((error) => {
-            console.error("Sync failed:", error);
-            process.exit(1);
-        });
-}
+
 
 export default syncNFLRoster;
