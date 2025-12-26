@@ -21,6 +21,10 @@ import { backfillContestStats } from "./backfill-contest-stats";
 import { generateWeeklyRoundup } from "./weekly-roundup";
 import { backfillMarketSnapshots } from "./market-snapshot";
 import { runBotEngineTick } from "../bot/bot-engine";
+import { syncNFLSchedule } from "./sync-nfl-schedule";
+import { syncNFLStats } from "./sync-nfl-stats";
+import { createNFLContests } from "./create-nfl-contests";
+import { syncNFLRoster } from "./sync-nfl-roster";
 import type { ProgressCallback } from "../lib/admin-stream";
 
 export interface JobResult {
@@ -40,7 +44,7 @@ export class JobScheduler {
   private jobs: Map<string, cron.ScheduledTask> = new Map();
   private isInitialized = false;
 
-  constructor() {}
+  constructor() { }
 
   /**
    * Helper method to schedule a job
@@ -55,7 +59,7 @@ export class JobScheduler {
       jobConfig.schedule,
       async () => {
         console.log(`[${jobConfig.name}] Starting scheduled run...`);
-        
+
         const jobLog = await storage.createJobLog({
           jobName: jobConfig.name,
           scheduledFor: new Date(),
@@ -64,10 +68,10 @@ export class JobScheduler {
 
         try {
           const result = await jobConfig.handler();
-          
+
           // Determine job status: degraded if some records failed, success if all succeeded
           const status = result.errorCount > 0 ? "degraded" : "success";
-          
+
           await storage.updateJobLog(jobLog.id, {
             status,
             finishedAt: new Date(),
@@ -75,7 +79,7 @@ export class JobScheduler {
             recordsProcessed: result.recordsProcessed || 0,
             errorCount: result.errorCount || 0,
           });
-          
+
           if (status === "degraded") {
             console.warn(`[${jobConfig.name}] Completed with errors - ${result.recordsProcessed} records processed, ${result.errorCount} failed, ${result.requestCount} requests`);
           } else {
@@ -83,7 +87,7 @@ export class JobScheduler {
           }
         } catch (error: any) {
           console.error(`[${jobConfig.name}] Failed:`, error.message);
-          
+
           await storage.updateJobLog(jobLog.id, {
             status: "failed",
             errorMessage: error.message,
@@ -202,6 +206,58 @@ export class JobScheduler {
         enabled: true,
         handler: generateWeeklyRoundup,
       },
+      {
+        name: "nfl_roster_sync",
+        schedule: "0 4 * * *", // Daily at 4:00 AM ET
+        enabled: true,
+        handler: async () => {
+          const result = await syncNFLRoster();
+          return {
+            requestCount: 0,
+            recordsProcessed: result.playersAdded + result.playersUpdated,
+            errorCount: result.errors.length,
+          };
+        },
+      },
+      {
+        name: "nfl_schedule_sync",
+        schedule: "0 6 * * *", // Daily at 6:00 AM ET (after roster sync)
+        enabled: true,
+        handler: async () => {
+          const result = await syncNFLSchedule();
+          return {
+            requestCount: 0,
+            recordsProcessed: result.gamesProcessed,
+            errorCount: result.errors.length,
+          };
+        },
+      },
+      {
+        name: "nfl_stats_sync",
+        schedule: "0 * * * *", // Every hour
+        enabled: true,
+        handler: async () => {
+          const result = await syncNFLStats();
+          return {
+            requestCount: 0,
+            recordsProcessed: result.statsProcessed,
+            errorCount: result.errors.length,
+          };
+        },
+      },
+      {
+        name: "nfl_create_contests",
+        schedule: "0 1 * * *", // Daily at 1:00 AM ET
+        enabled: true,
+        handler: async () => {
+          const result = await createNFLContests();
+          return {
+            requestCount: 0,
+            recordsProcessed: result.contestsCreated,
+            errorCount: result.errors,
+          };
+        },
+      },
     ];
 
     for (const jobConfig of apiJobs) {
@@ -290,7 +346,7 @@ export class JobScheduler {
     }
 
     console.log(`[${jobName}] Manual trigger started${progressCallback ? ' with live logging' : ''}...`);
-    
+
     const jobLog = await storage.createJobLog({
       jobName,
       scheduledFor: new Date(),
@@ -299,10 +355,10 @@ export class JobScheduler {
 
     try {
       const result = await handler(progressCallback);
-      
+
       // Determine job status: degraded if some records failed, success if all succeeded
       const status = result.errorCount > 0 ? "degraded" : "success";
-      
+
       await storage.updateJobLog(jobLog.id, {
         status,
         finishedAt: new Date(),
@@ -310,7 +366,7 @@ export class JobScheduler {
         recordsProcessed: result.recordsProcessed,
         errorCount: result.errorCount,
       });
-      
+
       if (status === "degraded") {
         console.warn(`[${jobName}] Manual trigger completed with errors - ${result.recordsProcessed} records processed, ${result.errorCount} failed, ${result.requestCount} requests`);
       } else {
@@ -319,13 +375,13 @@ export class JobScheduler {
       return result;
     } catch (error: any) {
       console.error(`[${jobName}] Manual trigger failed:`, error.message);
-      
+
       await storage.updateJobLog(jobLog.id, {
         status: "failed",
         errorMessage: error.message,
         finishedAt: new Date(),
       });
-      
+
       throw error;
     }
   }

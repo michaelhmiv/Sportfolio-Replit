@@ -70,9 +70,9 @@ export interface NFLGame {
     season: number;
     status: string; // "Final", "Scheduled", "In Progress"
     home_team: NFLTeam;
-    away_team: NFLTeam;
+    visitor_team: NFLTeam;
     home_team_score: number | null;
-    away_team_score: number | null;
+    visitor_team_score: number | null;
     venue?: string;
     time?: string;
 }

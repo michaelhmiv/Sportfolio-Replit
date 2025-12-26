@@ -2759,7 +2759,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Contests (public - anyone can view, optionalAuth to check for user entries)
   app.get("/api/contests", optionalAuth, async (req: any, res) => {
     try {
-      const { date } = req.query;
+      const { date, sport } = req.query;
 
       // Fetch ALL contests when date filter is provided, otherwise just open ones
       const allContests = date ? await storage.getContests() : await storage.getContests("open");
@@ -2776,11 +2776,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const gameDateStr = gameDate.toISOString().split('T')[0];
           return gameDateStr === date;
         });
-      } else {
-        // Default behavior: show all upcoming contests (haven't started yet)
-        filteredContests = allContests.filter(contest =>
-          new Date(contest.startsAt) > now
-        );
+      }
+
+      // Filter by sport if provided
+      if (sport && typeof sport === 'string' && sport !== 'all') {
+        filteredContests = filteredContests.filter(contest => contest.sport === sport);
       }
 
       // If user is authenticated, include their entries

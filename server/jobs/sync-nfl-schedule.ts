@@ -98,12 +98,12 @@ export async function syncNFLSchedule(): Promise<SyncResult> {
                     date: new Date(apiGame.date),
                     week: apiGame.week,
                     homeTeam: apiGame.home_team?.abbreviation || "TBD",
-                    awayTeam: apiGame.away_team?.abbreviation || "TBD",
+                    awayTeam: apiGame.visitor_team?.abbreviation || "TBD",
                     venue: apiGame.venue || null,
                     status,
                     startTime,
                     homeScore: status !== "scheduled" ? apiGame.home_team_score : null,
-                    awayScore: status !== "scheduled" ? apiGame.away_team_score : null,
+                    awayScore: status !== "scheduled" ? apiGame.visitor_team_score : null,
                 };
 
                 // Check if game exists
@@ -194,12 +194,12 @@ export async function syncNFLWeek(week: number): Promise<SyncResult> {
                     date: new Date(apiGame.date),
                     week: apiGame.week,
                     homeTeam: apiGame.home_team?.abbreviation || "TBD",
-                    awayTeam: apiGame.away_team?.abbreviation || "TBD",
+                    awayTeam: apiGame.visitor_team?.abbreviation || "TBD",
                     venue: apiGame.venue || null,
                     status,
                     startTime,
                     homeScore: status !== "scheduled" ? apiGame.home_team_score : null,
-                    awayScore: status !== "scheduled" ? apiGame.away_team_score : null,
+                    awayScore: status !== "scheduled" ? apiGame.visitor_team_score : null,
                 };
 
                 const existingGame = await storage.getDailyGameByGameId(gameId);
