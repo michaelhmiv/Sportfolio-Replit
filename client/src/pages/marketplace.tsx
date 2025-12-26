@@ -20,6 +20,8 @@ import { AnimatedPrice } from "@/components/ui/animated-price";
 import { AnimatedList } from "@/components/ui/animated-list";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useAuth } from "@/hooks/useAuth";
+import { useSport, useSportConfig } from "@/lib/sport-context";
+import { SportSelector } from "@/components/sport-selector";
 
 type PlayerWithOrderBook = Player & {
   bestBid: string | null;
@@ -34,8 +36,10 @@ type SortOrder = "asc" | "desc";
 export default function Marketplace() {
   const { user } = useAuth();
   const isPremiumUser = user?.isPremium || false;
+  const { sport } = useSport();
+  const sportConfig = useSportConfig();
   const searchParams = new URLSearchParams(useSearch());
-  const [,setLocation] = useLocation();
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "players");
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -48,7 +52,7 @@ export default function Marketplace() {
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false); // Collapsed by default
   const ITEMS_PER_PAGE = 50;
-  const { subscribe} = useWebSocket();
+  const { subscribe } = useWebSocket();
 
   // Sync active tab with URL query parameter
   useEffect(() => {
@@ -62,18 +66,23 @@ export default function Marketplace() {
     setActiveTab(value);
     setLocation(value === "players" ? "/marketplace" : `/marketplace?tab=${value}`);
   };
-  
+
   // Debounce search input (250ms delay)
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(search);
     }, 250);
-    
+
     return () => clearTimeout(timer);
   }, [search]);
 
   const { data: teams } = useQuery<string[]>({
-    queryKey: ["/api/teams"],
+    queryKey: ["/api/teams", sport],
+    queryFn: async () => {
+      const res = await fetch(`/api/teams?sport=${sport}`);
+      if (!res.ok) throw new Error("Failed to fetch teams");
+      return res.json();
+    },
   });
 
   // Premium market data - CRITICAL: Only show real trade data, never fabricated prices
@@ -84,7 +93,7 @@ export default function Marketplace() {
     circulation: number;
     totalTrades: number;
   };
-  
+
   const { data: premiumMarketData } = useQuery<PremiumMarketData>({
     queryKey: ["/api/premium/market-data"],
   });
@@ -99,9 +108,14 @@ export default function Marketplace() {
     price: number | null;
     priceChange24h: number;
   };
-  
+
   const { data: topRisers } = useQuery<SpotlightRiser[]>({
-    queryKey: ["/api/players/spotlight/top-risers"],
+    queryKey: ["/api/players/spotlight/top-risers", sport],
+    queryFn: async () => {
+      const res = await fetch(`/api/players/spotlight/top-risers?sport=${sport}`);
+      if (!res.ok) throw new Error("Failed to fetch top risers");
+      return res.json();
+    },
   });
 
   // Spotlight: Top market cap players
@@ -115,9 +129,14 @@ export default function Marketplace() {
     marketCap: number;
     totalShares: number;
   };
-  
+
   const { data: topMarketCap } = useQuery<SpotlightMarketCap[]>({
-    queryKey: ["/api/players/spotlight/top-market-cap"],
+    queryKey: ["/api/players/spotlight/top-market-cap", sport],
+    queryFn: async () => {
+      const res = await fetch(`/api/players/spotlight/top-market-cap?sport=${sport}`);
+      if (!res.ok) throw new Error("Failed to fetch top market cap");
+      return res.json();
+    },
   });
 
   // WebSocket listener for real-time marketplace updates
@@ -142,18 +161,20 @@ export default function Marketplace() {
 
   const { data: playersData, isLoading } = useQuery<{ players: PlayerWithOrderBook[]; total: number }>({
     queryKey: [
-      "/api/players", 
-      debouncedSearch, 
-      teamFilter, 
-      positionFilter, 
-      sortField, 
-      sortOrder, 
-      filterHasBuyOrders, 
-      filterHasSellOrders, 
+      "/api/players",
+      sport,
+      debouncedSearch,
+      teamFilter,
+      positionFilter,
+      sortField,
+      sortOrder,
+      filterHasBuyOrders,
+      filterHasSellOrders,
       page
     ],
     queryFn: async () => {
       const params = new URLSearchParams();
+      params.append("sport", sport);
       if (debouncedSearch) params.append("search", debouncedSearch);
       if (teamFilter && teamFilter !== "all") params.append("team", teamFilter);
       if (positionFilter && positionFilter !== "all") params.append("position", positionFilter);
@@ -163,7 +184,7 @@ export default function Marketplace() {
       if (filterHasSellOrders) params.append("hasSellOrders", "true");
       params.append("limit", String(ITEMS_PER_PAGE));
       params.append("offset", String((page - 1) * ITEMS_PER_PAGE));
-      
+
       const url = `/api/players?${params.toString()}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error("Failed to fetch players");
@@ -180,6 +201,13 @@ export default function Marketplace() {
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch, teamFilter, positionFilter, sortField, sortOrder, filterHasBuyOrders, filterHasSellOrders]);
+
+  // Reset filters when sport changes (positions differ between sports)
+  useEffect(() => {
+    setTeamFilter("all");
+    setPositionFilter("all");
+    setPage(1);
+  }, [sport]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -271,499 +299,502 @@ export default function Marketplace() {
 
             {/* Collapsible Filters */}
             <ScrollReveal>
-            <Card>
-          <CardContent className="p-3 sm:p-4">
-            {/* Filter Toggle Header */}
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="flex items-center justify-between w-full hover-elevate rounded p-1"
-              data-testid="button-toggle-filters"
-            >
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm font-medium">Search & Filters</span>
-                {(teamFilter !== "all" || positionFilter !== "all" || filterHasBuyOrders || filterHasSellOrders || search) && (
-                  <Badge variant="secondary" className="text-xs">Active</Badge>
-                )}
-              </div>
-              {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </button>
-            
-            {/* Expanded Filters */}
-            {showFilters && (
-              <div className="space-y-3 pt-3 border-t mt-3">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
-                  <div className="relative md:col-span-2">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search players..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="pl-9"
-                      data-testid="input-search-players"
-                    />
-                  </div>
-                  
-                  <Select value={teamFilter} onValueChange={setTeamFilter}>
-                    <SelectTrigger data-testid="select-team-filter">
-                      <SelectValue placeholder="All Teams" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Teams</SelectItem>
-                      {teams?.map((team) => (
-                        <SelectItem key={team} value={team}>{team}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              <Card>
+                <CardContent className="p-3 sm:p-4">
+                  {/* Filter Toggle Header */}
+                  <button
+                    onClick={() => setShowFilters(!showFilters)}
+                    className="flex items-center justify-between w-full hover-elevate rounded p-1"
+                    data-testid="button-toggle-filters"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-4 h-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Search & Filters</span>
+                      {(teamFilter !== "all" || positionFilter !== "all" || filterHasBuyOrders || filterHasSellOrders || search) && (
+                        <Badge variant="secondary" className="text-xs">Active</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <SportSelector size="sm" />
+                      {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                    </div>
+                  </button>
 
-                  <Select value={positionFilter} onValueChange={setPositionFilter}>
-                    <SelectTrigger data-testid="select-position-filter">
-                      <SelectValue placeholder="All Positions" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Positions</SelectItem>
-                      <SelectItem value="PG">Point Guard</SelectItem>
-                      <SelectItem value="SG">Shooting Guard</SelectItem>
-                      <SelectItem value="SF">Small Forward</SelectItem>
-                      <SelectItem value="PF">Power Forward</SelectItem>
-                      <SelectItem value="C">Center</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Order Book Filters */}
-                <div className="flex flex-wrap items-center gap-4 pt-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">Show only:</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox 
-                      id="filter-buy-orders" 
-                      checked={filterHasBuyOrders}
-                      onCheckedChange={(checked) => setFilterHasBuyOrders(checked as boolean)}
-                      data-testid="checkbox-filter-buy-orders"
-                    />
-                    <label htmlFor="filter-buy-orders" className="text-sm cursor-pointer">
-                      Has Buy Orders
-                    </label>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Checkbox 
-                      id="filter-sell-orders" 
-                      checked={filterHasSellOrders}
-                      onCheckedChange={(checked) => setFilterHasSellOrders(checked as boolean)}
-                      data-testid="checkbox-filter-sell-orders"
-                    />
-                    <label htmlFor="filter-sell-orders" className="text-sm cursor-pointer">
-                      Has Sell Orders
-                    </label>
-                  </div>
-                  {(filterHasBuyOrders || filterHasSellOrders || search || teamFilter !== "all" || positionFilter !== "all") && (
+                  {/* Expanded Filters */}
+                  {showFilters && (
+                    <div className="space-y-3 pt-3 border-t mt-3">
+                      <div className="grid grid-cols-1 md:grid-cols-4 gap-3 sm:gap-4">
+                        <div className="relative md:col-span-2">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            placeholder="Search players..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            className="pl-9"
+                            data-testid="input-search-players"
+                          />
+                        </div>
+
+                        <Select value={teamFilter} onValueChange={setTeamFilter}>
+                          <SelectTrigger data-testid="select-team-filter">
+                            <SelectValue placeholder="All Teams" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Teams</SelectItem>
+                            {teams?.map((team) => (
+                              <SelectItem key={team} value={team}>{team}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+
+                        <Select value={positionFilter} onValueChange={setPositionFilter}>
+                          <SelectTrigger data-testid="select-position-filter">
+                            <SelectValue placeholder="All Positions" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Positions</SelectItem>
+                            {sportConfig.positions.map((pos) => (
+                              <SelectItem key={pos} value={pos}>
+                                {sportConfig.positionLabels[pos] || pos}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Order Book Filters */}
+                      <div className="flex flex-wrap items-center gap-4 pt-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Show only:</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="filter-buy-orders"
+                            checked={filterHasBuyOrders}
+                            onCheckedChange={(checked) => setFilterHasBuyOrders(checked as boolean)}
+                            data-testid="checkbox-filter-buy-orders"
+                          />
+                          <label htmlFor="filter-buy-orders" className="text-sm cursor-pointer">
+                            Has Buy Orders
+                          </label>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="filter-sell-orders"
+                            checked={filterHasSellOrders}
+                            onCheckedChange={(checked) => setFilterHasSellOrders(checked as boolean)}
+                            data-testid="checkbox-filter-sell-orders"
+                          />
+                          <label htmlFor="filter-sell-orders" className="text-sm cursor-pointer">
+                            Has Sell Orders
+                          </label>
+                        </div>
+                        {(filterHasBuyOrders || filterHasSellOrders || search || teamFilter !== "all" || positionFilter !== "all") && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setFilterHasBuyOrders(false);
+                              setFilterHasSellOrders(false);
+                              setSearch("");
+                              setTeamFilter("all");
+                              setPositionFilter("all");
+                            }}
+                            className="text-xs"
+                            data-testid="button-clear-filters"
+                          >
+                            Clear All
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </ScrollReveal>
+
+            {/* Player Table */}
+            <Card id="all-players">
+              <CardHeader className="p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <CardTitle className="text-sm font-medium uppercase tracking-wide">All Players</CardTitle>
+                  {/* Mobile sort controls */}
+                  <div className="flex items-center gap-1 sm:hidden flex-wrap">
                     <Button
                       size="sm"
-                      variant="ghost"
-                      onClick={() => {
-                        setFilterHasBuyOrders(false);
-                        setFilterHasSellOrders(false);
-                        setSearch("");
-                        setTeamFilter("all");
-                        setPositionFilter("all");
-                      }}
+                      variant={sortField === 'bid' ? 'default' : 'outline'}
+                      onClick={() => toggleSort("bid")}
                       className="text-xs"
-                      data-testid="button-clear-filters"
+                      data-testid="button-sort-bid-mobile"
                     >
-                      Clear All
+                      Bid {sortField === 'bid' && <ArrowUpDown className="w-3 h-3 ml-1" />}
                     </Button>
-                  )}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        </ScrollReveal>
-
-        {/* Player Table */}
-        <Card id="all-players">
-          <CardHeader className="p-3">
-            <div className="flex items-center justify-between gap-3">
-              <CardTitle className="text-sm font-medium uppercase tracking-wide">All Players</CardTitle>
-              {/* Mobile sort controls */}
-              <div className="flex items-center gap-1 sm:hidden flex-wrap">
-                <Button
-                  size="sm"
-                  variant={sortField === 'bid' ? 'default' : 'outline'}
-                  onClick={() => toggleSort("bid")}
-                  className="text-xs"
-                  data-testid="button-sort-bid-mobile"
-                >
-                  Bid {sortField === 'bid' && <ArrowUpDown className="w-3 h-3 ml-1" />}
-                </Button>
-                <Button
-                  size="sm"
-                  variant={sortField === 'ask' ? 'default' : 'outline'}
-                  onClick={() => toggleSort("ask")}
-                  className="text-xs"
-                  data-testid="button-sort-ask-mobile"
-                >
-                  Ask {sortField === 'ask' && <ArrowUpDown className="w-3 h-3 ml-1" />}
-                </Button>
-                <Button
-                  size="sm"
-                  variant={sortField === 'volume' ? 'default' : 'outline'}
-                  onClick={() => toggleSort("volume")}
-                  className="text-xs"
-                  data-testid="button-sort-volume-mobile"
-                >
-                  Vol {sortField === 'volume' && <ArrowUpDown className="w-3 h-3 ml-1" />}
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="p-2">
-                {[75, 85, 65, 90, 70, 80, 60, 88].map((width, i) => (
-                  <div key={i} className="flex items-center gap-3 p-2 border-b last:border-0">
-                    <Shimmer width="32px" height="32px" className="rounded-full flex-shrink-0" />
-                    <div className="flex-1 space-y-2">
-                      <Shimmer height="16px" width={`${width}%`} />
-                      <Shimmer height="12px" width="100px" />
-                    </div>
-                    <div className="hidden sm:flex flex-col items-end gap-1">
-                      <Shimmer height="16px" width="60px" />
-                      <Shimmer height="12px" width="40px" />
-                    </div>
-                    <Shimmer height="32px" width="60px" className="rounded-md" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div>
-                <table className="w-full">
-                  <thead className="border-b bg-muted/50 hidden sm:table-header-group">
-                    <tr>
-                      <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
-                      <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Team</th>
-                      <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                        <button 
-                          onClick={() => toggleSort("price")} 
-                          className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded text-xs"
-                          data-testid="button-sort-price"
-                        >
-                          Market Value <ArrowUpDown className="w-3 h-3" />
-                        </button>
-                      </th>
-                      <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">
-                        <div className="flex items-center gap-1 justify-end">
-                          <button 
-                            onClick={() => toggleSort("bid")} 
-                            className="hover-elevate px-2 py-1 rounded text-xs text-blue-500 dark:text-blue-400 flex items-center gap-0.5"
-                            data-testid="button-sort-bid"
-                          >
-                            Bid {sortField === 'bid' && <ArrowUpDown className="w-3 h-3" />}
-                          </button>
-                          <span className="text-muted-foreground">/</span>
-                          <button 
-                            onClick={() => toggleSort("ask")} 
-                            className="hover-elevate px-2 py-1 rounded text-xs text-red-500 dark:text-red-400 flex items-center gap-0.5"
-                            data-testid="button-sort-ask"
-                          >
-                            Ask {sortField === 'ask' && <ArrowUpDown className="w-3 h-3" />}
-                          </button>
-                        </div>
-                      </th>
-                      <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">
-                        <button 
-                          onClick={() => toggleSort("volume")} 
-                          className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded text-xs"
-                          data-testid="button-sort-volume"
-                        >
-                          24h Vol <ArrowUpDown className="w-3 h-3" />
-                        </button>
-                      </th>
-                      <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">
-                        <button 
-                          onClick={() => toggleSort("change")} 
-                          className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded text-xs"
-                          data-testid="button-sort-change"
-                        >
-                          24h Change <ArrowUpDown className="w-3 h-3" />
-                        </button>
-                      </th>
-                      <th className="px-2 py-1.5"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Premium Shares Row - Always First */}
-                    <tr 
-                      key="premium-share"
-                      className="border-b hover-elevate bg-gradient-to-r from-yellow-500/5 to-amber-500/5"
-                      data-testid="row-premium-share"
+                    <Button
+                      size="sm"
+                      variant={sortField === 'ask' ? 'default' : 'outline'}
+                      onClick={() => toggleSort("ask")}
+                      className="text-xs"
+                      data-testid="button-sort-ask-mobile"
                     >
-                      {/* Mobile layout: stacked info */}
-                      <td className="px-2 py-2 sm:hidden" colSpan={6}>
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
-                              <Crown className="w-4 h-4 text-yellow-500" />
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <div className="font-medium text-sm text-yellow-500">Premium Share</div>
-                              <div className="flex items-center gap-1.5 text-xs flex-wrap">
-                                <span className="text-muted-foreground">30 Days Access</span>
-                              </div>
-                              <div className="flex items-center gap-1.5 text-xs mt-0.5">
-                                {premiumMarketData?.lastTradePrice !== null && premiumMarketData?.lastTradePrice !== undefined ? (
-                                  <span className="font-mono font-bold text-yellow-500">${premiumMarketData.lastTradePrice.toFixed(2)}</span>
-                                ) : (
-                                  <span className="text-muted-foreground">No trades</span>
-                                )}
-                                <span className="text-muted-foreground">•</span>
-                                {premiumMarketData?.bestBid ? (
-                                  <span className="text-blue-500 dark:text-blue-400 font-mono font-bold">${premiumMarketData.bestBid.price.toFixed(2)}</span>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                                <span className="text-muted-foreground">/</span>
-                                {premiumMarketData?.bestAsk ? (
-                                  <span className="text-red-500 dark:text-red-400 font-mono font-bold">${premiumMarketData.bestAsk.price.toFixed(2)}</span>
-                                ) : (
-                                  <span className="text-muted-foreground">-</span>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                          <Link href="/premium/trade">
-                            <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black" data-testid="button-trade-premium">Trade</Button>
-                          </Link>
-                        </div>
-                      </td>
-
-                      {/* Desktop layout: table cells */}
-                      <td className="px-2 py-1.5 hidden sm:table-cell">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
-                            <Crown className="w-4 h-4 text-yellow-500" />
-                          </div>
-                          <div>
-                            <div className="font-medium text-sm text-yellow-500">Premium Share</div>
-                            <div className="text-xs text-muted-foreground md:hidden">30 Days Access</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-2 py-1.5 hidden md:table-cell">
-                        <Badge variant="outline" className="text-xs text-yellow-500 border-yellow-500/50">PREMIUM</Badge>
-                      </td>
-                      <td className="px-2 py-1.5 text-right hidden sm:table-cell">
-                        {premiumMarketData?.lastTradePrice !== null && premiumMarketData?.lastTradePrice !== undefined ? (
-                          <span className="font-mono font-bold text-yellow-500">${premiumMarketData.lastTradePrice.toFixed(2)}</span>
-                        ) : (
-                          <span className="text-muted-foreground text-xs">No trades</span>
-                        )}
-                      </td>
-                      <td className="px-2 py-1.5 text-right hidden lg:table-cell">
-                        <div className="flex items-center justify-end gap-2 font-mono text-sm font-bold">
-                          {premiumMarketData?.bestBid ? (
-                            <span className="text-blue-500 dark:text-blue-400">${premiumMarketData.bestBid.price.toFixed(2)}</span>
-                          ) : (
-                            <span className="text-muted-foreground font-normal text-xs">-</span>
-                          )}
-                          <span className="text-muted-foreground font-normal">×</span>
-                          {premiumMarketData?.bestAsk ? (
-                            <span className="text-red-500 dark:text-red-400">${premiumMarketData.bestAsk.price.toFixed(2)}</span>
-                          ) : (
-                            <span className="text-muted-foreground font-normal text-xs">-</span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-2 py-1.5 text-right hidden lg:table-cell">
-                        <span className="text-xs text-muted-foreground">{premiumMarketData?.totalTrades || 0}</span>
-                      </td>
-                      <td className="px-2 py-1.5 text-right hidden md:table-cell">
-                        <div className="flex items-center justify-end gap-1 text-muted-foreground">
-                          <span className="font-medium text-xs">-</span>
-                        </div>
-                      </td>
-                      <td className="px-2 py-1.5 hidden sm:table-cell">
-                        <Link href="/premium/trade">
-                          <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black" data-testid="button-trade-premium-desktop">Trade</Button>
-                        </Link>
-                      </td>
-                    </tr>
-                    {players.flatMap((player: PlayerWithOrderBook, index: number) => {
-                      const playerRow = (
-                      <tr 
-                        key={player.id} 
-                        className="border-b last:border-0 hover-elevate"
-                        data-testid={`row-player-${player.id}`}
-                      >
-                        {/* Mobile layout: stacked info */}
-                        <td className="px-2 py-2 sm:hidden" colSpan={6}>
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-2 min-w-0 flex-1">
-                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                <span className="font-bold text-xs">{player.firstName[0]}{player.lastName[0]}</span>
-                              </div>
-                              <div className="min-w-0 flex-1">
-                                <div className="font-medium text-sm">
-                                  <PlayerName 
-                                    playerId={player.id} 
-                                    firstName={player.firstName} 
-                                    lastName={player.lastName}
-                                    className="text-sm"
-                                  />
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs flex-wrap">
-                                  <span className="text-muted-foreground">{player.team} • {player.position}</span>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-xs mt-0.5">
-                                  {player.lastTradePrice ? (
-                                    <AnimatedPrice 
-                                      value={parseFloat(player.lastTradePrice)} 
-                                      size="sm" 
-                                      className="font-mono font-bold"
-                                    />
-                                  ) : (
-                                    <span className="text-muted-foreground">-</span>
-                                  )}
-                                  <span className="text-muted-foreground">•</span>
-                                  <span className="text-blue-500 dark:text-blue-400 font-mono font-bold">
-                                    {player.bestBid ? `$${player.bestBid}` : '-'}
-                                  </span>
-                                  <span className="text-muted-foreground">/</span>
-                                  <span className="text-red-500 dark:text-red-400 font-mono font-bold">
-                                    {player.bestAsk ? `$${player.bestAsk}` : '-'}
-                                  </span>
-                                  <span className="text-muted-foreground">•</span>
-                                  <span className="text-muted-foreground">Vol: {player.volume24h > 0 ? player.volume24h.toLocaleString() : '-'}</span>
-                                </div>
-                              </div>
-                            </div>
-                            <Link href={`/player/${player.id}`}>
-                              <Button size="sm" data-testid={`button-trade-${player.id}`}>Trade</Button>
-                            </Link>
-                          </div>
-                        </td>
-
-                        {/* Desktop layout: table cells */}
-                        <td className="px-2 py-1.5 hidden sm:table-cell">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                              <span className="font-bold text-xs">{player.firstName[0]}{player.lastName[0]}</span>
-                            </div>
-                            <div>
-                              <div className="font-medium text-sm">
-                                <PlayerName 
-                                  playerId={player.id} 
-                                  firstName={player.firstName} 
-                                  lastName={player.lastName}
-                                  className="text-sm"
-                                />
-                              </div>
-                              <div className="text-xs text-muted-foreground md:hidden">{player.team} • {player.position}</div>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-2 py-1.5 hidden md:table-cell">
-                          <Badge variant="outline" className="text-xs">{player.team}</Badge>
-                        </td>
-                        <td className="px-2 py-1.5 text-right hidden sm:table-cell" data-testid={`text-market-value-${player.id}`}>
-                          {player.lastTradePrice ? (
-                            <AnimatedPrice 
-                              value={parseFloat(player.lastTradePrice)} 
-                              size="sm" 
-                              className="font-mono font-bold justify-end"
-                            />
-                          ) : (
-                            <span className="text-muted-foreground text-xs font-normal">-</span>
-                          )}
-                        </td>
-                        <td className="px-2 py-1.5 text-right hidden lg:table-cell">
-                          <div className="flex items-center justify-end gap-2 font-mono text-sm font-bold">
-                            <span className="text-blue-500 dark:text-blue-400" data-testid={`text-bid-${player.id}`}>
-                              {player.bestBid || '-'}
-                            </span>
-                            <span className="text-muted-foreground font-normal">×</span>
-                            <span className="text-red-500 dark:text-red-400" data-testid={`text-ask-${player.id}`}>
-                              {player.bestAsk || '-'}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-2 py-1.5 text-right hidden lg:table-cell">
-                          <span className="text-xs text-muted-foreground">{player.volume24h > 0 ? player.volume24h.toLocaleString() : '-'}</span>
-                        </td>
-                        <td className="px-2 py-1.5 text-right hidden md:table-cell">
-                          <div className={`flex items-center justify-end gap-1 ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
-                            {parseFloat(player.priceChange24h) >= 0 ? (
-                              <TrendingUp className="w-3 h-3" />
-                            ) : (
-                              <TrendingDown className="w-3 h-3" />
-                            )}
-                            <span className="font-medium text-xs">
-                              {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-2 py-1.5 hidden sm:table-cell">
-                          <Link href={`/player/${player.id}`}>
-                            <Button size="sm" data-testid={`button-trade-${player.id}`}>Trade</Button>
-                          </Link>
-                        </td>
-                      </tr>
-                      );
-
-                      // Insert ad after every 10 players (but not after the last player)
-                      if ((index + 1) % 10 === 0 && index < players.length - 1) {
-                        return [
-                          playerRow,
-                          <tr key={`ad-${index}`} className="border-b">
-                            <td colSpan={7} className="py-4">
-                              <WhopAd isPremium={isPremiumUser} />
-                            </td>
-                          </tr>
-                        ];
-                      }
-
-                      return [playerRow];
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Pagination Controls */}
-            {!isLoading && players.length > 0 && totalPages > 1 && (
-              <div className="mt-4 flex items-center justify-between px-2">
-                <div className="text-sm text-muted-foreground">
-                  Showing {((page - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(page * ITEMS_PER_PAGE, totalCount)} of {totalCount} players
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    data-testid="button-prev-page"
-                  >
-                    Previous
-                  </Button>
-                  <div className="text-sm text-muted-foreground">
-                    Page {page} of {totalPages}
+                      Ask {sortField === 'ask' && <ArrowUpDown className="w-3 h-3 ml-1" />}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={sortField === 'volume' ? 'default' : 'outline'}
+                      onClick={() => toggleSort("volume")}
+                      className="text-xs"
+                      data-testid="button-sort-volume-mobile"
+                    >
+                      Vol {sortField === 'volume' && <ArrowUpDown className="w-3 h-3 ml-1" />}
+                    </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                    disabled={page === totalPages}
-                    data-testid="button-next-page"
-                  >
-                    Next
-                  </Button>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </CardHeader>
+              <CardContent className="p-0">
+                {isLoading ? (
+                  <div className="p-2">
+                    {[75, 85, 65, 90, 70, 80, 60, 88].map((width, i) => (
+                      <div key={i} className="flex items-center gap-3 p-2 border-b last:border-0">
+                        <Shimmer width="32px" height="32px" className="rounded-full flex-shrink-0" />
+                        <div className="flex-1 space-y-2">
+                          <Shimmer height="16px" width={`${width}%`} />
+                          <Shimmer height="12px" width="100px" />
+                        </div>
+                        <div className="hidden sm:flex flex-col items-end gap-1">
+                          <Shimmer height="16px" width="60px" />
+                          <Shimmer height="12px" width="40px" />
+                        </div>
+                        <Shimmer height="32px" width="60px" className="rounded-md" />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div>
+                    <table className="w-full">
+                      <thead className="border-b bg-muted/50 hidden sm:table-header-group">
+                        <tr>
+                          <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
+                          <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Team</th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                            <button
+                              onClick={() => toggleSort("price")}
+                              className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded text-xs"
+                              data-testid="button-sort-price"
+                            >
+                              Market Value <ArrowUpDown className="w-3 h-3" />
+                            </button>
+                          </th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">
+                            <div className="flex items-center gap-1 justify-end">
+                              <button
+                                onClick={() => toggleSort("bid")}
+                                className="hover-elevate px-2 py-1 rounded text-xs text-blue-500 dark:text-blue-400 flex items-center gap-0.5"
+                                data-testid="button-sort-bid"
+                              >
+                                Bid {sortField === 'bid' && <ArrowUpDown className="w-3 h-3" />}
+                              </button>
+                              <span className="text-muted-foreground">/</span>
+                              <button
+                                onClick={() => toggleSort("ask")}
+                                className="hover-elevate px-2 py-1 rounded text-xs text-red-500 dark:text-red-400 flex items-center gap-0.5"
+                                data-testid="button-sort-ask"
+                              >
+                                Ask {sortField === 'ask' && <ArrowUpDown className="w-3 h-3" />}
+                              </button>
+                            </div>
+                          </th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden lg:table-cell">
+                            <button
+                              onClick={() => toggleSort("volume")}
+                              className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded text-xs"
+                              data-testid="button-sort-volume"
+                            >
+                              24h Vol <ArrowUpDown className="w-3 h-3" />
+                            </button>
+                          </th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">
+                            <button
+                              onClick={() => toggleSort("change")}
+                              className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded text-xs"
+                              data-testid="button-sort-change"
+                            >
+                              24h Change <ArrowUpDown className="w-3 h-3" />
+                            </button>
+                          </th>
+                          <th className="px-2 py-1.5"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {/* Premium Shares Row - Always First */}
+                        <tr
+                          key="premium-share"
+                          className="border-b hover-elevate bg-gradient-to-r from-yellow-500/5 to-amber-500/5"
+                          data-testid="row-premium-share"
+                        >
+                          {/* Mobile layout: stacked info */}
+                          <td className="px-2 py-2 sm:hidden" colSpan={6}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0 flex-1">
+                                <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                                  <Crown className="w-4 h-4 text-yellow-500" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-medium text-sm text-yellow-500">Premium Share</div>
+                                  <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                                    <span className="text-muted-foreground">30 Days Access</span>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 text-xs mt-0.5">
+                                    {premiumMarketData?.lastTradePrice !== null && premiumMarketData?.lastTradePrice !== undefined ? (
+                                      <span className="font-mono font-bold text-yellow-500">${premiumMarketData.lastTradePrice.toFixed(2)}</span>
+                                    ) : (
+                                      <span className="text-muted-foreground">No trades</span>
+                                    )}
+                                    <span className="text-muted-foreground">•</span>
+                                    {premiumMarketData?.bestBid ? (
+                                      <span className="text-blue-500 dark:text-blue-400 font-mono font-bold">${premiumMarketData.bestBid.price.toFixed(2)}</span>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                    <span className="text-muted-foreground">/</span>
+                                    {premiumMarketData?.bestAsk ? (
+                                      <span className="text-red-500 dark:text-red-400 font-mono font-bold">${premiumMarketData.bestAsk.price.toFixed(2)}</span>
+                                    ) : (
+                                      <span className="text-muted-foreground">-</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <Link href="/premium/trade">
+                                <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black" data-testid="button-trade-premium">Trade</Button>
+                              </Link>
+                            </div>
+                          </td>
+
+                          {/* Desktop layout: table cells */}
+                          <td className="px-2 py-1.5 hidden sm:table-cell">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
+                                <Crown className="w-4 h-4 text-yellow-500" />
+                              </div>
+                              <div>
+                                <div className="font-medium text-sm text-yellow-500">Premium Share</div>
+                                <div className="text-xs text-muted-foreground md:hidden">30 Days Access</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-2 py-1.5 hidden md:table-cell">
+                            <Badge variant="outline" className="text-xs text-yellow-500 border-yellow-500/50">PREMIUM</Badge>
+                          </td>
+                          <td className="px-2 py-1.5 text-right hidden sm:table-cell">
+                            {premiumMarketData?.lastTradePrice !== null && premiumMarketData?.lastTradePrice !== undefined ? (
+                              <span className="font-mono font-bold text-yellow-500">${premiumMarketData.lastTradePrice.toFixed(2)}</span>
+                            ) : (
+                              <span className="text-muted-foreground text-xs">No trades</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 text-right hidden lg:table-cell">
+                            <div className="flex items-center justify-end gap-2 font-mono text-sm font-bold">
+                              {premiumMarketData?.bestBid ? (
+                                <span className="text-blue-500 dark:text-blue-400">${premiumMarketData.bestBid.price.toFixed(2)}</span>
+                              ) : (
+                                <span className="text-muted-foreground font-normal text-xs">-</span>
+                              )}
+                              <span className="text-muted-foreground font-normal">×</span>
+                              {premiumMarketData?.bestAsk ? (
+                                <span className="text-red-500 dark:text-red-400">${premiumMarketData.bestAsk.price.toFixed(2)}</span>
+                              ) : (
+                                <span className="text-muted-foreground font-normal text-xs">-</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-2 py-1.5 text-right hidden lg:table-cell">
+                            <span className="text-xs text-muted-foreground">{premiumMarketData?.totalTrades || 0}</span>
+                          </td>
+                          <td className="px-2 py-1.5 text-right hidden md:table-cell">
+                            <div className="flex items-center justify-end gap-1 text-muted-foreground">
+                              <span className="font-medium text-xs">-</span>
+                            </div>
+                          </td>
+                          <td className="px-2 py-1.5 hidden sm:table-cell">
+                            <Link href="/premium/trade">
+                              <Button size="sm" className="bg-yellow-500 hover:bg-yellow-600 text-black" data-testid="button-trade-premium-desktop">Trade</Button>
+                            </Link>
+                          </td>
+                        </tr>
+                        {players.flatMap((player: PlayerWithOrderBook, index: number) => {
+                          const playerRow = (
+                            <tr
+                              key={player.id}
+                              className="border-b last:border-0 hover-elevate"
+                              data-testid={`row-player-${player.id}`}
+                            >
+                              {/* Mobile layout: stacked info */}
+                              <td className="px-2 py-2 sm:hidden" colSpan={6}>
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                      <span className="font-bold text-xs">{player.firstName[0]}{player.lastName[0]}</span>
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                      <div className="font-medium text-sm">
+                                        <PlayerName
+                                          playerId={player.id}
+                                          firstName={player.firstName}
+                                          lastName={player.lastName}
+                                          className="text-sm"
+                                        />
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-xs flex-wrap">
+                                        <span className="text-muted-foreground">{player.team} • {player.position}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-xs mt-0.5">
+                                        {player.lastTradePrice ? (
+                                          <AnimatedPrice
+                                            value={parseFloat(player.lastTradePrice)}
+                                            size="sm"
+                                            className="font-mono font-bold"
+                                          />
+                                        ) : (
+                                          <span className="text-muted-foreground">-</span>
+                                        )}
+                                        <span className="text-muted-foreground">•</span>
+                                        <span className="text-blue-500 dark:text-blue-400 font-mono font-bold">
+                                          {player.bestBid ? `$${player.bestBid}` : '-'}
+                                        </span>
+                                        <span className="text-muted-foreground">/</span>
+                                        <span className="text-red-500 dark:text-red-400 font-mono font-bold">
+                                          {player.bestAsk ? `$${player.bestAsk}` : '-'}
+                                        </span>
+                                        <span className="text-muted-foreground">•</span>
+                                        <span className="text-muted-foreground">Vol: {player.volume24h > 0 ? player.volume24h.toLocaleString() : '-'}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <Link href={`/player/${player.id}`}>
+                                    <Button size="sm" data-testid={`button-trade-${player.id}`}>Trade</Button>
+                                  </Link>
+                                </div>
+                              </td>
+
+                              {/* Desktop layout: table cells */}
+                              <td className="px-2 py-1.5 hidden sm:table-cell">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                                    <span className="font-bold text-xs">{player.firstName[0]}{player.lastName[0]}</span>
+                                  </div>
+                                  <div>
+                                    <div className="font-medium text-sm">
+                                      <PlayerName
+                                        playerId={player.id}
+                                        firstName={player.firstName}
+                                        lastName={player.lastName}
+                                        className="text-sm"
+                                      />
+                                    </div>
+                                    <div className="text-xs text-muted-foreground md:hidden">{player.team} • {player.position}</div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5 hidden md:table-cell">
+                                <Badge variant="outline" className="text-xs">{player.team}</Badge>
+                              </td>
+                              <td className="px-2 py-1.5 text-right hidden sm:table-cell" data-testid={`text-market-value-${player.id}`}>
+                                {player.lastTradePrice ? (
+                                  <AnimatedPrice
+                                    value={parseFloat(player.lastTradePrice)}
+                                    size="sm"
+                                    className="font-mono font-bold justify-end"
+                                  />
+                                ) : (
+                                  <span className="text-muted-foreground text-xs font-normal">-</span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1.5 text-right hidden lg:table-cell">
+                                <div className="flex items-center justify-end gap-2 font-mono text-sm font-bold">
+                                  <span className="text-blue-500 dark:text-blue-400" data-testid={`text-bid-${player.id}`}>
+                                    {player.bestBid || '-'}
+                                  </span>
+                                  <span className="text-muted-foreground font-normal">×</span>
+                                  <span className="text-red-500 dark:text-red-400" data-testid={`text-ask-${player.id}`}>
+                                    {player.bestAsk || '-'}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5 text-right hidden lg:table-cell">
+                                <span className="text-xs text-muted-foreground">{player.volume24h > 0 ? player.volume24h.toLocaleString() : '-'}</span>
+                              </td>
+                              <td className="px-2 py-1.5 text-right hidden md:table-cell">
+                                <div className={`flex items-center justify-end gap-1 ${parseFloat(player.priceChange24h) >= 0 ? 'text-positive' : 'text-negative'}`}>
+                                  {parseFloat(player.priceChange24h) >= 0 ? (
+                                    <TrendingUp className="w-3 h-3" />
+                                  ) : (
+                                    <TrendingDown className="w-3 h-3" />
+                                  )}
+                                  <span className="font-medium text-xs">
+                                    {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-2 py-1.5 hidden sm:table-cell">
+                                <Link href={`/player/${player.id}`}>
+                                  <Button size="sm" data-testid={`button-trade-${player.id}`}>Trade</Button>
+                                </Link>
+                              </td>
+                            </tr>
+                          );
+
+                          // Insert ad after every 10 players (but not after the last player)
+                          if ((index + 1) % 10 === 0 && index < players.length - 1) {
+                            return [
+                              playerRow,
+                              <tr key={`ad-${index}`} className="border-b">
+                                <td colSpan={7} className="py-4">
+                                  <WhopAd isPremium={isPremiumUser} />
+                                </td>
+                              </tr>
+                            ];
+                          }
+
+                          return [playerRow];
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Pagination Controls */}
+                {!isLoading && players.length > 0 && totalPages > 1 && (
+                  <div className="mt-4 flex items-center justify-between px-2">
+                    <div className="text-sm text-muted-foreground">
+                      Showing {((page - 1) * ITEMS_PER_PAGE) + 1}-{Math.min(page * ITEMS_PER_PAGE, totalCount)} of {totalCount} players
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPage(p => Math.max(1, p - 1))}
+                        disabled={page === 1}
+                        data-testid="button-prev-page"
+                      >
+                        Previous
+                      </Button>
+                      <div className="text-sm text-muted-foreground">
+                        Page {page} of {totalPages}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                        disabled={page === totalPages}
+                        data-testid="button-next-page"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="activity" className="space-y-4">
@@ -800,7 +831,7 @@ function MarketActivityFeed() {
   const { subscribe } = useWebSocket();
   const [playerFilter, setPlayerFilter] = useState("");
   const [debouncedPlayerFilter, setDebouncedPlayerFilter] = useState("");
-  
+
   // Debounce player filter
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -840,9 +871,9 @@ function MarketActivityFeed() {
     }
     // order_placed
     const orderTypeLabel = item.orderType === "limit" ? "Limit" : "Market";
-    return { 
-      type: orderTypeLabel, 
-      color: item.side === "buy" ? "text-blue-500" : "text-red-500" 
+    return {
+      type: orderTypeLabel,
+      color: item.side === "buy" ? "text-blue-500" : "text-red-500"
     };
   };
 
@@ -926,13 +957,13 @@ function MarketActivityFeed() {
                   <div className="w-16 text-xs text-muted-foreground flex-shrink-0 hidden sm:block">
                     {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true }).replace("about ", "").replace(" ago", "")}
                   </div>
-                  
+
                   {/* Side and Order Type */}
                   <div className="w-20 text-xs font-medium flex-shrink-0">
                     {sideLabel && <span className={item.side === "buy" ? "text-blue-500" : "text-red-500"}>{sideLabel} </span>}
                     <span className={label.color}>{label.type}</span>
                   </div>
-                  
+
                   {/* Player */}
                   <div className="flex-1 min-w-0">
                     <Link href={`/player/${item.playerId}`}>
@@ -941,22 +972,22 @@ function MarketActivityFeed() {
                       </span>
                     </Link>
                   </div>
-                  
+
                   {/* Team */}
                   <div className="w-12 text-xs text-muted-foreground hidden md:block flex-shrink-0">
                     {item.playerTeam}
                   </div>
-                  
+
                   {/* Price */}
                   <div className="w-16 text-right font-mono text-xs flex-shrink-0">
                     {item.price ? `$${item.price}` : item.limitPrice ? `$${item.limitPrice}` : "-"}
                   </div>
-                  
+
                   {/* Quantity */}
                   <div className="w-14 text-right text-xs text-muted-foreground flex-shrink-0 hidden lg:block">
                     {item.quantity}×
                   </div>
-                  
+
                   {/* User */}
                   <div className="w-32 text-muted-foreground truncate hidden xl:block flex-shrink-0">
                     {getUsername(item)}

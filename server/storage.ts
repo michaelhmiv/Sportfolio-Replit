@@ -647,9 +647,13 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Helper: Build player query conditions (reused by getPlayers and getPlayersPaginated)
-  private buildPlayerQueryConditions(filters?: { search?: string; team?: string; position?: string }) {
+  private buildPlayerQueryConditions(filters?: { search?: string; team?: string; position?: string; sport?: string }) {
     const conditions = [];
 
+    // Sport filter - default to NBA if not specified (backward compatibility)
+    if (filters?.sport && filters.sport !== "all") {
+      conditions.push(eq(players.sport, filters.sport));
+    }
     if (filters?.team && filters.team !== "all") {
       conditions.push(eq(players.team, filters.team));
     }
@@ -687,6 +691,7 @@ export class DatabaseStorage implements IStorage {
     search?: string;
     team?: string;
     position?: string;
+    sport?: string;
     limit?: number;
     offset?: number;
     sortBy?: 'price' | 'volume' | 'change' | 'bid' | 'ask';
@@ -696,7 +701,7 @@ export class DatabaseStorage implements IStorage {
     teamsPlayingOnDate?: string[];
   }): Promise<{ players: Player[]; total: number }> {
     const {
-      search, team, position,
+      search, team, position, sport,
       limit = 50, offset = 0,
       sortBy = 'volume',
       sortOrder = 'desc',
@@ -705,7 +710,7 @@ export class DatabaseStorage implements IStorage {
       teamsPlayingOnDate
     } = filters || {};
 
-    const conditions = this.buildPlayerQueryConditions({ search, team, position });
+    const conditions = this.buildPlayerQueryConditions({ search, team, position, sport });
 
     // Add teams playing on date filter
     if (teamsPlayingOnDate && teamsPlayingOnDate.length > 0) {
