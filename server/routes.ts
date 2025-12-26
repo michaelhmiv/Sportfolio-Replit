@@ -814,8 +814,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Today's games (in ET timezone where NBA games are scheduled)
   app.get("/api/games/today", async (req, res) => {
     try {
+      const sport = (req.query.sport as string) || "NBA";
       const { startOfDay, endOfDay } = getTodayETBoundaries();
-      const games = await storage.getDailyGames(startOfDay, endOfDay);
+      const games = await storage.getDailyGamesBySport(sport, startOfDay, endOfDay);
 
       // Add gameDay to each game for frontend display
       const gamesWithDay = games.map(game => ({
@@ -833,6 +834,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/games/date/:date", async (req, res) => {
     try {
       const { date } = req.params;
+      const sport = (req.query.sport as string) || "NBA";
 
       // Validate date format (YYYY-MM-DD)
       const dateMatch = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -841,7 +843,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { startOfDay, endOfDay } = getETDayBoundaries(date);
-      const games = await storage.getDailyGames(startOfDay, endOfDay);
+      const games = await storage.getDailyGamesBySport(sport, startOfDay, endOfDay);
 
       // Add gameDay to each game for frontend display
       const gamesWithDay = games.map(game => ({
