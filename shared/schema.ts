@@ -304,16 +304,16 @@ export const dailyGames = pgTable("daily_games", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   gameId: text("game_id").notNull().unique(), // API game ID (prefixed for clarity)
   sport: text("sport").notNull().default("NBA"), // NBA, NFL, etc.
-  date: timestamp("date").notNull(), // Game date
+  date: timestamp("date", { withTimezone: true }).notNull(), // Game date
   week: integer("week"), // NFL week number (1-18 for regular season, null for NBA)
   homeTeam: text("home_team").notNull(), // Team abbreviation
   awayTeam: text("away_team").notNull(), // Team abbreviation
   venue: text("venue"),
   status: text("status").notNull().default("scheduled"), // "scheduled", "inprogress", "completed"
-  startTime: timestamp("start_time").notNull(),
+  startTime: timestamp("start_time", { withTimezone: true }).notNull(),
   homeScore: integer("home_score"), // null for scheduled games
   awayScore: integer("away_score"), // null for scheduled games
-  lastFetchedAt: timestamp("last_fetched_at").notNull().defaultNow(),
+  lastFetchedAt: timestamp("last_fetched_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
   sportIdx: index("daily_games_sport_idx").on(table.sport),
   sportDateIdx: index("daily_games_sport_date_idx").on(table.sport, table.date),

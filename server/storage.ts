@@ -2381,19 +2381,7 @@ export class DatabaseStorage implements IStorage {
     return result[0]?.count || 0;
   }
 
-  async getPlayerSeasonStatsFromLogs(playerId: string): Promise<{
-    gamesPlayed: number;
-    avgFantasyPointsPerGame: string;
-    pointsPerGame: string;
-    reboundsPerGame: string;
-    assistsPerGame: string;
-    fieldGoalPct: string;
-    threePointPct: string;
-    freeThrowPct: string;
-    steals: number;
-    blocks: number;
-    minutesPerGame: string;
-  } | null> {
+  async getPlayerSeasonStatsFromLogs(playerId: string): Promise<any | null> {
     // Filter by current competitive season (regular + playoffs combined for rolling average)
     const currentSeasons = getCurrentCompetitiveSeasons();
 
@@ -2429,45 +2417,90 @@ export class DatabaseStorage implements IStorage {
     let totalFreeThrowsMade = 0;
     let totalFreeThrowsAttempted = 0;
 
-    for (const log of gameLogs) {
-      totalFantasyPoints += parseFloat(log.fantasyPoints);
-      totalPoints += log.points;
-      totalRebounds += log.rebounds;
-      totalAssists += log.assists;
-      totalSteals += log.steals;
-      totalBlocks += log.blocks;
-      totalMinutes += log.minutes;
-      totalFieldGoalsMade += log.fieldGoalsMade || 0;
-      totalFieldGoalsAttempted += log.fieldGoalsAttempted || 0;
-      totalThreePointersMade += log.threePointersMade || 0;
-      totalThreePointersAttempted += log.threePointersAttempted || 0;
-      totalFreeThrowsMade += log.freeThrowsMade || 0;
-      totalFreeThrowsAttempted += log.freeThrowsAttempted || 0;
+    // Check sport from first log (assuming consistent sport per player)
+    const sport = gameLogs[0].sport;
+
+    if (sport === 'NFL') {
+      let totalPassingYards = 0;
+      let totalPassingTouchdowns = 0;
+      let totalPassingInterceptions = 0;
+      let totalRushingYards = 0;
+      let totalRushingTouchdowns = 0;
+      let totalReceivingYards = 0;
+      let totalReceivingTouchdowns = 0;
+      let totalReceptions = 0;
+
+      for (const log of gameLogs) {
+        // NFL stats are stored in statsJson
+        const stats = log.statsJson as Record<string, any> || {};
+        totalFantasyPoints += parseFloat(log.fantasyPoints);
+
+        totalPassingYards += Number(stats.passing_yards || 0);
+        totalPassingTouchdowns += Number(stats.passing_touchdowns || 0);
+        totalPassingInterceptions += Number(stats.passing_interceptions || 0);
+        totalRushingYards += Number(stats.rushing_yards || 0);
+        totalRushingTouchdowns += Number(stats.rushing_touchdowns || 0);
+        totalReceivingYards += Number(stats.receiving_yards || 0);
+        totalReceivingTouchdowns += Number(stats.receiving_touchdowns || 0);
+        totalReceptions += Number(stats.receiving_receptions || 0);
+      }
+
+      return {
+        sport: 'NFL',
+        gamesPlayed,
+        avgFantasyPointsPerGame: (totalFantasyPoints / gamesPlayed).toFixed(2),
+        passingYards: totalPassingYards,
+        passingTouchdowns: totalPassingTouchdowns,
+        passingInterceptions: totalPassingInterceptions,
+        rushingYards: totalRushingYards,
+        rushingTouchdowns: totalRushingTouchdowns,
+        receivingYards: totalReceivingYards,
+        receivingTouchdowns: totalReceivingTouchdowns,
+        receptions: totalReceptions,
+      };
+    } else {
+      // NBA Logic (Existing)
+      for (const log of gameLogs) {
+        totalFantasyPoints += parseFloat(log.fantasyPoints);
+        totalPoints += log.points;
+        totalRebounds += log.rebounds;
+        totalAssists += log.assists;
+        totalSteals += log.steals;
+        totalBlocks += log.blocks;
+        totalMinutes += log.minutes;
+        totalFieldGoalsMade += log.fieldGoalsMade || 0;
+        totalFieldGoalsAttempted += log.fieldGoalsAttempted || 0;
+        totalThreePointersMade += log.threePointersMade || 0;
+        totalThreePointersAttempted += log.threePointersAttempted || 0;
+        totalFreeThrowsMade += log.freeThrowsMade || 0;
+        totalFreeThrowsAttempted += log.freeThrowsAttempted || 0;
+      }
+
+      const fieldGoalPct = totalFieldGoalsAttempted > 0
+        ? ((totalFieldGoalsMade / totalFieldGoalsAttempted) * 100).toFixed(1)
+        : "0.0";
+      const threePointPct = totalThreePointersAttempted > 0
+        ? ((totalThreePointersMade / totalThreePointersAttempted) * 100).toFixed(1)
+        : "0.0";
+      const freeThrowPct = totalFreeThrowsAttempted > 0
+        ? ((totalFreeThrowsMade / totalFreeThrowsAttempted) * 100).toFixed(1)
+        : "0.0";
+
+      return {
+        sport: 'NBA',
+        gamesPlayed,
+        avgFantasyPointsPerGame: (totalFantasyPoints / gamesPlayed).toFixed(2),
+        pointsPerGame: (totalPoints / gamesPlayed).toFixed(1),
+        reboundsPerGame: (totalRebounds / gamesPlayed).toFixed(1),
+        assistsPerGame: (totalAssists / gamesPlayed).toFixed(1),
+        fieldGoalPct,
+        threePointPct,
+        freeThrowPct,
+        steals: totalSteals,
+        blocks: totalBlocks,
+        minutesPerGame: (totalMinutes / gamesPlayed).toFixed(1),
+      };
     }
-
-    const fieldGoalPct = totalFieldGoalsAttempted > 0
-      ? ((totalFieldGoalsMade / totalFieldGoalsAttempted) * 100).toFixed(1)
-      : "0.0";
-    const threePointPct = totalThreePointersAttempted > 0
-      ? ((totalThreePointersMade / totalThreePointersAttempted) * 100).toFixed(1)
-      : "0.0";
-    const freeThrowPct = totalFreeThrowsAttempted > 0
-      ? ((totalFreeThrowsMade / totalFreeThrowsAttempted) * 100).toFixed(1)
-      : "0.0";
-
-    return {
-      gamesPlayed,
-      avgFantasyPointsPerGame: (totalFantasyPoints / gamesPlayed).toFixed(2),
-      pointsPerGame: (totalPoints / gamesPlayed).toFixed(1),
-      reboundsPerGame: (totalRebounds / gamesPlayed).toFixed(1),
-      assistsPerGame: (totalAssists / gamesPlayed).toFixed(1),
-      fieldGoalPct,
-      threePointPct,
-      freeThrowPct,
-      steals: totalSteals,
-      blocks: totalBlocks,
-      minutesPerGame: (totalMinutes / gamesPlayed).toFixed(1),
-    };
   }
 
   // Batched version: fetch season stats for multiple players in ONE query
@@ -2538,7 +2571,17 @@ export class DatabaseStorage implements IStorage {
         opponent: log.opponentTeam || "UNK",
         isHome: log.homeAway === "home",
       },
-      stats: {
+      stats: log.sport === 'NFL' ? {
+        // NFL Stats
+        passingYards: (log.statsJson as any)?.passing_yards || 0,
+        passingTouchdowns: (log.statsJson as any)?.passing_touchdowns || 0,
+        rushingYards: (log.statsJson as any)?.rushing_yards || 0,
+        rushingTouchdowns: (log.statsJson as any)?.rushing_touchdowns || 0,
+        receivingYards: (log.statsJson as any)?.receiving_yards || 0,
+        receivingTouchdowns: (log.statsJson as any)?.receiving_touchdowns || 0,
+        fantasyPoints: parseFloat(log.fantasyPoints),
+      } : {
+        // NBA Stats
         points: log.points,
         rebounds: log.rebounds,
         assists: log.assists,
@@ -2549,6 +2592,7 @@ export class DatabaseStorage implements IStorage {
         minutes: log.minutes,
         fantasyPoints: parseFloat(log.fantasyPoints),
       },
+      sport: log.sport,
     }));
   }
 

@@ -44,7 +44,7 @@ export default function Contests() {
   const contestsUrl = `/api/contests?date=${formattedDate}&sport=${sport}`;
 
   const { data, isLoading } = useQuery<ContestsData>({
-    queryKey: [contestsUrl, sport],
+    queryKey: [contestsUrl],
     refetchOnMount: "always",
     staleTime: 0,
     gcTime: 0,

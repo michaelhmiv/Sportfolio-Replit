@@ -1,0 +1,23 @@
+NFL Games in DB (Dec 27-29):
+  HOU @ LAC: 2025-12-27T21:30:00.000Z (scheduled)
+  BAL @ GB: 2025-12-28T01:00:00.000Z (scheduled)
+  ARI @ CIN: 2025-12-28T18:00:00.000Z (scheduled)
+  TB @ MIA: 2025-12-28T18:00:00.000Z (scheduled)
+  NE @ NYJ: 2025-12-28T18:00:00.000Z (scheduled)
+  SEA @ CAR: 2025-12-28T18:00:00.000Z (scheduled)
+  PIT @ CLE: 2025-12-28T18:00:00.000Z (scheduled)
+  NO @ TEN: 2025-12-28T18:00:00.000Z (scheduled)
+  JAX @ IND: 2025-12-28T18:00:00.000Z (scheduled)
+  NYG @ LV: 2025-12-28T21:05:00.000Z (scheduled)
+  PHI @ BUF: 2025-12-28T21:25:00.000Z (scheduled)
+
+NBA Games in DB (Dec 26):
+  MIA @ ATL: 2025-12-27T00:00:00.000Z (scheduled)
+  CHA @ ORL: 2025-12-27T00:00:00.000Z (scheduled)
+  TOR @ WAS: 2025-12-27T00:00:00.000Z (scheduled)
+  BOS @ IND: 2025-12-27T00:30:00.000Z (scheduled)
+  MIL @ MEM: 2025-12-27T01:00:00.000Z (scheduled)
+  PHX @ NOP: 2025-12-27T01:00:00.000Z (scheduled)
+  PHI @ CHI: 2025-12-27T01:00:00.000Z (scheduled)
+  DET @ UTA: 2025-12-27T02:30:00.000Z (scheduled)
+  LAC @ POR: 2025-12-27T03:00:00.000Z (scheduled)

@@ -26,6 +26,64 @@ interface SyncResult {
 }
 
 /**
+ * Parse game time from API status field
+ * The Ball Don't Lie API embeds actual game times in the status field for scheduled games
+ * Format: "MM/DD - H:MM PM EST" (e.g., "12/27 - 8:00 PM EST")
+ * 
+ * @param status - The status string from the API
+ * @param fallbackDate - The date to use if parsing fails
+ * @returns A Date object with the correct game time in UTC
+ */
+function parseGameTimeFromStatus(status: string, fallbackDate: Date): Date {
+    if (!status) return fallbackDate;
+
+    // Match patterns like "12/27 - 8:00 PM EST" or "12/28 - 1:00 PM EST"
+    const timeMatch = status.match(/(\d{1,2})\/(\d{1,2})\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)\s*(?:EST|ET)/i);
+
+    if (!timeMatch) {
+        // Also try just time pattern like "8:00 PM EST" without date
+        const simpleTimeMatch = status.match(/(\d{1,2}):(\d{2})\s*(AM|PM)\s*(?:EST|ET)/i);
+        if (simpleTimeMatch) {
+            let hours = parseInt(simpleTimeMatch[1]);
+            const minutes = parseInt(simpleTimeMatch[2]);
+            const isPM = simpleTimeMatch[3].toUpperCase() === 'PM';
+
+            // Convert to 24-hour format
+            if (isPM && hours !== 12) hours += 12;
+            else if (!isPM && hours === 12) hours = 0;
+
+            // Use fallback date and set the time
+            const result = new Date(fallbackDate);
+            // EST is UTC-5, so add 5 hours to convert to UTC
+            result.setUTCHours(hours + 5, minutes, 0, 0);
+            return result;
+        }
+        return fallbackDate;
+    }
+
+    const month = parseInt(timeMatch[1]);
+    const day = parseInt(timeMatch[2]);
+    let hours = parseInt(timeMatch[3]);
+    const minutes = parseInt(timeMatch[4]);
+    const isPM = timeMatch[5].toUpperCase() === 'PM';
+
+    // Convert to 24-hour format
+    if (isPM && hours !== 12) hours += 12;
+    else if (!isPM && hours === 12) hours = 0;
+
+    // Get year from fallback date
+    const year = fallbackDate.getFullYear();
+
+    // Create date in EST first (using UTC as if it were EST)
+    // Then add 5 hours to convert EST to UTC
+    const estDate = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
+    // Add 5 hours for EST -> UTC conversion
+    const utcDate = new Date(estDate.getTime() + 5 * 60 * 60 * 1000);
+
+    return utcDate;
+}
+
+/**
  * Sync NFL schedule for current week and upcoming games
  */
 export async function syncNFLSchedule(): Promise<SyncResult> {
@@ -85,11 +143,25 @@ export async function syncNFLSchedule(): Promise<SyncResult> {
                 }
 
                 // Parse game date and time
+                // For completed games, API returns correct time in date field
+                // For scheduled games, API may have time in status field like "12/27 - 8:00 PM EST"
                 let startTime: Date;
-                if (apiGame.time) {
-                    startTime = new Date(`${apiGame.date}T${apiGame.time}`);
+                const apiDate = new Date(apiGame.date);
+
+                // Check if the date already has a non-midnight time (completed games)
+                const hasRealTime = apiDate.getUTCHours() !== 5 || apiDate.getUTCMinutes() !== 0;
+
+                if (hasRealTime) {
+                    // API date field has actual game time
+                    startTime = apiDate;
+                } else if (apiGame.status && apiGame.status.match(/\d{1,2}\/\d{1,2}\s*-\s*\d{1,2}:\d{2}\s*(AM|PM)/i)) {
+                    // Parse time from status field (e.g., "12/27 - 8:00 PM EST")
+                    startTime = parseGameTimeFromStatus(apiGame.status, apiDate);
+                    console.log(`[NFL Schedule Sync] Parsed time: "${apiGame.status}" -> ${startTime.toISOString()}`);
                 } else {
-                    startTime = new Date(apiGame.date);
+                    // Fallback to date field
+                    startTime = apiDate;
+                    console.log(`[NFL Schedule Sync] Using API date for ${apiGame.home_team?.abbreviation} vs ${apiGame.visitor_team?.abbreviation}: ${startTime.toISOString()}`);
                 }
 
                 const gameData = {
@@ -111,6 +183,7 @@ export async function syncNFLSchedule(): Promise<SyncResult> {
 
                 if (existingGame) {
                     // Update existing game
+                    console.log(`[NFL Schedule Sync] Updating ${apiGame.visitor_team?.abbreviation} @ ${apiGame.home_team?.abbreviation}: startTime=${startTime.toISOString()}`);
                     await storage.updateDailyGame(existingGame.id, gameData);
                     result.gamesUpdated++;
                 } else {

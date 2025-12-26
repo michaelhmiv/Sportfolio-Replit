@@ -1,0 +1,28 @@
+--- Running NFL Sync ---
+NFL Sync Result: {
+  "success": true,
+  "gamesProcessed": 32,
+  "gamesAdded": 0,
+  "gamesUpdated": 32,
+  "errors": []
+}
+
+--- Running NBA Sync ---
+NBA Sync Result: {
+  "requestCount": 22,
+  "recordsProcessed": 166,
+  "errorCount": 0
+}
+
+--- Running NBA Contest Creation ---
+NBA Contest Creation Result: {
+  "requestCount": 7,
+  "recordsProcessed": 0,
+  "errorCount": 0
+}
+
+--- Running NFL Contest Creation ---
+NFL Contest Creation Result: {
+  "contestsCreated": 0,
+  "errors": 0
+}

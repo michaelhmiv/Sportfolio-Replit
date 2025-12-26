@@ -1,0 +1,180 @@
+=== NFL API Direct Test Results ===
+Timestamp: 2025-12-26T14:17:17.287Z
+
+2025 Season Week 17 Games: 16
+--------------------------------------------------
+
+RAW API DATA (first 5 scheduled games):
+Game 1:
+  date: 2025-12-27T05:00:00.000Z
+  time: undefined
+  status: "12/28 - 1:00 PM EST"
+  home_team: CIN
+  visitor_team: ARI
+
+Game 2:
+  date: 2025-12-27T05:00:00.000Z
+  time: undefined
+  status: "12/27 - 8:00 PM EST"
+  home_team: GB
+  visitor_team: BAL
+
+Game 3:
+  date: 2025-12-27T05:00:00.000Z
+  time: undefined
+  status: "12/28 - 4:05 PM EST"
+  home_team: LV
+  visitor_team: NYG
+
+Game 4:
+  date: 2025-12-27T05:00:00.000Z
+  time: undefined
+  status: "12/27 - 4:30 PM EST"
+  home_team: LAC
+  visitor_team: HOU
+
+Game 5:
+  date: 2025-12-27T05:00:00.000Z
+  time: undefined
+  status: "12/28 - 1:00 PM EST"
+  home_team: CAR
+  visitor_team: SEA
+
+2025-12-25T18:00:00.000Z TBD: DAL @ WSH (Final)
+2025-12-25T21:30:00.000Z TBD: DET @ MIN (Final)
+2025-12-26T01:15:00.000Z TBD: DEN @ KC (Final)
+2025-12-27T05:00:00.000Z TBD: ARI @ CIN (12/28 - 1:00 PM EST)
+2025-12-27T05:00:00.000Z TBD: BAL @ GB (12/27 - 8:00 PM EST)
+2025-12-27T05:00:00.000Z TBD: NYG @ LV (12/28 - 4:05 PM EST)
+2025-12-27T05:00:00.000Z TBD: HOU @ LAC (12/27 - 4:30 PM EST)
+2025-12-27T05:00:00.000Z TBD: SEA @ CAR (12/28 - 1:00 PM EST)
+2025-12-28T18:00:00.000Z TBD: PIT @ CLE (12/28 - 1:00 PM EST)
+2025-12-28T18:00:00.000Z TBD: NO @ TEN (12/28 - 1:00 PM EST)
+2025-12-28T18:00:00.000Z TBD: JAX @ IND (12/28 - 1:00 PM EST)
+2025-12-28T18:00:00.000Z TBD: TB @ MIA (12/28 - 1:00 PM EST)
+2025-12-28T18:00:00.000Z TBD: NE @ NYJ (12/28 - 1:00 PM EST)
+2025-12-28T21:25:00.000Z TBD: PHI @ BUF (12/28 - 4:25 PM EST)
+2025-12-29T01:20:00.000Z TBD: CHI @ SF (12/28 - 8:20 PM EST)
+2025-12-30T01:15:00.000Z TBD: LAR @ ATL (12/29 - 8:15 PM EST)
+
+2024 Season Week 17 Games: 16
+--------------------------------------------------
+2024-12-25T18:00:00.000Z TBD: KC @ PIT (Final) 29-10
+2024-12-25T21:30:00.000Z TBD: BAL @ HOU (Final) 31-2
+2024-12-27T01:15:00.000Z TBD: SEA @ CHI (Final) 6-3
+2024-12-29T05:00:00.000Z TBD: DEN @ CIN (Final/OT) 
+2024-12-29T05:00:00.000Z TBD: ARI @ LAR (Final) 9-13
+2024-12-29T05:00:00.000Z TBD: LAC @ NE (Final) 40-7
+2024-12-29T05:00:00.000Z TBD: IND @ NYG (Final) 33-45
+2024-12-29T05:00:00.000Z TBD: ATL @ WSH (Final/OT) 
+2024-12-29T18:00:00.000Z TBD: NYJ @ BUF (Final) 14-40
+2024-12-29T18:00:00.000Z TBD: GB @ MIN (Final) 25-27
+2024-12-29T18:00:00.000Z TBD: LV @ NO (Final) 25-10
+2024-12-29T18:00:00.000Z TBD: CAR @ TB (Final) 14-48
+2024-12-29T18:00:00.000Z TBD: TEN @ JAX (Final) 13-20
+2024-12-29T21:25:00.000Z TBD: DAL @ PHI (Final) 7-41
+2024-12-30T01:20:00.000Z TBD: MIA @ CLE (Final) 20-3
+2024-12-31T01:15:00.000Z TBD: DET @ SF (Final) 40-34
+
+Games by Date (Dec 26-29, 2025): 13
+--------------------------------------------------
+2025-12-26T01:15:00.000Z TBD: DEN @ KC (Final)
+2025-12-27T05:00:00.000Z TBD: ARI @ CIN (12/28 - 1:00 PM EST)
+2025-12-27T05:00:00.000Z TBD: BAL @ GB (12/27 - 8:00 PM EST)
+2025-12-27T05:00:00.000Z TBD: NYG @ LV (12/28 - 4:05 PM EST)
+2025-12-27T05:00:00.000Z TBD: HOU @ LAC (12/27 - 4:30 PM EST)
+2025-12-27T05:00:00.000Z TBD: SEA @ CAR (12/28 - 1:00 PM EST)
+2025-12-28T18:00:00.000Z TBD: PIT @ CLE (12/28 - 1:00 PM EST)
+2025-12-28T18:00:00.000Z TBD: NO @ TEN (12/28 - 1:00 PM EST)
+2025-12-28T18:00:00.000Z TBD: JAX @ IND (12/28 - 1:00 PM EST)
+2025-12-28T18:00:00.000Z TBD: TB @ MIA (12/28 - 1:00 PM EST)
+2025-12-28T18:00:00.000Z TBD: NE @ NYJ (12/28 - 1:00 PM EST)
+2025-12-28T21:25:00.000Z TBD: PHI @ BUF (12/28 - 4:25 PM EST)
+2025-12-29T01:20:00.000Z TBD: CHI @ SF (12/28 - 8:20 PM EST)
+
+Games by Date (Dec 26-29): 12
+--------------------------------------------------
+2024-12-27T01:15:00.000Z TBD: SEA @ CHI (Final)
+2024-12-29T05:00:00.000Z TBD: DEN @ CIN (Final/OT)
+2024-12-29T05:00:00.000Z TBD: ARI @ LAR (Final)
+2024-12-29T05:00:00.000Z TBD: LAC @ NE (Final)
+2024-12-29T05:00:00.000Z TBD: IND @ NYG (Final)
+2024-12-29T05:00:00.000Z TBD: ATL @ WSH (Final/OT)
+2024-12-29T18:00:00.000Z TBD: NYJ @ BUF (Final)
+2024-12-29T18:00:00.000Z TBD: GB @ MIN (Final)
+2024-12-29T18:00:00.000Z TBD: LV @ NO (Final)
+2024-12-29T18:00:00.000Z TBD: CAR @ TB (Final)
+2024-12-29T18:00:00.000Z TBD: TEN @ JAX (Final)
+2024-12-29T21:25:00.000Z TBD: DAL @ PHI (Final)
+
+Games for Dec 26, 2024: 0
+--------------------------------------------------
+(No games scheduled for today)
+
+Scheduled Games (2024 Season): 50
+--------------------------------------------------
+2024-09-06: 1 games
+  TBD: BAL @ KC
+2024-09-07: 1 games
+  TBD: GB @ PHI
+2024-09-08: 12 games
+  TBD: PIT @ ATL
+  TBD: ARI @ BUF
+  TBD: TEN @ CHI
+  TBD: NE @ CIN
+  TBD: HOU @ IND
+  TBD: JAX @ MIA
+  TBD: CAR @ NO
+  TBD: MIN @ NYG
+  TBD: LV @ LAC
+  TBD: DEN @ SEA
+  TBD: DAL @ CLE
+  TBD: WSH @ TB
+2024-09-09: 1 games
+  TBD: LAR @ DET
+2024-09-10: 1 games
+  TBD: NYJ @ SF
+2024-09-13: 1 games
+  TBD: BUF @ MIA
+2024-09-15: 13 games
+  TBD: NO @ DAL
+  TBD: TB @ DET
+  TBD: IND @ GB
+  TBD: NYJ @ TEN
+  TBD: SF @ MIN
+  TBD: SEA @ NE
+  TBD: NYG @ WSH
+  TBD: LAC @ CAR
+  TBD: CLE @ JAX
+  TBD: LV @ BAL
+  TBD: LAR @ ARI
+  TBD: PIT @ DEN
+  TBD: CIN @ KC
+2024-09-16: 1 games
+  TBD: CHI @ HOU
+2024-09-17: 1 games
+  TBD: ATL @ PHI
+2024-09-20: 1 games
+  TBD: NE @ NYJ
+2024-09-22: 12 games
+  TBD: NYG @ CLE
+  TBD: GB @ TEN
+  TBD: CHI @ IND
+  TBD: HOU @ MIN
+  TBD: PHI @ NO
+  TBD: LAC @ PIT
+  TBD: DEN @ TB
+  TBD: CAR @ LV
+  TBD: MIA @ SEA
+  TBD: BAL @ DAL
+  TBD: SF @ LAR
+  TBD: DET @ ARI
+2024-09-23: 2 games
+  TBD: KC @ ATL
+  TBD: JAX @ BUF
+2024-09-24: 1 games
+  TBD: WSH @ CIN
+2024-09-27: 1 games
+  TBD: DAL @ NYG
+2024-09-29: 1 games
+  TBD: NO @ ATL

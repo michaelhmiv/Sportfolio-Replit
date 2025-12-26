@@ -1,0 +1,227 @@
+﻿Available environment variables: [
+  'ADMIN_API_TOKEN',
+  'ALLUSERSPROFILE',
+  'ANTIGRAVITY_AGENT',
+  'ANTIGRAVITY_CLI_ALIAS',
+  'APPDATA',
+  'BALLDONTLIE_API_KEY',
+  'CAMLIBS',
+  'CHROME_CRASHPAD_PIPE_NAME',
+  'COLOR',
+  'COLORTERM',
+  'CommonProgramFiles',
+  'CommonProgramFiles(x86)',
+  'CommonProgramW6432',
+  'COMPUTERNAME',
+  'ComSpec',
+  'DATABASE_URL',
+  'DriverData',
+  'EDITOR',
+  'EFC_15604_1262719628',
+  'EFC_15604_1592913036',
+  'EFC_15604_2283032206',
+  'EFC_15604_2775293581',
+  'EFC_15604_3789132940',
+  'FPS_BROWSER_APP_PROFILE_STRING',
+  'FPS_BROWSER_USER_PROFILE_STRING',
+  'GIT_ASKPASS',
+  'HOME',
+  'HOMEDRIVE',
+  'HOMEPATH',
+  'INIT_CWD',
+  'IOLIBS',
+  'LANG',
+  'LOCALAPPDATA',
+  'LOGONSERVER',
+  'MYSPORTSFEEDS_API_KEY',
+  'NODE',
+  'NODE_ENV',
+  'npm_command',
+  'npm_config_cache',
+  'npm_config_globalconfig',
+  'npm_config_global_prefix',
+  'npm_config_init_module',
+  'npm_config_local_prefix',
+  'npm_config_node_gyp',
+  'npm_config_noproxy',
+  'npm_config_npm_version',
+  'npm_config_prefix',
+  'npm_config_userconfig',
+  'npm_config_user_agent',
+  'npm_execpath',
+  'npm_lifecycle_event',
+  'npm_lifecycle_script',
+  'npm_node_execpath',
+  'npm_package_json',
+  'npm_package_name',
+  'npm_package_version',
+  'NUMBER_OF_PROCESSORS',
+  'OneDrive',
+  'OneDriveConsumer',
+  'ORIGINAL_XDG_CURRENT_DESKTOP',
+  'OS',
+  'PAGER',
+  'Path',
+  'PATHEXT',
+  'PERPLEXITY_API_KEY',
+  'PROCESSOR_ARCHITECTURE',
+  'PROCESSOR_IDENTIFIER',
+  'PROCESSOR_LEVEL',
+  'PROCESSOR_REVISION',
+  'ProgramData',
+  'ProgramFiles',
+  'ProgramFiles(x86)',
+  'ProgramW6432',
+  'PROMPT',
+  'PSModulePath',
+  'PUBLIC',
+  'SESSIONNAME',
+  'SESSION_SECRET',
+  'SUPABASE_ANON_KEY',
+  'SUPABASE_SERVICE_ROLE_KEY',
+  'SUPABASE_URL',
+  'SystemDrive',
+  'SystemRoot',
+  'TEMP',
+  'TERM_PROGRAM',
+  'TERM_PROGRAM_VERSION',
+  'TMP',
+  'TWITTER_ACCESS_TOKEN',
+  'TWITTER_ACCESS_TOKEN_SECRET',
+  'TWITTER_API_KEY',
+  'TWITTER_API_SECRET',
+  'USERDOMAIN',
+  'USERDOMAIN_ROAMINGPROFILE',
+  'USERNAME',
+  'USERPROFILE',
+  'VSCODE_GIT_ASKPASS_EXTRA_ARGS',
+  'VSCODE_GIT_ASKPASS_MAIN',
+  'VSCODE_GIT_ASKPASS_NODE',
+  'VSCODE_GIT_IPC_HANDLE',
+  'VSCODE_INJECTION',
+  ... 6 more items
+]
+--- Running NFL Sync ---
+[NFL Schedule Sync] Starting schedule synchronization...
+[NFL Schedule Sync] Fetching games for season 2025, weeks: 16, 17
+[NFL API] Fetching games with params: { per_page: 100, 'weeks[]': [ 16, 17 ], 'seasons[]': [ 2025 ] }
+[NFL API] Fetched 32 games
+[NFL Schedule Sync] Fetched 32 games from API
+[NFL Schedule Sync] Updating LAR @ SEA: startTime=2025-12-19T01:15:00.000Z
+[NFL Schedule Sync] Using API date for CHI vs GB: 2025-12-20T05:00:00.000Z
+[NFL Schedule Sync] Updating GB @ CHI: startTime=2025-12-20T05:00:00.000Z
+[NFL Schedule Sync] Using API date for WSH vs PHI: 2025-12-20T05:00:00.000Z
+[NFL Schedule Sync] Updating PHI @ WSH: startTime=2025-12-20T05:00:00.000Z
+[NFL Schedule Sync] Updating BUF @ CLE: startTime=2025-12-21T18:00:00.000Z
+[NFL Schedule Sync] Updating LAC @ DAL: startTime=2025-12-21T18:00:00.000Z
+[NFL Schedule Sync] Updating KC @ TEN: startTime=2025-12-21T18:00:00.000Z
+[NFL Schedule Sync] Updating NYJ @ NO: startTime=2025-12-21T18:00:00.000Z
+[NFL Schedule Sync] Updating MIN @ NYG: startTime=2025-12-21T18:00:00.000Z
+[NFL Schedule Sync] Updating TB @ CAR: startTime=2025-12-21T18:00:00.000Z
+[NFL Schedule Sync] Updating NE @ BAL: startTime=2025-12-21T18:00:00.000Z
+[NFL Schedule Sync] Updating JAX @ DEN: startTime=2025-12-21T21:05:00.000Z
+[NFL Schedule Sync] Updating ATL @ ARI: startTime=2025-12-21T21:05:00.000Z
+[NFL Schedule Sync] Updating PIT @ DET: startTime=2025-12-21T21:25:00.000Z
+[NFL Schedule Sync] Updating LV @ HOU: startTime=2025-12-21T21:25:00.000Z
+[NFL Schedule Sync] Updating CIN @ MIA: startTime=2025-12-22T01:20:00.000Z
+[NFL Schedule Sync] Updating SF @ IND: startTime=2025-12-23T01:15:00.000Z
+[NFL Schedule Sync] Updating DAL @ WSH: startTime=2025-12-25T18:00:00.000Z
+[NFL Schedule Sync] Updating DET @ MIN: startTime=2025-12-25T21:30:00.000Z
+[NFL Schedule Sync] Updating DEN @ KC: startTime=2025-12-26T01:15:00.000Z
+[NFL Schedule Sync] Parsed time: "12/28 - 1:00 PM EST" -> 2025-12-28T18:00:00.000Z
+[NFL Schedule Sync] Updating ARI @ CIN: startTime=2025-12-28T18:00:00.000Z
+[NFL Schedule Sync] Parsed time: "12/27 - 8:00 PM EST" -> 2025-12-28T01:00:00.000Z
+[NFL Schedule Sync] Updating BAL @ GB: startTime=2025-12-28T01:00:00.000Z
+[NFL Schedule Sync] Parsed time: "12/28 - 4:05 PM EST" -> 2025-12-28T21:05:00.000Z
+[NFL Schedule Sync] Updating NYG @ LV: startTime=2025-12-28T21:05:00.000Z
+[NFL Schedule Sync] Parsed time: "12/27 - 4:30 PM EST" -> 2025-12-27T21:30:00.000Z
+[NFL Schedule Sync] Updating HOU @ LAC: startTime=2025-12-27T21:30:00.000Z
+[NFL Schedule Sync] Parsed time: "12/28 - 1:00 PM EST" -> 2025-12-28T18:00:00.000Z
+[NFL Schedule Sync] Updating SEA @ CAR: startTime=2025-12-28T18:00:00.000Z
+[NFL Schedule Sync] Updating PIT @ CLE: startTime=2025-12-28T18:00:00.000Z
+[NFL Schedule Sync] Updating NO @ TEN: startTime=2025-12-28T18:00:00.000Z
+[NFL Schedule Sync] Updating JAX @ IND: startTime=2025-12-28T18:00:00.000Z
+[NFL Schedule Sync] Updating TB @ MIA: startTime=2025-12-28T18:00:00.000Z
+[NFL Schedule Sync] Updating NE @ NYJ: startTime=2025-12-28T18:00:00.000Z
+[NFL Schedule Sync] Updating PHI @ BUF: startTime=2025-12-28T21:25:00.000Z
+[NFL Schedule Sync] Updating CHI @ SF: startTime=2025-12-29T01:20:00.000Z
+[NFL Schedule Sync] Updating LAR @ ATL: startTime=2025-12-30T01:15:00.000Z
+[NFL Schedule Sync] Completed in 5.84s
+  - Games processed: 32
+  - Games added: 0
+  - Games updated: 32
+NFL Sync Result: {
+  "success": true,
+  "gamesProcessed": 32,
+  "gamesAdded": 0,
+  "gamesUpdated": 32,
+  "errors": []
+}
+
+--- Running NBA Sync ---
+[schedule_sync] Starting game schedule sync...
+[schedule_sync] Fetching games for dates range
+[schedule_sync] Broadcasting updates for 47 games with scores
+[schedule_sync] Successfully processed 166 games, 0 errors
+[schedule_sync] API requests made: 22
+NBA Sync Result: {
+  "requestCount": 22,
+  "recordsProcessed": 166,
+  "errorCount": 0
+}
+
+--- Running NBA Contest Creation ---
+[create_contests] Starting contest creation...
+[create_contests] Current ET date: 2025-12-26
+[create_contests] Current UTC time: 2025-12-26T14:23:59.228Z
+[create_contests] Fetching NBA schedule for next 7 days...
+[create_contests] Checking date: 2025-12-26 (API: 20251226)
+[create_contests] Found 9 games for 2025-12-26
+[create_contests] Checking date: 2025-12-27 (API: 20251227)
+[create_contests] Found 9 games for 2025-12-27
+[create_contests] Checking date: 2025-12-28 (API: 20251228)
+[create_contests] Found 6 games for 2025-12-28
+[create_contests] Checking date: 2025-12-29 (API: 20251229)
+[create_contests] Found 11 games for 2025-12-29
+[create_contests] Checking date: 2025-12-30 (API: 20251230)
+[create_contests] Found 4 games for 2025-12-30
+[create_contests] Checking date: 2025-12-31 (API: 20251231)
+[create_contests] Found 9 games for 2025-12-31
+[create_contests] Checking date: 2026-01-01 (API: 20260101)
+[create_contests] Found 5 games for 2026-01-01
+[create_contests] Found 7 unique game days with games
+[create_contests] Found existing contest for 2025-12-26: NBA 50/50 - 2025/12/26 (gameDate: Fri Dec 26 2025 00:00:00 GMT-0500 (Eastern Standard Time), status: open)
+[create_contests] Contest already exists for game_date 2025-12-26, skipping...
+[create_contests] Found existing contest for 2025-12-27: NBA 50/50 - 2025/12/27 (gameDate: Sat Dec 27 2025 00:00:00 GMT-0500 (Eastern Standard Time), status: open)
+[create_contests] Contest already exists for game_date 2025-12-27, skipping...
+[create_contests] Found existing contest for 2025-12-28: NBA 50/50 - 2025/12/28 (gameDate: Sun Dec 28 2025 00:00:00 GMT-0500 (Eastern Standard Time), status: open)
+[create_contests] Contest already exists for game_date 2025-12-28, skipping...
+[create_contests] Found existing contest for 2025-12-29: NFL 50/50 - 2025/12/29 (Week 17) (gameDate: Mon Dec 29 2025 00:00:00 GMT-0500 (Eastern Standard Time), status: open)
+[create_contests] Contest already exists for game_date 2025-12-29, skipping...
+[create_contests] Found existing contest for 2025-12-30: NBA 50/50 - 2025/12/30 (gameDate: Tue Dec 30 2025 00:00:00 GMT-0500 (Eastern Standard Time), status: open)
+[create_contests] Contest already exists for game_date 2025-12-30, skipping...
+[create_contests] Found existing contest for 2025-12-31: NBA 50/50 - 2025/12/31 (gameDate: Wed Dec 31 2025 00:00:00 GMT-0500 (Eastern Standard Time), status: open)
+[create_contests] Contest already exists for game_date 2025-12-31, skipping...
+[create_contests] Found existing contest for 2026-01-01: NBA 50/50 - 2026/01/01 (gameDate: Thu Jan 01 2026 00:00:00 GMT-0500 (Eastern Standard Time), status: open)
+[create_contests] Contest already exists for game_date 2026-01-01, skipping...
+[create_contests] Created 0 new contests, 0 errors
+NBA Contest Creation Result: {
+  "requestCount": 7,
+  "recordsProcessed": 0,
+  "errorCount": 0
+}
+
+--- Running NFL Contest Creation ---
+[NFL Contest Creation] Starting...
+[NFL Contest Creation] Looking for games between 2025-12-26T14:24:00.036Z and 2026-01-02T14:24:00.036Z
+[NFL Contest Creation] Found 13 upcoming NFL games
+[NFL Contest Creation] Contest already exists for 2025-12-27, skipping
+[NFL Contest Creation] Contest already exists for 2025-12-28, skipping
+[NFL Contest Creation] Contest already exists for 2025-12-29, skipping
+[NFL Contest Creation] Finished: 0 created, 0 errors
+NFL Contest Creation Result: {
+  "contestsCreated": 0,
+  "errors": 0
+}
+
+Output saved to sync_debug_results.txt

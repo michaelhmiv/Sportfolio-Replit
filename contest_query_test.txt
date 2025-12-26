@@ -1,0 +1,65 @@
+=== Testing Contest Query ===
+
+Selected date: 2025-12-26
+
+All open contests:
+  [NBA] NBA 50/50 - 2025/12/26
+    game_date raw: Fri Dec 26 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+    toISOString: 2025-12-26T10:00:00.000Z
+    extracted date: 2025-12-26
+    matches '2025-12-26'? true
+
+  [NFL] NFL 50/50 - 2025/12/27 (Week 17)
+    game_date raw: Sat Dec 27 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+    toISOString: 2025-12-27T10:00:00.000Z
+    extracted date: 2025-12-27
+    matches '2025-12-26'? false
+
+  [NBA] NBA 50/50 - 2025/12/27
+    game_date raw: Sat Dec 27 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+    toISOString: 2025-12-27T10:00:00.000Z
+    extracted date: 2025-12-27
+    matches '2025-12-26'? false
+
+  [NFL] NFL 50/50 - 2025/12/28 (Week 17)
+    game_date raw: Sun Dec 28 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+    toISOString: 2025-12-28T10:00:00.000Z
+    extracted date: 2025-12-28
+    matches '2025-12-26'? false
+
+  [NBA] NBA 50/50 - 2025/12/28
+    game_date raw: Sun Dec 28 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+    toISOString: 2025-12-28T10:00:00.000Z
+    extracted date: 2025-12-28
+    matches '2025-12-26'? false
+
+  [NFL] NFL 50/50 - 2025/12/29 (Week 17)
+    game_date raw: Mon Dec 29 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+    toISOString: 2025-12-29T10:00:00.000Z
+    extracted date: 2025-12-29
+    matches '2025-12-26'? false
+
+  [NBA] NBA 50/50 - 2025/12/29
+    game_date raw: Mon Dec 29 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+    toISOString: 2025-12-29T10:00:00.000Z
+    extracted date: 2025-12-29
+    matches '2025-12-26'? false
+
+  [NBA] NBA 50/50 - 2025/12/30
+    game_date raw: Tue Dec 30 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+    toISOString: 2025-12-30T10:00:00.000Z
+    extracted date: 2025-12-30
+    matches '2025-12-26'? false
+
+  [NBA] NBA 50/50 - 2025/12/31
+    game_date raw: Wed Dec 31 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+    toISOString: 2025-12-31T10:00:00.000Z
+    extracted date: 2025-12-31
+    matches '2025-12-26'? false
+
+  [NBA] NBA 50/50 - 2026/01/01
+    game_date raw: Thu Jan 01 2026 05:00:00 GMT-0500 (Eastern Standard Time)
+    toISOString: 2026-01-01T10:00:00.000Z
+    extracted date: 2026-01-01
+    matches '2025-12-26'? false
+

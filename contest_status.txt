@@ -1,0 +1,83 @@
+=== Contest Status ===
+
+Contest table columns: entry_count, starts_at, ends_at, created_at, week, game_date, entry_fee, total_shares_entered, total_prize_pool, game_day, name, sport, contest_type, status, id
+
+Total contests found: 11
+
+[NBA] NBA 50/50 - 2026/01/01
+  ID: 207459b4-ce6c-48a7-86cd-237644f83d2f
+  Game Date: Thu Jan 01 2026 05:00:00 GMT-0500 (Eastern Standard Time)
+  Starts: Thu Jan 01 2026 23:00:00 GMT-0500 (Eastern Standard Time)
+  Ends: Fri Jan 02 2026 04:59:59 GMT-0500 (Eastern Standard Time)
+  Status: open
+
+[NBA] NBA 50/50 - 2025/12/31
+  ID: 42dedb38-d28c-4d7c-896a-e1a4d7827bcd
+  Game Date: Wed Dec 31 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+  Starts: Wed Dec 31 2025 18:00:00 GMT-0500 (Eastern Standard Time)
+  Ends: Thu Jan 01 2026 04:59:59 GMT-0500 (Eastern Standard Time)
+  Status: open
+
+[NBA] NBA 50/50 - 2025/12/30
+  ID: 641644e7-3165-413f-b47c-57ad30713962
+  Game Date: Tue Dec 30 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+  Starts: Wed Dec 31 2025 01:00:00 GMT-0500 (Eastern Standard Time)
+  Ends: Wed Dec 31 2025 04:59:59 GMT-0500 (Eastern Standard Time)
+  Status: open
+
+[NFL] NFL 50/50 - 2025/12/29 (Week 17)
+  ID: d5f08e7e-7cef-4d8b-b296-9b0c823b4c83
+  Game Date: Mon Dec 29 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+  Starts: Tue Dec 30 2025 01:15:00 GMT-0500 (Eastern Standard Time)
+  Ends: Tue Dec 30 2025 04:59:59 GMT-0500 (Eastern Standard Time)
+  Status: open
+
+[NBA] NBA 50/50 - 2025/12/29
+  ID: 8eeaa193-20b7-4672-92f3-3c19c51f6b06
+  Game Date: Mon Dec 29 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+  Starts: Tue Dec 30 2025 00:00:00 GMT-0500 (Eastern Standard Time)
+  Ends: Tue Dec 30 2025 04:59:59 GMT-0500 (Eastern Standard Time)
+  Status: open
+
+[NBA] NBA 50/50 - 2025/12/28
+  ID: 56f91acb-0c2c-4363-ab84-3a9d90a9c11a
+  Game Date: Sun Dec 28 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+  Starts: Sun Dec 28 2025 20:30:00 GMT-0500 (Eastern Standard Time)
+  Ends: Mon Dec 29 2025 04:59:59 GMT-0500 (Eastern Standard Time)
+  Status: open
+
+[NFL] NFL 50/50 - 2025/12/28 (Week 17)
+  ID: df5cb90c-990b-465f-ac59-1c542886979e
+  Game Date: Sun Dec 28 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+  Starts: Sun Dec 28 2025 18:00:00 GMT-0500 (Eastern Standard Time)
+  Ends: Mon Dec 29 2025 04:59:59 GMT-0500 (Eastern Standard Time)
+  Status: open
+
+[NBA] NBA 50/50 - 2025/12/27
+  ID: 927d0b3c-39e9-4b8a-9f08-d341bcec2770
+  Game Date: Sat Dec 27 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+  Starts: Sat Dec 27 2025 22:00:00 GMT-0500 (Eastern Standard Time)
+  Ends: Sun Dec 28 2025 04:59:59 GMT-0500 (Eastern Standard Time)
+  Status: open
+
+[NFL] NFL 50/50 - 2025/12/27 (Week 17)
+  ID: c5b5ddc2-5bc9-4c34-9b38-4c3af87051f3
+  Game Date: Sat Dec 27 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+  Starts: Sat Dec 27 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+  Ends: Sun Dec 28 2025 04:59:59 GMT-0500 (Eastern Standard Time)
+  Status: open
+
+[NBA] NBA 50/50 - 2025/12/26
+  ID: e9557a0d-811e-46eb-b545-4a01c36fb96a
+  Game Date: Fri Dec 26 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+  Starts: Sat Dec 27 2025 00:00:00 GMT-0500 (Eastern Standard Time)
+  Ends: Sat Dec 27 2025 04:59:59 GMT-0500 (Eastern Standard Time)
+  Status: open
+
+[NBA] NBA 50/50 - 2025/12/25
+  ID: c7f3c3cf-f18f-47d5-88cf-69c348cc7081
+  Game Date: Thu Dec 25 2025 05:00:00 GMT-0500 (Eastern Standard Time)
+  Starts: Thu Dec 25 2025 17:00:00 GMT-0500 (Eastern Standard Time)
+  Ends: Fri Dec 26 2025 04:59:59 GMT-0500 (Eastern Standard Time)
+  Status: completed
+

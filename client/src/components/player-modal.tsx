@@ -16,28 +16,49 @@ interface PlayerModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-interface SharesInfo {
-  totalSharesOutstanding: number;
-  currentSharePrice: string | null;
-  marketCap: string | null;
-  totalHolders: number;
-  volume24h: number;
-  priceChange24h: string;
-}
-
-interface SeasonStats {
-  gamesPlayed: number;
-  avgFantasyPointsPerGame: string;
-  pointsPerGame: string;
-  reboundsPerGame: string;
-  assistsPerGame: string;
-  fieldGoalPct: string;
-  threePointPct: string;
-  freeThrowPct: string;
-  steals: number;
-  blocks: number;
-  minutesPerGame: string;
-}
+// Sport configuration for dynamic display
+const SPORT_CONFIG: Record<string, {
+  seasonStats: { key: string; label: string; highlight?: boolean; format?: (val: any) => string }[];
+  recentGames: { key: string; label: string; format?: (val: any) => string }[];
+}> = {
+  NBA: {
+    seasonStats: [
+      { key: "avgFantasyPointsPerGame", label: "FP/G", highlight: true },
+      { key: "fieldGoalPct", label: "FG%", format: (v) => `${v}%` },
+      { key: "pointsPerGame", label: "PPG" },
+      { key: "threePointPct", label: "3P%", format: (v) => `${v}%` },
+      { key: "reboundsPerGame", label: "RPG" },
+      { key: "freeThrowPct", label: "FT%", format: (v) => `${v}%` },
+      { key: "assistsPerGame", label: "APG" },
+      { key: "minutesPerGame", label: "MPG" },
+    ],
+    recentGames: [
+      { key: "points", label: "PTS" },
+      { key: "rebounds", label: "REB" },
+      { key: "assists", label: "AST" },
+    ]
+  },
+  NFL: {
+    seasonStats: [
+      { key: "avgFantasyPointsPerGame", label: "FP/G", highlight: true },
+      { key: "gamesPlayed", label: "GP" },
+      { key: "passingYards", label: "Pas Yds" },
+      { key: "passingTouchdowns", label: "Pas TD" },
+      { key: "rushingYards", label: "Rus Yds" },
+      { key: "rushingTouchdowns", label: "Rus TD" },
+      { key: "receivingYards", label: "Rec Yds" },
+      { key: "receivingTouchdowns", label: "Rec TD" },
+    ],
+    recentGames: [
+      // Check top stats dynamically or just show key ones
+      // For now, let's show generic "Yds" if we can sum them, or just list main categories
+      // Given space, maybe: Pass Yds, Rush Yds, Rec Yds
+      { key: "passingYards", label: "P.YDS" },
+      { key: "rushingYards", label: "R.YDS" },
+      { key: "receivingYards", label: "R.YDS" },
+    ]
+  }
+};
 
 interface RecentGame {
   game: {
@@ -46,24 +67,15 @@ interface RecentGame {
     opponent: string;
     isHome: boolean;
   };
-  stats: {
-    points: number;
-    rebounds: number;
-    assists: number;
-    steals: number;
-    blocks: number;
-    turnovers: number;
-    threePointersMade: number;
-    minutes: number;
-    fantasyPoints: number;
-  };
+  stats: Record<string, any>;
+  sport?: string;
 }
 
 export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) {
   const [gamesToShow, setGamesToShow] = useState(5);
   const { isAuthenticated } = useAuth();
   const { openRedemptionModal } = useVesting();
-  
+
   // Fetch all player data
   const { data: statsData, isLoading: statsLoading } = useQuery<any>({
     queryKey: ["/api/player", playerId, "stats"],
@@ -84,12 +96,14 @@ export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) 
 
   const player = statsData?.player;
   const team = statsData?.team;
-  const stats: SeasonStats | null = statsData?.stats;
+  // Determine sport from stats data or default to NBA
+  const sport = statsData?.stats?.sport || (player?.sport === 'NFL' ? 'NFL' : 'NBA');
+  const stats = statsData?.stats;
   const recentGames: RecentGame[] = recentGamesData?.recentGames || [];
   const sharesInfo: SharesInfo | null = sharesData?.sharesInfo;
 
   const isLoading = statsLoading || gamesLoading || sharesLoading;
-  
+
   // Backend already returns most recent games first (desc order)
   const displayedGames = recentGames.slice(0, gamesToShow);
   const hasMoreGames = recentGames.length > gamesToShow;
@@ -111,8 +125,8 @@ export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) 
             </DialogTitle>
             <div className="flex items-center gap-2">
               {playerId && isAuthenticated && (
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   variant="outline"
                   onClick={() => {
                     openRedemptionModal([playerId]);
@@ -180,12 +194,11 @@ export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) 
                 </div>
                 <div>
                   <div className="text-muted-foreground text-[10px]">24h Chg</div>
-                  <div 
-                    className={`font-bold ${
-                      parseFloat(sharesInfo.priceChange24h) >= 0 
-                        ? 'text-positive' 
+                  <div
+                    className={`font-bold ${parseFloat(sharesInfo.priceChange24h) >= 0
+                        ? 'text-positive'
                         : 'text-negative'
-                    }`}
+                      }`}
                     data-testid="text-price-change"
                   >
                     {parseFloat(sharesInfo.priceChange24h) >= 0 ? '+' : ''}
@@ -212,38 +225,22 @@ export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) 
               </div>
             ) : stats ? (
               <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">FP/G</span>
-                  <span className="font-bold text-primary" data-testid="stat-avg-fp">{stats.avgFantasyPointsPerGame}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">FG%</span>
-                  <span className="font-bold" data-testid="stat-fg-pct">{stats.fieldGoalPct}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">PPG</span>
-                  <span className="font-bold" data-testid="stat-ppg">{stats.pointsPerGame}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">3P%</span>
-                  <span className="font-bold" data-testid="stat-3pt-pct">{stats.threePointPct}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">RPG</span>
-                  <span className="font-bold" data-testid="stat-rpg">{stats.reboundsPerGame}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">FT%</span>
-                  <span className="font-bold" data-testid="stat-ft-pct">{stats.freeThrowPct}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">APG</span>
-                  <span className="font-bold" data-testid="stat-apg">{stats.assistsPerGame}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">MPG</span>
-                  <span className="font-bold" data-testid="stat-mpg">{stats.minutesPerGame}</span>
-                </div>
+                {(SPORT_CONFIG[sport]?.seasonStats || SPORT_CONFIG.NBA.seasonStats).map((statConfig) => {
+                  const value = stats[statConfig.key];
+                  if (value === undefined || value === null) return null;
+
+                  return (
+                    <div key={statConfig.key} className="flex justify-between">
+                      <span className="text-muted-foreground">{statConfig.label}</span>
+                      <span
+                        className={`font-bold ${statConfig.highlight ? "text-primary" : ""}`}
+                        data-testid={`stat-${statConfig.key}`}
+                      >
+                        {statConfig.format ? statConfig.format(value) : value}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center text-xs text-muted-foreground py-2">No stats</div>
@@ -275,15 +272,17 @@ export function PlayerModal({ playerId, open, onOpenChange }: PlayerModalProps) 
                             </span>
                           </div>
                           <div className="flex gap-2 text-[10px]">
-                            <span className="text-muted-foreground">
-                              <span className="font-semibold text-foreground">{game.stats.points}</span> PTS
-                            </span>
-                            <span className="text-muted-foreground">
-                              <span className="font-semibold text-foreground">{game.stats.rebounds}</span> REB
-                            </span>
-                            <span className="text-muted-foreground">
-                              <span className="font-semibold text-foreground">{game.stats.assists}</span> AST
-                            </span>
+                            {(SPORT_CONFIG[sport]?.recentGames || SPORT_CONFIG.NBA.recentGames).map((statConfig) => {
+                              const value = game.stats[statConfig.key];
+                              // Skip 0 values for cleaner look, unless it's a key stat
+                              if (!value) return null;
+
+                              return (
+                                <span key={statConfig.key} className="text-muted-foreground">
+                                  <span className="font-semibold text-foreground">{value}</span> {statConfig.label}
+                                </span>
+                              );
+                            })}
                           </div>
                         </div>
                         <div className="text-right flex-shrink-0">

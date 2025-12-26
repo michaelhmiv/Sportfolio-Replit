@@ -1,0 +1,99 @@
+--- Database Check results ---
+Date: 2025-12-26
+
+NFL Game counts by date:
+  2025-12-19 - Count: 1
+  2025-12-20 - Count: 2
+  2025-12-21 - Count: 7
+  2025-12-21 - Count: 2
+  2025-12-21 - Count: 2
+  2025-12-22 - Count: 1
+  2025-12-23 - Count: 1
+  2025-12-25 - Count: 1
+  2025-12-25 - Count: 1
+  2025-12-26 - Count: 1
+  2025-12-27 - Count: 5
+  2025-12-28 - Count: 5
+  2025-12-28 - Count: 1
+  2025-12-29 - Count: 1
+  2025-12-30 - Count: 1
+
+NBA Games from Dec 25:
+  2025-12-25 - Count: 5
+  2025-12-26 - Count: 9
+  2025-12-27 - Count: 9
+  2025-12-28 - Count: 6
+  2025-12-29 - Count: 11
+  2025-12-30 - Count: 4
+  2025-12-31 - Count: 9
+  2026-01-01 - Count: 5
+  2026-01-02 - Count: 10
+  2026-01-03 - Count: 8
+
+Recent Contest job logs:
+  [update_contest_statuses] success - 2025-12-26 14:20 - 
+  [settle_contests] success - 2025-12-26 14:20 - 
+  [update_contest_statuses] success - 2025-12-26 14:15 - 
+  [settle_contests] success - 2025-12-26 14:15 - 
+  [settle_contests] success - 2025-12-26 14:10 - 
+  [update_contest_statuses] success - 2025-12-26 14:10 - 
+  [settle_contests] success - 2025-12-26 14:05 - 
+  [update_contest_statuses] success - 2025-12-26 14:05 - 
+  [settle_contests] success - 2025-12-26 14:00 - 
+  [update_contest_statuses] success - 2025-12-26 14:00 - 
+  [settle_contests] success - 2025-12-26 13:55 - 
+  [update_contest_statuses] success - 2025-12-26 13:55 - 
+  [update_contest_statuses] success - 2025-12-26 13:50 - 
+  [settle_contests] success - 2025-12-26 13:50 - 
+  [settle_contests] success - 2025-12-26 13:45 - 
+  [update_contest_statuses] success - 2025-12-26 13:45 - 
+  [update_contest_statuses] success - 2025-12-26 13:40 - 
+  [settle_contests] success - 2025-12-26 13:40 - 
+  [settle_contests] success - 2025-12-26 13:35 - 
+  [update_contest_statuses] success - 2025-12-26 13:35 - 
+
+Time boundaries for Dec 26 ET:
+  Start: 2025-12-26T05:00:00.000Z
+  End: 2025-12-27T05:00:00.000Z
+
+NFL Games on Dec 26 (by start_time):
+  DEN @ KC - Start: 2025-12-26 01:15 - Status: completed
+
+NBA Games on Dec 26 (by start_time):
+  HOU @ LAL - Raw: Fri Dec 26 2025 01:00:00 GMT-0500 (Eastern Standard Time) - Parsed: 2025-12-26T06:00:00.000Z - InBounds: true
+  MIN @ DEN - Raw: Fri Dec 26 2025 03:30:00 GMT-0500 (Eastern Standard Time) - Parsed: 2025-12-26T08:30:00.000Z - InBounds: true
+
+All games with date = Dec 26 (by date column):
+  [NFL] DEN @ KC - Date: 2025-12-26 - Start: 2025-12-26 01:15 UTC
+  [NBA] CHA @ ORL - Date: 2025-12-26 - Start: 2025-12-27 00:00 UTC
+  [NBA] TOR @ WAS - Date: 2025-12-26 - Start: 2025-12-27 00:00 UTC
+  [NBA] MIA @ ATL - Date: 2025-12-26 - Start: 2025-12-27 00:00 UTC
+  [NBA] BOS @ IND - Date: 2025-12-26 - Start: 2025-12-27 00:30 UTC
+  [NBA] MIL @ MEM - Date: 2025-12-26 - Start: 2025-12-27 01:00 UTC
+  [NBA] PHX @ NOP - Date: 2025-12-26 - Start: 2025-12-27 01:00 UTC
+  [NBA] PHI @ CHI - Date: 2025-12-26 - Start: 2025-12-27 01:00 UTC
+  [NBA] DET @ UTA - Date: 2025-12-26 - Start: 2025-12-27 02:30 UTC
+  [NBA] LAC @ POR - Date: 2025-12-26 - Start: 2025-12-27 03:00 UTC
+
+NFL Games in Database (Dec 27-29):
+  HOU @ LAC - Date: 2025-12-27 - Start: 2025-12-28T02:30:00.000Z - Status: scheduled
+  BAL @ GB - Date: 2025-12-27 - Start: 2025-12-28T06:00:00.000Z - Status: scheduled
+  ARI @ CIN - Date: 2025-12-27 - Start: 2025-12-28T23:00:00.000Z - Status: scheduled
+  TB @ MIA - Date: 2025-12-28 - Start: 2025-12-28T23:00:00.000Z - Status: scheduled
+  NE @ NYJ - Date: 2025-12-28 - Start: 2025-12-28T23:00:00.000Z - Status: scheduled
+  SEA @ CAR - Date: 2025-12-27 - Start: 2025-12-28T23:00:00.000Z - Status: scheduled
+  PIT @ CLE - Date: 2025-12-28 - Start: 2025-12-28T23:00:00.000Z - Status: scheduled
+  NO @ TEN - Date: 2025-12-28 - Start: 2025-12-28T23:00:00.000Z - Status: scheduled
+  JAX @ IND - Date: 2025-12-28 - Start: 2025-12-28T23:00:00.000Z - Status: scheduled
+  NYG @ LV - Date: 2025-12-27 - Start: 2025-12-29T02:05:00.000Z - Status: scheduled
+  PHI @ BUF - Date: 2025-12-29 - Start: 2025-12-29T02:25:00.000Z - Status: scheduled
+
+NBA Games tonight (after 5 PM ET):
+  MIA @ ATL - Start: 2025-12-27 00:00 UTC - Status: scheduled
+  CHA @ ORL - Start: 2025-12-27 00:00 UTC - Status: scheduled
+  TOR @ WAS - Start: 2025-12-27 00:00 UTC - Status: scheduled
+  BOS @ IND - Start: 2025-12-27 00:30 UTC - Status: scheduled
+  MIL @ MEM - Start: 2025-12-27 01:00 UTC - Status: scheduled
+  PHX @ NOP - Start: 2025-12-27 01:00 UTC - Status: scheduled
+  PHI @ CHI - Start: 2025-12-27 01:00 UTC - Status: scheduled
+  DET @ UTA - Start: 2025-12-27 02:30 UTC - Status: scheduled

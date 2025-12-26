@@ -1,0 +1,16 @@
+=== Games for Today (Dec 26 ET) ===
+Query: start_time >= 2025-12-26T05:00:00.000Z AND start_time < 2025-12-27T05:00:00.000Z
+
+NFL Games Today:
+  (No NFL games scheduled for today)
+
+NBA Games Today:
+  MIA @ ATL - 7:00 PM ET (scheduled)
+  CHA @ ORL - 7:00 PM ET (scheduled)
+  TOR @ WAS - 7:00 PM ET (scheduled)
+  BOS @ IND - 7:30 PM ET (scheduled)
+  MIL @ MEM - 8:00 PM ET (scheduled)
+  PHX @ NOP - 8:00 PM ET (scheduled)
+  PHI @ CHI - 8:00 PM ET (scheduled)
+  DET @ UTA - 9:30 PM ET (scheduled)
+  LAC @ POR - 10:00 PM ET (scheduled)
