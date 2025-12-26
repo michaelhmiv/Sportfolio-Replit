@@ -61,6 +61,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
 
   const [dirSearchQuery, setDirSearchQuery] = useState("");
   const [teamFilter, setTeamFilter] = useState<string>("all");
+  const [sportFilter, setSportFilter] = useState<string>("all");
   const [sortField, setSortField] = useState<SortField>("fantasyPoints");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [visibleLimit, setVisibleLimit] = useState(50);
@@ -74,14 +75,15 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
     enabled: open,
   });
 
-  // Build query URL for server-side filtering - limit=1000 ensures full player access
+  // Build query URL for server-side filtering - limit=5000 ensures full player access
   const playerQueryUrl = useMemo(() => {
     const params = new URLSearchParams();
-    params.set('limit', '1000');
+    params.set('limit', '5000');
     if (dirSearchQuery) params.set('search', dirSearchQuery);
     if (teamFilter !== 'all') params.set('team', teamFilter);
+    if (sportFilter !== 'all') params.set('sport', sportFilter);
     return `/api/players?${params.toString()}`;
-  }, [dirSearchQuery, teamFilter]);
+  }, [dirSearchQuery, teamFilter, sportFilter]);
 
   const { data: playersData, isLoading: playersLoading } = useQuery<{ players: PlayerWithStats[], total: number }>({
     queryKey: [playerQueryUrl],
@@ -155,6 +157,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
       setActiveTab("directory");
       setDirSearchQuery("");
       setTeamFilter("all");
+      setSportFilter("all");
       setSortField("fantasyPoints");
       setSortDirection("desc");
       setVisibleLimit(50);
@@ -164,7 +167,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
   // Reset visible limit when search or filter changes
   useEffect(() => {
     setVisibleLimit(50);
-  }, [dirSearchQuery, teamFilter, sortField, sortDirection]);
+  }, [dirSearchQuery, teamFilter, sportFilter, sortField, sortDirection]);
 
   const filteredPlayers = useMemo(() => {
     if (!playersData?.players) return [];
@@ -439,8 +442,18 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
                   />
                 </div>
                 <div className="flex gap-2">
+                  <Select value={sportFilter} onValueChange={setSportFilter}>
+                    <SelectTrigger className="w-[90px] h-9" data-testid="select-sport-filter">
+                      <SelectValue placeholder="Sport" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="NBA">NBA</SelectItem>
+                      <SelectItem value="NFL">NFL</SelectItem>
+                    </SelectContent>
+                  </Select>
                   <Select value={teamFilter} onValueChange={setTeamFilter}>
-                    <SelectTrigger className="w-[120px] h-9" data-testid="select-team-filter">
+                    <SelectTrigger className="w-[90px] h-9" data-testid="select-team-filter">
                       <SelectValue placeholder="Team" />
                     </SelectTrigger>
                     <SelectContent>

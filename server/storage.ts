@@ -99,6 +99,8 @@ function getCurrentCompetitiveSeasons(): string[] {
   return [
     `${seasonStartYear}-${seasonEndYear}-regular`,
     `${seasonStartYear}-${seasonEndYear}-playoff`,
+    // Explicitly include 2025-2026-regular for NFL compatibility during transition
+    "2025-2026-regular"
   ];
 }
 

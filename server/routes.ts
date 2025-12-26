@@ -1115,7 +1115,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const parsedOffset = offset ? parseInt(offset as string) : 0;
 
       // Guard against invalid numeric input (NaN) - allow up to 1000 for redemption modal
-      const safeLimit = isNaN(parsedLimit) ? 50 : Math.max(1, Math.min(parsedLimit, 1000));
+      const safeLimit = isNaN(parsedLimit) ? 50 : Math.max(1, Math.min(parsedLimit, 5000));
       const safeOffset = isNaN(parsedOffset) ? 0 : Math.max(0, parsedOffset);
 
       // Parse sorting and filter params
@@ -1330,42 +1330,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!seasonStats) {
         return res.json({
-          player: { firstName: player.firstName, lastName: player.lastName },
+          player: { firstName: player.firstName, lastName: player.lastName, sport: player.sport },
           team: { abbreviation: player.team },
           stats: null
         });
       }
 
-      res.json({
-        player: { firstName: player.firstName, lastName: player.lastName },
-        team: { abbreviation: player.team },
-        stats: {
-          gamesPlayed: seasonStats.gamesPlayed,
-          // Fantasy scoring
-          avgFantasyPointsPerGame: seasonStats.avgFantasyPointsPerGame,
-          // Scoring
-          points: Math.round(parseFloat(seasonStats.pointsPerGame) * seasonStats.gamesPlayed),
-          pointsPerGame: seasonStats.pointsPerGame,
-          fieldGoalPct: seasonStats.fieldGoalPct,
-          threePointPct: seasonStats.threePointPct,
-          freeThrowPct: seasonStats.freeThrowPct,
-          // Rebounding
-          rebounds: Math.round(parseFloat(seasonStats.reboundsPerGame) * seasonStats.gamesPlayed),
-          reboundsPerGame: seasonStats.reboundsPerGame,
-          offensiveRebounds: 0, // Not tracked in simplified cache
-          defensiveRebounds: 0, // Not tracked in simplified cache
-          // Playmaking
-          assists: Math.round(parseFloat(seasonStats.assistsPerGame) * seasonStats.gamesPlayed),
-          assistsPerGame: seasonStats.assistsPerGame,
-          turnovers: 0, // Not tracked in summary
-          // Defense
-          steals: seasonStats.steals,
-          blocks: seasonStats.blocks,
-          // Minutes
-          minutes: Math.round(parseFloat(seasonStats.minutesPerGame) * seasonStats.gamesPlayed),
-          minutesPerGame: seasonStats.minutesPerGame,
-        },
-      });
+      if (seasonStats.sport === 'NFL') {
+        res.json({
+          player: { firstName: player.firstName, lastName: player.lastName, sport: player.sport },
+          team: { abbreviation: player.team },
+          stats: seasonStats
+        });
+      } else {
+        res.json({
+          player: { firstName: player.firstName, lastName: player.lastName, sport: player.sport },
+          team: { abbreviation: player.team },
+          stats: {
+            // Pass sport through
+            sport: seasonStats.sport,
+            gamesPlayed: seasonStats.gamesPlayed,
+            // Fantasy scoring
+            avgFantasyPointsPerGame: seasonStats.avgFantasyPointsPerGame,
+            // Scoring
+            points: Math.round(parseFloat(seasonStats.pointsPerGame) * seasonStats.gamesPlayed),
+            pointsPerGame: seasonStats.pointsPerGame,
+            fieldGoalPct: seasonStats.fieldGoalPct,
+            threePointPct: seasonStats.threePointPct,
+            freeThrowPct: seasonStats.freeThrowPct,
+            // Rebounding
+            rebounds: Math.round(parseFloat(seasonStats.reboundsPerGame) * seasonStats.gamesPlayed),
+            reboundsPerGame: seasonStats.reboundsPerGame,
+            offensiveRebounds: 0, // Not tracked in simplified cache
+            defensiveRebounds: 0, // Not tracked in simplified cache
+            // Playmaking
+            assists: Math.round(parseFloat(seasonStats.assistsPerGame) * seasonStats.gamesPlayed),
+            assistsPerGame: seasonStats.assistsPerGame,
+            turnovers: 0, // Not tracked in summary
+            // Defense
+            steals: seasonStats.steals,
+            blocks: seasonStats.blocks,
+            // Minutes
+            minutes: Math.round(parseFloat(seasonStats.minutesPerGame) * seasonStats.gamesPlayed),
+            minutesPerGame: seasonStats.minutesPerGame,
+          },
+        });
+      }
     } catch (error: any) {
       console.error("[API] Error fetching player stats:", error.message);
       // Return graceful fallback instead of 500 error

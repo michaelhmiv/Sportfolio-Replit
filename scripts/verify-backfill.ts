@@ -25,7 +25,7 @@ async function verify() {
             .from(playerGameStats)
             .where(and(
                 eq(playerGameStats.sport, 'NFL'),
-                eq(playerGameStats.season, '2025')
+                eq(playerGameStats.season, '2025-2026-regular')
             ));
 
         console.log(`Found ${result[0].count} NFL stats for 2025 season.`);
@@ -35,7 +35,7 @@ async function verify() {
             .from(playerGameStats)
             .where(and(
                 eq(playerGameStats.sport, 'NFL'),
-                eq(playerGameStats.season, '2025')
+                eq(playerGameStats.season, '2025-2026-regular')
             ))
             .limit(1);
 

@@ -4,6 +4,8 @@ import {
     fetchGameStats,
     calculateNFLFantasyPoints,
     parseStatsToJson,
+    fetchActivePlayers,
+    normalizePosition,
     createNFLPlayerId,
     isNFLApiConfigured
 } from "./balldontlie-nfl";
@@ -18,6 +20,28 @@ export async function runBackfill() {
     console.log(`Starting NFL stats backfill for season ${SEASON}...`);
 
     try {
+        // 0. Sync Active Players first to avoid FK constraints
+        // console.log("Syncing active NFL players...");
+        // const activePlayers = await fetchActivePlayers();
+        // console.log(`Found ${activePlayers.length} active players. Upserting...`);
+
+        // for (const p of activePlayers) {
+        //     const playerId = createNFLPlayerId(p.id);
+        //     await storage.upsertPlayer({
+        //         id: playerId,
+        //         sport: "NFL",
+        //         firstName: p.first_name,
+        //         lastName: p.last_name,
+        //         team: p.team?.abbreviation || "FA",
+        //         position: normalizePosition(p.position),
+        //         jerseyNumber: p.jersey_number,
+        //         isActive: true,
+        //         isEligibleForMining: true, // Default to true
+        //         lastUpdated: new Date()
+        //     });
+        // }
+        // console.log("Player sync complete.");
+
         // 1. Fetch all finalized games for the season
         console.log("Fetching finalized games...");
         const games = await fetchGames({
@@ -57,7 +81,7 @@ export async function runBackfill() {
                 sport: "NFL",
                 gameDate: gameDate,
                 week: game.week,
-                season: game.season.toString(),
+                season: "2025-2026-regular",
                 opponentTeam: stat.team.id === game.home_team.id ? game.visitor_team.abbreviation : game.home_team.abbreviation,
                 homeAway: stat.team.id === game.home_team.id ? "home" : "away",
                 statsJson: statsJson,
