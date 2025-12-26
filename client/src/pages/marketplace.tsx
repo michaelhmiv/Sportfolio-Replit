@@ -22,15 +22,18 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { useAuth } from "@/hooks/useAuth";
 import { useSport, useSportConfig } from "@/lib/sport-context";
 import { SportSelector } from "@/components/sport-selector";
+import { MarketplaceScanners } from "@/components/marketplace-scanners";
 
 type PlayerWithOrderBook = Player & {
   bestBid: string | null;
   bestAsk: string | null;
   bidSize: number;
   askSize: number;
+  buyPressure?: number;
+  valueIndex?: number;
 };
 
-type SortField = "price" | "volume" | "change" | "bid" | "ask";
+type SortField = "price" | "volume" | "change" | "bid" | "ask" | "marketCap" | "sentiment" | "undervalued";
 type SortOrder = "asc" | "desc";
 
 export default function Marketplace() {
@@ -45,8 +48,8 @@ export default function Marketplace() {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [positionFilter, setPositionFilter] = useState<string>("all");
-  const [sortField, setSortField] = useState<SortField>("volume");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [sortField, setSortField] = useState<SortField>((searchParams.get("sortBy") as SortField) || "volume");
+  const [sortOrder, setSortOrder] = useState<SortOrder>((searchParams.get("sortOrder") as SortOrder) || "desc");
   const [filterHasBuyOrders, setFilterHasBuyOrders] = useState(false);
   const [filterHasSellOrders, setFilterHasSellOrders] = useState(false);
   const [page, setPage] = useState(1);
@@ -54,11 +57,20 @@ export default function Marketplace() {
   const ITEMS_PER_PAGE = 50;
   const { subscribe } = useWebSocket();
 
-  // Sync active tab with URL query parameter
+  // Sync active tab and sort with URL query parameters
   useEffect(() => {
     const tab = searchParams.get("tab");
     if (tab && (tab === "players" || tab === "activity")) {
       setActiveTab(tab);
+    }
+
+    const sortBy = searchParams.get("sortBy") as SortField;
+    const sortOrder = searchParams.get("sortOrder") as SortOrder;
+    if (sortBy && ["price", "volume", "change", "bid", "ask", "marketCap", "sentiment", "undervalued"].includes(sortBy)) {
+      setSortField(sortBy);
+    }
+    if (sortOrder && ["asc", "desc"].includes(sortOrder)) {
+      setSortOrder(sortOrder);
     }
   }, [searchParams]);
 
@@ -214,7 +226,12 @@ export default function Marketplace() {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortOrder("desc");
+      // Logic for sensible default sort order
+      if (field === 'price' || field === 'bid' || field === 'ask' || field === 'undervalued') {
+        setSortOrder("asc"); // Usually want cheapest/most undervalued first
+      } else {
+        setSortOrder("desc"); // Usually want highest volume/cap/sentiment/change first
+      }
     }
   };
 
@@ -232,70 +249,8 @@ export default function Marketplace() {
           </TabsList>
 
           <TabsContent value="players" className="space-y-4">
-            {/* Spotlight Cards - Side by Side */}
-            <div className="grid grid-cols-2 gap-2">
-              {/* Top Risers Card */}
-              <Card className="border-green-500/20">
-                <CardHeader className="py-1.5 px-2">
-                  <CardTitle className="text-xs font-semibold flex items-center gap-1">
-                    <TrendingUp className="w-3 h-3 text-green-500" />
-                    Top Risers
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-2 pb-1 pt-0">
-                  {topRisers && topRisers.length > 0 ? (
-                    <div className="flex flex-col">
-                      {topRisers.slice(0, 5).map((player, index) => (
-                        <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded px-1 py-0 cursor-pointer">
-                          <div className="flex items-center gap-0.5 min-w-0 flex-1">
-                            <TrendingUp className="w-2.5 h-2.5 text-green-500 flex-shrink-0" />
-                            <span className="text-[10px] text-muted-foreground">{index + 1}.</span>
-                            <span className="text-xs font-medium truncate">{player.lastName}</span>
-                            <span className="text-[10px] text-muted-foreground">{player.team}</span>
-                          </div>
-                          <div className="text-right flex-shrink-0 ml-1">
-                            <span className="text-xs font-mono text-green-500">+${player.priceChange24h.toFixed(2)}</span>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">No data</p>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Top Market Cap Card */}
-              <Card className="border-blue-500/20">
-                <CardHeader className="py-1.5 px-2">
-                  <CardTitle className="text-xs font-semibold flex items-center gap-1">
-                    <BarChart3 className="w-3 h-3 text-blue-500" />
-                    Top Market Cap
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-2 pb-1 pt-0">
-                  {topMarketCap && topMarketCap.length > 0 ? (
-                    <div className="flex flex-col">
-                      {topMarketCap.slice(0, 5).map((player, index) => (
-                        <Link key={player.id} href={`/player/${player.id}`} className="flex items-center justify-between hover-elevate rounded px-1 py-0 cursor-pointer">
-                          <div className="flex items-center gap-0.5 min-w-0 flex-1">
-                            <BarChart3 className="w-2.5 h-2.5 text-blue-500 flex-shrink-0" />
-                            <span className="text-[10px] text-muted-foreground">{index + 1}.</span>
-                            <span className="text-xs font-medium truncate">{player.lastName}</span>
-                            <span className="text-[10px] text-muted-foreground">{player.team}</span>
-                          </div>
-                          <div className="text-right flex-shrink-0 ml-1">
-                            <span className="text-xs font-mono">${(player.marketCap / 1000).toFixed(0)}K</span>
-                          </div>
-                        </Link>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-muted-foreground">No data</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
+            {/* Market Scanners */}
+            <MarketplaceScanners />
 
             {/* Collapsible Filters */}
             <ScrollReveal>
@@ -521,6 +476,16 @@ export default function Marketplace() {
                               24h Change <ArrowUpDown className="w-3 h-3" />
                             </button>
                           </th>
+                          <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">
+                            <button
+                              onClick={() => toggleSort(sortField === 'sentiment' ? 'sentiment' : sortField === 'undervalued' ? 'undervalued' : "marketCap")}
+                              className="flex items-center gap-1 ml-auto hover-elevate px-2 py-1 rounded text-xs"
+                              data-testid="button-sort-dynamic"
+                            >
+                              {sortField === 'sentiment' ? 'Sentiment' : sortField === 'undervalued' ? 'Val Index' : 'Mkt Cap'}
+                              <ArrowUpDown className="w-3 h-3" />
+                            </button>
+                          </th>
                           <th className="px-2 py-1.5"></th>
                         </tr>
                       </thead>
@@ -647,6 +612,45 @@ export default function Marketplace() {
                                       <div className="flex items-center gap-1.5 text-xs flex-wrap">
                                         <span className="text-muted-foreground">{player.team} • {player.position}</span>
                                       </div>
+                                      {/* Enhanced Visibility for Sorted Metric */}
+                                      {(sortField === 'marketCap' || sortField === 'change' || sortField === 'sentiment' || sortField === 'undervalued') && (
+                                        <div className="mb-1.5 flex items-center gap-1.5 text-[10px] px-2 py-1 bg-primary/10 text-primary rounded-full w-fit font-bold border border-primary/20 shadow-sm animate-in fade-in slide-in-from-left-2">
+                                          {sortField === 'marketCap' && (
+                                            <div className="flex items-center gap-1 uppercase tracking-wider">
+                                              <span>Market Cap:</span>
+                                              <span className="font-mono text-xs">
+                                                ${(parseFloat(player.marketCap) / 1000000).toFixed(1)}M
+                                              </span>
+                                            </div>
+                                          )}
+                                          {sortField === 'change' && (
+                                            <div className="flex items-center gap-1 uppercase tracking-wider">
+                                              <span>24h Change:</span>
+                                              <div className="flex items-center gap-0.5">
+                                                {parseFloat(player.priceChange24h) >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                                <span className="text-xs">{parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%</span>
+                                              </div>
+                                            </div>
+                                          )}
+                                          {sortField === 'sentiment' && (
+                                            <div className="flex items-center gap-1 uppercase tracking-wider">
+                                              <span>Buy Pressure:</span>
+                                              <span className="font-mono text-xs">
+                                                {player.buyPressure ? Math.round(player.buyPressure) : 50}%
+                                              </span>
+                                            </div>
+                                          )}
+                                          {sortField === 'undervalued' && (
+                                            <div className="flex items-center gap-1 uppercase tracking-wider">
+                                              <span>Value Index:</span>
+                                              <span className="font-mono text-xs">
+                                                {player.valueIndex ? player.valueIndex.toFixed(1) : '-'}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+
                                       <div className="flex items-center gap-1.5 text-xs mt-0.5">
                                         {player.lastTradePrice ? (
                                           <AnimatedPrice
@@ -734,6 +738,17 @@ export default function Marketplace() {
                                     {parseFloat(player.priceChange24h) >= 0 ? '+' : ''}{player.priceChange24h}%
                                   </span>
                                 </div>
+                              </td>
+                              <td className="px-2 py-1.5 text-right hidden md:table-cell">
+                                <span className="text-xs font-mono font-bold text-muted-foreground">
+                                  {sortField === 'sentiment' ? (
+                                    `${Math.round(player.buyPressure || 50)}%`
+                                  ) : sortField === 'undervalued' ? (
+                                    player.valueIndex?.toFixed(1) || '-'
+                                  ) : (
+                                    `$${(parseFloat(player.marketCap) / 1000000).toFixed(1)}M`
+                                  )}
+                                </span>
                               </td>
                               <td className="px-2 py-1.5 hidden sm:table-cell">
                                 <Link href={`/player/${player.id}`}>

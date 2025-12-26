@@ -7,9 +7,9 @@
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 
-export type Sport = "NBA" | "NFL";
+export type Sport = "NBA" | "NFL" | "ALL";
 
-export const SPORTS: Sport[] = ["NBA", "NFL"];
+export const SPORTS: Sport[] = ["NBA", "NFL", "ALL"];
 
 interface SportContextValue {
     /** Currently selected sport */
@@ -105,6 +105,13 @@ export function useSportConfig() {
                 "DEF": "Defense",
             } as Record<string, string>,
         },
+        ALL: {
+            name: "All Sports",
+            fullName: "All Sports Market",
+            icon: "🌎",
+            positions: [],
+            positionLabels: {} as Record<string, string>,
+        }
     };
 
     return configs[sport];

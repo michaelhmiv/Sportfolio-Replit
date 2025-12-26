@@ -64,7 +64,7 @@ import {
   type InsertWhopPayment,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, asc, sql, inArray, or, gte, lte, isNotNull, count } from "drizzle-orm";
+import { eq, and, desc, asc, sql, inArray, or, gte, lte, isNotNull, count, gt } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { randomUUID } from "crypto";
 
@@ -104,6 +104,26 @@ function getCurrentCompetitiveSeasons(): string[] {
   ];
 }
 
+export interface PlayerFinancialMetrics {
+  peRatio: number;
+  valueIndex: number; // 100 = Fair. <100 = Undervalued. >100 = Premium.
+  isUndervalued: boolean; // Computed helper (valueIndex < 100)
+  sentiment: {
+    buyPressure: number; // 0-100
+    totalVolume24h: number;
+    trend: 'bullish' | 'bearish' | 'neutral';
+  };
+  heatCheck: {
+    l5Avg: number;
+    seasonAvg: number;
+    status: 'fire' | 'ice' | 'neutral'; // >15% above, >15% below
+  };
+  marketCapRank: {
+    tier: 'blue_chip' | 'mid_cap' | 'moonshot'; // Top 10%, Mid, Bottom 50%
+    percentile: number;
+  };
+}
+
 export interface IStorage {
   // User methods
   getUser(id: string): Promise<User | undefined>;
@@ -120,7 +140,19 @@ export interface IStorage {
 
   // Player methods
   getPlayers(filters?: { search?: string; team?: string; position?: string }): Promise<Player[]>;
-  getPlayersPaginated(filters?: { search?: string; team?: string; position?: string; limit?: number; offset?: number }): Promise<{ players: Player[]; total: number }>;
+  getPlayersPaginated(filters?: {
+    search?: string;
+    team?: string;
+    position?: string;
+    sport?: string;
+    limit?: number;
+    offset?: number;
+    sortBy?: 'price' | 'volume' | 'change' | 'bid' | 'ask' | 'marketCap' | 'sentiment' | 'undervalued';
+    sortOrder?: 'asc' | 'desc';
+    hasBuyOrders?: boolean;
+    hasSellOrders?: boolean;
+    teamsPlayingOnDate?: string[];
+  }): Promise<{ players: Player[]; total: number }>;
   getPlayer(id: string): Promise<Player | undefined>;
   getPlayersByIds(ids: string[]): Promise<Player[]>;
   getPlayersBySport(sport: string): Promise<Player[]>;
@@ -136,6 +168,12 @@ export interface IStorage {
   getUserHoldings(userId: string): Promise<Holding[]>;
   getUserHoldingsWithPlayers(userId: string): Promise<any[]>;
   updateHolding(userId: string, assetType: string, assetId: string, quantity: number, avgCost: string): Promise<void>;
+
+  // Batch sentiment logic
+  getBatchSentiment(playerIds: string[]): Promise<Map<string, { buyPressure: number; totalVolume24h: number }>>;
+
+  // Batch all-time average fantasy points (for Value Index calculation, matches scanner logic)
+  getBatchAllTimeAvgFantasyPoints(playerIds: string[]): Promise<Map<string, number>>;
 
   // Holdings lock methods - prevent double-spending of shares
   reserveShares(userId: string, assetType: string, assetId: string, lockType: string, lockReferenceId: string, quantity: number): Promise<HoldingsLock>;
@@ -312,6 +350,15 @@ export interface IStorage {
   creditWhopPayment(paymentId: string, userId: string): Promise<WhopPayment | undefined>;
   revokeWhopPayment(paymentId: string, revokedQuantity: number, liabilityQuantity?: number): Promise<WhopPayment | undefined>;
   updateWhopPaymentStatus(paymentId: string, whopStatus: string): Promise<WhopPayment | undefined>;
+
+  // Financial Metrics
+  getPlayerFinancialMetrics(playerId: string): Promise<PlayerFinancialMetrics>;
+  getFinancialMarketScanners(): Promise<{
+    undervalued: { player: Player, metrics: PlayerFinancialMetrics }[];
+    sentiment: { player: Player, metrics: PlayerFinancialMetrics }[];
+    momentum: { player: Player, metrics: PlayerFinancialMetrics }[];
+    premium: { player: Player, metrics: PlayerFinancialMetrics }[];
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -653,7 +700,7 @@ export class DatabaseStorage implements IStorage {
     const conditions = [];
 
     // Sport filter - default to NBA if not specified (backward compatibility)
-    if (filters?.sport && filters.sport !== "all") {
+    if (filters?.sport && filters.sport !== "ALL" && filters.sport !== "all") {
       conditions.push(eq(players.sport, filters.sport));
     }
     if (filters?.team && filters.team !== "all") {
@@ -696,7 +743,7 @@ export class DatabaseStorage implements IStorage {
     sport?: string;
     limit?: number;
     offset?: number;
-    sortBy?: 'price' | 'volume' | 'change' | 'bid' | 'ask';
+    sortBy?: 'price' | 'volume' | 'change' | 'bid' | 'ask' | 'marketCap' | 'sentiment' | 'undervalued';
     sortOrder?: 'asc' | 'desc';
     hasBuyOrders?: boolean;
     hasSellOrders?: boolean;
@@ -743,6 +790,21 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
+    // CRITICAL: When sorting by sentiment, filter to only include players with
+    // significant 24h order volume (> 10), matching the scanner card logic.
+    // This prevents low-activity players (who default to 100% or 50%) from
+    // dominating the results.
+    if (sortBy === 'sentiment') {
+      conditions.push(
+        sql`(
+          SELECT COALESCE(SUM(${orders.quantity}), 0)
+          FROM ${orders}
+          WHERE ${orders.playerId} = ${players.id}
+          AND ${orders.createdAt} >= NOW() - INTERVAL '24 hours'
+        ) > 10`
+      );
+    }
+
     // Determine sort column based on sortBy parameter
     // For price/bid/ask sorts, always use NULLS LAST so real market data appears before empty values
     let orderByClause;
@@ -751,6 +813,8 @@ export class DatabaseStorage implements IStorage {
       orderByClause = sortOrder === 'asc'
         ? sql`${players.lastTradePrice} ASC NULLS LAST`
         : sql`${players.lastTradePrice} DESC NULLS LAST`;
+    } else if (sortBy === 'marketCap') {
+      orderByClause = sortOrder === 'asc' ? asc(players.marketCap) : desc(players.marketCap);
     } else if (sortBy === 'volume') {
       orderByClause = sortOrder === 'asc' ? asc(players.volume24h) : desc(players.volume24h);
     } else if (sortBy === 'change') {
@@ -779,6 +843,29 @@ export class DatabaseStorage implements IStorage {
       orderByClause = sortOrder === 'asc'
         ? sql`${bestAskSubquery} ASC NULLS LAST`
         : sql`${bestAskSubquery} DESC NULLS LAST`;
+    } else if (sortBy === 'sentiment') {
+      // Use Postgres-native interval for 24h window to avoid JS Date serialization issues
+      // Also add a minimum volume filter to match scanner quality (total volume > 5)
+      const sentimentSubquery = sql`(
+        SELECT (SUM(CASE WHEN ${orders.side} = 'buy' THEN ${orders.quantity} ELSE 0 END)::numeric / NULLIF(SUM(${orders.quantity}), 0)::numeric) * 100
+        FROM ${orders}
+        WHERE ${orders.playerId} = ${players.id}
+        AND ${orders.createdAt} >= NOW() - INTERVAL '24 hours'
+      )`;
+
+      // Secondary sort by volume to break ties (especially for 50/50 players)
+      orderByClause = sortOrder === 'asc'
+        ? sql`${sentimentSubquery} ASC NULLS LAST, ${players.volume24h} ASC`
+        : sql`${sentimentSubquery} DESC NULLS LAST, ${players.volume24h} DESC`;
+    } else if (sortBy === 'undervalued') {
+      const LEAGUE_AVG_PE = 0.43;
+      // Correlated subquery for avg points
+      const undervaluedSubquery = sql`(
+        ( ( ${players.lastTradePrice}::numeric / NULLIF((SELECT AVG(${playerGameStats.fantasyPoints}::numeric) FROM ${playerGameStats} WHERE ${playerGameStats.playerId} = ${players.id}), 0) ) / ${LEAGUE_AVG_PE} ) * 100
+      )`;
+      orderByClause = sortOrder === 'asc'
+        ? sql`CASE WHEN ${undervaluedSubquery} > 0 THEN ${undervaluedSubquery} ELSE 999 END ASC`
+        : sql`${undervaluedSubquery} DESC NULLS LAST`;
     } else {
       // Default to volume desc
       orderByClause = desc(players.volume24h);
@@ -861,6 +948,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPlayersBySport(sport: string): Promise<Player[]> {
+    if (sport === "ALL") {
+      return await db
+        .select()
+        .from(players);
+    }
     return await db
       .select()
       .from(players)
@@ -1318,6 +1410,72 @@ export class DatabaseStorage implements IStorage {
     }
 
     return orderBookMap;
+  }
+
+  async getBatchSentiment(playerIds: string[]): Promise<Map<string, { buyPressure: number; totalVolume24h: number }>> {
+    if (playerIds.length === 0) {
+      return new Map();
+    }
+
+    const sentimentStats = await db
+      .select({
+        playerId: orders.playerId,
+        buyVol: sql<number>`SUM(CASE WHEN ${orders.side} = 'buy' THEN ${orders.quantity} ELSE 0 END)`,
+        totalVol: sql<number>`SUM(${orders.quantity})`,
+      })
+      .from(orders)
+      .where(and(
+        inArray(orders.playerId, playerIds),
+        gte(orders.createdAt, sql`NOW() - INTERVAL '24 hours'`)
+      ))
+      .groupBy(orders.playerId);
+
+    const sentimentMap = new Map();
+    for (const s of sentimentStats) {
+      const buyPressure = s.totalVol > 0 ? (s.buyVol / s.totalVol) * 100 : 50;
+      sentimentMap.set(s.playerId as string, { buyPressure, totalVolume24h: s.totalVol });
+    }
+
+    // Ensure all requested IDs have an entry (default to neutral 50)
+    for (const id of playerIds) {
+      if (!sentimentMap.has(id)) {
+        sentimentMap.set(id, { buyPressure: 50, totalVolume24h: 0 });
+      }
+    }
+
+    return sentimentMap;
+  }
+
+  // Batch fetch ALL-TIME average fantasy points for players
+  // This matches the calculation used in getFinancialMarketScanners for value index
+  async getBatchAllTimeAvgFantasyPoints(playerIds: string[]): Promise<Map<string, number>> {
+    if (playerIds.length === 0) {
+      return new Map();
+    }
+
+    // Same query logic as getFinancialMarketScanners line 3840
+    const avgStats = await db
+      .select({
+        playerId: playerGameStats.playerId,
+        avgPoints: sql<string>`AVG(CAST(${playerGameStats.fantasyPoints} AS numeric))`,
+      })
+      .from(playerGameStats)
+      .where(inArray(playerGameStats.playerId, playerIds))
+      .groupBy(playerGameStats.playerId);
+
+    const avgMap = new Map<string, number>();
+    for (const stat of avgStats) {
+      avgMap.set(stat.playerId as string, stat.avgPoints ? parseFloat(stat.avgPoints) : 0);
+    }
+
+    // Ensure all requested IDs have an entry (default to 0)
+    for (const id of playerIds) {
+      if (!avgMap.has(id)) {
+        avgMap.set(id, 0);
+      }
+    }
+
+    return avgMap;
   }
 
   async updateOrder(orderId: string, updates: Partial<Order>): Promise<void> {
@@ -2181,16 +2339,20 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getDailyGames(startDate: Date, endDate: Date): Promise<DailyGame[]> {
+  async getDailyGames(startDate: Date, endDate: Date, sport?: string): Promise<DailyGame[]> {
+    const conditions = [
+      sql`${dailyGames.startTime} >= ${startDate}`,
+      sql`${dailyGames.startTime} < ${endDate}`
+    ];
+
+    if (sport && sport !== "ALL") {
+      conditions.push(eq(dailyGames.sport, sport));
+    }
+
     return await db
       .select()
       .from(dailyGames)
-      .where(
-        and(
-          sql`${dailyGames.startTime} >= ${startDate}`,
-          sql`${dailyGames.startTime} < ${endDate}`
-        )
-      )
+      .where(and(...conditions))
       .orderBy(asc(dailyGames.startTime));
   }
 
@@ -2216,16 +2378,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getDailyGamesBySport(sport: string, startDate: Date, endDate: Date): Promise<DailyGame[]> {
+    const conditions = [
+      sql`${dailyGames.startTime} >= ${startDate}`,
+      sql`${dailyGames.startTime} < ${endDate}`
+    ];
+
+    // Only filter by sport if not "ALL"
+    if (sport !== "ALL") {
+      conditions.push(eq(dailyGames.sport, sport));
+    }
+
     return await db
       .select()
       .from(dailyGames)
-      .where(
-        and(
-          eq(dailyGames.sport, sport),
-          sql`${dailyGames.startTime} >= ${startDate}`,
-          sql`${dailyGames.startTime} < ${endDate}`
-        )
-      )
+      .where(and(...conditions))
       .orderBy(asc(dailyGames.startTime));
   }
 
@@ -3587,6 +3753,217 @@ export class DatabaseStorage implements IStorage {
       .where(eq(whopPayments.paymentId, paymentId))
       .returning();
     return updated || undefined;
+  }
+
+  async getPlayerFinancialMetrics(playerId: string): Promise<PlayerFinancialMetrics> {
+    // 1. Fetch Player and Average Stats
+    const player = await this.getPlayer(playerId);
+    if (!player) throw new Error("Player not found");
+
+    const seasonStats = await this.getPlayerSeasonStatsFromLogs(playerId);
+    const avgFantasyPoints = seasonStats ? Number(seasonStats.avgFantasyPointsPerGame) : 0;
+    const currentPrice = player.lastTradePrice ? Number(player.lastTradePrice) : 0;
+
+    // --- P/E INDEX CALCULATION ---
+    // 1. Calculate Player P/E
+    // Avoid division by zero: if avg points is 0, P/E is effectively infinite (or 0 for safety)
+    const peRatio = avgFantasyPoints > 0 ? currentPrice / avgFantasyPoints : 0;
+
+    // 2. League Average P/E
+    // HARDCODED Snapshot from "analyze-market-multipliers.ts" (Median)
+    // TODO: Calculate this dynamically by caching a daily league-wide aggregation
+    const LEAGUE_AVG_PE = 0.43;
+
+    // 3. Value Index (100 = Fair)
+    // If P/E is 0 (no stats), Index is 0 (N/A)
+    const valueIndex = LEAGUE_AVG_PE > 0 ? (peRatio / LEAGUE_AVG_PE) * 100 : 0;
+
+    const isUndervalued = valueIndex > 0 && valueIndex < 100;
+
+    // --- SENTIMENT (BUY PRESSURE) ---
+    const now = new Date();
+    const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+    // Aggregation of buy vs sell orders in last 24h
+    // Note: We use the 'orders' table. Ideally we check 'trades' for actual volume, 
+    // but 'orders' shows intent/sentiment even if not filled.
+    const recentOrders = await db
+      .select({
+        side: orders.side,
+        quantity: orders.quantity,
+      })
+      .from(orders)
+      .where(and(
+        eq(orders.playerId, playerId),
+        gte(orders.createdAt, twentyFourHoursAgo)
+      ));
+
+    let buyVol = 0;
+    let sellVol = 0;
+
+    for (const o of recentOrders) {
+      if (o.side === 'buy') buyVol += o.quantity;
+      if (o.side === 'sell') sellVol += o.quantity;
+    }
+
+    const totalVol = buyVol + sellVol;
+    const buyPressure = totalVol > 0 ? (buyVol / totalVol) * 100 : 50; // Default to neutral 50
+
+    let sentimentTrend: 'bullish' | 'bearish' | 'neutral' = 'neutral';
+    if (buyPressure >= 60) sentimentTrend = 'bullish';
+    else if (buyPressure <= 40) sentimentTrend = 'bearish';
+
+    // --- HEAT CHECK ---
+    const recentGames = await this.getPlayerRecentGamesFromLogs(playerId, 5);
+    let l5Avg = 0;
+    if (recentGames.length > 0) {
+      const sum = recentGames.reduce((acc, g) => acc + Number(g.fantasyPoints), 0);
+      l5Avg = sum / recentGames.length;
+    }
+
+    let heatStatus: 'fire' | 'ice' | 'neutral' = 'neutral';
+    if (avgFantasyPoints > 0) {
+      const diff = (l5Avg - avgFantasyPoints) / avgFantasyPoints;
+      if (diff >= 0.15) heatStatus = 'fire'; // 15% better than season avg
+      else if (diff <= -0.15) heatStatus = 'ice'; // 15% worse
+    }
+
+    // --- MARKET CAP RANK ---
+    // Simple heuristic for now until we have global rank query
+    // Top tier > $100k cap (assuming lots of shares * price)
+    // This is a placeholder logic that should eventually be a percentile query
+    const totalShares = await this.getTotalSharesForPlayer(playerId);
+    const mktCap = totalShares * currentPrice;
+
+    let tier: 'blue_chip' | 'mid_cap' | 'moonshot' = 'mid_cap';
+    if (mktCap > 50000) tier = 'blue_chip';
+    else if (mktCap < 5000) tier = 'moonshot';
+
+    // Mock percentile for now
+    const percentile = 50;
+
+    return {
+      peRatio,
+      valueIndex,
+      isUndervalued,
+      sentiment: {
+        buyPressure,
+        totalVolume24h: totalVol,
+        trend: sentimentTrend
+      },
+      heatCheck: {
+        l5Avg,
+        seasonAvg: avgFantasyPoints,
+        status: heatStatus
+      },
+      marketCapRank: {
+        tier,
+        percentile
+      }
+    };
+  }
+
+  // --- Financial Market Scanners (P/E, Value Index) ---
+  // Calculates metrics for active players and returns sorted lists
+  async getFinancialMarketScanners(sport: string = "ALL") {
+    // 1. Bulk Fetch Player Stats for P/E Calculation
+    // If sport is specific, filter by it. If "ALL", fetch all.
+    const whereClause = sport === "ALL"
+      ? and(isNotNull(players.lastTradePrice), gt(players.lastTradePrice, "0"))
+      : and(
+        isNotNull(players.lastTradePrice),
+        gt(players.lastTradePrice, "0"),
+        eq(players.sport, sport)
+      );
+
+    const activePlayers = await db
+      .select({
+        id: players.id,
+        firstName: players.firstName,
+        lastName: players.lastName,
+        team: players.team,
+        position: players.position,
+        sport: players.sport,
+        lastTradePrice: players.lastTradePrice,
+        volume24h: players.volume24h,
+        priceChange24h: players.priceChange24h,
+        avgPoints: sql<string>`AVG(CAST(${playerGameStats.fantasyPoints} AS numeric))`,
+      })
+      .from(players)
+      .leftJoin(playerGameStats, eq(players.id, playerGameStats.playerId))
+      .where(whereClause)
+      .groupBy(players.id);
+
+    // 2. Bulk Fetch Sentiment (using Postgres-native interval for consistency with getPlayersPaginated)
+    const sentimentStats = await db
+      .select({
+        playerId: orders.playerId,
+        buyVol: sql<number>`SUM(CASE WHEN ${orders.side} = 'buy' THEN ${orders.quantity} ELSE 0 END)`,
+        totalVol: sql<number>`SUM(${orders.quantity})`,
+      })
+      .from(orders)
+      .where(gte(orders.createdAt, sql`NOW() - INTERVAL '24 hours'`))
+      .groupBy(orders.playerId);
+
+    const sentimentMap = new Map(sentimentStats.map(s => [s.playerId, s]));
+
+    // 3. Process Metrics
+    const LEAGUE_AVG_PE = 0.43;
+    const processed = activePlayers.map(p => {
+      const price = parseFloat(p.lastTradePrice as string);
+      const avgFP = p.avgPoints ? parseFloat(p.avgPoints) : 0;
+      const peRatio = avgFP > 0 ? price / avgFP : 0;
+      const valueIndex = LEAGUE_AVG_PE > 0 ? (peRatio / LEAGUE_AVG_PE) * 100 : 0;
+
+      const sent = sentimentMap.get(p.id);
+      const buyPressure = sent && sent.totalVol > 0 ? (sent.buyVol / sent.totalVol) * 100 : 50;
+
+      return {
+        player: {
+          ...p,
+          status: "active",
+          totalSharesOutstanding: 0,
+          totalHolders: 0,
+          marketCap: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        } as unknown as Player,
+        metrics: {
+          peRatio,
+          valueIndex,
+          isUndervalued: valueIndex > 0 && valueIndex < 100,
+          sentiment: {
+            buyPressure,
+            totalVolume24h: sent?.totalVol || 0,
+            trend: buyPressure >= 60 ? 'bullish' : buyPressure <= 40 ? 'bearish' : 'neutral',
+          } as any,
+          heatCheck: { status: 'neutral' } as any,
+          marketCapRank: { tier: 'mid_cap' } as any
+        }
+      };
+    });
+
+    // 4. Sort and Slice
+    const undervalued = processed
+      .filter(x => x.metrics.valueIndex > 0 && x.metrics.valueIndex < 100)
+      .sort((a, b) => a.metrics.valueIndex - b.metrics.valueIndex)
+      .slice(0, 10);
+
+    const premium = processed
+      .filter(x => x.metrics.valueIndex > 100)
+      .sort((a, b) => b.metrics.valueIndex - a.metrics.valueIndex)
+      .slice(0, 10);
+
+    const sentiment = processed
+      .filter(x => x.metrics.sentiment.totalVolume24h > 10)
+      .sort((a, b) => b.metrics.sentiment.buyPressure - a.metrics.sentiment.buyPressure)
+      .slice(0, 10);
+
+    const momentum = processed
+      .sort((a, b) => parseFloat(b.player.priceChange24h) - parseFloat(a.player.priceChange24h))
+      .slice(0, 10);
+
+    return { undervalued, premium, sentiment, momentum };
   }
 }
 

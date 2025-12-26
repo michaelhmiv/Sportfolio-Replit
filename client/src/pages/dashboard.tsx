@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { invalidatePortfolioQueries } from "@/lib/cache-invalidation";
 import { calculateVestingShares } from "@shared/vesting-utils";
-import { MarketActivityWidget } from "@/components/market-activity-widget";
+import { DashboardScanners } from "@/components/marketplace-scanners";
 import { useVesting } from "@/lib/vesting-context";
 import { PlayerName } from "@/components/player-name";
 import { WhopAd } from "@/components/whop-ad";
@@ -650,9 +650,9 @@ export default function Dashboard() {
 
           {/* Widgets Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
-            {/* Market Activity */}
+            {/* Market Scanners Carousel */}
             <ScrollReveal delay={0.15}>
-              <MarketActivityWidget />
+              <DashboardScanners />
             </ScrollReveal>
 
             {/* Contest Summary */}

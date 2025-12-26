@@ -30,6 +30,10 @@ const SPORT_DISPLAY: Record<Sport, SportConfig> = {
         name: "NFL",
         icon: "🏈",
     },
+    ALL: {
+        name: "All Sports",
+        icon: "🌎",
+    },
 };
 
 interface SportSelectorProps {

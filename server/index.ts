@@ -1,3 +1,4 @@
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
@@ -106,11 +107,10 @@ app.use((req, res, next) => {
   server.listen({
     port,
     host: "0.0.0.0",
-    reusePort: true,
   }, async () => {
     startupLog('LISTEN', `Server listening on port ${port}`);
     log(`serving on port ${port}`);
-    
+
     // Startup migration: Ensure all bot profiles have unlimited daily limits
     try {
       await db
@@ -123,7 +123,7 @@ app.use((req, res, next) => {
     } catch (error: any) {
       console.error("Failed to update bot profiles:", error.message);
     }
-    
+
     // Always initialize contest jobs (database-only, no API required)
     try {
       await jobScheduler.initializeContestJobs();
@@ -132,7 +132,7 @@ app.use((req, res, next) => {
     } catch (error: any) {
       console.error("Failed to initialize contest jobs:", error.message);
     }
-    
+
     // Initialize API-dependent jobs only if API key is available
     if (process.env.MYSPORTSFEEDS_API_KEY) {
       try {
@@ -145,7 +145,7 @@ app.use((req, res, next) => {
       log("Skipping API-dependent jobs - MYSPORTSFEEDS_API_KEY not set");
       log("Contest jobs will still process data from the database when available");
     }
-    
+
     // Mark server as fully ready
     serverReady = true;
     startupLog('READY', 'Server fully initialized and ready to serve requests');

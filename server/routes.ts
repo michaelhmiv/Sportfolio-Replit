@@ -22,6 +22,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Setup authentication middleware
   await setupAuth(app);
 
+  app.get("/api/market/scanners", async (req, res) => {
+    try {
+      const sport = (req.query.sport as string) || "ALL"; // Default to ALL if not specified
+      const scanners = await storage.getFinancialMarketScanners(sport);
+      res.json(scanners);
+    } catch (error) {
+      console.error("Error fetching market scanners:", error);
+      res.status(500).json({ error: "Failed to fetch market scanners" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Initialize WebSocket server
@@ -1106,6 +1117,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+
+
   app.get("/api/players", async (req, res) => {
     try {
       const { search, team, position, limit, offset, sortBy, sortOrder, hasBuyOrders, hasSellOrders, teamsPlayingOnDate, sport } = req.query;
@@ -1119,9 +1132,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const safeOffset = isNaN(parsedOffset) ? 0 : Math.max(0, parsedOffset);
 
       // Parse sorting and filter params
-      const validSortBy = ['price', 'volume', 'change', 'bid', 'ask'];
+      const validSortBy = ['price', 'volume', 'change', 'bid', 'ask', 'marketCap', 'sentiment', 'undervalued'];
       const safeSortBy = sortBy && validSortBy.includes(sortBy as string)
-        ? sortBy as 'price' | 'volume' | 'change' | 'bid' | 'ask'
+        ? sortBy as 'price' | 'volume' | 'change' | 'bid' | 'ask' | 'marketCap' | 'sentiment' | 'undervalued'
         : 'volume';
       const safeSortOrder = sortOrder === 'asc' ? 'asc' : 'desc';
       const safeHasBuyOrders = hasBuyOrders === 'true';
@@ -1176,9 +1189,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // - 50 players × 2 order book queries = 100 queries → 1 query
       // - 50 players × 1 season stats query = 50 queries → 1 query
       const playerIds = playersRaw.map(p => p.id);
-      const [orderBooksMap, seasonStatsMap] = await Promise.all([
+      const [orderBooksMap, seasonStatsMap, sentimentMap, avgFantasyPointsMap] = await Promise.all([
         storage.getBatchOrderBooks(playerIds),
         storage.getBatchPlayerSeasonStatsFromLogs(playerIds),
+        storage.getBatchSentiment(playerIds),
+        storage.getBatchAllTimeAvgFantasyPoints(playerIds), // Same calculation as scanner cards
       ]);
 
       // Enrich with market values, order book data, and fantasy points average (only for paginated results)
@@ -1201,6 +1216,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           avgFantasyPointsPerGame: "0.0",
         };
 
+        // Look up pre-fetched sentiment from map
+        const sentimentData = sentimentMap.get(player.id) || {
+          buyPressure: 50,
+          totalVolume24h: 0,
+        };
+
+        // Calculate Value Index using ALL-TIME average fantasy points (same as scanner cards)
+        // This ensures the numbers match what users see in the carousel
+        const LEAGUE_AVG_PE = 0.43;
+        const price = parseFloat(player.lastTradePrice || "0");
+
+        // Use all-time avg from a batch query (to be consistent with getFinancialMarketScanners)
+        // For now, we'll calculate it inline using the same logic as scanners
+        const avgFP = avgFantasyPointsMap.get(player.id) || 0;
+        const peRatio = avgFP > 0 ? price / avgFP : 0;
+        const valueIndex = LEAGUE_AVG_PE > 0 ? (peRatio / LEAGUE_AVG_PE) * 100 : 0;
+
         return {
           ...enriched,
           bestBid: orderBookData.bestBid,
@@ -1208,6 +1240,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           bidSize: orderBookData.bidSize,
           askSize: orderBookData.askSize,
           avgFantasyPointsPerGame: seasonStats.avgFantasyPointsPerGame,
+          buyPressure: sentimentData.buyPressure,
+          valueIndex: valueIndex,
         };
       });
 
@@ -1556,6 +1590,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("[API] Error fetching shares info:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get player financial metrics (Gamified Stats)
+  app.get("/api/player/:id/financials", async (req, res) => {
+    try {
+      const metrics = await storage.getPlayerFinancialMetrics(req.params.id);
+      res.json(metrics);
+    } catch (error: any) {
+      console.error("[API] Error fetching financial metrics:", error.message);
       res.status(500).json({ error: error.message });
     }
   });
