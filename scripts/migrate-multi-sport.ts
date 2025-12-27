@@ -176,33 +176,33 @@ async function runMigration() {
         `);
         console.log("   ✅ Updated player_game_stats table");
 
-        console.log("   Updating mining...");
+        console.log("   Updating vesting...");
         await client.query(`
-          UPDATE mining 
+          UPDATE vesting 
           SET player_id = 'nba_' || player_id 
           WHERE player_id IS NOT NULL 
             AND player_id NOT LIKE 'nba_%' 
             AND player_id NOT LIKE 'nfl_%'
         `);
-        console.log("   ✅ Updated mining table");
+        console.log("   ✅ Updated vesting table");
 
-        console.log("   Updating mining_splits...");
+        console.log("   Updating vesting_splits...");
         await client.query(`
-          UPDATE mining_splits 
+          UPDATE vesting_splits 
           SET player_id = 'nba_' || player_id 
           WHERE player_id NOT LIKE 'nba_%' AND player_id NOT LIKE 'nfl_%'
         `);
-        console.log("   ✅ Updated mining_splits table");
+        console.log("   ✅ Updated vesting_splits table");
 
-        console.log("   Updating mining_claims...");
+        console.log("   Updating vesting_claims...");
         await client.query(`
-          UPDATE mining_claims 
+          UPDATE vesting_claims 
           SET player_id = 'nba_' || player_id 
           WHERE player_id IS NOT NULL 
             AND player_id NOT LIKE 'nba_%' 
             AND player_id NOT LIKE 'nfl_%'
         `);
-        console.log("   ✅ Updated mining_claims table");
+        console.log("   ✅ Updated vesting_claims table");
 
         console.log("   Updating contest_lineups...");
         await client.query(`

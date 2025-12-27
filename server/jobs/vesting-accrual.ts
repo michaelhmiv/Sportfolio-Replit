@@ -14,7 +14,7 @@ export async function accrueVestingForAllUsers(): Promise<JobResult> {
   let errorCount = 0;
 
   try {
-    const userIds = await storage.getAllActiveMiningUserIds();
+    const userIds = await storage.getAllActiveVestingUserIds();
     console.log(`[vesting_accrual] Processing ${userIds.length} active users`);
     const now = new Date();
 
@@ -23,27 +23,27 @@ export async function accrueVestingForAllUsers(): Promise<JobResult> {
         const user = await storage.getUser(userId);
         if (!user) continue;
 
-        const miningData = await storage.getMining(userId);
-        if (!miningData || !miningData.lastAccruedAt) continue;
+        const vestingData = await storage.getVesting(userId);
+        if (!vestingData || !vestingData.lastAccruedAt) continue;
 
         const isPremiumUser = user.premiumExpiresAt && user.premiumExpiresAt > new Date();
         const sharesPerHour = isPremiumUser ? 200 : 100;
         const capLimit = isPremiumUser ? 4800 : 2400;
 
         // Skip if already at cap
-        if (miningData.sharesAccumulated >= capLimit) continue;
+        if (vestingData.sharesAccumulated >= capLimit) continue;
 
         const update = calculateAccrualUpdate({
-          sharesAccumulated: miningData.sharesAccumulated || 0,
-          residualMs: miningData.residualMs || 0,
-          lastAccruedAt: miningData.lastAccruedAt,
+          sharesAccumulated: vestingData.sharesAccumulated || 0,
+          residualMs: vestingData.residualMs || 0,
+          lastAccruedAt: vestingData.lastAccruedAt,
           sharesPerHour,
           capLimit,
         }, now);
 
-        const sharesEarned = update.sharesAccumulated - miningData.sharesAccumulated;
+        const sharesEarned = update.sharesAccumulated - vestingData.sharesAccumulated;
         if (sharesEarned > 0) {
-          await storage.updateMining(userId, {
+          await storage.updateVesting(userId, {
             sharesAccumulated: update.sharesAccumulated,
             residualMs: update.residualMs,
             lastAccruedAt: update.lastAccruedAt,

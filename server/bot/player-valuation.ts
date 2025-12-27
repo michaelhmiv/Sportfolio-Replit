@@ -382,11 +382,11 @@ export async function getMarketMakingCandidates(
 }
 
 /**
- * Get players suitable for mining (good value, might not have active markets)
+ * Get players suitable for vesting (good value, might not have active markets)
  */
-export async function getMiningCandidates(limit: number = 10): Promise<PlayerValuation[]> {
+export async function getVestingCandidates(limit: number = 10): Promise<PlayerValuation[]> {
   return getPlayersForTrading({
-    tier: [1, 2, 3, 4], // Include more tiers for mining
+    tier: [1, 2, 3, 4], // Include more tiers for vesting
     minGamesPlayed: 1,
     limit,
   });

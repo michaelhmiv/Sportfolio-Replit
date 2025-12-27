@@ -35,14 +35,11 @@ export function AnimatedPrice({
     }
 
     if (value !== prevValueRef.current) {
-      if (value > prevValueRef.current) {
-        setFlash("up");
-      } else if (value < prevValueRef.current) {
-        setFlash("down");
-      }
+      const newTrend = value > prevValueRef.current ? "up" : "down";
+      setFlash(newTrend);
       prevValueRef.current = value;
 
-      const timer = setTimeout(() => setFlash(null), 600);
+      const timer = setTimeout(() => setFlash(null), 1500);
       return () => clearTimeout(timer);
     }
   }, [value]);
@@ -147,7 +144,7 @@ export function PriceChangeIndicator({
   size = "md",
 }: PriceChangeIndicatorProps) {
   const isPositive = change >= 0;
-  
+
   const sizeClasses = {
     sm: "text-xs",
     md: "text-sm",
@@ -181,37 +178,70 @@ export function PriceChangeIndicator({
   );
 }
 
+import { Link } from "wouter";
+
 interface LivePriceTickerProps {
-  prices: Array<{ symbol: string; price: number; change: number }>;
+  prices: Array<{ symbol: string; price: number; change: number; link?: string }>;
   className?: string;
 }
 
 export function LivePriceTicker({ prices, className }: LivePriceTickerProps) {
+  // If we have a very short list, we duplicate it sufficiently to fill a screen and create a loop illusion
+  // But usage of 'queue' implies we prefer a stream.
+  // The 'marquee' effect relies on translation.
+  // With a constantly growing list (queue), we don't need to duplicate to array length * 2 if array is long enough.
+  // However, simpler to just treat it as a stream.
+
   return (
     <div className={cn("overflow-hidden", className)}>
       <motion.div
-        className="flex gap-6 whitespace-nowrap"
-        animate={{ x: [0, -50 * prices.length] }}
+        className="flex gap-8 whitespace-nowrap pl-full"
+        animate={{ x: "-100%" }}
         transition={{
-          duration: prices.length * 3,
+          duration: Math.max(20, prices.length * 4), // Dynamic duration based on content length
           repeat: Infinity,
           ease: "linear",
         }}
+        // Start from right side (not exactly possible with just x: -100 without initial offset)
+        // With x: -100%, we move the entire block left. 
+        // We need the content to start off-screen right?
+        // Let's us CSS Marquee for better robustness with dynamic width
+        style={{
+          width: "max-content",
+          marginLeft: "100%" // Start pushed to the right
+        }}
       >
-        {[...prices, ...prices].map((item, i) => (
-          <span
-            key={i}
-            className={cn(
-              "inline-flex items-center gap-2 text-sm",
-              item.change >= 0 ? "text-emerald-500" : "text-red-500"
-            )}
-          >
-            <span className="font-medium text-foreground">{item.symbol}</span>
-            <span>${item.price.toFixed(2)}</span>
-            <span>{item.change >= 0 ? "↑" : "↓"}{Math.abs(item.change).toFixed(1)}%</span>
-          </span>
+        {prices.map((item, i) => (
+          <TickerItem key={`${i}-${item.symbol}`} item={item} />
         ))}
       </motion.div>
     </div>
   );
+}
+
+function TickerItem({ item }: { item: { symbol: string; price: number; change: number; link?: string } }) {
+  const content = (
+    <>
+      <span className="font-medium text-foreground hover:underline">{item.symbol}</span>
+      <span>${item.price.toFixed(2)}</span>
+      {item.change !== 0 && (
+        <span>{item.change >= 0 ? "↑" : "↓"}{Math.abs(item.change).toFixed(1)}%</span>
+      )}
+    </>
+  );
+
+  const containerClass = cn(
+    "inline-flex items-center gap-2 text-sm",
+    item.change >= 0 ? "text-emerald-500" : "text-red-500"
+  );
+
+  if (item.link) {
+    return (
+      <Link href={item.link} className={containerClass}>
+        {content}
+      </Link>
+    );
+  }
+
+  return <span className={containerClass}>{content}</span>;
 }

@@ -174,7 +174,7 @@ export default function UserProfile() {
                 <AvatarImage src={user.profileImageUrl} alt={displayName} />
                 <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
               </Avatar>
-              
+
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <h1 className="text-2xl sm:text-3xl font-bold" data-testid="text-username">@{displayName}</h1>
@@ -223,10 +223,10 @@ export default function UserProfile() {
                           </DialogFooter>
                         </DialogContent>
                       </Dialog>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="gap-2" 
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
                         onClick={toggleTheme}
                         data-testid="button-theme-toggle"
                       >
@@ -281,7 +281,7 @@ export default function UserProfile() {
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <Award className="w-4 h-4 text-primary" />
-                  <span className="text-xs sm:text-sm text-muted-foreground">Shares Mined</span>
+                  <span className="text-xs sm:text-sm text-muted-foreground">Shares Vested</span>
                 </div>
                 <div className="text-lg sm:text-2xl font-bold" data-testid="text-shares-mined">
                   {stats.totalSharesMined.toLocaleString()}
@@ -353,9 +353,9 @@ export default function UserProfile() {
                         <div className="flex items-center gap-3">
                           <div>
                             <div className="font-semibold">
-                              <PlayerName 
-                                playerId={player.id} 
-                                firstName={player.firstName} 
+                              <PlayerName
+                                playerId={player.id}
+                                firstName={player.firstName}
                                 lastName={player.lastName}
                               />
                             </div>
@@ -364,7 +364,7 @@ export default function UserProfile() {
                             </div>
                           </div>
                         </div>
-                        
+
                         <div className="text-right">
                           <div className="font-semibold" data-testid={`text-quantity-${holding.assetId}`}>
                             {holding.quantity} shares

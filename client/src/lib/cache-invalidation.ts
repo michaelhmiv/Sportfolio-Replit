@@ -30,17 +30,17 @@ function throttledExecute(groupKey: string, callback: () => void): void {
   const state = getThrottleState(groupKey);
   const now = Date.now();
   const timeSinceLastExec = now - state.lastExecuted;
-  
+
   state.pendingCallback = callback;
-  
+
   if (timeSinceLastExec >= THROTTLE_MS) {
     state.lastExecuted = now;
-    
+
     if (state.pendingTimer) {
       clearTimeout(state.pendingTimer);
       state.pendingTimer = null;
     }
-    
+
     callback();
     state.pendingCallback = null;
   } else if (!state.pendingTimer) {
@@ -48,7 +48,7 @@ function throttledExecute(groupKey: string, callback: () => void): void {
     state.pendingTimer = setTimeout(() => {
       state.lastExecuted = Date.now();
       state.pendingTimer = null;
-      
+
       if (state.pendingCallback) {
         state.pendingCallback();
         state.pendingCallback = null;
@@ -88,7 +88,7 @@ export function debouncedInvalidatePlayer(playerId?: string): void {
   throttledExecute("player", () => {
     queryClient.invalidateQueries({ queryKey: ["/api/players"] });
   });
-  
+
   if (playerId) {
     queryClient.invalidateQueries({ queryKey: ["/api/player", playerId] });
     queryClient.invalidateQueries({ queryKey: ["/api/player", playerId, "orders"] });
@@ -112,7 +112,7 @@ export function debouncedInvalidateContests(contestId?: string): void {
   throttledExecute("contests", () => {
     queryClient.invalidateQueries({ queryKey: ["/api/contests"] });
   });
-  
+
   if (contestId) {
     queryClient.invalidateQueries({ queryKey: ["/api/contest", contestId] });
     queryClient.invalidateQueries({ queryKey: ["/api/contest", contestId, "leaderboard"] });
@@ -154,6 +154,7 @@ export async function invalidateContestQueries(): Promise<void> {
   await Promise.all([
     queryClient.invalidateQueries({ queryKey: ["/api/contests"] }),
     queryClient.invalidateQueries({ queryKey: ["/api/contest"] }),
+    queryClient.invalidateQueries({ queryKey: ["/api/contests/entries"] }),
   ]);
 }
 

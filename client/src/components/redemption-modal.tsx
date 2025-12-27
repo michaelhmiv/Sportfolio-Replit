@@ -15,6 +15,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { Search, X, Trash2, Plus, Save, ChevronDown, ChevronUp, ArrowUpDown } from "lucide-react";
 import type { Player, VestingPreset } from "@shared/schema";
+import { Confetti } from "@/components/ui/confetti";
 
 type SortField = 'name' | 'price' | 'priceChange' | 'volume' | 'marketCap' | 'fantasyPoints';
 type SortDirection = 'asc' | 'desc';
@@ -58,6 +59,7 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
   const [newPresetName, setNewPresetName] = useState("");
   const [showPresetSave, setShowPresetSave] = useState(false);
   const [activeTab, setActiveTab] = useState("directory");
+  const [showConfetti, setShowConfetti] = useState(false);
 
   const [dirSearchQuery, setDirSearchQuery] = useState("");
   const [teamFilter, setTeamFilter] = useState<string>("all");
@@ -250,9 +252,16 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
       });
       queryClient.invalidateQueries({ queryKey: ['/api/dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['/api/portfolio'] });
-      // Invalidate auth/user to update totalSharesMined and clear first-time indicator
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/user?sync=true'] });
-      onOpenChange(false);
+      // Invalidate auth/user to update totalSharesVested and clear first-time indicator
+      // Invalidate auth/user to update totalSharesVested and clear first-time indicator
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+
+      // Trigger confetti and close after delay
+      setShowConfetti(true);
+      setTimeout(() => {
+        onOpenChange(false);
+        setShowConfetti(false);
+      }, 2500);
     },
     onError: (error: Error) => {
       toast({
@@ -408,419 +417,422 @@ export function RedemptionModal({ open, onOpenChange, preselectedPlayerIds = [] 
 
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="!inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 sm:!inset-auto sm:!left-[50%] sm:!top-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] max-w-full sm:max-w-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-hidden rounded-none sm:rounded-md p-0 sm:p-6 !flex !flex-col !gap-0">
-        <DialogHeader className="shrink-0 p-4 pb-2 sm:p-0 sm:pb-4">
-          <DialogTitle>Vest Shares</DialogTitle>
-          <DialogDescription>
-            {isDashboardLoading && projectedShares === 0 ? (
-              "Loading available shares..."
-            ) : (
-              `Allocate your ${projectedShares.toLocaleString()} pooled shares to players`
-            )}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Confetti active={showConfetti} type="coins" duration={2500} />
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="!inset-0 !translate-x-0 !translate-y-0 !top-0 !left-0 sm:!inset-auto sm:!left-[50%] sm:!top-[50%] sm:!translate-x-[-50%] sm:!translate-y-[-50%] max-w-full sm:max-w-2xl h-[100dvh] sm:h-auto sm:max-h-[90vh] overflow-hidden rounded-none sm:rounded-md p-0 sm:p-6 !flex !flex-col !gap-0">
+          <DialogHeader className="shrink-0 p-4 pb-2 sm:p-0 sm:pb-4">
+            <DialogTitle>Vest Shares</DialogTitle>
+            <DialogDescription>
+              {isDashboardLoading && projectedShares === 0 ? (
+                "Loading available shares..."
+              ) : (
+                `Allocate your ${projectedShares.toLocaleString()} pooled shares to players`
+              )}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="flex-1 min-h-0 overflow-hidden px-4 sm:px-0">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
-            <TabsList className="grid w-full grid-cols-3 shrink-0">
-              <TabsTrigger value="directory" data-testid="tab-directory">Directory</TabsTrigger>
-              <TabsTrigger value="allocate" data-testid="tab-allocate">Allocate</TabsTrigger>
-              <TabsTrigger value="presets" data-testid="tab-presets">Presets</TabsTrigger>
-            </TabsList>
+          <div className="flex-1 min-h-0 overflow-hidden px-4 sm:px-0">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex flex-col h-full">
+              <TabsList className="grid w-full grid-cols-3 shrink-0">
+                <TabsTrigger value="directory" data-testid="tab-directory">Directory</TabsTrigger>
+                <TabsTrigger value="allocate" data-testid="tab-allocate">Allocate</TabsTrigger>
+                <TabsTrigger value="presets" data-testid="tab-presets">Presets</TabsTrigger>
+              </TabsList>
 
-            <TabsContent value="directory" className="flex-1 min-h-0 mt-2 gap-2 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
-              <div className="flex flex-col sm:flex-row gap-2 shrink-0">
-                <div className="relative flex-1">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search players..."
-                    value={dirSearchQuery}
-                    onChange={(e) => setDirSearchQuery(e.target.value)}
-                    className="pl-9 h-9"
-                    data-testid="input-dir-search"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <Select value={sportFilter} onValueChange={setSportFilter}>
-                    <SelectTrigger className="w-[90px] h-9" data-testid="select-sport-filter">
-                      <SelectValue placeholder="Sport" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All</SelectItem>
-                      <SelectItem value="NBA">NBA</SelectItem>
-                      <SelectItem value="NFL">NFL</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select value={teamFilter} onValueChange={setTeamFilter}>
-                    <SelectTrigger className="w-[90px] h-9" data-testid="select-team-filter">
-                      <SelectValue placeholder="Team" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Teams</SelectItem>
-                      {teamsData?.map(team => (
-                        <SelectItem key={team} value={team}>{team}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Select value={sortField} onValueChange={(v) => setSortField(v as SortField)}>
-                    <SelectTrigger className="w-[100px] h-9" data-testid="select-sort-field">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="fantasyPoints">FPTS</SelectItem>
-                      <SelectItem value="volume">Volume</SelectItem>
-                      <SelectItem value="price">Price</SelectItem>
-                      <SelectItem value="priceChange">Change</SelectItem>
-                      <SelectItem value="marketCap">Mkt Cap</SelectItem>
-                      <SelectItem value="name">Name</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    onClick={toggleSortDirection}
-                    className="h-9 w-9 shrink-0"
-                    data-testid="button-sort-direction"
-                  >
-                    <ArrowUpDown className={cn("h-4 w-4", sortDirection === "asc" && "rotate-180")} />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="text-xs text-muted-foreground px-1 shrink-0">
-                {playersLoading ? "Loading..." : (
-                  <>
-                    Showing {Math.min(visibleLimit, directoryPlayers.length)} of {playersData?.total || directoryPlayers.length} players
-                    {distributions.length > 0 && (
-                      <span className="ml-2 text-primary font-medium">
-                        ({distributions.length} selected)
-                      </span>
-                    )}
-                  </>
-                )}
-              </div>
-
-              <div className="border rounded-md overflow-hidden flex-1 min-h-0">
-                <div className="h-full overflow-y-auto">
-                  <div className="divide-y">
-                    {playersLoading ? (
-                      <div className="py-8 text-center text-sm text-muted-foreground">
-                        Loading players...
-                      </div>
-                    ) : directoryPlayers.length === 0 ? (
-                      <div className="py-8 text-center text-sm text-muted-foreground">
-                        No players found
-                      </div>
-                    ) : (
-                      <>
-                        {directoryPlayers.slice(0, visibleLimit).map(player => {
-                          const price = parseFloat(player.currentPrice || '0');
-                          const change = parseFloat(player.priceChange24h || '0');
-                          const fpts = parseFloat(player.avgFantasyPointsPerGame || '0');
-                          const volume = parseFloat(String(player.volume24h || '0'));
-                          const marketCap = parseFloat(String(player.marketCap || '0'));
-
-                          const getSortedStatValue = () => {
-                            switch (sortField) {
-                              case 'fantasyPoints':
-                                return fpts.toFixed(1);
-                              case 'marketCap':
-                                return marketCap >= 1000 ? `${(marketCap / 1000).toFixed(1)}K` : marketCap.toFixed(0);
-                              case 'volume':
-                                return volume >= 1000 ? `${(volume / 1000).toFixed(1)}K` : volume.toFixed(0);
-                              case 'priceChange':
-                                return `${change > 0 ? '+' : ''}${change.toFixed(1)}%`;
-                              case 'price':
-                                return `$${price.toFixed(2)}`;
-                              default:
-                                return fpts.toFixed(1);
-                            }
-                          };
-
-                          const getSortedStatColor = () => {
-                            if (sortField === 'priceChange') {
-                              return change > 0 ? "text-green-500" : change < 0 ? "text-red-500" : "text-muted-foreground";
-                            }
-                            return "text-green-500";
-                          };
-
-                          return (
-                            <div
-                              key={player.id}
-                              className="flex items-center gap-1 sm:gap-2 px-2 py-1.5 hover-elevate text-sm"
-                              data-testid={`dir-player-${player.id}`}
-                            >
-                              <div className="flex-1 min-w-0">
-                                <span className="font-medium truncate block">
-                                  {player.firstName} {player.lastName}
-                                </span>
-                              </div>
-                              <span className="text-xs text-muted-foreground w-8 sm:w-10 shrink-0 hidden sm:inline">
-                                {player.team}
-                              </span>
-                              <span className="text-xs font-mono w-12 sm:w-14 text-right shrink-0">
-                                ${price.toFixed(2)}
-                              </span>
-                              <span className={cn(
-                                "text-xs font-mono w-10 sm:w-12 text-right shrink-0 hidden sm:inline",
-                                change > 0 ? "text-green-500" : change < 0 ? "text-red-500" : "text-muted-foreground"
-                              )}>
-                                {change > 0 ? '+' : ''}{change.toFixed(1)}%
-                              </span>
-                              <span
-                                className={cn(
-                                  "text-xs font-mono w-10 sm:w-12 text-right shrink-0",
-                                  getSortedStatColor()
-                                )}
-                                title={sortField === 'fantasyPoints' ? 'Fantasy Points' : sortField === 'marketCap' ? 'Market Cap' : sortField === 'volume' ? 'Volume' : sortField}
-                              >
-                                {getSortedStatValue()}
-                              </span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => addPlayer(player)}
-                                className="px-2 shrink-0"
-                                data-testid={`button-dir-add-${player.id}`}
-                              >
-                                <Plus className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          );
-                        })}
-                        {visibleLimit < directoryPlayers.length && (
-                          <div className="p-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full"
-                              onClick={() => setVisibleLimit(prev => prev + 50)}
-                              data-testid="button-load-more"
-                            >
-                              Load More ({directoryPlayers.length - visibleLimit} remaining)
-                            </Button>
-                          </div>
-                        )}
-                      </>
-                    )}
+              <TabsContent value="directory" className="flex-1 min-h-0 mt-2 gap-2 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+                <div className="flex flex-col sm:flex-row gap-2 shrink-0">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search players..."
+                      value={dirSearchQuery}
+                      onChange={(e) => setDirSearchQuery(e.target.value)}
+                      className="pl-9 h-9"
+                      data-testid="input-dir-search"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Select value={sportFilter} onValueChange={setSportFilter}>
+                      <SelectTrigger className="w-[90px] h-9" data-testid="select-sport-filter">
+                        <SelectValue placeholder="Sport" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All</SelectItem>
+                        <SelectItem value="NBA">NBA</SelectItem>
+                        <SelectItem value="NFL">NFL</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Select value={teamFilter} onValueChange={setTeamFilter}>
+                      <SelectTrigger className="w-[90px] h-9" data-testid="select-team-filter">
+                        <SelectValue placeholder="Team" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Teams</SelectItem>
+                        {teamsData?.map(team => (
+                          <SelectItem key={team} value={team}>{team}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={sortField} onValueChange={(v) => setSortField(v as SortField)}>
+                      <SelectTrigger className="w-[100px] h-9" data-testid="select-sort-field">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fantasyPoints">FPTS</SelectItem>
+                        <SelectItem value="volume">Volume</SelectItem>
+                        <SelectItem value="price">Price</SelectItem>
+                        <SelectItem value="priceChange">Change</SelectItem>
+                        <SelectItem value="marketCap">Mkt Cap</SelectItem>
+                        <SelectItem value="name">Name</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      onClick={toggleSortDirection}
+                      className="h-9 w-9 shrink-0"
+                      data-testid="button-sort-direction"
+                    >
+                      <ArrowUpDown className={cn("h-4 w-4", sortDirection === "asc" && "rotate-180")} />
+                    </Button>
                   </div>
                 </div>
-              </div>
-            </TabsContent>
 
-            <TabsContent value="allocate" className="flex-1 min-h-0 mt-2 gap-2 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
-              <div className="flex flex-col gap-2 shrink-0">
-                <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md p-2">
-                  <span className="text-muted-foreground">Available:</span>
-                  <span className="font-mono font-bold">{projectedShares.toLocaleString()}</span>
-                  <span className="text-muted-foreground ml-auto">Allocated:</span>
-                  <span className={cn(
-                    "font-mono font-bold",
-                    remainingToAllocate > 0 && "text-yellow-500"
-                  )}>{totalAllocated.toLocaleString()}</span>
-                  {remainingToAllocate > 0 && (
-                    <Badge variant="secondary" className="text-xs">
-                      {remainingToAllocate} remaining
-                    </Badge>
+                <div className="text-xs text-muted-foreground px-1 shrink-0">
+                  {playersLoading ? "Loading..." : (
+                    <>
+                      Showing {Math.min(visibleLimit, directoryPlayers.length)} of {playersData?.total || directoryPlayers.length} players
+                      {distributions.length > 0 && (
+                        <span className="ml-2 text-primary font-medium">
+                          ({distributions.length} selected)
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
 
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search players..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 h-9"
-                    data-testid="input-search-players"
-                  />
-                </div>
+                <div className="border rounded-md overflow-hidden flex-1 min-h-0">
+                  <div className="h-full overflow-y-auto">
+                    <div className="divide-y">
+                      {playersLoading ? (
+                        <div className="py-8 text-center text-sm text-muted-foreground">
+                          Loading players...
+                        </div>
+                      ) : directoryPlayers.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-muted-foreground">
+                          No players found
+                        </div>
+                      ) : (
+                        <>
+                          {directoryPlayers.slice(0, visibleLimit).map(player => {
+                            const price = parseFloat(player.currentPrice || '0');
+                            const change = parseFloat(player.priceChange24h || '0');
+                            const fpts = parseFloat(player.avgFantasyPointsPerGame || '0');
+                            const volume = parseFloat(String(player.volume24h || '0'));
+                            const marketCap = parseFloat(String(player.marketCap || '0'));
 
-                {searchQuery && (
-                  <ScrollArea className="h-24 border rounded-md">
-                    <div className="p-1">
-                      {filteredPlayers.map(player => (
-                        <button
-                          key={player.id}
-                          onClick={() => addPlayer(player)}
-                          className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover-elevate rounded-sm text-left"
-                          data-testid={`button-add-player-${player.id}`}
-                        >
-                          <Plus className="h-3 w-3 text-muted-foreground" />
-                          <span className="font-medium">{player.firstName} {player.lastName}</span>
-                          <span className="text-xs text-muted-foreground">{player.team}</span>
-                          <span className="text-xs text-muted-foreground ml-auto">{player.position}</span>
-                        </button>
-                      ))}
-                      {filteredPlayers.length === 0 && (
-                        <div className="px-2 py-4 text-sm text-muted-foreground text-center">No players found</div>
+                            const getSortedStatValue = () => {
+                              switch (sortField) {
+                                case 'fantasyPoints':
+                                  return fpts.toFixed(1);
+                                case 'marketCap':
+                                  return marketCap >= 1000 ? `${(marketCap / 1000).toFixed(1)}K` : marketCap.toFixed(0);
+                                case 'volume':
+                                  return volume >= 1000 ? `${(volume / 1000).toFixed(1)}K` : volume.toFixed(0);
+                                case 'priceChange':
+                                  return `${change > 0 ? '+' : ''}${change.toFixed(1)}%`;
+                                case 'price':
+                                  return `$${price.toFixed(2)}`;
+                                default:
+                                  return fpts.toFixed(1);
+                              }
+                            };
+
+                            const getSortedStatColor = () => {
+                              if (sortField === 'priceChange') {
+                                return change > 0 ? "text-green-500" : change < 0 ? "text-red-500" : "text-muted-foreground";
+                              }
+                              return "text-green-500";
+                            };
+
+                            return (
+                              <div
+                                key={player.id}
+                                className="flex items-center gap-1 sm:gap-2 px-2 py-1.5 hover-elevate text-sm"
+                                data-testid={`dir-player-${player.id}`}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-medium truncate block">
+                                    {player.firstName} {player.lastName}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-muted-foreground w-8 sm:w-10 shrink-0 hidden sm:inline">
+                                  {player.team}
+                                </span>
+                                <span className="text-xs font-mono w-12 sm:w-14 text-right shrink-0">
+                                  ${price.toFixed(2)}
+                                </span>
+                                <span className={cn(
+                                  "text-xs font-mono w-10 sm:w-12 text-right shrink-0 hidden sm:inline",
+                                  change > 0 ? "text-green-500" : change < 0 ? "text-red-500" : "text-muted-foreground"
+                                )}>
+                                  {change > 0 ? '+' : ''}{change.toFixed(1)}%
+                                </span>
+                                <span
+                                  className={cn(
+                                    "text-xs font-mono w-10 sm:w-12 text-right shrink-0",
+                                    getSortedStatColor()
+                                  )}
+                                  title={sortField === 'fantasyPoints' ? 'Fantasy Points' : sortField === 'marketCap' ? 'Market Cap' : sortField === 'volume' ? 'Volume' : sortField}
+                                >
+                                  {getSortedStatValue()}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => addPlayer(player)}
+                                  className="px-2 shrink-0"
+                                  data-testid={`button-dir-add-${player.id}`}
+                                >
+                                  <Plus className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            );
+                          })}
+                          {visibleLimit < directoryPlayers.length && (
+                            <div className="p-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="w-full"
+                                onClick={() => setVisibleLimit(prev => prev + 50)}
+                                data-testid="button-load-more"
+                              >
+                                Load More ({directoryPlayers.length - visibleLimit} remaining)
+                              </Button>
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
-                  </ScrollArea>
-                )}
-              </div>
+                  </div>
+                </div>
+              </TabsContent>
 
-              <div className="border rounded-md overflow-hidden flex-1 min-h-0">
-                <div className="h-full overflow-y-auto">
-                  <div className="divide-y">
-                    {distributions.length === 0 ? (
+              <TabsContent value="allocate" className="flex-1 min-h-0 mt-2 gap-2 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+                <div className="flex flex-col gap-2 shrink-0">
+                  <div className="flex items-center gap-2 text-sm bg-muted/50 rounded-md p-2">
+                    <span className="text-muted-foreground">Available:</span>
+                    <span className="font-mono font-bold">{projectedShares.toLocaleString()}</span>
+                    <span className="text-muted-foreground ml-auto">Allocated:</span>
+                    <span className={cn(
+                      "font-mono font-bold",
+                      remainingToAllocate > 0 && "text-yellow-500"
+                    )}>{totalAllocated.toLocaleString()}</span>
+                    {remainingToAllocate > 0 && (
+                      <Badge variant="secondary" className="text-xs">
+                        {remainingToAllocate} remaining
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search players..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 h-9"
+                      data-testid="input-search-players"
+                    />
+                  </div>
+
+                  {searchQuery && (
+                    <ScrollArea className="h-24 border rounded-md">
+                      <div className="p-1">
+                        {filteredPlayers.map(player => (
+                          <button
+                            key={player.id}
+                            onClick={() => addPlayer(player)}
+                            className="w-full flex items-center gap-2 px-2 py-1.5 text-sm hover-elevate rounded-sm text-left"
+                            data-testid={`button-add-player-${player.id}`}
+                          >
+                            <Plus className="h-3 w-3 text-muted-foreground" />
+                            <span className="font-medium">{player.firstName} {player.lastName}</span>
+                            <span className="text-xs text-muted-foreground">{player.team}</span>
+                            <span className="text-xs text-muted-foreground ml-auto">{player.position}</span>
+                          </button>
+                        ))}
+                        {filteredPlayers.length === 0 && (
+                          <div className="px-2 py-4 text-sm text-muted-foreground text-center">No players found</div>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </div>
+
+                <div className="border rounded-md overflow-hidden flex-1 min-h-0">
+                  <div className="h-full overflow-y-auto">
+                    <div className="divide-y">
+                      {distributions.length === 0 ? (
+                        <div className="py-8 text-center text-sm text-muted-foreground">
+                          Search and add players to allocate shares
+                        </div>
+                      ) : (
+                        distributions.map(dist => (
+                          <div
+                            key={dist.player.id}
+                            className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/30"
+                            data-testid={`distribution-row-${dist.player.id}`}
+                          >
+                            <span className="font-medium text-sm truncate min-w-0 flex-1">
+                              {dist.player.firstName} {dist.player.lastName}
+                            </span>
+                            <span className="text-xs text-muted-foreground shrink-0 hidden sm:block w-10">
+                              {dist.player.team}
+                            </span>
+                            <Slider
+                              value={[dist.shares]}
+                              min={0}
+                              max={projectedShares}
+                              step={1}
+                              onValueChange={([val]) => setPlayerShares(dist.player.id, val)}
+                              className="w-16 sm:w-20 shrink-0"
+                              data-testid={`slider-${dist.player.id}`}
+                            />
+                            <Input
+                              type="number"
+                              min={0}
+                              max={projectedShares}
+                              value={dist.shares}
+                              onChange={(e) => setPlayerShares(dist.player.id, parseInt(e.target.value) || 0)}
+                              className="w-14 h-7 text-right font-mono text-xs px-1 shrink-0"
+                              data-testid={`input-shares-${dist.player.id}`}
+                            />
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => removePlayer(dist.player.id)}
+                              className="h-7 w-7 p-0 shrink-0"
+                              data-testid={`button-remove-${dist.player.id}`}
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 shrink-0">
+                  {distributions.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => redistributeEvenly(distributions)}
+                        data-testid="button-even-split"
+                      >
+                        Even Split
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowPresetSave(!showPresetSave)}
+                        data-testid="button-toggle-save-preset"
+                      >
+                        <Save className="h-4 w-4 mr-1" />
+                        Save as Preset
+                      </Button>
+                    </div>
+                  )}
+
+                  {showPresetSave && (
+                    <div className="flex items-center gap-2">
+                      <Input
+                        placeholder="Preset name..."
+                        value={newPresetName}
+                        onChange={(e) => setNewPresetName(e.target.value)}
+                        className="flex-1 h-9"
+                        data-testid="input-preset-name"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleSavePreset}
+                        disabled={createPresetMutation.isPending}
+                        data-testid="button-save-preset"
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+
+              <TabsContent value="presets" className="flex-1 min-h-0 mt-2 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
+                <div className="border rounded-md overflow-hidden flex-1 min-h-0">
+                  <div className="h-full overflow-y-auto p-2 space-y-2">
+                    {!presetsData?.presets || presetsData.presets.length === 0 ? (
                       <div className="py-8 text-center text-sm text-muted-foreground">
-                        Search and add players to allocate shares
+                        No presets saved. Create one from the Allocate tab.
                       </div>
                     ) : (
-                      distributions.map(dist => (
+                      presetsData.presets.map(preset => (
                         <div
-                          key={dist.player.id}
-                          className="flex items-center gap-2 px-2 py-1.5 hover:bg-muted/30"
-                          data-testid={`distribution-row-${dist.player.id}`}
+                          key={preset.id}
+                          className="flex items-center gap-2 p-3 border rounded-md bg-card hover-elevate"
+                          data-testid={`preset-${preset.id}`}
                         >
-                          <span className="font-medium text-sm truncate min-w-0 flex-1">
-                            {dist.player.firstName} {dist.player.lastName}
-                          </span>
-                          <span className="text-xs text-muted-foreground shrink-0 hidden sm:block w-10">
-                            {dist.player.team}
-                          </span>
-                          <Slider
-                            value={[dist.shares]}
-                            min={0}
-                            max={projectedShares}
-                            step={1}
-                            onValueChange={([val]) => setPlayerShares(dist.player.id, val)}
-                            className="w-16 sm:w-20 shrink-0"
-                            data-testid={`slider-${dist.player.id}`}
-                          />
-                          <Input
-                            type="number"
-                            min={0}
-                            max={projectedShares}
-                            value={dist.shares}
-                            onChange={(e) => setPlayerShares(dist.player.id, parseInt(e.target.value) || 0)}
-                            className="w-14 h-7 text-right font-mono text-xs px-1 shrink-0"
-                            data-testid={`input-shares-${dist.player.id}`}
-                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium text-sm">{preset.name}</div>
+                            <div className="text-xs text-muted-foreground truncate">
+                              {preset.players.map(p => `${p.firstName} ${p.lastName}`).join(", ")}
+                            </div>
+                          </div>
+                          <Badge variant="secondary" className="shrink-0">
+                            {preset.playerIds.length} players
+                          </Badge>
                           <Button
                             size="sm"
-                            variant="ghost"
-                            onClick={() => removePlayer(dist.player.id)}
-                            className="h-7 w-7 p-0 shrink-0"
-                            data-testid={`button-remove-${dist.player.id}`}
+                            onClick={() => loadPreset(preset)}
+                            data-testid={`button-load-preset-${preset.id}`}
                           >
-                            <X className="h-3.5 w-3.5" />
+                            Load
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => deletePresetMutation.mutate(preset.id)}
+                            disabled={deletePresetMutation.isPending}
+                            data-testid={`button-delete-preset-${preset.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
                       ))
                     )}
                   </div>
                 </div>
-              </div>
+              </TabsContent>
+            </Tabs>
+          </div>
 
-              <div className="flex flex-col gap-2 shrink-0">
-                {distributions.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => redistributeEvenly(distributions)}
-                      data-testid="button-even-split"
-                    >
-                      Even Split
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowPresetSave(!showPresetSave)}
-                      data-testid="button-toggle-save-preset"
-                    >
-                      <Save className="h-4 w-4 mr-1" />
-                      Save as Preset
-                    </Button>
-                  </div>
-                )}
-
-                {showPresetSave && (
-                  <div className="flex items-center gap-2">
-                    <Input
-                      placeholder="Preset name..."
-                      value={newPresetName}
-                      onChange={(e) => setNewPresetName(e.target.value)}
-                      className="flex-1 h-9"
-                      data-testid="input-preset-name"
-                    />
-                    <Button
-                      size="sm"
-                      onClick={handleSavePreset}
-                      disabled={createPresetMutation.isPending}
-                      data-testid="button-save-preset"
-                    >
-                      Save
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="presets" className="flex-1 min-h-0 mt-2 overflow-hidden data-[state=active]:flex data-[state=active]:flex-col">
-              <div className="border rounded-md overflow-hidden flex-1 min-h-0">
-                <div className="h-full overflow-y-auto p-2 space-y-2">
-                  {!presetsData?.presets || presetsData.presets.length === 0 ? (
-                    <div className="py-8 text-center text-sm text-muted-foreground">
-                      No presets saved. Create one from the Allocate tab.
-                    </div>
-                  ) : (
-                    presetsData.presets.map(preset => (
-                      <div
-                        key={preset.id}
-                        className="flex items-center gap-2 p-3 border rounded-md bg-card hover-elevate"
-                        data-testid={`preset-${preset.id}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-medium text-sm">{preset.name}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {preset.players.map(p => `${p.firstName} ${p.lastName}`).join(", ")}
-                          </div>
-                        </div>
-                        <Badge variant="secondary" className="shrink-0">
-                          {preset.playerIds.length} players
-                        </Badge>
-                        <Button
-                          size="sm"
-                          onClick={() => loadPreset(preset)}
-                          data-testid={`button-load-preset-${preset.id}`}
-                        >
-                          Load
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => deletePresetMutation.mutate(preset.id)}
-                          disabled={deletePresetMutation.isPending}
-                          data-testid={`button-delete-preset-${preset.id}`}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        <DialogFooter className="shrink-0 p-4 pt-2 sm:p-0 sm:pt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
-            Cancel
-          </Button>
-          <Button
-            onClick={handleRedeem}
-            disabled={redeemMutation.isPending || totalAllocated === 0}
-            data-testid="button-confirm-vest"
-          >
-            {redeemMutation.isPending ? "Vesting..." : `Vest ${totalAllocated.toLocaleString()} Shares`}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <DialogFooter className="shrink-0 p-4 pt-2 sm:p-0 sm:pt-4">
+            <Button variant="outline" onClick={() => onOpenChange(false)} data-testid="button-cancel">
+              Cancel
+            </Button>
+            <Button
+              onClick={handleRedeem}
+              disabled={redeemMutation.isPending || totalAllocated === 0}
+              data-testid="button-confirm-vest"
+            >
+              {redeemMutation.isPending ? "Vesting..." : `Vest ${totalAllocated.toLocaleString()} Shares`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

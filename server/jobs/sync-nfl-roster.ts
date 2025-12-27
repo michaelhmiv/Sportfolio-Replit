@@ -108,7 +108,7 @@ export async function syncNFLRoster(): Promise<SyncResult> {
                 position: normalizedPosition,
                 jerseyNumber: apiPlayer.jersey_number || null,
                 isActive: true,
-                isEligibleForMining: isEligibleForVesting,
+                isEligibleForVesting: isEligibleForVesting,
             };
 
             try {
@@ -132,7 +132,7 @@ export async function syncNFLRoster(): Promise<SyncResult> {
                 try {
                     await storage.updatePlayer(existingPlayer.id, {
                         isActive: false,
-                        isEligibleForMining: false,
+                        isEligibleForVesting: false,
                     });
                     result.playersDeactivated++;
                 } catch (error: any) {

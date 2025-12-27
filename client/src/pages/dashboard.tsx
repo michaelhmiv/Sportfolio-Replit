@@ -28,6 +28,8 @@ import { Shimmer, ShimmerCard, ScrollReveal, AnimatedButton, SwipeHint } from "@
 import { AnimatedPrice } from "@/components/ui/animated-price";
 import { useSport } from "@/lib/sport-context";
 import { SportSelector } from "@/components/sport-selector";
+import { OnboardingMissions } from "@/components/onboarding-missions";
+import { MarketTicker } from "@/components/market-ticker";
 
 interface DashboardData {
   user: {
@@ -345,44 +347,22 @@ export default function Dashboard() {
         )}
 
         {/* Market Activity Ticker */}
-        {data && data.recentTrades && data.recentTrades.length > 0 && (
-          <div className="border-b bg-card/80 backdrop-blur-sm overflow-x-hidden relative">
-            {/* Gradient fade edges */}
-            <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-card to-transparent z-10 pointer-events-none" />
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-card to-transparent z-10 pointer-events-none" />
-
-            <div className="h-12 overflow-hidden relative">
-              <div className="flex gap-4 animate-ticker absolute whitespace-nowrap py-3 px-4">
-                {data.recentTrades.concat(data.recentTrades).concat(data.recentTrades).map((trade, idx) => (
-                  <div
-                    key={`${trade.id}-${idx}`}
-                    className="inline-flex items-center gap-2 hover-elevate px-3 py-1 rounded-md transition-all duration-200 group"
-                  >
-                    <span className="text-primary font-bold text-sm group-hover:scale-110 transition-transform">
-                      <Activity className="w-3 h-3" />
-                    </span>
-                    <span className="font-medium text-xs sm:text-sm">
-                      <PlayerName
-                        playerId={trade.player.id}
-                        firstName={trade.player.firstName}
-                        lastName={trade.player.lastName}
-                      />
-                    </span>
-                    <span className="font-mono font-bold text-xs sm:text-sm text-primary">${trade.price}</span>
-                    <span className="text-muted-foreground text-xs">{trade.quantity} sh</span>
-                    <span className="text-muted-foreground/50 text-xs">|</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        <MarketTicker />
 
         {/* Main Dashboard Grid */}
-        <div className="p-3 sm:p-4 max-w-full overflow-x-hidden">
+        <div className="p-3 sm:p-4 max-w-full overflow-x-hidden space-y-4 sm:space-y-6">
+          {/* Missions Section */}
+          {isAuthenticated && (
+            <div className="mb-4">
+              <OnboardingMissions />
+            </div>
+          )}
+
           {/* Balance Header - Only show for authenticated users */}
           {isAuthenticated && data?.user && (
-            <div className="mb-4 sm:mb-6 p-3 sm:p-6 rounded-2xl bg-card/80 backdrop-blur-sm" style={{ boxShadow: 'inset 0 1px 0 0 rgba(255, 255, 255, 0.08)' }}>
+            <div className="p-4 sm:p-8 rounded-2xl bg-card/60 backdrop-blur-xl border border-white/5 shadow-2xl relative overflow-hidden group">
+              {/* Background Glow */}
+              <div className="absolute top-0 left-1/4 w-1/2 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
               {/* Labels row */}
               <div className="flex justify-between gap-4 mb-4">
                 <div className="text-xs text-muted-foreground uppercase tracking-wider font-sans">Cash Balance</div>
@@ -392,7 +372,14 @@ export default function Dashboard() {
               {/* Values row */}
               <div className="flex justify-between gap-4 items-center">
                 <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <div className="fintech-balance text-foreground truncate" data-testid="text-balance">{formatBalance(data?.user?.balance || "0.00")}</div>
+                  <div className="fintech-balance text-foreground truncate" data-testid="text-balance">
+                    <AnimatedPrice
+                      value={parseFloat(data?.user?.balance || "0")}
+                      size="lg"
+                      showArrow={false}
+                      className="text-2xl sm:text-3xl font-bold font-mono"
+                    />
+                  </div>
                   {data?.user?.cashRank && data?.user.cashRank > 0 && (
                     <button
                       onClick={() => setLocation("/leaderboards#cashBalance")}
@@ -415,7 +402,14 @@ export default function Dashboard() {
                 </div>
 
                 <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-                  <div className="fintech-balance text-foreground" data-testid="text-portfolio-value">{formatBalance(data?.user?.portfolioValue || "0.00")}</div>
+                  <div className="fintech-balance text-foreground" data-testid="text-portfolio-value">
+                    <AnimatedPrice
+                      value={parseFloat(data?.user?.portfolioValue || "0")}
+                      size="lg"
+                      showArrow={false}
+                      className="text-2xl sm:text-3xl font-bold font-mono"
+                    />
+                  </div>
                   {data?.user?.portfolioRank && data?.user.portfolioRank > 0 && (
                     <button
                       onClick={() => setLocation("/leaderboards#portfolioValue")}

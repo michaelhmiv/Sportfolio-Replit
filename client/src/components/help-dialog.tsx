@@ -23,7 +23,7 @@ export function HelpDialog() {
           <DialogHeader>
             <DialogTitle className="text-2xl">Welcome to Sportfolio: The Persistent Fantasy Sports Market</DialogTitle>
           </DialogHeader>
-          
+
           <div className="space-y-6 text-sm">
             <p>
               Sportfolio is a fantasy sports game where your progress and investments last for a player's entire career, not just one season.
@@ -63,7 +63,7 @@ export function HelpDialog() {
                 <div>
                   <h4 className="font-semibold mb-2">3. Use Your Shares (Trade or Compete)</h4>
                   <p className="mb-2">Once shares are redeemed to players in your portfolio, you have two main options:</p>
-                  
+
                   <div className="pl-4 space-y-3">
                     <div>
                       <p className="font-medium mb-1">Option A: Trade on the Player Exchange</p>

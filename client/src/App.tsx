@@ -41,6 +41,7 @@ import HowItWorks from "@/pages/how-it-works";
 import Analytics from "@/pages/analytics";
 import Premium from "@/pages/premium";
 import PremiumTrade from "@/pages/premium-trade";
+import Watchlists from "@/pages/watchlists";
 import Login from "@/pages/Login";
 import AuthCallback from "@/pages/AuthCallback";
 import logoUrl from "@assets/Sportfolio png_1763227952318.png";
@@ -244,6 +245,9 @@ function Router() {
           </Route>
           <Route path="/premium/trade">
             {isAuthenticated ? <PremiumTrade /> : <Dashboard />}
+          </Route>
+          <Route path="/watchlists">
+            {isAuthenticated ? <Watchlists /> : <Dashboard />}
           </Route>
           <Route path="/profile">
             {isAuthenticated && user ? <ProfileRedirect userId={user.id} /> : <Dashboard />}

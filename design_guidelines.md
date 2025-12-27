@@ -70,10 +70,10 @@
 - Minimal gridlines, clear axis labels
 - Premium overlays: MA lines (different opacities), RSI subplot below
 
-**Mining Widget:**
+**Vesting Widget:**
 - Compact card with circular progress indicator
 - "XXX / 2,400 shares" in large monospace
-- Player avatar(s) being mined with small badges
+- Player avatar(s) being vested with small badges
 - Prominent "Claim All" button (full-width, primary CTA)
 
 **Contest Cards:**
@@ -158,7 +158,7 @@
 
 **Icon Usage:**
 - Sport icons (basketball, etc.) as small badges
-- Status indicators (mining active, contest live)
+- Status indicators (vesting active, contest live)
 - Trade type icons (buy/sell arrows)
 - Premium feature icon (crown/star badge)
 Use Heroicons via CDN for all UI icons.

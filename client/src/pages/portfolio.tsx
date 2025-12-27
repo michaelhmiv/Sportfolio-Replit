@@ -228,7 +228,7 @@ export default function Portfolio() {
 
   // Sort player holdings and filter by selected sport
   const sortedHoldings = (data?.holdings.filter(h => h.assetType === "player") || [])
-    .filter(h => h.player?.sport === sport)
+    .filter(h => !sport || sport === 'all' || h.player?.sport === sport)
     .slice()
     .sort((a, b) => {
       const aVal = getSortValue(a, sortField);

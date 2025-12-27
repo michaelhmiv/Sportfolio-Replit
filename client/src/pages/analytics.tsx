@@ -5,7 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, BarChart, Bar, AreaChart, Area, ComposedChart } from "recharts";
-import { BarChart3, Users, Target, GitCompare, Activity, DollarSign, ArrowUpRight, ArrowDownRight, Pickaxe, Flame, Coins } from "lucide-react";
+import { BarChart3, Users, Target, GitCompare, Activity, DollarSign, ArrowUpRight, ArrowDownRight, Flame, Coins } from "lucide-react";
 import { Link } from "wouter";
 import type { Player } from "@shared/schema";
 
@@ -228,7 +228,7 @@ export default function Analytics() {
         {/* Market Health Dashboard - 6 Clickable Metric Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {/* Market Cap - First and Default */}
-          <Card 
+          <Card
             data-testid="card-market-cap"
             className={`cursor-pointer transition-all ${selectedMetric === 'marketCap' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
             onClick={() => setSelectedMetric('marketCap')}
@@ -251,7 +251,7 @@ export default function Analytics() {
           </Card>
 
           {/* Transactions */}
-          <Card 
+          <Card
             data-testid="card-transactions"
             className={`cursor-pointer transition-all ${selectedMetric === 'transactions' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
             onClick={() => setSelectedMetric('transactions')}
@@ -272,9 +272,9 @@ export default function Analytics() {
               </div>
             </CardContent>
           </Card>
-          
+
           {/* Volume */}
-          <Card 
+          <Card
             data-testid="card-volume"
             className={`cursor-pointer transition-all ${selectedMetric === 'volume' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
             onClick={() => setSelectedMetric('volume')}
@@ -297,7 +297,7 @@ export default function Analytics() {
           </Card>
 
           {/* Shares Mined */}
-          <Card 
+          <Card
             data-testid="card-shares-mined"
             className={`cursor-pointer transition-all ${selectedMetric === 'sharesMined' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
             onClick={() => setSelectedMetric('sharesMined')}
@@ -305,8 +305,8 @@ export default function Analytics() {
             <CardContent className="p-3 sm:p-4">
               <div className="flex flex-col gap-1">
                 <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                  <Pickaxe className="w-3 h-3" />
-                  Shares Mined
+                  <Activity className="w-3 h-3 text-primary" />
+                  Shares Vested
                 </div>
                 <div className="text-xl sm:text-2xl font-mono font-bold">
                   {formatNumber(mh?.sharesMined || 0)}
@@ -319,7 +319,7 @@ export default function Analytics() {
           </Card>
 
           {/* Shares Burned */}
-          <Card 
+          <Card
             data-testid="card-shares-burned"
             className={`cursor-pointer transition-all ${selectedMetric === 'sharesBurned' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
             onClick={() => setSelectedMetric('sharesBurned')}
@@ -341,7 +341,7 @@ export default function Analytics() {
           </Card>
 
           {/* Total Shares */}
-          <Card 
+          <Card
             data-testid="card-total-shares"
             className={`cursor-pointer transition-all ${selectedMetric === 'totalShares' ? 'ring-2 ring-primary' : 'hover-elevate'}`}
             onClick={() => setSelectedMetric('totalShares')}
@@ -370,7 +370,7 @@ export default function Analytics() {
               {selectedMetric === 'marketCap' && <><BarChart3 className="w-4 h-4" /> Market Cap Over Time</>}
               {selectedMetric === 'transactions' && <><Activity className="w-4 h-4" /> Transactions Over Time</>}
               {selectedMetric === 'volume' && <><DollarSign className="w-4 h-4" /> Volume Over Time</>}
-              {selectedMetric === 'sharesMined' && <><Pickaxe className="w-4 h-4" /> Shares Mined Over Time</>}
+              {selectedMetric === 'sharesMined' && <><Activity className="w-4 h-4 text-primary" /> Shares Vested Over Time</>}
               {selectedMetric === 'sharesBurned' && <><Flame className="w-4 h-4" /> Shares Burned Over Time</>}
               {selectedMetric === 'totalShares' && <><Coins className="w-4 h-4" /> Total Shares Over Time</>}
             </CardTitle>
@@ -380,14 +380,14 @@ export default function Analytics() {
               <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={snapshotsData.snapshots}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                  <XAxis 
-                    dataKey="date" 
-                    stroke="hsl(var(--muted-foreground))" 
+                  <XAxis
+                    dataKey="date"
+                    stroke="hsl(var(--muted-foreground))"
                     fontSize={10}
                     tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                   />
-                  <YAxis 
-                    stroke="hsl(var(--muted-foreground))" 
+                  <YAxis
+                    stroke="hsl(var(--muted-foreground))"
                     fontSize={10}
                     tickFormatter={(v) => {
                       if (selectedMetric === 'marketCap' || selectedMetric === 'volume') {
@@ -411,17 +411,17 @@ export default function Analytics() {
                       if (selectedMetric === 'marketCap' || selectedMetric === 'volume') {
                         return [`$${value.toLocaleString()}`, selectedMetric === 'marketCap' ? 'Market Cap' : 'Volume'];
                       }
-                      return [value.toLocaleString(), 
-                        selectedMetric === 'transactions' ? 'Transactions' :
-                        selectedMetric === 'sharesMined' ? 'Shares Mined' :
-                        selectedMetric === 'sharesBurned' ? 'Shares Burned' : 'Total Shares'
+                      return [value.toLocaleString(),
+                      selectedMetric === 'transactions' ? 'Transactions' :
+                        selectedMetric === 'sharesMined' ? 'Shares Vested' :
+                          selectedMetric === 'sharesBurned' ? 'Shares Burned' : 'Total Shares'
                       ];
                     }}
                   />
-                  <Line 
-                    type="monotone" 
+                  <Line
+                    type="monotone"
                     dataKey={selectedMetric}
-                    stroke="hsl(var(--primary))" 
+                    stroke="hsl(var(--primary))"
                     strokeWidth={2}
                     dot={{ fill: 'hsl(var(--primary))', strokeWidth: 0, r: 3 }}
                     activeDot={{ r: 5, fill: 'hsl(var(--primary))' }}
@@ -475,14 +475,14 @@ export default function Analytics() {
                   <ResponsiveContainer width="100%" height={250}>
                     <ComposedChart data={mh.shareEconomyTimeSeries}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="date" 
-                        stroke="hsl(var(--muted-foreground))" 
+                      <XAxis
+                        dataKey="date"
+                        stroke="hsl(var(--muted-foreground))"
                         fontSize={10}
                         tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       />
-                      <YAxis 
-                        stroke="hsl(var(--muted-foreground))" 
+                      <YAxis
+                        stroke="hsl(var(--muted-foreground))"
                         fontSize={10}
                       />
                       <Tooltip
@@ -496,18 +496,18 @@ export default function Analytics() {
                         formatter={(value: number, name: string) => [value.toLocaleString(), name]}
                       />
                       <Legend />
-                      <Bar 
-                        dataKey="sharesMined" 
-                        fill="hsl(142 76% 36%)" 
+                      <Bar
+                        dataKey="sharesMined"
+                        fill="hsl(142 76% 36%)"
                         name="Shares Vested"
                         radius={[4, 4, 0, 0]}
                         isAnimationActive={true}
                         animationDuration={800}
                         animationEasing="ease-out"
                       />
-                      <Bar 
-                        dataKey="sharesBurned" 
-                        fill="hsl(0 72% 51%)" 
+                      <Bar
+                        dataKey="sharesBurned"
+                        fill="hsl(0 72% 51%)"
                         name="Shares Burned"
                         radius={[4, 4, 0, 0]}
                         isAnimationActive={true}
@@ -538,22 +538,22 @@ export default function Analytics() {
                   <ResponsiveContainer width="100%" height={200}>
                     <ComposedChart data={mh.timeSeries}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                      <XAxis 
-                        dataKey="date" 
-                        stroke="hsl(var(--muted-foreground))" 
+                      <XAxis
+                        dataKey="date"
+                        stroke="hsl(var(--muted-foreground))"
                         fontSize={10}
                         tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       />
-                      <YAxis 
+                      <YAxis
                         yAxisId="left"
-                        stroke="hsl(var(--muted-foreground))" 
+                        stroke="hsl(var(--muted-foreground))"
                         fontSize={10}
-                        tickFormatter={(v) => `$${v >= 1000 ? (v/1000).toFixed(0) + 'K' : v}`}
+                        tickFormatter={(v) => `$${v >= 1000 ? (v / 1000).toFixed(0) + 'K' : v}`}
                       />
-                      <YAxis 
+                      <YAxis
                         yAxisId="right"
                         orientation="right"
-                        stroke="hsl(var(--muted-foreground))" 
+                        stroke="hsl(var(--muted-foreground))"
                         fontSize={10}
                       />
                       <Tooltip
@@ -570,21 +570,21 @@ export default function Analytics() {
                         }}
                       />
                       <Legend />
-                      <Bar 
+                      <Bar
                         yAxisId="left"
-                        dataKey="volume" 
-                        fill="hsl(var(--primary) / 0.3)" 
+                        dataKey="volume"
+                        fill="hsl(var(--primary) / 0.3)"
                         name="Volume"
                         radius={[4, 4, 0, 0]}
                         isAnimationActive={true}
                         animationDuration={800}
                         animationEasing="ease-out"
                       />
-                      <Line 
+                      <Line
                         yAxisId="right"
-                        type="monotone" 
-                        dataKey="transactions" 
-                        stroke="hsl(var(--chart-2))" 
+                        type="monotone"
+                        dataKey="transactions"
+                        stroke="hsl(var(--chart-2))"
                         strokeWidth={2}
                         dot={false}
                         name="Transactions"
@@ -693,10 +693,10 @@ export default function Analytics() {
                           </td>
                         </tr>
                       )) || (
-                        <tr>
-                          <td colSpan={6} className="text-center py-8 text-muted-foreground">No rankings available</td>
-                        </tr>
-                      )}
+                          <tr>
+                            <td colSpan={6} className="text-center py-8 text-muted-foreground">No rankings available</td>
+                          </tr>
+                        )}
                     </tbody>
                   </table>
                 </div>
@@ -733,9 +733,9 @@ export default function Analytics() {
                   {selectedPlayers.map(id => {
                     const player = allPlayers?.find(p => p.id === id);
                     return player ? (
-                      <Badge 
-                        key={id} 
-                        variant="secondary" 
+                      <Badge
+                        key={id}
+                        variant="secondary"
                         className="cursor-pointer"
                         onClick={() => handlePlayerSelect(id)}
                       >
@@ -794,9 +794,9 @@ export default function Analytics() {
                         <ResponsiveContainer width="100%" height={200}>
                           <LineChart>
                             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                            <XAxis 
-                              dataKey="timestamp" 
-                              stroke="hsl(var(--muted-foreground))" 
+                            <XAxis
+                              dataKey="timestamp"
+                              stroke="hsl(var(--muted-foreground))"
                               fontSize={10}
                               tickFormatter={(v) => new Date(v).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                             />
@@ -812,7 +812,7 @@ export default function Analytics() {
                             <Legend />
                             {comparisonData.players.map((player, idx) => (
                               player.priceHistory.length > 0 && (
-                                <Line 
+                                <Line
                                   key={player.id}
                                   type="monotone"
                                   data={player.priceHistory}

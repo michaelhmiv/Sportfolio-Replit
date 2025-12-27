@@ -19,7 +19,7 @@ export interface BotProfile {
   minOrderSize: number;
   maxDailyOrders: number;
   maxDailyVolume: number;
-  miningClaimThreshold: string;
+  vestingClaimThreshold: string;
   maxPlayersToMine: number;
   maxContestEntriesPerDay: number;
   contestEntryBudget: number;
@@ -72,15 +72,15 @@ function isWithinActiveHours(profile: BotProfile): boolean {
  */
 function isCooldownComplete(profile: BotProfile): boolean {
   if (!profile.lastActionAt) return true;
-  
+
   const now = Date.now();
   const lastAction = new Date(profile.lastActionAt).getTime();
-  
+
   // Add jitter: random cooldown between min and max
   const jitter = Math.random();
-  const cooldownMs = profile.minActionCooldownMs + 
+  const cooldownMs = profile.minActionCooldownMs +
     (profile.maxActionCooldownMs - profile.minActionCooldownMs) * jitter;
-  
+
   return (now - lastAction) >= cooldownMs;
 }
 
@@ -90,7 +90,7 @@ function isCooldownComplete(profile: BotProfile): boolean {
 async function maybeResetDailyCounters(profile: BotProfile): Promise<BotProfile> {
   const now = new Date();
   const lastReset = new Date(profile.lastResetDate);
-  
+
   // Check if it's a new day (UTC)
   if (
     now.getUTCFullYear() !== lastReset.getUTCFullYear() ||
@@ -108,7 +108,7 @@ async function maybeResetDailyCounters(profile: BotProfile): Promise<BotProfile>
         updatedAt: now,
       })
       .where(eq(botProfiles.id, profile.id));
-    
+
     return {
       ...profile,
       ordersToday: 0,
@@ -117,7 +117,7 @@ async function maybeResetDailyCounters(profile: BotProfile): Promise<BotProfile>
       lastResetDate: now,
     };
   }
-  
+
   return profile;
 }
 
@@ -146,7 +146,7 @@ export async function updateBotCounters(
     .select({ ordersToday: botProfiles.ordersToday, volumeToday: botProfiles.volumeToday })
     .from(botProfiles)
     .where(eq(botProfiles.id, profileId));
-  
+
   if (current) {
     await db
       .update(botProfiles)
@@ -167,7 +167,7 @@ export async function updateContestEntries(profileId: string): Promise<void> {
     .select({ contestEntriesToday: botProfiles.contestEntriesToday })
     .from(botProfiles)
     .where(eq(botProfiles.id, profileId));
-  
+
   if (current) {
     await db
       .update(botProfiles)
@@ -188,7 +188,7 @@ async function getActiveBots(): Promise<Array<BotProfile & { user: typeof users.
     .from(botProfiles)
     .innerJoin(users, eq(botProfiles.userId, users.id))
     .where(eq(botProfiles.isActive, true));
-  
+
   return results.map(r => ({
     ...r.bot_profiles,
     user: r.users,
@@ -203,7 +203,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, name: string): Promise<
     const timer = setTimeout(() => {
       reject(new Error(`${name} timed out after ${ms}ms`));
     }, ms);
-    
+
     promise
       .then((result) => {
         clearTimeout(timer);
@@ -219,7 +219,7 @@ function withTimeout<T>(promise: Promise<T>, ms: number, name: string): Promise<
 const STRATEGY_TIMEOUT_MS = 30000; // 30 seconds max per strategy
 
 /**
- * Execute ALL strategies for every bot - mining, trading, and contests
+ * Execute ALL strategies for every bot - vesting, trading, and contests
  * Each bot's individual settings (aggressiveness, limits, budgets) determine their behavior
  * The bot_role field now acts as a "persona" hint but doesn't gate any strategies
  */
@@ -228,22 +228,22 @@ async function executeBotStrategies(
 ): Promise<void> {
   // Lazy imports to avoid circular dependency issues
   const { executeMarketMakerStrategy } = await import("./market-maker-strategy");
-  const { executeMiningStrategy } = await import("./mining-strategy");
+  const { executeVestingStrategy } = await import("./vesting-strategy");
   const { executeContestStrategy } = await import("./contest-strategy");
   const { executeTakerStrategy } = await import("./taker-strategy");
-  
+
   const strategiesExecuted: string[] = [];
-  
+
   try {
-    // 1. MINING - All bots mine to accumulate shares
-    // Uses: maxPlayersToMine, miningClaimThreshold
+    // 1. VESTING - All bots vest to accumulate shares
+    // Uses: maxPlayersToVest, vestingClaimThreshold
     try {
-      await withTimeout(executeMiningStrategy(profile), STRATEGY_TIMEOUT_MS, 'mining');
-      strategiesExecuted.push("mining");
+      await withTimeout(executeVestingStrategy(profile), STRATEGY_TIMEOUT_MS, 'vesting');
+      strategiesExecuted.push("vesting");
     } catch (e: any) {
-      console.warn(`[BotEngine] ${profile.botName} mining failed: ${e.message}`);
+      console.warn(`[BotEngine] ${profile.botName} vesting failed: ${e.message}`);
     }
-    
+
     // 2. TRADING - All bots can place orders in the marketplace
     // Uses: maxDailyOrders, maxDailyVolume, maxOrderSize, minOrderSize, spreadPercent, aggressiveness
     // Check if bot has trading budget remaining
@@ -255,7 +255,7 @@ async function executeBotStrategies(
         console.warn(`[BotEngine] ${profile.botName} trading failed: ${e.message}`);
       }
     }
-    
+
     // 3. TAKER - Aggressive market orders to actually execute trades
     // Run taker strategy on EVERY tick for active markets - this is what creates trades
     // Aggressiveness determines HOW aggressive, not WHETHER to run
@@ -267,7 +267,7 @@ async function executeBotStrategies(
         console.warn(`[BotEngine] ${profile.botName} taker failed: ${e.message}`);
       }
     }
-    
+
     // 4. CONTESTS - All bots can enter contests
     // Uses: maxContestEntriesPerDay, contestEntryBudget, aggressiveness
     // Check if bot has contest entries remaining
@@ -279,19 +279,19 @@ async function executeBotStrategies(
         console.warn(`[BotEngine] ${profile.botName} contests failed: ${e.message}`);
       }
     }
-    
+
     console.log(`[BotEngine] ${profile.botName} executed: [${strategiesExecuted.join(", ")}]`);
-    
+
   } catch (error: any) {
     console.error(`[BotEngine] Error executing strategies for ${profile.botName}:`, error.message);
     try {
       await withTimeout(
         logBotAction(profile.userId, {
           actionType: "strategy_error",
-          actionDetails: { 
-            persona: profile.botRole, 
+          actionDetails: {
+            persona: profile.botRole,
             strategiesAttempted: strategiesExecuted,
-            error: error.message 
+            error: error.message
           },
           triggerReason: "Strategy execution failed",
           success: false,
@@ -315,57 +315,57 @@ export async function runBotEngineTick(): Promise<{
   errors: number;
 }> {
   console.log("[BotEngine] Running bot engine tick...");
-  
+
   let botsProcessed = 0;
   let botsSkipped = 0;
   let errors = 0;
-  
+
   try {
     const bots = await getActiveBots();
     console.log(`[BotEngine] Found ${bots.length} active bots`);
-    
+
     for (const botData of bots) {
       try {
         // Reset daily counters if needed
         const profile = await maybeResetDailyCounters(botData);
         const botWithProfile = { ...profile, user: botData.user };
-        
+
         // Check active hours
         if (!isWithinActiveHours(botWithProfile)) {
           console.log(`[BotEngine] ${profile.botName} outside active hours, skipping`);
           botsSkipped++;
           continue;
         }
-        
+
         // Check cooldown
         if (!isCooldownComplete(botWithProfile)) {
           console.log(`[BotEngine] ${profile.botName} still cooling down, skipping`);
           botsSkipped++;
           continue;
         }
-        
+
         // Execute strategies
         await executeBotStrategies(botWithProfile);
-        
+
         // Update last action time
         await updateLastActionTime(profile.id);
-        
+
         botsProcessed++;
         console.log(`[BotEngine] ${profile.botName} processed successfully`);
-        
+
       } catch (error: any) {
         errors++;
         console.error(`[BotEngine] Error processing bot ${botData.botName}:`, error.message);
       }
     }
-    
+
   } catch (error: any) {
     console.error("[BotEngine] Fatal error in bot engine tick:", error.message);
     errors++;
   }
-  
+
   console.log(`[BotEngine] Tick complete: ${botsProcessed} processed, ${botsSkipped} skipped, ${errors} errors`);
-  
+
   return { botsProcessed, botsSkipped, errors };
 }
 
@@ -380,21 +380,21 @@ export async function getBotStats(): Promise<{
 }> {
   const allProfiles = await db.select().from(botProfiles);
   const activeBots = allProfiles.filter(p => p.isActive);
-  
+
   const botsByRole: Record<string, number> = {};
   for (const profile of allProfiles) {
     botsByRole[profile.botRole] = (botsByRole[profile.botRole] || 0) + 1;
   }
-  
+
   // Count today's actions
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
-  
+
   const [actionCount] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(botActionsLog)
     .where(gte(botActionsLog.createdAt, today));
-  
+
   return {
     totalBots: allProfiles.length,
     activeBots: activeBots.length,

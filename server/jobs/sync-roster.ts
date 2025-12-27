@@ -2,7 +2,7 @@
  * Roster Sync Job
  * 
  * Fetches NBA player rosters from MySportsFeeds and updates database.
- * Updates: active status, team assignments, injury status, and mining eligibility.
+ * Updates: active status, team assignments, injury status, and vesting eligibility.
  */
 
 import { storage } from "../storage";
@@ -50,7 +50,7 @@ export async function syncRoster(progressCallback?: ProgressCallback): Promise<J
     for (const player of players) {
       try {
         const isActive = player.currentRosterStatus === "ROSTER";
-        const isEligibleForMining = isActive && player.currentRosterStatus !== "INJURED";
+        const isEligibleForVesting = isActive && player.currentRosterStatus !== "INJURED";
 
         await storage.upsertPlayer({
           id: `nba_${player.id}`, // Prefix with sport for multi-sport support
@@ -61,7 +61,7 @@ export async function syncRoster(progressCallback?: ProgressCallback): Promise<J
           position: player.primaryPosition || "G",
           jerseyNumber: player.jerseyNumber || "",
           isActive,
-          isEligibleForMining,
+          isEligibleForVesting,
           currentPrice: "10.00", // Keep existing price
           volume24h: 0, // Reset daily volume
           priceChange24h: "0.00",

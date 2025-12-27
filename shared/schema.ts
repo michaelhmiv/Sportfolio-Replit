@@ -31,7 +31,7 @@ export const users = pgTable("users", {
   hasSeenOnboarding: boolean("has_seen_onboarding").notNull().default(false), // Track if user completed onboarding
   isBot: boolean("is_bot").notNull().default(false), // True for market maker bot accounts
   // Profile stats
-  totalSharesMined: integer("total_shares_mined").notNull().default(0),
+  totalSharesVested: integer("total_shares_vested").notNull().default(0),
   totalMarketOrders: integer("total_market_orders").notNull().default(0),
   totalTradesExecuted: integer("total_trades_executed").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -49,7 +49,7 @@ export const players = pgTable("players", {
   position: text("position").notNull(),
   jerseyNumber: text("jersey_number"),
   isActive: boolean("is_active").notNull().default(true), // On active roster
-  isEligibleForMining: boolean("is_eligible_for_mining").notNull().default(true),
+  isEligibleForVesting: boolean("is_eligible_for_vesting").notNull().default(true),
   currentPrice: decimal("current_price", { precision: 10, scale: 2 }).notNull().default("10.00"), // Placeholder - use lastTradePrice for real market value
   lastTradePrice: decimal("last_trade_price", { precision: 10, scale: 2 }), // Actual market price from last trade, null if no trades
   volume24h: integer("volume_24h").notNull().default(0),
@@ -92,8 +92,8 @@ export const holdingsLocks = pgTable("holdings_locks", {
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   assetType: text("asset_type").notNull(), // "player" or "premium"
   assetId: text("asset_id").notNull(), // player ID or "premium"
-  lockType: text("lock_type").notNull(), // "order", "contest", "mining"
-  lockReferenceId: varchar("lock_reference_id").notNull(), // order ID, contest entry ID, or mining record ID
+  lockType: text("lock_type").notNull(), // "order", "contest", "vesting"
+  lockReferenceId: varchar("lock_reference_id").notNull(), // order ID, contest entry ID, or vesting record ID
   lockedQuantity: integer("locked_quantity").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (table) => ({
@@ -150,11 +150,11 @@ export const trades = pgTable("trades", {
   executedIdx: index("executed_idx").on(table.executedAt),
 }));
 
-// Mining table - tracks user mining state
-export const mining = pgTable("mining", {
+// Vesting table - tracks user vesting state
+export const vesting = pgTable("vesting", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
-  playerId: varchar("player_id").references(() => players.id), // null for premium users with split mining
+  playerId: varchar("player_id").references(() => players.id), // null for premium users with split vesting
   sharesAccumulated: integer("shares_accumulated").notNull().default(0),
   residualMs: integer("residual_ms").notNull().default(0), // Fractional time carryover in milliseconds
   lastAccruedAt: timestamp("last_accrued_at").notNull().defaultNow(), // Baseline timestamp for accrual calculation
@@ -163,8 +163,8 @@ export const mining = pgTable("mining", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
-// Mining splits table - for premium users splitting mining across players
-export const miningSplits = pgTable("mining_splits", {
+// Vesting splits table - for premium users splitting vesting across players
+export const vestingSplits = pgTable("vesting_splits", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   playerId: varchar("player_id").notNull().references(() => players.id),
@@ -173,16 +173,16 @@ export const miningSplits = pgTable("mining_splits", {
   userIdx: index("user_split_idx").on(table.userId),
 }));
 
-// Mining claims table - immutable log of individual claim events
-export const miningClaims = pgTable("mining_claims", {
+// Vesting claims table - immutable log of individual claim events
+export const vestingClaims = pgTable("vesting_claims", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  playerId: varchar("player_id").references(() => players.id), // null for premium split mining
+  playerId: varchar("player_id").references(() => players.id), // null for premium split vesting
   sharesClaimed: integer("shares_claimed").notNull(),
   claimedAt: timestamp("claimed_at").notNull().defaultNow(),
 }, (table) => ({
-  userIdx: index("mining_claims_user_idx").on(table.userId),
-  claimedAtIdx: index("mining_claims_claimed_at_idx").on(table.claimedAt),
+  userIdx: index("vesting_claims_user_idx").on(table.userId),
+  claimedAtIdx: index("vesting_claims_claimed_at_idx").on(table.claimedAt),
 }));
 
 // Vesting presets table - saved player groups for quick redemption
@@ -381,7 +381,7 @@ export const marketSnapshots = pgTable("market_snapshots", {
   marketCap: decimal("market_cap", { precision: 20, scale: 2 }).notNull(), // Total value of all shares (shares * price)
   transactionsCount: integer("transactions_count").notNull().default(0), // Number of trades that day
   volume: decimal("volume", { precision: 20, scale: 2 }).notNull().default("0"), // Total trading volume that day
-  sharesMined: integer("shares_mined").notNull().default(0), // Shares mined that day
+  sharesVested: integer("shares_vested").notNull().default(0), // Shares vested that day
   sharesBurned: integer("shares_burned").notNull().default(0), // Shares used in contests that day
   totalShares: integer("total_shares").notNull().default(0), // Total shares in economy (snapshot)
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -394,7 +394,7 @@ export const botProfiles = pgTable("bot_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
   botName: text("bot_name").notNull(), // Human-readable name like "MarketMaker_Alpha"
-  botRole: text("bot_role").notNull(), // "market_maker", "trader", "contest", "miner", "casual"
+  botRole: text("bot_role").notNull(), // "market_maker", "trader", "contest", "vester", "casual"
   isActive: boolean("is_active").notNull().default(true), // Enable/disable this bot
   // Trading configuration
   aggressiveness: decimal("aggressiveness", { precision: 3, scale: 2 }).notNull().default("0.50"), // 0.0-1.0 scale
@@ -404,9 +404,9 @@ export const botProfiles = pgTable("bot_profiles", {
   maxDailyOrders: integer("max_daily_orders").notNull().default(50), // Daily order cap
   maxDailyVolume: integer("max_daily_volume").notNull().default(1000), // Max shares traded per day
   targetTiers: integer("target_tiers").array(), // Player tiers to target (1-5), null = all tiers
-  // Mining configuration
-  miningClaimThreshold: decimal("mining_claim_threshold", { precision: 3, scale: 2 }).notNull().default("0.85"), // Claim at 85% of cap
-  maxPlayersToMine: integer("max_players_to_mine").notNull().default(5), // Max players to split mining across
+  // Vesting configuration
+  vestingClaimThreshold: decimal("vesting_claim_threshold", { precision: 3, scale: 2 }).notNull().default("0.85"), // Claim at 85% of cap
+  maxPlayersToVest: integer("max_players_to_vest").notNull().default(5), // Max players to split vesting across
   // Contest configuration
   maxContestEntriesPerDay: integer("max_contest_entries_per_day").notNull().default(2),
   contestEntryBudget: integer("contest_entry_budget").notNull().default(500), // Max shares per entry
@@ -432,7 +432,7 @@ export const botProfiles = pgTable("bot_profiles", {
 export const botActionsLog = pgTable("bot_actions_log", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   botUserId: varchar("bot_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  actionType: text("action_type").notNull(), // "order_placed", "order_cancelled", "mining_claim", "contest_entry", "mining_selection"
+  actionType: text("action_type").notNull(), // "order_placed", "order_cancelled", "vesting_claim", "contest_entry", "vesting_selection"
   actionDetails: jsonb("action_details").notNull(), // JSON with specific details (order ID, player ID, amounts, etc.)
   triggerReason: text("trigger_reason").notNull(), // Why this action was taken
   success: boolean("success").notNull().default(true),
@@ -548,6 +548,30 @@ export const tweetHistory = pgTable("tweet_history", {
   createdAtIdx: index("tweet_history_created_idx").on(table.createdAt),
 }));
 
+// Watchlists table - named lists for organizing players
+export const watchlists = pgTable("watchlists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  isDefault: boolean("is_default").notNull().default(false),
+  color: varchar("color", { length: 20 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userIdx: index("watchlists_user_idx").on(table.userId),
+}));
+
+// Watch list items table - tracks players in each watchlist
+export const watchList = pgTable("watch_list", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  watchlistId: varchar("watchlist_id").references(() => watchlists.id, { onDelete: "cascade" }),
+  playerId: varchar("player_id").notNull().references(() => players.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  userPlayerIdx: index("watch_user_player_idx").on(table.userId, table.playerId),
+  watchlistIdx: index("watch_watchlist_idx").on(table.watchlistId),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   holdings: many(holdings),
@@ -555,6 +579,34 @@ export const usersRelations = relations(users, ({ many }) => ({
   contestEntries: many(contestEntries),
   blogPosts: many(blogPosts),
   portfolioSnapshots: many(portfolioSnapshots),
+  vestingItems: many(vesting),
+  vestingSplits: many(vestingSplits),
+  vestingClaims: many(vestingClaims),
+  watchlists: many(watchlists),
+  watchList: many(watchList),
+}));
+
+export const watchlistsRelations = relations(watchlists, ({ one, many }) => ({
+  user: one(users, {
+    fields: [watchlists.userId],
+    references: [users.id],
+  }),
+  items: many(watchList),
+}));
+
+export const watchListRelations = relations(watchList, ({ one }) => ({
+  user: one(users, {
+    fields: [watchList.userId],
+    references: [users.id],
+  }),
+  watchlist: one(watchlists, {
+    fields: [watchList.watchlistId],
+    references: [watchlists.id],
+  }),
+  player: one(players, {
+    fields: [watchList.playerId],
+    references: [players.id],
+  }),
 }));
 
 export const blogPostsRelations = relations(blogPosts, ({ one }) => ({
@@ -653,12 +705,24 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   limitPrice: z.string().optional(),
 });
 
+export const insertContestSchema = createInsertSchema(contests).omit({
+  id: true,
+  createdAt: true,
+  entryCount: true,
+  totalSharesEntered: true,
+  totalPrizePool: true,
+  week: true, // Optional/computed
+  gameDay: true, // Optional
+  endsAt: true // Optional/computed
+});
+
 export const insertContestEntrySchema = createInsertSchema(contestEntries).omit({
   id: true,
+  createdAt: true,
+  totalSharesEntered: true,
   totalScore: true,
   rank: true,
   payout: true,
-  createdAt: true,
 });
 
 export const insertContestLineupSchema = createInsertSchema(contestLineups).omit({
@@ -682,7 +746,16 @@ export const insertPlayerGameStatsSchema = createInsertSchema(playerGameStats).o
   lastFetchedAt: true,
 });
 
-export const insertMiningClaimSchema = createInsertSchema(miningClaims).omit({
+export const insertVestingSchema = createInsertSchema(vesting).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export const insertVestingSplitSchema = createInsertSchema(vestingSplits).omit({
+  id: true,
+});
+
+export const insertVestingClaimSchema = createInsertSchema(vestingClaims).omit({
   id: true,
   claimedAt: true,
 });
@@ -714,16 +787,14 @@ export type InsertOrder = z.infer<typeof insertOrderSchema>;
 
 export type Trade = typeof trades.$inferSelect;
 
-export type Mining = typeof mining.$inferSelect;
-export type Vesting = Mining; // Alias for frontend terminology
+export type Vesting = typeof vesting.$inferSelect;
+export type InsertVesting = z.infer<typeof insertVestingSchema>;
 
-export type MiningSplit = typeof miningSplits.$inferSelect;
-export type VestingSplit = MiningSplit; // Alias for frontend terminology
-export type InsertMiningSplit = typeof miningSplits.$inferInsert;
+export type VestingSplit = typeof vestingSplits.$inferSelect;
+export type InsertVestingSplit = z.infer<typeof insertVestingSplitSchema>;
 
-export type MiningClaim = typeof miningClaims.$inferSelect;
-export type VestingClaim = MiningClaim; // Alias for frontend terminology
-export type InsertMiningClaim = z.infer<typeof insertMiningClaimSchema>;
+export type VestingClaim = typeof vestingClaims.$inferSelect;
+export type InsertVestingClaim = z.infer<typeof insertVestingClaimSchema>;
 
 export type VestingPreset = typeof vestingPresets.$inferSelect;
 export type InsertVestingPreset = z.infer<typeof insertVestingPresetSchema>;
@@ -738,6 +809,7 @@ export type PlayerGameStats = typeof playerGameStats.$inferSelect;
 export type InsertPlayerGameStats = z.infer<typeof insertPlayerGameStatsSchema>;
 
 export type Contest = typeof contests.$inferSelect;
+export type InsertContest = z.infer<typeof insertContestSchema>;
 export type ContestEntry = typeof contestEntries.$inferSelect;
 export type ContestLineup = typeof contestLineups.$inferSelect;
 

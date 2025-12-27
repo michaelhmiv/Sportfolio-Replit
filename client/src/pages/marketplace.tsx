@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useWebSocket } from "@/lib/websocket";
 import { queryClient } from "@/lib/queryClient";
@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, TrendingUp, TrendingDown, ArrowUpDown, Filter, Clock, Crown, ChevronDown, ChevronUp, BarChart3 } from "lucide-react";
+import { Search, TrendingUp, TrendingDown, ArrowUpDown, Filter, Clock, Crown, ChevronDown, ChevronUp, BarChart3, Star, Eye } from "lucide-react";
 import { Link, useLocation, useSearch } from "wouter";
 import type { Player } from "@shared/schema";
 import { formatDistanceToNow } from "date-fns";
@@ -41,6 +42,7 @@ export default function Marketplace() {
   const isPremiumUser = user?.isPremium || false;
   const { sport } = useSport();
   const sportConfig = useSportConfig();
+  const { toast } = useToast();
   const searchParams = new URLSearchParams(useSearch());
   const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "players");
@@ -52,6 +54,7 @@ export default function Marketplace() {
   const [sortOrder, setSortOrder] = useState<SortOrder>((searchParams.get("sortOrder") as SortOrder) || "desc");
   const [filterHasBuyOrders, setFilterHasBuyOrders] = useState(false);
   const [filterHasSellOrders, setFilterHasSellOrders] = useState(false);
+  const [filterWatchlistId, setFilterWatchlistId] = useState<string>("none"); // "none", "all", or specific watchlist ID
   const [page, setPage] = useState(1);
   const [showFilters, setShowFilters] = useState(false); // Collapsed by default
   const ITEMS_PER_PAGE = 50;
@@ -130,6 +133,99 @@ export default function Marketplace() {
     },
   });
 
+  // Watch List Data
+  const { data: watchList, refetch: refetchWatchList } = useQuery<string[]>({
+    queryKey: ["/api/watchlist"],
+    enabled: !!user
+  });
+
+  // Fetch user's watchlists for filter dropdown
+  interface Watchlist {
+    id: string;
+    name: string;
+    isDefault: boolean;
+    itemCount: number;
+  }
+  const { data: userWatchlists } = useQuery<Watchlist[]>({
+    queryKey: ["/api/watchlists"],
+    enabled: !!user
+  });
+
+  // Fetch player IDs for selected watchlist
+  const { data: selectedWatchlistPlayerIds } = useQuery<string[]>({
+    queryKey: ["/api/watchlists", filterWatchlistId, "items"],
+    queryFn: async () => {
+      if (filterWatchlistId === "none") return [];
+      if (filterWatchlistId === "all") {
+        // Return all watchlist player IDs
+        return watchList || [];
+      }
+      // Fetch specific watchlist items
+      const res = await fetch(`/api/watchlists/${filterWatchlistId}/items`);
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: filterWatchlistId !== "none" && !!user,
+  });
+
+  const toggleWatchList = async (playerId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to create your watch list.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const isWatching = watchList?.includes(playerId);
+    const method = isWatching ? "DELETE" : "POST";
+
+    try {
+      const res = await fetch(`/api/watchlist/${playerId}`, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: method === 'POST' ? JSON.stringify({}) : undefined
+      });
+      if (!res.ok) throw new Error("Failed to update watchlist");
+
+      const data = await res.json();
+      await refetchWatchList();
+
+      if (isWatching) {
+        toast({
+          title: "Removed from Watch List",
+          description: "Player removed from your watch list.",
+        });
+      } else {
+        toast({
+          title: `Added to ${data.watchlistName || 'Favorites'}`,
+          description: (
+            <span>
+              Player added to your watch list.{" "}
+              <a
+                href="/watchlists"
+                className="underline font-medium text-primary hover:text-primary/80"
+                onClick={(e) => e.stopPropagation()}
+              >
+                Edit
+              </a>
+            </span>
+          ),
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update watch list. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   // Spotlight: Top market cap players
   type SpotlightMarketCap = {
     id: string;
@@ -182,6 +278,7 @@ export default function Marketplace() {
       sortOrder,
       filterHasBuyOrders,
       filterHasSellOrders,
+      filterWatchlistId,
       page
     ],
     queryFn: async () => {
@@ -194,6 +291,7 @@ export default function Marketplace() {
       params.append("sortOrder", sortOrder);
       if (filterHasBuyOrders) params.append("hasBuyOrders", "true");
       if (filterHasSellOrders) params.append("hasSellOrders", "true");
+      // Watchlist filtering is now done client-side
       params.append("limit", String(ITEMS_PER_PAGE));
       params.append("offset", String((page - 1) * ITEMS_PER_PAGE));
 
@@ -205,14 +303,22 @@ export default function Marketplace() {
     },
   });
 
-  const players = playersData?.players || [];
+  const rawPlayers = playersData?.players || [];
   const totalCount = playersData?.total || 0;
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+
+  // Client-side watchlist filtering
+  const players = useMemo(() => {
+    if (filterWatchlistId === "none" || !selectedWatchlistPlayerIds?.length) {
+      return rawPlayers;
+    }
+    return rawPlayers.filter(p => selectedWatchlistPlayerIds.includes(p.id));
+  }, [rawPlayers, filterWatchlistId, selectedWatchlistPlayerIds]);
 
   // Reset to page 1 when any filter or sort changes
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, teamFilter, positionFilter, sortField, sortOrder, filterHasBuyOrders, filterHasSellOrders]);
+  }, [debouncedSearch, teamFilter, positionFilter, sortField, sortOrder, filterHasBuyOrders, filterHasSellOrders, filterWatchlistId]);
 
   // Reset filters when sport changes (positions differ between sports)
   useEffect(() => {
@@ -265,7 +371,7 @@ export default function Marketplace() {
                     <div className="flex items-center gap-2">
                       <Filter className="w-4 h-4 text-muted-foreground" />
                       <span className="text-sm font-medium">Search & Filters</span>
-                      {(teamFilter !== "all" || positionFilter !== "all" || filterHasBuyOrders || filterHasSellOrders || search) && (
+                      {(teamFilter !== "all" || positionFilter !== "all" || filterHasBuyOrders || filterHasSellOrders || filterWatchlistId !== "none" || search) && (
                         <Badge variant="secondary" className="text-xs">Active</Badge>
                       )}
                     </div>
@@ -344,6 +450,23 @@ export default function Marketplace() {
                             Has Sell Orders
                           </label>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <Star className="w-3.5 h-3.5 text-muted-foreground" />
+                          <Select value={filterWatchlistId} onValueChange={setFilterWatchlistId}>
+                            <SelectTrigger className="h-8 w-[160px]" data-testid="select-watchlist-filter">
+                              <SelectValue placeholder="Watchlist" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">No Filter</SelectItem>
+                              <SelectItem value="all">All Watchlists</SelectItem>
+                              {userWatchlists?.map((list) => (
+                                <SelectItem key={list.id} value={list.id}>
+                                  {list.name} ({list.itemCount})
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         {(filterHasBuyOrders || filterHasSellOrders || search || teamFilter !== "all" || positionFilter !== "all") && (
                           <Button
                             size="sm"
@@ -351,6 +474,7 @@ export default function Marketplace() {
                             onClick={() => {
                               setFilterHasBuyOrders(false);
                               setFilterHasSellOrders(false);
+                              setFilterWatchList(false);
                               setSearch("");
                               setTeamFilter("all");
                               setPositionFilter("all");
@@ -428,6 +552,7 @@ export default function Marketplace() {
                     <table className="w-full">
                       <thead className="border-b bg-muted/50 hidden sm:table-header-group">
                         <tr>
+                          <th className="w-8 px-2 py-1.5"></th>
                           <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
                           <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Team</th>
                           <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -493,7 +618,7 @@ export default function Marketplace() {
                         {/* Premium Shares Row - Always First */}
                         <tr
                           key="premium-share"
-                          className="border-b hover-elevate bg-gradient-to-r from-yellow-500/5 to-amber-500/5"
+                          className="border-b hover-elevate bg-gradient-to-r from-yellow-500/5 to-amber-500/5 holographic-premium"
                           data-testid="row-premium-share"
                         >
                           {/* Mobile layout: stacked info */}
@@ -536,6 +661,7 @@ export default function Marketplace() {
                           </td>
 
                           {/* Desktop layout: table cells */}
+                          <td className="px-2 py-1.5 hidden sm:table-cell"></td>
                           <td className="px-2 py-1.5 hidden sm:table-cell">
                             <div className="flex items-center gap-2">
                               <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
@@ -590,15 +716,24 @@ export default function Marketplace() {
                           const playerRow = (
                             <tr
                               key={player.id}
-                              className="border-b last:border-0 hover-elevate"
+                              className="border-b last:border-0 hover-elevate holographic"
                               data-testid={`row-player-${player.id}`}
                             >
                               {/* Mobile layout: stacked info */}
                               <td className="px-2 py-2 sm:hidden" colSpan={6}>
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                                      <span className="font-bold text-xs">{player.firstName[0]}{player.lastName[0]}</span>
+                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 relative group-hover:bg-primary/20 transition-colors cursor-pointer" onClick={(e) => toggleWatchList(player.id, e)}>
+                                      <div className="absolute inset-0 flex items-center justify-center transition-opacity">
+                                        {watchList?.includes(player.id) ? (
+                                          <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
+                                        ) : (
+                                          <>
+                                            <span className="group-hover:hidden font-bold text-xs">{player.firstName[0]}{player.lastName[0]}</span>
+                                            <Star className="hidden group-hover:block w-4 h-4 text-muted-foreground/50 hover:text-yellow-500" />
+                                          </>
+                                        )}
+                                      </div>
                                     </div>
                                     <div className="min-w-0 flex-1">
                                       <div className="font-medium text-sm">
@@ -681,6 +816,16 @@ export default function Marketplace() {
                               </td>
 
                               {/* Desktop layout: table cells */}
+                              <td className="px-2 py-1.5 hidden sm:table-cell w-8">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 hover:bg-transparent"
+                                  onClick={(e) => toggleWatchList(player.id, e)}
+                                >
+                                  <Star className={`w-4 h-4 ${watchList?.includes(player.id) ? "fill-yellow-500 text-yellow-500" : "text-muted-foreground/30 hover:text-yellow-500"}`} />
+                                </Button>
+                              </td>
                               <td className="px-2 py-1.5 hidden sm:table-cell">
                                 <div className="flex items-center gap-2">
                                   <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">

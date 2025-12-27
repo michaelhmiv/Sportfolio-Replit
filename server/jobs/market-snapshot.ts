@@ -5,7 +5,7 @@
  * - Market Cap: Total value of all shares (shares outstanding × price)
  * - Transactions Count: Number of trades that day
  * - Volume: Total trading volume that day
- * - Shares Mined: Shares mined that day
+ * - Shares Vested: Shares vested that day
  * - Shares Burned: Shares used in contests that day
  * - Total Shares: Total shares in economy (snapshot)
  * 
@@ -13,7 +13,7 @@
  */
 
 import { db } from "../db";
-import { trades, miningClaims, contestEntries, holdings, players, marketSnapshots } from "@shared/schema";
+import { trades, vestingClaims, contestEntries, holdings, players, marketSnapshots } from "@shared/schema";
 import { sql, eq, gte, lte, and, sum } from "drizzle-orm";
 import type { JobResult } from "./scheduler";
 import type { ProgressCallback } from "../lib/admin-stream";
@@ -23,7 +23,7 @@ interface DailyMetrics {
   marketCap: number;
   transactionsCount: number;
   volume: number;
-  sharesMined: number;
+  sharesVested: number;
   sharesBurned: number;
   totalShares: number;
 }
@@ -50,18 +50,18 @@ async function calculateMetricsForDate(targetDate: Date): Promise<DailyMetrics> 
   const transactionsCount = parseInt(tradeStats[0]?.count || "0");
   const volume = parseFloat(tradeStats[0]?.volume || "0");
 
-  // 2. Shares mined that day
-  const minedStats = await db
+  // 2. Shares vested that day
+  const vestedStats = await db
     .select({
-      total: sql<string>`COALESCE(SUM(${miningClaims.sharesClaimed}), 0)`,
+      total: sql<string>`COALESCE(SUM(${vestingClaims.sharesClaimed}), 0)`,
     })
-    .from(miningClaims)
+    .from(vestingClaims)
     .where(and(
-      gte(miningClaims.claimedAt, startOfDay),
-      lte(miningClaims.claimedAt, endOfDay)
+      gte(vestingClaims.claimedAt, startOfDay),
+      lte(vestingClaims.claimedAt, endOfDay)
     ));
 
-  const sharesMined = parseInt(minedStats[0]?.total || "0");
+  const sharesVested = parseInt(vestedStats[0]?.total || "0");
 
   // 3. Shares burned (entered in contests) that day
   const burnedStats = await db
@@ -102,7 +102,7 @@ async function calculateMetricsForDate(targetDate: Date): Promise<DailyMetrics> 
     marketCap,
     transactionsCount,
     volume,
-    sharesMined,
+    sharesVested,
     sharesBurned,
     totalShares,
   };
@@ -113,7 +113,7 @@ async function calculateMetricsForDate(targetDate: Date): Promise<DailyMetrics> 
  */
 export async function takeMarketSnapshot(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[market_snapshot] Starting market snapshot...");
-  
+
   progressCallback?.({
     type: 'info',
     timestamp: new Date().toISOString(),
@@ -125,7 +125,7 @@ export async function takeMarketSnapshot(progressCallback?: ProgressCallback): P
     const snapshotDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
 
     console.log(`[market_snapshot] Taking snapshot for ${snapshotDate.toISOString()}`);
-    
+
     progressCallback?.({
       type: 'info',
       timestamp: new Date().toISOString(),
@@ -142,7 +142,7 @@ export async function takeMarketSnapshot(progressCallback?: ProgressCallback): P
         marketCap: metrics.marketCap.toFixed(2),
         transactionsCount: metrics.transactionsCount,
         volume: metrics.volume.toFixed(2),
-        sharesMined: metrics.sharesMined,
+        sharesVested: metrics.sharesVested,
         sharesBurned: metrics.sharesBurned,
         totalShares: metrics.totalShares,
       })
@@ -152,13 +152,13 @@ export async function takeMarketSnapshot(progressCallback?: ProgressCallback): P
           marketCap: metrics.marketCap.toFixed(2),
           transactionsCount: metrics.transactionsCount,
           volume: metrics.volume.toFixed(2),
-          sharesMined: metrics.sharesMined,
+          sharesVested: metrics.sharesVested,
           sharesBurned: metrics.sharesBurned,
           totalShares: metrics.totalShares,
         },
       });
 
-    console.log(`[market_snapshot] Snapshot saved: Market Cap=$${metrics.marketCap.toFixed(2)}, Transactions=${metrics.transactionsCount}, Volume=$${metrics.volume.toFixed(2)}, Mined=${metrics.sharesMined}, Burned=${metrics.sharesBurned}, Total=${metrics.totalShares}`);
+    console.log(`[market_snapshot] Snapshot saved: Market Cap=$${metrics.marketCap.toFixed(2)}, Transactions=${metrics.transactionsCount}, Volume=$${metrics.volume.toFixed(2)}, Vested=${metrics.sharesVested}, Burned=${metrics.sharesBurned}, Total=${metrics.totalShares}`);
 
     progressCallback?.({
       type: 'complete',
@@ -174,7 +174,7 @@ export async function takeMarketSnapshot(progressCallback?: ProgressCallback): P
     };
   } catch (error: any) {
     console.error("[market_snapshot] Error:", error);
-    
+
     progressCallback?.({
       type: 'error',
       timestamp: new Date().toISOString(),
@@ -194,7 +194,7 @@ export async function takeMarketSnapshot(progressCallback?: ProgressCallback): P
  */
 export async function backfillMarketSnapshots(progressCallback?: ProgressCallback): Promise<JobResult> {
   console.log("[market_snapshot] Starting historical backfill...");
-  
+
   progressCallback?.({
     type: 'info',
     timestamp: new Date().toISOString(),
@@ -210,13 +210,13 @@ export async function backfillMarketSnapshots(progressCallback?: ProgressCallbac
       .select({ minDate: sql<Date>`MIN(${trades.executedAt})` })
       .from(trades);
 
-    const earliestMining = await db
-      .select({ minDate: sql<Date>`MIN(${miningClaims.claimedAt})` })
-      .from(miningClaims);
+    const earliestVesting = await db
+      .select({ minDate: sql<Date>`MIN(${vestingClaims.claimedAt})` })
+      .from(vestingClaims);
 
     const earliestDates = [
       earliestTrade[0]?.minDate,
-      earliestMining[0]?.minDate,
+      earliestVesting[0]?.minDate,
     ].filter(Boolean).map(d => new Date(d));
 
     if (earliestDates.length === 0) {
@@ -233,7 +233,7 @@ export async function backfillMarketSnapshots(progressCallback?: ProgressCallbac
     const endDate = new Date();
 
     console.log(`[market_snapshot] Backfilling from ${startDate.toISOString()} to ${endDate.toISOString()}`);
-    
+
     progressCallback?.({
       type: 'info',
       timestamp: new Date().toISOString(),
@@ -249,7 +249,7 @@ export async function backfillMarketSnapshots(progressCallback?: ProgressCallbac
         const metrics = await calculateMetricsForDate(currentDate);
 
         // Only insert if there's any activity that day
-        if (metrics.transactionsCount > 0 || metrics.sharesMined > 0 || metrics.sharesBurned > 0) {
+        if (metrics.transactionsCount > 0 || metrics.sharesVested > 0 || metrics.sharesBurned > 0) {
           await db
             .insert(marketSnapshots)
             .values({
@@ -257,7 +257,7 @@ export async function backfillMarketSnapshots(progressCallback?: ProgressCallbac
               marketCap: metrics.marketCap.toFixed(2),
               transactionsCount: metrics.transactionsCount,
               volume: metrics.volume.toFixed(2),
-              sharesMined: metrics.sharesMined,
+              sharesVested: metrics.sharesVested,
               sharesBurned: metrics.sharesBurned,
               totalShares: metrics.totalShares,
             })
@@ -267,7 +267,7 @@ export async function backfillMarketSnapshots(progressCallback?: ProgressCallbac
                 marketCap: metrics.marketCap.toFixed(2),
                 transactionsCount: metrics.transactionsCount,
                 volume: metrics.volume.toFixed(2),
-                sharesMined: metrics.sharesMined,
+                sharesVested: metrics.sharesVested,
                 sharesBurned: metrics.sharesBurned,
                 totalShares: metrics.totalShares,
               },
@@ -286,7 +286,7 @@ export async function backfillMarketSnapshots(progressCallback?: ProgressCallbac
     }
 
     console.log(`[market_snapshot] Backfill complete: ${recordsProcessed} days processed, ${errorCount} errors`);
-    
+
     progressCallback?.({
       type: 'complete',
       timestamp: new Date().toISOString(),
@@ -301,7 +301,7 @@ export async function backfillMarketSnapshots(progressCallback?: ProgressCallbac
     };
   } catch (error: any) {
     console.error("[market_snapshot] Backfill error:", error);
-    
+
     progressCallback?.({
       type: 'error',
       timestamp: new Date().toISOString(),

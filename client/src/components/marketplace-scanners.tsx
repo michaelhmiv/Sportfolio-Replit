@@ -369,7 +369,7 @@ function ScannerRowExpanded({ rank, player, label, value, color, type }: any) {
                 <div className="flex items-center gap-6 text-right">
                     {/* Price */}
                     <div className="flex flex-col items-end w-16">
-                        <span className="text-sm font-mono font-bold">${parseFloat(player.lastTradePrice || player.currentPrice || 0).toFixed(2)}</span>
+                        <span className="text-sm font-mono font-bold">${parseFloat(player.currentPrice || "0").toFixed(2)}</span>
                         <span className="text-[10px] text-muted-foreground uppercase opacity-50">Price</span>
                     </div>
 

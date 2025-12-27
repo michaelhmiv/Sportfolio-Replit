@@ -90,8 +90,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const user = await storage.getUser(userId);
     if (!user) return;
 
-    const miningData = await storage.getMining(userId);
-    if (!miningData) return;
+    const vestingData = await storage.getVesting(userId);
+    if (!vestingData) return;
 
     const now = new Date();
     // Premium users get double rate (200 shares/hour) and double cap (4800)
@@ -100,9 +100,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const totalSharesPerHour = isPremium ? 200 : 100;
 
     // If already at cap, don't accrue more - clear residual time
-    if (miningData.sharesAccumulated >= capLimit) {
-      if (!miningData.capReachedAt || miningData.residualMs !== 0) {
-        await storage.updateMining(userId, {
+    if (vestingData.sharesAccumulated >= capLimit) {
+      if (!vestingData.capReachedAt || vestingData.residualMs !== 0) {
+        await storage.updateVesting(userId, {
           capReachedAt: now,
           residualMs: 0,
           updatedAt: now,
@@ -112,11 +112,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     // Initialize lastAccruedAt if missing (fallback to updatedAt or now)
-    const effectiveLastAccruedAt = miningData.lastAccruedAt || miningData.updatedAt || now;
+    const effectiveLastAccruedAt = vestingData.lastAccruedAt || vestingData.updatedAt || now;
 
     // If we had to initialize, update the database immediately
-    if (!miningData.lastAccruedAt) {
-      await storage.updateMining(userId, {
+    if (!vestingData.lastAccruedAt) {
+      await storage.updateVesting(userId, {
         lastAccruedAt: effectiveLastAccruedAt,
         updatedAt: now,
       });
@@ -124,17 +124,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     // Use shared utility to calculate accrual update
     const update = calculateAccrualUpdate({
-      sharesAccumulated: miningData.sharesAccumulated,
-      residualMs: miningData.residualMs || 0,
+      sharesAccumulated: vestingData.sharesAccumulated,
+      residualMs: vestingData.residualMs || 0,
       lastAccruedAt: effectiveLastAccruedAt,
       sharesPerHour: totalSharesPerHour,
       capLimit,
     }, now);
 
     // Only update if shares were actually earned
-    const sharesEarned = update.sharesAccumulated - miningData.sharesAccumulated;
+    const sharesEarned = update.sharesAccumulated - vestingData.sharesAccumulated;
     if (sharesEarned > 0) {
-      await storage.updateMining(userId, {
+      await storage.updateVesting(userId, {
         sharesAccumulated: update.sharesAccumulated,
         residualMs: update.residualMs,
         lastAccruedAt: update.lastAccruedAt,
@@ -481,13 +481,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get updated user data
       const updatedUser = await storage.getUser(userId);
+      const premiumHolding = await storage.getHolding(userId, "premium", "premium");
 
       res.json({
         success: true,
         credited: result.credited,
         revoked: result.revoked,
         synced: result.synced,
-        premiumShares: updatedUser?.premiumShares || 0,
+        premiumShares: premiumHolding?.quantity || 0,
       });
     } catch (error: any) {
       console.error("Error syncing Whop payments:", error);
@@ -534,6 +535,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get updated user data
       const updatedUser = await storage.getUser(targetUser.id);
+      const premiumHolding = await storage.getHolding(targetUser.id, "premium", "premium");
 
       res.json({
         success: true,
@@ -541,7 +543,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: updatedUser?.id,
           username: updatedUser?.username,
           email: updatedUser?.email,
-          premiumShares: updatedUser?.premiumShares || 0,
+          premiumShares: premiumHolding?.quantity || 0,
         },
         credited: result.credited,
         revoked: result.revoked,
@@ -667,15 +669,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "User not found" });
       }
 
-      // Accrue mining shares in background (fire-and-forget for dashboard speed)
+      // Accrue vesting shares in background (fire-and-forget for dashboard speed)
       // Vesting is also triggered by: cron job, vesting modal, claim, redeem, login
       accrueVestingShares(user.id).catch(err => console.error('[Vesting] Background accrual error:', err));
 
       // Fetch user-specific data in parallel
-      const [userHoldings, miningData, miningSplits] = await Promise.all([
+      const [userHoldings, vestingData, vestingSplits] = await Promise.all([
         storage.getUserHoldings(user.id),
-        storage.getMining(user.id),
-        storage.getMiningSplits(user.id),
+        storage.getVesting(user.id),
+        storage.getVestingSplits(user.id),
       ]);
 
       // Collect all unique player IDs we need to fetch
@@ -689,9 +691,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add recent trades player IDs
       recentTrades.forEach(t => playerIds.add(t.playerId));
 
-      // Add mining player IDs
-      if (miningData?.playerId) playerIds.add(miningData.playerId);
-      miningSplits.forEach(s => playerIds.add(s.playerId));
+      // Add vesting player IDs
+      if (vestingData?.playerId) playerIds.add(vestingData.playerId);
+      vestingSplits.forEach(s => playerIds.add(s.playerId));
 
       // Parallel fetch: players, ranks, and yesterday's snapshot
       const yesterday = new Date();
@@ -749,19 +751,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return parseFloat(b.value) - parseFloat(a.value);
       });
 
-      // Get mining data using pre-fetched players
-      let miningPlayer = undefined;
-      let miningPlayers: Array<{ player: Player | undefined; sharesPerHour: number }> = [];
+      // Get vesting data using pre-fetched players
+      let vestingPlayer = undefined;
+      let vestingPlayers: Array<{ player: Player | undefined; sharesPerHour: number }> = [];
 
-      if (miningSplits.length > 0) {
-        // Multi-player mining
-        miningPlayers = miningSplits.map(split => ({
+      if (vestingSplits.length > 0) {
+        // Multi-player vesting
+        vestingPlayers = vestingSplits.map(split => ({
           player: playerMap.get(split.playerId),
           sharesPerHour: split.sharesPerHour,
         }));
-      } else if (miningData?.playerId) {
-        // Legacy single-player mining
-        miningPlayer = playerMap.get(miningData.playerId);
+      } else if (vestingData?.playerId) {
+        // Legacy single-player vesting
+        vestingPlayer = playerMap.get(vestingData.playerId);
       }
 
       // Get ranks from cached snapshot or calculate real-time
@@ -802,10 +804,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           portfolioRankChange,
         },
         hotPlayers,
-        vesting: miningData ? {
-          ...miningData,
-          player: miningPlayer,
-          players: miningPlayers,
+        vesting: vestingData ? {
+          ...vestingData,
+          player: vestingPlayer,
+          players: vestingPlayers,
           capLimit: user.isPremium ? 4800 : 2400,
           sharesPerHour: user.isPremium ? 200 : 100,
         } : null,
@@ -1066,7 +1068,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: p.lastName,
           team: p.team,
           position: p.position,
-          price: p.lastTradePrice ? parseFloat(p.lastTradePrice) : null,
+          price: p.currentPrice ? parseFloat(p.currentPrice) : (p.lastTradePrice ? parseFloat(p.lastTradePrice) : null),
           priceChange24h: parseFloat(p.priceChange24h),
         }));
 
@@ -1085,7 +1087,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Filter to players with established market prices and sort by marketCap
       const topMarketCap = players
-        .filter(p => p.lastTradePrice && parseFloat(p.marketCap) > 0)
+        .filter(p => (p.lastTradePrice || p.currentPrice) && parseFloat(p.marketCap) > 0)
         .sort((a, b) => parseFloat(b.marketCap) - parseFloat(a.marketCap))
         .slice(0, limit)
         .map(p => ({
@@ -1094,7 +1096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: p.lastName,
           team: p.team,
           position: p.position,
-          price: p.lastTradePrice ? parseFloat(p.lastTradePrice) : null,
+          price: p.currentPrice ? parseFloat(p.currentPrice) : (p.lastTradePrice ? parseFloat(p.lastTradePrice) : null),
           marketCap: parseFloat(p.marketCap),
           totalShares: p.totalShares,
         }));
@@ -1119,9 +1121,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
 
+  // Get all players with advanced filtering
   app.get("/api/players", async (req, res) => {
     try {
-      const { search, team, position, limit, offset, sortBy, sortOrder, hasBuyOrders, hasSellOrders, teamsPlayingOnDate, sport } = req.query;
+      const { search, team, position, limit, offset, sortBy, sortOrder, hasBuyOrders, hasSellOrders, teamsPlayingOnDate, sport, isWatchlist } = req.query;
+
+      // Handle watchlist filtering
+      // If isWatchlist=true, we need authentication
+      let watchlistUserId: string | undefined = undefined;
+      if (isWatchlist === 'true') {
+        const userId = (req.user as any)?.claims?.sub; // Use raw claims check here since middleware might be optionalAuth
+        if (!userId) {
+          // If asking for watchlist but not logged in, return empty or error?
+          // Let's return empty to be safe
+          return res.json({ players: [], total: 0 });
+        }
+        watchlistUserId = userId;
+      }
 
       // Parse and validate pagination params
       const parsedLimit = limit ? parseInt(limit as string) : 50;
@@ -1182,6 +1198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         hasBuyOrders: safeHasBuyOrders,
         hasSellOrders: safeHasSellOrders,
         teamsPlayingOnDate: teamsPlayingFilter,
+        watchlistUserId: watchlistUserId
       });
 
       // PERFORMANCE OPTIMIZATION: Batch fetch order books and season stats for ALL players in parallel
@@ -1266,7 +1283,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
         limit: safeLimit,
       });
 
-      res.json(activity);
+      // Enrich with player metrics (priceChange24h)
+      const uniquePlayerIds = Array.from(new Set(activity.map((a: any) => a.playerId)));
+      const players = await storage.getPlayersByIds(uniquePlayerIds);
+      const playerMap = new Map(players.map(p => [p.id, p]));
+
+      const enrichedActivity = activity.map((item: any) => {
+        const player = playerMap.get(item.playerId);
+        return {
+          ...item,
+          priceChange24h: player?.priceChange24h || "0",
+          currentPrice: player?.currentPrice || "0", // Ensure we have the latest reference price
+        };
+      });
+
+      res.json(enrichedActivity);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // User trade history (for checklist/onboarding and portfolio)
+  app.get("/api/trades/history", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const trades = await storage.getMarketActivity({ userId, limit: 100 });
+      res.json(trades);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Watch List - Legacy endpoint (returns all player IDs across all watchlists)
+  app.get("/api/watchlist", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const playerIds = await storage.getWatchList(userId);
+      res.json(playerIds);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Multi-watchlist endpoints
+  app.get("/api/watchlists", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const watchlists = await storage.getWatchlists(userId);
+      res.json(watchlists);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.post("/api/watchlists", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { name, color } = req.body;
+      if (!name) {
+        return res.status(400).json({ error: "Watchlist name is required" });
+      }
+      const watchlist = await storage.createWatchlist(userId, name, false, color);
+      res.json(watchlist);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.put("/api/watchlists/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { name, color } = req.body;
+      await storage.updateWatchlist(id, { name, color });
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  app.delete("/api/watchlists/:id", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteWatchlist(id);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get items in a specific watchlist
+  app.get("/api/watchlists/:id/items", isAuthenticated, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const playerIds = await storage.getWatchlistItems(id);
+      res.json(playerIds);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Add player to watchlist (with optional watchlistId, defaults to Favorites)
+  app.post("/api/watchlist/:playerId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { playerId } = req.params;
+      const { watchlistId } = req.body || {};
+      await storage.addToWatchList(userId, playerId, watchlistId);
+
+      // Get the watchlist name for response
+      const watchlistDetails = watchlistId
+        ? (await storage.getWatchlists(userId)).find(w => w.id === watchlistId)
+        : (await storage.getWatchlists(userId)).find(w => w.isDefault);
+
+      res.json({
+        success: true,
+        watchlistId: watchlistDetails?.id,
+        watchlistName: watchlistDetails?.name || 'Favorites'
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Remove player from watchlist (with optional watchlistId)
+  app.delete("/api/watchlist/:playerId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { playerId } = req.params;
+      const watchlistId = req.query.watchlistId as string | undefined;
+      await storage.removeFromWatchList(userId, playerId, watchlistId);
+      res.json({ success: true });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get which watchlists contain a specific player
+  app.get("/api/player/:playerId/watchlists", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { playerId } = req.params;
+      const watchlistIds = await storage.getPlayerWatchlists(userId, playerId);
+      res.json(watchlistIds);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -2137,7 +2295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Parse types filter (comma-separated string to array)
       let typesArray: string[] | undefined;
       if (types && typeof types === 'string') {
-        typesArray = types.split(',').filter(t => ['mining', 'market', 'contest'].includes(t));
+        typesArray = types.split(',').filter(t => ['vesting', 'market', 'contest'].includes(t));
       }
 
       const filters = {
@@ -2172,15 +2330,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await accrueVestingShares(userId);
 
       // Fetch updated vesting data
-      const [miningData, miningSplits] = await Promise.all([
-        storage.getMining(userId),
-        storage.getMiningSplits(userId),
+      const [vestingData, vestingSplits] = await Promise.all([
+        storage.getVesting(userId),
+        storage.getVestingSplits(userId),
       ]);
 
       // Get player data for splits
       const playerIds = new Set<string>();
-      if (miningData?.playerId) playerIds.add(miningData.playerId);
-      miningSplits.forEach(s => playerIds.add(s.playerId));
+      if (vestingData?.playerId) playerIds.add(vestingData.playerId);
+      vestingSplits.forEach(s => playerIds.add(s.playerId));
 
       const players = await storage.getPlayersByIds(Array.from(playerIds));
       const playerMap = new Map(players.map(p => [p.id, p]));
@@ -2188,10 +2346,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const isPremiumUser = user.premiumExpiresAt && user.premiumExpiresAt > new Date();
 
       res.json({
-        vesting: miningData ? {
-          ...miningData,
-          player: miningData.playerId ? playerMap.get(miningData.playerId) : null,
-          splits: miningSplits.map(s => ({
+        vesting: vestingData ? {
+          ...vestingData,
+          player: vestingData.playerId ? playerMap.get(vestingData.playerId) : null,
+          splits: vestingSplits.map(s => ({
             ...s,
             player: playerMap.get(s.playerId),
           })),
@@ -2234,7 +2392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       for (const player of playersArray) {
-        if (!player.isEligibleForMining) {
+        if (!player.isEligibleForVesting) {
           return res.status(400).json({ error: `${player.firstName} ${player.lastName} is not eligible for vesting` });
         }
       }
@@ -2243,12 +2401,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // AUTO-CLAIM: Check if user has unclaimed shares and claim them automatically
       await accrueVestingShares(user.id);
-      const currentMining = await storage.getMining(user.id);
+      const currentVesting = await storage.getVesting(user.id);
       let claimedData = null;
 
-      if (currentMining && currentMining.sharesAccumulated > 0) {
-        const totalAccumulated = currentMining.sharesAccumulated;
-        const splits = await storage.getMiningSplits(user.id);
+      if (currentVesting && currentVesting.sharesAccumulated > 0) {
+        const totalAccumulated = currentVesting.sharesAccumulated;
+        const splits = await storage.getVestingSplits(user.id);
         const usingSplits = splits.length > 0;
 
         if (usingSplits) {
@@ -2297,7 +2455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               await storage.updateHolding(user.id, "player", dist.playerId, dist.shares, "0.0000");
             }
 
-            await storage.createMiningClaim({
+            await storage.createVestingClaim({
               userId: user.id,
               playerId: dist.playerId,
               sharesClaimed: dist.shares,
@@ -2311,37 +2469,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
             totalDistributed += dist.shares;
           }
 
-          await storage.incrementTotalSharesMined(user.id, totalDistributed);
+          await storage.incrementTotalSharesVested(user.id, totalDistributed);
           claimedData = { players: claimedPlayers, totalSharesClaimed: totalDistributed };
         } else {
-          // Legacy single-player mining - use batched queries for consistency
-          if (currentMining.playerId) {
+          // Legacy single-player vesting - use batched queries for consistency
+          if (currentVesting.playerId) {
             const [players, holdings] = await Promise.all([
-              storage.getPlayersByIds([currentMining.playerId]),
-              storage.getBatchHoldings(user.id, "player", [currentMining.playerId]),
+              storage.getPlayersByIds([currentVesting.playerId]),
+              storage.getBatchHoldings(user.id, "player", [currentVesting.playerId]),
             ]);
 
             const player = players[0];
             if (player) {
-              const holding = holdings.get(currentMining.playerId);
+              const holding = holdings.get(currentVesting.playerId);
               if (holding) {
-                const newQuantity = holding.quantity + currentMining.sharesAccumulated;
+                const newQuantity = holding.quantity + currentVesting.sharesAccumulated;
                 const newTotalCost = parseFloat(holding.totalCostBasis);
                 const newAvgCost = newTotalCost / newQuantity;
-                await storage.updateHolding(user.id, "player", currentMining.playerId, newQuantity, newAvgCost.toFixed(4));
+                await storage.updateHolding(user.id, "player", currentVesting.playerId, newQuantity, newAvgCost.toFixed(4));
               } else {
-                await storage.updateHolding(user.id, "player", currentMining.playerId, currentMining.sharesAccumulated, "0.0000");
+                await storage.updateHolding(user.id, "player", currentVesting.playerId, currentVesting.sharesAccumulated, "0.0000");
               }
 
-              await storage.incrementTotalSharesMined(user.id, currentMining.sharesAccumulated);
-              await storage.createMiningClaim({
+              await storage.incrementTotalSharesVested(user.id, currentVesting.sharesAccumulated);
+              await storage.createVestingClaim({
                 userId: user.id,
-                playerId: currentMining.playerId,
-                sharesClaimed: currentMining.sharesAccumulated,
+                playerId: currentVesting.playerId,
+                sharesClaimed: currentVesting.sharesAccumulated,
               });
 
               claimedData = {
-                sharesClaimed: currentMining.sharesAccumulated,
+                sharesClaimed: currentVesting.sharesAccumulated,
                 player,
               };
             }
@@ -2365,10 +2523,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         sharesPerHour: baseSharesPerHour + (index < remainder ? 1 : 0),
       }));
 
-      // Update mining state: clear playerId (using splits now), reset timestamps
+      // Update vesting state: clear playerId (using splits now), reset timestamps
       const now = new Date();
-      await storage.setMiningSplits(user.id, newSplits);
-      await storage.updateMining(user.id, {
+      await storage.setVestingSplits(user.id, newSplits);
+      await storage.updateVesting(user.id, {
         playerId: null, // Clear single player ID since using splits
         sharesAccumulated: 0,
         residualMs: 0,
@@ -2403,25 +2561,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Accrue any final shares before claiming
       await accrueVestingShares(user.id);
 
-      const miningData = await storage.getMining(user.id);
+      const vestingData = await storage.getVesting(user.id);
 
-      if (!miningData || miningData.sharesAccumulated === 0) {
+      if (!vestingData || vestingData.sharesAccumulated === 0) {
         return res.status(400).json({ error: "No shares to claim" });
       }
 
       // Check if using multi-player vesting (splits)
-      const splits = await storage.getMiningSplits(user.id);
+      const splits = await storage.getVestingSplits(user.id);
       const usingSplits = splits.length > 0;
 
       if (!usingSplits) {
-        // Legacy single-player mining - use batched queries for consistency
-        if (!miningData.playerId) {
+        // Legacy single-player vesting - use batched queries for consistency
+        if (!vestingData.playerId) {
           return res.status(400).json({ error: "No player selected for vesting" });
         }
 
         const [players, holdings] = await Promise.all([
-          storage.getPlayersByIds([miningData.playerId]),
-          storage.getBatchHoldings(user.id, "player", [miningData.playerId]),
+          storage.getPlayersByIds([vestingData.playerId]),
+          storage.getBatchHoldings(user.id, "player", [vestingData.playerId]),
         ]);
 
         const player = players[0];
@@ -2430,29 +2588,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Add shares to holdings (cost basis $0)
-        const holding = holdings.get(miningData.playerId);
+        const holding = holdings.get(vestingData.playerId);
         if (holding) {
-          const newQuantity = holding.quantity + miningData.sharesAccumulated;
-          const newTotalCost = parseFloat(holding.totalCostBasis); // Mined shares have $0 cost
+          const newQuantity = holding.quantity + vestingData.sharesAccumulated;
+          const newTotalCost = parseFloat(holding.totalCostBasis); // Vested shares have $0 cost
           const newAvgCost = newTotalCost / newQuantity;
-          await storage.updateHolding(user.id, "player", miningData.playerId, newQuantity, newAvgCost.toFixed(4));
+          await storage.updateHolding(user.id, "player", vestingData.playerId, newQuantity, newAvgCost.toFixed(4));
         } else {
-          await storage.updateHolding(user.id, "player", miningData.playerId, miningData.sharesAccumulated, "0.0000");
+          await storage.updateHolding(user.id, "player", vestingData.playerId, vestingData.sharesAccumulated, "0.0000");
         }
 
-        // Increment total shares mined counter
-        await storage.incrementTotalSharesMined(user.id, miningData.sharesAccumulated);
+        // Increment total shares vested counter
+        await storage.incrementTotalSharesVested(user.id, vestingData.sharesAccumulated);
 
-        // Record mining claim for activity timeline
-        await storage.createMiningClaim({
+        // Record vesting claim for activity timeline
+        await storage.createVestingClaim({
           userId: user.id,
-          playerId: miningData.playerId,
-          sharesClaimed: miningData.sharesAccumulated,
+          playerId: vestingData.playerId,
+          sharesClaimed: vestingData.sharesAccumulated,
         });
 
-        // Reset mining
+        // Reset vesting
         const now = new Date();
-        await storage.updateMining(user.id, {
+        await storage.updateVesting(user.id, {
           sharesAccumulated: 0,
           lastClaimedAt: now,
           lastAccruedAt: now,
@@ -2462,17 +2620,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
 
         broadcast({ type: "portfolio", userId: user.id });
-        broadcast({ type: "vesting", userId: user.id, claimed: miningData.sharesAccumulated });
+        broadcast({ type: "vesting", userId: user.id, claimed: vestingData.sharesAccumulated });
 
         return res.json({
           success: true,
-          sharesClaimed: miningData.sharesAccumulated,
+          sharesClaimed: vestingData.sharesAccumulated,
           player,
         });
       }
 
-      // Multi-player mining: distribute shares proportionally
-      const totalAccumulated = miningData.sharesAccumulated;
+      // Multi-player vesting: distribute shares proportionally
+      const totalAccumulated = vestingData.sharesAccumulated;
       const totalRate = 100;
       const claimedPlayers = [];
       let totalDistributed = 0;
@@ -2518,8 +2676,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateHolding(user.id, "player", dist.playerId, dist.shares, "0.0000");
         }
 
-        // Record mining claim for activity timeline
-        await storage.createMiningClaim({
+        // Record vesting claim for activity timeline
+        await storage.createVestingClaim({
           userId: user.id,
           playerId: dist.playerId,
           sharesClaimed: dist.shares,
@@ -2533,12 +2691,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         totalDistributed += dist.shares;
       }
 
-      // Increment total shares mined counter
-      await storage.incrementTotalSharesMined(user.id, totalDistributed);
+      // Increment total shares vested counter
+      await storage.incrementTotalSharesVested(user.id, totalDistributed);
 
-      // Reset mining (keep splits intact)
+      // Reset vesting (keep splits intact)
       const now = new Date();
-      await storage.updateMining(user.id, {
+      await storage.updateVesting(user.id, {
         sharesAccumulated: 0,
         lastClaimedAt: now,
         lastAccruedAt: now,
@@ -2573,8 +2731,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Accrue any final shares before redeeming
       await accrueVestingShares(user.id);
 
-      const miningData = await storage.getMining(user.id);
-      if (!miningData || miningData.sharesAccumulated === 0) {
+      const vestingData = await storage.getVesting(user.id);
+      if (!vestingData || vestingData.sharesAccumulated === 0) {
         return res.status(400).json({ error: "No shares to redeem" });
       }
 
@@ -2587,9 +2745,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Validate total shares don't exceed available
       const totalRequested = distributions.reduce((sum: number, d: any) => sum + (d.shares || 0), 0);
-      if (totalRequested > miningData.sharesAccumulated) {
+      if (totalRequested > vestingData.sharesAccumulated) {
         return res.status(400).json({
-          error: `Cannot redeem ${totalRequested} shares. Only ${miningData.sharesAccumulated} available.`
+          error: `Cannot redeem ${totalRequested} shares. Only ${vestingData.sharesAccumulated} available.`
         });
       }
 
@@ -2633,7 +2791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
 
         // Record claim for activity timeline
-        await storage.createMiningClaim({
+        await storage.createVestingClaim({
           userId: user.id,
           playerId: dist.playerId,
           sharesClaimed: dist.shares,
@@ -2648,22 +2806,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Increment total shares mined counter
-      await storage.incrementTotalSharesMined(user.id, totalRedeemed);
+      await storage.incrementTotalSharesVested(user.id, totalRedeemed);
 
-      // Update mining - subtract redeemed shares, keep remaining in pool
+      // Update vesting - subtract redeemed shares, keep remaining in pool
       // CRITICAL: Reset lastAccruedAt to prevent frontend from projecting phantom shares
       const now = new Date();
-      const remainingShares = miningData.sharesAccumulated - totalRedeemed;
-      await storage.updateMining(user.id, {
+      const remainingShares = vestingData.sharesAccumulated - totalRedeemed;
+      await storage.updateVesting(user.id, {
         sharesAccumulated: remainingShares,
         lastClaimedAt: now,
         updatedAt: now,
         // Reset accrual baseline so frontend projections start fresh
         lastAccruedAt: now,
         // Only reset residualMs on full redemption - preserve fractional progress for partial redemptions
-        residualMs: remainingShares === 0 ? 0 : miningData.residualMs,
+        residualMs: remainingShares === 0 ? 0 : vestingData.residualMs,
         // Only clear cap if we have room now
-        capReachedAt: remainingShares < (user.isPremium ? 4800 : 2400) ? null : miningData.capReachedAt,
+        capReachedAt: remainingShares < (user.isPremium ? 4800 : 2400) ? null : vestingData.capReachedAt,
       });
 
       broadcast({ type: "portfolio", userId: user.id });
@@ -2806,6 +2964,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const deleted = await storage.deleteVestingPreset(presetId);
       res.json({ success: deleted });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get user's contest entries
+  app.get("/api/contests/entries", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const entries = await storage.getUserContestEntries(userId);
+      res.json(entries);
     } catch (error: any) {
       res.status(500).json({ error: error.message });
     }
@@ -2985,18 +3154,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Lineup cannot be empty" });
       }
 
-      // VALIDATE: Ensure all player IDs are numeric (MySportsFeeds IDs)
-      // Reject any slug-style IDs to prevent data corruption
+      // VALIDATE: Ensure all player IDs are in valid format
+      // Accept both pure numeric IDs and sport-prefixed IDs (e.g., nba_12345)
       for (const item of lineup) {
-        if (!/^\d+$/.test(item.playerId)) {
+        if (!/^(nba_|nfl_)?\d+$/.test(item.playerId)) {
           return res.status(400).json({
-            error: `Invalid player ID: ${item.playerId}. Player IDs must be numeric MySportsFeeds IDs, not slugs.`
+            error: `Invalid player ID format: ${item.playerId}. Expected numeric or sport-prefixed format (e.g., nba_12345).`
           });
         }
       }
 
       // VALIDATE: Check user has enough available shares BEFORE creating entry
-      // Available shares = total - locked (in orders, other contests, mining)
+      // Available shares = total - locked (in orders, other contests, vesting)
       const playerIds = lineup.map((item: any) => item.playerId);
       const players = await storage.getPlayersByIds(playerIds);
       const playerMap = new Map(players.map(p => [p.id, p]));
@@ -3167,12 +3336,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "Lineup cannot be empty" });
       }
 
-      // VALIDATE: Ensure all player IDs are numeric (MySportsFeeds IDs)
-      // Reject any slug-style IDs to prevent data corruption
+      // VALIDATE: Ensure all player IDs are in valid format
+      // Accept both pure numeric IDs and sport-prefixed IDs (e.g., nba_12345)
       for (const item of lineup) {
-        if (!/^\d+$/.test(item.playerId)) {
+        if (!/^(nba_|nfl_)?\d+$/.test(item.playerId)) {
           return res.status(400).json({
-            error: `Invalid player ID: ${item.playerId}. Player IDs must be numeric MySportsFeeds IDs, not slugs.`
+            error: `Invalid player ID format: ${item.playerId}. Expected numeric or sport-prefixed format (e.g., nba_12345).`
           });
         }
       }
@@ -3372,18 +3541,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Use cache for all leaderboard categories (60s TTL)
       const result = await getOrCompute(cacheKey, async () => {
-        if (category === "sharesMined") {
+        if (category === "sharesVested") {
           const allUsers = await storage.getUsers();
           return {
-            category: "sharesMined",
+            category: "sharesVested",
             leaderboard: allUsers
-              .sort((a: User, b: User) => b.totalSharesMined - a.totalSharesMined)
+              .sort((a: User, b: User) => b.totalSharesVested - a.totalSharesVested)
               .map((u: User, index: number) => ({
                 rank: index + 1,
                 userId: u.id,
                 username: u.username,
                 profileImageUrl: u.profileImageUrl,
-                value: u.totalSharesMined,
+                value: u.totalSharesVested,
               })),
           };
         }
@@ -3827,8 +3996,8 @@ ${posts.map(post => `  <url>
       const allUsers = await storage.getUsers();
 
       // Calculate rankings
-      const sharesMinedRank = allUsers
-        .sort((a: User, b: User) => b.totalSharesMined - a.totalSharesMined)
+      const sharesVestedRank = allUsers
+        .sort((a: User, b: User) => b.totalSharesVested - a.totalSharesVested)
         .findIndex((u: User) => u.id === user.id) + 1;
 
       const marketOrdersRank = allUsers
@@ -3875,13 +4044,13 @@ ${posts.map(post => `  <url>
         },
         stats: {
           netWorth,
-          totalSharesMined: user.totalSharesMined,
+          totalSharesVested: user.totalSharesVested,
           totalMarketOrders: user.totalMarketOrders,
           totalTradesExecuted: user.totalTradesExecuted,
           holdingsCount: enrichedHoldings.length,
         },
         rankings: {
-          sharesMined: sharesMinedRank,
+          sharesVested: sharesVestedRank,
           marketOrders: marketOrdersRank,
           netWorth: netWorthRank,
         },
@@ -5436,10 +5605,10 @@ ${posts.map(post => `  <url>
           volumeChange,
           marketCap: marketHealth.totalMarketCap,
           marketCapChange,
-          sharesMined: shareEconomy.totalSharesMined,
+          sharesVested: shareEconomy.totalSharesVested,
           sharesBurned: shareEconomy.totalSharesBurned,
           totalShares: shareEconomy.totalSharesInEconomy,
-          periodSharesMined: shareEconomy.periodSharesMined,
+          periodsharesVested: shareEconomy.periodsharesVested,
           periodSharesBurned: shareEconomy.periodSharesBurned,
           timeSeries,
           shareEconomyTimeSeries,
@@ -5495,7 +5664,7 @@ ${posts.map(post => `  <url>
           marketCap: parseFloat(s.marketCap),
           transactions: s.transactionsCount,
           volume: parseFloat(s.volume),
-          sharesMined: s.sharesMined,
+          sharesVested: s.sharesVested,
           sharesBurned: s.sharesBurned,
           totalShares: s.totalShares,
         })),

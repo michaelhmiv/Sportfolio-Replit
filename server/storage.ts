@@ -6,9 +6,9 @@ import {
   balanceLocks,
   orders,
   trades,
-  mining,
-  miningSplits,
-  miningClaims,
+  vesting,
+  vestingSplits,
+  vestingClaims,
   vestingPresets,
   contests,
   contestEntries,
@@ -23,6 +23,8 @@ import {
   premiumOrders,
   premiumTrades,
   whopPayments,
+  watchlists,
+  watchList,
   type User,
   type InsertUser,
   type UpsertUser,
@@ -34,11 +36,11 @@ import {
   type BalanceLock,
   type Order,
   type Trade,
-  type Mining,
-  type MiningSplit,
-  type InsertMiningSplit,
-  type MiningClaim,
-  type InsertMiningClaim,
+  type Vesting,
+  type VestingSplit,
+  type InsertVestingSplit,
+  type VestingClaim,
+  type InsertVestingClaim,
   type VestingPreset,
   type InsertVestingPreset,
   type Contest,
@@ -134,7 +136,7 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserBalance(userId: string, amount: string): Promise<void>;
   updateUsername(userId: string, username: string): Promise<User | undefined>;
-  incrementTotalSharesMined(userId: string, amount: number): Promise<void>;
+  incrementTotalSharesVested(userId: string, amount: number): Promise<void>;
   markOnboardingComplete(userId: string): Promise<void>;
   updateUserPremiumStatus(userId: string, isPremium: boolean, premiumExpiresAt: Date | null): Promise<void>;
 
@@ -152,6 +154,7 @@ export interface IStorage {
     hasBuyOrders?: boolean;
     hasSellOrders?: boolean;
     teamsPlayingOnDate?: string[];
+    watchlistUserId?: string;
   }): Promise<{ players: Player[]; total: number }>;
   getPlayer(id: string): Promise<Player | undefined>;
   getPlayersByIds(ids: string[]): Promise<Player[]>;
@@ -172,8 +175,22 @@ export interface IStorage {
   // Batch sentiment logic
   getBatchSentiment(playerIds: string[]): Promise<Map<string, { buyPressure: number; totalVolume24h: number }>>;
 
-  // Batch all-time average fantasy points (for Value Index calculation, matches scanner logic)
   getBatchAllTimeAvgFantasyPoints(playerIds: string[]): Promise<Map<string, number>>;
+
+  // Watch list methods
+  getWatchList(userId: string): Promise<string[]>; // Returns array of player IDs (legacy/all lists)
+  addToWatchList(userId: string, playerId: string, watchlistId?: string): Promise<void>;
+  removeFromWatchList(userId: string, playerId: string, watchlistId?: string): Promise<void>;
+  isOnWatchList(userId: string, playerId: string): Promise<boolean>;
+
+  // Multi-watchlist methods
+  getWatchlists(userId: string): Promise<{ id: string; name: string; isDefault: boolean; color: string | null; itemCount: number }[]>;
+  createWatchlist(userId: string, name: string, isDefault?: boolean, color?: string): Promise<{ id: string; name: string }>;
+  updateWatchlist(watchlistId: string, updates: { name?: string; color?: string }): Promise<void>;
+  deleteWatchlist(watchlistId: string): Promise<void>;
+  ensureDefaultWatchlist(userId: string): Promise<string>; // Returns default watchlist ID
+  getWatchlistItems(watchlistId: string): Promise<string[]>; // Returns player IDs
+  getPlayerWatchlists(userId: string, playerId: string): Promise<string[]>; // Returns watchlist IDs containing player
 
   // Holdings lock methods - prevent double-spending of shares
   reserveShares(userId: string, assetType: string, assetId: string, lockType: string, lockReferenceId: string, quantity: number): Promise<HoldingsLock>;
@@ -213,13 +230,13 @@ export interface IStorage {
   // Market cap methods
   getTotalSharesForPlayer(playerId: string): Promise<number>;
 
-  // Mining methods
-  getMining(userId: string): Promise<Mining | undefined>;
-  getAllActiveMiningUserIds(): Promise<string[]>;
-  updateMining(userId: string, updates: Partial<Mining>): Promise<void>;
-  getMiningSplits(userId: string): Promise<MiningSplit[]>;
-  setMiningSplits(userId: string, splits: InsertMiningSplit[]): Promise<void>;
-  createMiningClaim(claim: InsertMiningClaim): Promise<MiningClaim>;
+  // Vesting methods
+  getVesting(userId: string): Promise<Vesting | undefined>;
+  getAllActiveVestingUserIds(): Promise<string[]>;
+  updateVesting(userId: string, updates: Partial<Vesting>): Promise<void>;
+  getVestingSplits(userId: string): Promise<VestingSplit[]>;
+  setVestingSplits(userId: string, splits: InsertVestingSplit[]): Promise<void>;
+  createVestingClaim(claim: InsertVestingClaim): Promise<VestingClaim>;
 
   // Activity methods
   getUserActivity(userId: string, filters?: { types?: string[]; limit?: number; offset?: number }): Promise<any[]>;
@@ -321,17 +338,19 @@ export interface IStorage {
     compositeScore: number;
   }>>;
   getShareEconomyStats(startDate?: Date, endDate?: Date): Promise<{
-    totalSharesMined: number;
+    totalSharesVested: number;
     totalSharesBurned: number;
     totalSharesInEconomy: number;
-    periodSharesMined: number;
+    periodsharesVested: number;
     periodSharesBurned: number;
   }>;
   getShareEconomyTimeSeries(startDate: Date, endDate: Date): Promise<Array<{
     date: string;
-    sharesMined: number;
+    sharesVested: number;
     sharesBurned: number;
   }>>;
+
+  getVestingByReference?(referenceId: string): Promise<Vesting | undefined>;
 
   // Premium checkout session methods
   createPremiumCheckoutSession(session: { userId: string; planId: string; quantity: number; amountCents: number; whopSessionId?: string }): Promise<PremiumCheckoutSession>;
@@ -392,10 +411,11 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
 
-    // Initialize mining for new user with lastAccruedAt set so vesting job processes them
-    await db.insert(mining).values({
+    // Initialize vesting for new user with full bar so they can immediately claim
+    // Cap is 2400 for non-premium, 4800 for premium - start at non-premium cap
+    await db.insert(vesting).values({
       userId: user.id,
-      sharesAccumulated: 0,
+      sharesAccumulated: 2400,
       lastAccruedAt: new Date(),
     });
 
@@ -405,7 +425,7 @@ export class DatabaseStorage implements IStorage {
   async upsertUser(userData: UpsertUser): Promise<User> {
     // IDEMPOTENCY GUARD: Check if target user ID already exists
     // This handles duplicate requests/retries where migration already completed
-    const [existingTargetUser] = await db.select().from(users).where(eq(users.id, userData.id));
+    const [existingTargetUser] = await db.select().from(users).where(eq(users.id, userData.id!));
     if (existingTargetUser) {
       console.log(`[LAZY_MIGRATION] User ${userData.email} already exists with ID ${userData.id}, skipping migration`);
       // Update profile fields if needed and return
@@ -419,7 +439,7 @@ export class DatabaseStorage implements IStorage {
           username: userData.username || existingTargetUser.username,
           updatedAt: new Date(),
         })
-        .where(eq(users.id, userData.id))
+        .where(eq(users.id, userData.id!))
         .returning();
       return updatedUser;
     }
@@ -474,7 +494,7 @@ export class DatabaseStorage implements IStorage {
           premiumExpiresAt: existingUserByEmail.premiumExpiresAt,
           hasSeenOnboarding: existingUserByEmail.hasSeenOnboarding,
           isBot: existingUserByEmail.isBot,
-          totalSharesMined: existingUserByEmail.totalSharesMined,
+          totalSharesVested: existingUserByEmail.totalSharesVested,
           totalMarketOrders: existingUserByEmail.totalMarketOrders,
           totalTradesExecuted: existingUserByEmail.totalTradesExecuted,
           createdAt: existingUserByEmail.createdAt,
@@ -484,11 +504,11 @@ export class DatabaseStorage implements IStorage {
         // Step 3: Update all FK references to point to the new user ID
         // (New ID now exists, so FK constraints are satisfied)
 
-        // Update mining records
+        // Update vesting records
         await tx
-          .update(mining)
+          .update(vesting)
           .set({ userId: newId })
-          .where(eq(mining.userId, oldId));
+          .where(eq(vesting.userId, oldId));
 
         // Update holdings
         await tx
@@ -525,17 +545,17 @@ export class DatabaseStorage implements IStorage {
           .set({ sellerId: newId })
           .where(eq(trades.sellerId, oldId));
 
-        // Update mining splits
+        // Update vesting splits
         await tx
-          .update(miningSplits)
+          .update(vestingSplits)
           .set({ userId: newId })
-          .where(eq(miningSplits.userId, oldId));
+          .where(eq(vestingSplits.userId, oldId));
 
-        // Update mining claims
+        // Update vesting claims
         await tx
-          .update(miningClaims)
+          .update(vestingClaims)
           .set({ userId: newId })
-          .where(eq(miningClaims.userId, oldId));
+          .where(eq(vestingClaims.userId, oldId));
 
         // Update vesting presets
         await tx
@@ -594,7 +614,7 @@ export class DatabaseStorage implements IStorage {
         await tx.delete(users).where(eq(users.id, oldId));
 
         // Return the migrated user
-        const [result] = await tx.select().from(users).where(eq(users.id, newId));
+        const [result] = await tx.select().from(users).where(eq(users.id, newId!));
         console.log(`[LAZY_MIGRATION] Successfully migrated user ${userData.email} to new auth ID`);
         return result;
       });
@@ -625,10 +645,10 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
 
-    // Initialize mining for new user if it doesn't exist (with lastAccruedAt so vesting job processes them)
-    const existingMining = await db.select().from(mining).where(eq(mining.userId, user.id));
-    if (existingMining.length === 0) {
-      await db.insert(mining).values({
+    // Initialize vesting for new user if it doesn't exist (with lastAccruedAt so vesting job processes them)
+    const existingVesting = await db.select().from(vesting).where(eq(vesting.userId, user.id));
+    if (existingVesting.length === 0) {
+      await db.insert(vesting).values({
         userId: user.id,
         sharesAccumulated: 0,
         lastAccruedAt: new Date(),
@@ -645,13 +665,49 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId));
   }
 
-  async incrementTotalSharesMined(userId: string, amount: number): Promise<void> {
+  async incrementTotalSharesVested(userId: string, amount: number): Promise<void> {
     await db
       .update(users)
       .set({
-        totalSharesMined: sql`${users.totalSharesMined} + ${amount}`
+        totalSharesVested: sql`${users.totalSharesVested} + ${amount}`
       })
       .where(eq(users.id, userId));
+  }
+
+  // Vesting methods
+  async getVesting(userId: string): Promise<Vesting | undefined> {
+    const [userVesting] = await db.select().from(vesting).where(eq(vesting.userId, userId));
+    return userVesting || undefined;
+  }
+
+  async getAllActiveVestingUserIds(): Promise<string[]> {
+    const result = await db.select({ userId: vesting.userId }).from(vesting);
+    return result.map(r => r.userId);
+  }
+
+  async updateVesting(userId: string, updates: Partial<Vesting>): Promise<void> {
+    await db
+      .update(vesting)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(vesting.userId, userId));
+  }
+
+  async getVestingSplits(userId: string): Promise<VestingSplit[]> {
+    return await db.select().from(vestingSplits).where(eq(vestingSplits.userId, userId));
+  }
+
+  async setVestingSplits(userId: string, splits: InsertVestingSplit[]): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.delete(vestingSplits).where(eq(vestingSplits.userId, userId));
+      if (splits.length > 0) {
+        await tx.insert(vestingSplits).values(splits.map(s => ({ ...s, userId })));
+      }
+    });
+  }
+
+  async createVestingClaim(claim: InsertVestingClaim): Promise<VestingClaim> {
+    const [created] = await db.insert(vestingClaims).values(claim).returning();
+    return created;
   }
 
   async addUserBalance(userId: string, delta: number): Promise<User | undefined> {
@@ -748,6 +804,7 @@ export class DatabaseStorage implements IStorage {
     hasBuyOrders?: boolean;
     hasSellOrders?: boolean;
     teamsPlayingOnDate?: string[];
+    watchlistUserId?: string;
   }): Promise<{ players: Player[]; total: number }> {
     const {
       search, team, position, sport,
@@ -756,10 +813,22 @@ export class DatabaseStorage implements IStorage {
       sortOrder = 'desc',
       hasBuyOrders,
       hasSellOrders,
-      teamsPlayingOnDate
+      teamsPlayingOnDate,
+      watchlistUserId
     } = filters || {};
 
     const conditions = this.buildPlayerQueryConditions({ search, team, position, sport });
+
+    // Watchlist filter
+    if (watchlistUserId) {
+      conditions.push(
+        sql`EXISTS (
+          SELECT 1 FROM ${watchList}
+          WHERE ${watchList.playerId} = ${players.id}
+          AND ${watchList.userId} = ${watchlistUserId}
+        )`
+      );
+    }
 
     // Add teams playing on date filter
     if (teamsPlayingOnDate && teamsPlayingOnDate.length > 0) {
@@ -1558,7 +1627,8 @@ export class DatabaseStorage implements IStorage {
       .from(trades)
       .innerJoin(players, eq(trades.playerId, players.id))
       .innerJoin(buyer, eq(trades.buyerId, buyer.id))
-      .innerJoin(seller, eq(trades.sellerId, seller.id));
+      .innerJoin(seller, eq(trades.sellerId, seller.id))
+      .$dynamic();
 
     // Build and apply where conditions for trades (after joins)
     const tradeConditions = [];
@@ -1580,8 +1650,23 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(trades.executedAt))
       .limit(fetchLimit);
 
+    // Build where conditions for orders
+    const ordersConditions = [];
+    if (playerId) ordersConditions.push(eq(orders.playerId, playerId));
+    if (userId) ordersConditions.push(eq(orders.userId, userId));
+    // Exclude filled orders (optional, but good for "activity" feed unless we want history)
+    // ordersConditions.push(ne(orders.status, 'filled')); // Keep filled for history?
+
+    // Search filter for orders
+    if (playerSearch) {
+      const searchPattern = `%${playerSearch}%`;
+      ordersConditions.push(
+        sql`(${players.firstName} ILIKE ${searchPattern} OR ${players.lastName} ILIKE ${searchPattern})`
+      );
+    }
+
     // Fetch recent orders (placed and cancelled) with player and user info
-    let ordersQuery = db
+    const recentOrders = await db
       .select({
         activityType: sql<string>`CASE WHEN ${orders.status} = 'cancelled' THEN 'order_cancelled' ELSE 'order_placed' END`,
         id: orders.id,
@@ -1589,38 +1674,19 @@ export class DatabaseStorage implements IStorage {
         playerFirstName: players.firstName,
         playerLastName: players.lastName,
         playerTeam: players.team,
+        playerSport: players.sport,
         userId: orders.userId,
-        username: users.username,
-        buyerId: sql<string>`NULL`,
-        buyerUsername: sql<string>`NULL`,
-        sellerId: sql<string>`NULL`,
-        sellerUsername: sql<string>`NULL`,
-        side: orders.side,
-        orderType: orders.orderType,
-        quantity: sql<number>`GREATEST(${orders.quantity} - ${orders.filledQuantity}, 0)`,
-        price: sql<string>`NULL`,
-        limitPrice: orders.limitPrice,
+        userUsername: users.username,
+        userAvatar: users.profileImageUrl,
+        price: orders.limitPrice,
+        quantity: orders.quantity,
         timestamp: orders.createdAt,
       })
       .from(orders)
       .innerJoin(players, eq(orders.playerId, players.id))
-      .innerJoin(users, eq(orders.userId, users.id));
-
-    // Build and apply where conditions for orders (after joins)
-    const orderConditions = [];
-    if (playerId) orderConditions.push(eq(orders.playerId, playerId));
-    if (userId) orderConditions.push(eq(orders.userId, userId));
-    if (playerSearch) {
-      const searchPattern = `%${playerSearch}%`;
-      orderConditions.push(
-        sql`(${players.firstName} ILIKE ${searchPattern} OR ${players.lastName} ILIKE ${searchPattern})`
-      );
-    }
-    if (orderConditions.length > 0) {
-      ordersQuery = ordersQuery.where(and(...orderConditions));
-    }
-
-    const recentOrders = await ordersQuery
+      .innerJoin(users, eq(orders.userId, users.id))
+      .$dynamic()
+      .where(and(...ordersConditions))
       .orderBy(desc(orders.createdAt))
       .limit(fetchLimit);
 
@@ -1695,55 +1761,7 @@ export class DatabaseStorage implements IStorage {
     return parseInt(result?.totalShares || '0', 10);
   }
 
-  // Mining methods
-  async getMining(userId: string): Promise<Mining | undefined> {
-    const [miningData] = await db
-      .select()
-      .from(mining)
-      .where(eq(mining.userId, userId));
-    return miningData || undefined;
-  }
 
-  async getAllActiveMiningUserIds(): Promise<string[]> {
-    // Get all users with active mining (has lastAccruedAt set)
-    const results = await db
-      .select({ userId: mining.userId })
-      .from(mining)
-      .where(isNotNull(mining.lastAccruedAt));
-    return results.map(r => r.userId);
-  }
-
-  async updateMining(userId: string, updates: Partial<Mining>): Promise<void> {
-    await db
-      .update(mining)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(mining.userId, userId));
-  }
-
-  async getMiningSplits(userId: string): Promise<MiningSplit[]> {
-    return await db
-      .select()
-      .from(miningSplits)
-      .where(eq(miningSplits.userId, userId));
-  }
-
-  async setMiningSplits(userId: string, splits: InsertMiningSplit[]): Promise<void> {
-    // Delete existing splits
-    await db.delete(miningSplits).where(eq(miningSplits.userId, userId));
-
-    // Insert new splits
-    if (splits.length > 0) {
-      await db.insert(miningSplits).values(splits);
-    }
-  }
-
-  async createMiningClaim(claim: InsertMiningClaim): Promise<MiningClaim> {
-    const [created] = await db
-      .insert(miningClaims)
-      .values(claim)
-      .returning();
-    return created;
-  }
 
   // Vesting presets methods
   async getVestingPresets(userId: string): Promise<VestingPreset[]> {
@@ -1799,34 +1817,34 @@ export class DatabaseStorage implements IStorage {
   async getUserActivity(userId: string, filters?: { types?: string[]; limit?: number; offset?: number }): Promise<any[]> {
     const limit = filters?.limit || 50;
     const offset = filters?.offset || 0;
-    const types = filters?.types || ['mining', 'market', 'contest'];
+    const types = filters?.types || ['vesting', 'market', 'contest'];
 
     const activities: any[] = [];
 
-    // 1. Mining claims
-    if (types.includes('mining')) {
+    // 1. Vesting claims
+    if (types.includes('vesting')) {
       const claims = await db
         .select({
-          id: miningClaims.id,
-          occurredAt: miningClaims.claimedAt,
-          playerId: miningClaims.playerId,
+          id: vestingClaims.id,
+          occurredAt: vestingClaims.claimedAt,
+          playerId: vestingClaims.playerId,
           playerFirstName: players.firstName,
           playerLastName: players.lastName,
           playerTeam: players.team,
-          sharesClaimed: miningClaims.sharesClaimed,
+          sharesClaimed: vestingClaims.sharesClaimed,
         })
-        .from(miningClaims)
-        .leftJoin(players, eq(miningClaims.playerId, players.id))
-        .where(eq(miningClaims.userId, userId))
-        .orderBy(desc(miningClaims.claimedAt))
+        .from(vestingClaims)
+        .leftJoin(players, eq(vestingClaims.playerId, players.id))
+        .where(eq(vestingClaims.userId, userId))
+        .orderBy(desc(vestingClaims.claimedAt))
         .limit(limit);
 
       claims.forEach(claim => {
         activities.push({
-          id: `mining-${claim.id}`,
+          id: `vesting-${claim.id}`,
           userId,
           occurredAt: claim.occurredAt,
-          category: 'mining',
+          category: 'vesting',
           subtype: 'claim',
           cashDelta: '0.00',
           sharesDelta: claim.sharesClaimed,
@@ -2048,7 +2066,7 @@ export class DatabaseStorage implements IStorage {
       let description = '';
       const meta = activity.metadata;
 
-      if (activity.category === 'mining') {
+      if (activity.category === 'vesting') {
         description = `Claimed ${meta.sharesClaimed} shares${meta.playerName ? ` of ${meta.playerName}` : ''}`;
       } else if (activity.category === 'market') {
         if (activity.subtype === 'trade_buy') {
@@ -2211,9 +2229,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteContestLineup(entryId: string): Promise<void> {
-    await db
-      .delete(contestLineups)
-      .where(eq(contestLineups.entryId, entryId));
+    await db.delete(contestLineups).where(eq(contestLineups.entryId, entryId));
   }
 
   async getContestEntryDetail(contestId: string, entryId: string): Promise<any> {
@@ -2438,7 +2454,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getRecentJobLogs(jobName?: string, limit: number = 50): Promise<JobExecutionLog[]> {
-    let query = db.select().from(jobExecutionLogs);
+    let query = db.select().from(jobExecutionLogs).$dynamic();
 
     if (jobName) {
       query = query.where(eq(jobExecutionLogs.jobName, jobName));
@@ -2768,25 +2784,29 @@ export class DatabaseStorage implements IStorage {
   async getBlogPosts(options: { limit: number; offset: number; publishedOnly: boolean }): Promise<{ posts: BlogPost[]; total: number }> {
     const { limit, offset, publishedOnly } = options;
 
-    let query = db.select().from(blogPosts);
-
-    if (publishedOnly) {
-      query = query.where(isNotNull(blogPosts.publishedAt));
-    }
-
-    const posts = await query
+    const posts = await db
+      .select()
+      .from(blogPosts)
+      .where(publishedOnly ? isNotNull(blogPosts.publishedAt) : undefined)
       .orderBy(desc(blogPosts.publishedAt), desc(blogPosts.createdAt))
       .limit(limit)
       .offset(offset);
 
     // Get total count
-    let countQuery = db.select({ count: count() }).from(blogPosts);
-    if (publishedOnly) {
-      countQuery = countQuery.where(isNotNull(blogPosts.publishedAt));
-    }
-    const [{ count: total }] = await countQuery;
+    const [{ count: total }] = await db
+      .select({ count: count() })
+      .from(blogPosts)
+      .where(publishedOnly ? isNotNull(blogPosts.publishedAt) : undefined);
 
     return { posts, total };
+  }
+
+  async getPublishedBlogCount(): Promise<number> {
+    const [result] = await db
+      .select({ count: count() })
+      .from(blogPosts)
+      .where(isNotNull(blogPosts.publishedAt));
+    return result?.count || 0;
   }
 
   async getBlogPostBySlug(slug: string): Promise<BlogPost | undefined> {
@@ -3065,24 +3085,22 @@ export class DatabaseStorage implements IStorage {
     const totalEntries = totalEntriesResult[0]?.count || 0;
 
     // Get player usage counts
-    let usageQuery = db
-      .select({
-        playerId: contestLineups.playerId,
-        timesUsed: count(),
-      })
-      .from(contestLineups)
-      .groupBy(contestLineups.playerId);
-
-    if (playerIds && playerIds.length > 0) {
-      usageQuery = db
+    const usageQuery = playerIds && playerIds.length > 0
+      ? db
         .select({
           playerId: contestLineups.playerId,
           timesUsed: count(),
         })
         .from(contestLineups)
         .where(inArray(contestLineups.playerId, playerIds))
+        .groupBy(contestLineups.playerId)
+      : db
+        .select({
+          playerId: contestLineups.playerId,
+          timesUsed: count(),
+        })
+        .from(contestLineups)
         .groupBy(contestLineups.playerId);
-    }
 
     const usageResults = await usageQuery;
     const usageMap = new Map<string, { timesUsed: number; totalEntries: number; usagePercent: number }>();
@@ -3261,19 +3279,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getShareEconomyStats(startDate?: Date, endDate?: Date): Promise<{
-    totalSharesMined: number;
+    totalSharesVested: number;
     totalSharesBurned: number;
     totalSharesInEconomy: number;
-    periodSharesMined: number;
+    periodsharesVested: number;
     periodSharesBurned: number;
   }> {
-    // Total shares mined all time
-    const totalMinedResult = await db
+    // Total shares vested all time
+    const totalVestedResult = await db
       .select({
-        total: sql<string>`COALESCE(SUM(${miningClaims.sharesClaimed}), 0)`.as('total'),
+        total: sql<string>`COALESCE(SUM(${vestingClaims.sharesClaimed}), 0)`.as('total'),
       })
-      .from(miningClaims);
-    const totalSharesMined = parseInt(totalMinedResult[0]?.total || "0");
+      .from(vestingClaims);
+    const totalSharesVested = parseInt(totalVestedResult[0]?.total || "0");
 
     // Total shares in economy (all holdings)
     const totalHoldingsResult = await db
@@ -3296,20 +3314,20 @@ export class DatabaseStorage implements IStorage {
     const totalSharesBurned = parseInt(totalBurnedResult[0]?.total || "0");
 
     // Period stats (if dates provided)
-    let periodSharesMined = 0;
+    let periodsharesVested = 0;
     let periodSharesBurned = 0;
 
     if (startDate && endDate) {
-      const periodMinedResult = await db
+      const periodVestedResult = await db
         .select({
-          total: sql<string>`COALESCE(SUM(${miningClaims.sharesClaimed}), 0)`.as('total'),
+          total: sql<string>`COALESCE(SUM(${vestingClaims.sharesClaimed}), 0)`.as('total'),
         })
-        .from(miningClaims)
+        .from(vestingClaims)
         .where(and(
-          gte(miningClaims.claimedAt, startDate),
-          lte(miningClaims.claimedAt, endDate)
+          gte(vestingClaims.claimedAt, startDate),
+          lte(vestingClaims.claimedAt, endDate)
         ));
-      periodSharesMined = parseInt(periodMinedResult[0]?.total || "0");
+      periodsharesVested = parseInt(periodVestedResult[0]?.total || "0");
 
       const periodBurnedResult = await db
         .select({
@@ -3325,32 +3343,32 @@ export class DatabaseStorage implements IStorage {
     }
 
     return {
-      totalSharesMined,
+      totalSharesVested,
       totalSharesBurned,
       totalSharesInEconomy,
-      periodSharesMined,
+      periodsharesVested,
       periodSharesBurned,
     };
   }
 
   async getShareEconomyTimeSeries(startDate: Date, endDate: Date): Promise<{
     date: string;
-    sharesMined: number;
+    sharesVested: number;
     sharesBurned: number;
   }[]> {
-    // Get shares mined by date
-    const minedByDate = await db
+    // Get shares vested by date
+    const vestedByDate = await db
       .select({
-        date: sql<string>`DATE(${miningClaims.claimedAt})`.as('date'),
-        shares: sql<string>`COALESCE(SUM(${miningClaims.sharesClaimed}), 0)`.as('shares'),
+        date: sql<string>`DATE(${vestingClaims.claimedAt})`.as('date'),
+        shares: sql<string>`COALESCE(SUM(${vestingClaims.sharesClaimed}), 0)`.as('shares'),
       })
-      .from(miningClaims)
+      .from(vestingClaims)
       .where(and(
-        gte(miningClaims.claimedAt, startDate),
-        lte(miningClaims.claimedAt, endDate)
+        gte(vestingClaims.claimedAt, startDate),
+        lte(vestingClaims.claimedAt, endDate)
       ))
-      .groupBy(sql`DATE(${miningClaims.claimedAt})`)
-      .orderBy(sql`DATE(${miningClaims.claimedAt})`);
+      .groupBy(sql`DATE(${vestingClaims.claimedAt})`)
+      .orderBy(sql`DATE(${vestingClaims.claimedAt})`);
 
     // Get shares burned by contest game_date (shares are burned when contest starts, not when entry created)
     // Only count entries from contests that have started (live or completed status)
@@ -3369,14 +3387,12 @@ export class DatabaseStorage implements IStorage {
       .groupBy(sql`DATE(${contests.gameDate})`)
       .orderBy(sql`DATE(${contests.gameDate})`);
 
-    // Combine into a single time series
-    const dateMap = new Map<string, { sharesMined: number; sharesBurned: number }>();
-
-    // Add all mined dates
-    for (const row of minedByDate) {
+    // Add all vested dates
+    const dateMap = new Map<string, { sharesVested: number; sharesBurned: number }>();
+    for (const row of vestedByDate) {
       const dateStr = row.date;
       dateMap.set(dateStr, {
-        sharesMined: parseInt(row.shares || "0"),
+        sharesVested: parseInt(row.shares || "0"),
         sharesBurned: 0,
       });
     }
@@ -3384,7 +3400,7 @@ export class DatabaseStorage implements IStorage {
     // Add/merge burned dates
     for (const row of burnedByDate) {
       const dateStr = row.date;
-      const existing = dateMap.get(dateStr) || { sharesMined: 0, sharesBurned: 0 };
+      const existing = dateMap.get(dateStr) || { sharesVested: 0, sharesBurned: 0 };
       existing.sharesBurned = parseInt(row.shares || "0");
       dateMap.set(dateStr, existing);
     }
@@ -3393,7 +3409,7 @@ export class DatabaseStorage implements IStorage {
     const sortedDates = Array.from(dateMap.keys()).sort();
     return sortedDates.map(date => ({
       date,
-      sharesMined: dateMap.get(date)?.sharesMined || 0,
+      sharesVested: dateMap.get(date)?.sharesVested || 0,
       sharesBurned: dateMap.get(date)?.sharesBurned || 0,
     }));
   }
@@ -3884,9 +3900,11 @@ export class DatabaseStorage implements IStorage {
         team: players.team,
         position: players.position,
         sport: players.sport,
+        currentPrice: players.currentPrice,
         lastTradePrice: players.lastTradePrice,
         volume24h: players.volume24h,
         priceChange24h: players.priceChange24h,
+        marketCap: players.marketCap,
         avgPoints: sql<string>`AVG(CAST(${playerGameStats.fantasyPoints} AS numeric))`,
       })
       .from(players)
@@ -3924,7 +3942,6 @@ export class DatabaseStorage implements IStorage {
           status: "active",
           totalSharesOutstanding: 0,
           totalHolders: 0,
-          marketCap: 0,
           createdAt: new Date(),
           updatedAt: new Date(),
         } as unknown as Player,
@@ -3964,6 +3981,108 @@ export class DatabaseStorage implements IStorage {
       .slice(0, 10);
 
     return { undervalued, premium, sentiment, momentum };
+  }
+  async getTradeHistory(userId: string): Promise<Trade[]> {
+    return await db.select().from(trades).where(or(eq(trades.buyerId, userId), eq(trades.sellerId, userId))).orderBy(desc(trades.executedAt)).limit(100);
+  }
+
+  async getWatchList(userId: string): Promise<string[]> {
+    // Returns all player IDs across all watchlists for the user
+    const results = await db.select({ playerId: watchList.playerId }).from(watchList).where(eq(watchList.userId, userId));
+    return results.map(r => r.playerId);
+  }
+
+  async addToWatchList(userId: string, playerId: string, watchlistId?: string): Promise<void> {
+    // If no watchlistId provided, use the default "Favorites" watchlist
+    let targetWatchlistId = watchlistId;
+    if (!targetWatchlistId) {
+      targetWatchlistId = await this.ensureDefaultWatchlist(userId);
+    }
+
+    // Check if already in this watchlist to avoid duplicates
+    const [exists] = await db.select().from(watchList).where(
+      and(eq(watchList.userId, userId), eq(watchList.playerId, playerId), eq(watchList.watchlistId, targetWatchlistId))
+    ).limit(1);
+    if (exists) return;
+
+    await db.insert(watchList).values({ userId, playerId, watchlistId: targetWatchlistId });
+  }
+
+  async removeFromWatchList(userId: string, playerId: string, watchlistId?: string): Promise<void> {
+    if (watchlistId) {
+      // Remove from specific watchlist
+      await db.delete(watchList).where(
+        and(eq(watchList.userId, userId), eq(watchList.playerId, playerId), eq(watchList.watchlistId, watchlistId))
+      );
+    } else {
+      // Remove from all watchlists
+      await db.delete(watchList).where(and(eq(watchList.userId, userId), eq(watchList.playerId, playerId)));
+    }
+  }
+
+  async isOnWatchList(userId: string, playerId: string): Promise<boolean> {
+    const [result] = await db.select().from(watchList).where(and(eq(watchList.userId, userId), eq(watchList.playerId, playerId))).limit(1);
+    return !!result;
+  }
+
+  async getWatchlists(userId: string): Promise<{ id: string; name: string; isDefault: boolean; color: string | null; itemCount: number }[]> {
+    const results = await db.select({
+      id: watchlists.id,
+      name: watchlists.name,
+      isDefault: watchlists.isDefault,
+      color: watchlists.color,
+      itemCount: sql<number>`(SELECT COUNT(*) FROM watch_list WHERE watchlist_id = watchlists.id)`.as('item_count'),
+    }).from(watchlists).where(eq(watchlists.userId, userId)).orderBy(desc(watchlists.isDefault), watchlists.name);
+
+    return results;
+  }
+
+  async createWatchlist(userId: string, name: string, isDefault?: boolean, color?: string): Promise<{ id: string; name: string }> {
+    const [result] = await db.insert(watchlists).values({
+      userId,
+      name,
+      isDefault: isDefault || false,
+      color,
+    }).returning({ id: watchlists.id, name: watchlists.name });
+    return result;
+  }
+
+  async updateWatchlist(watchlistId: string, updates: { name?: string; color?: string }): Promise<void> {
+    await db.update(watchlists).set(updates).where(eq(watchlists.id, watchlistId));
+  }
+
+  async deleteWatchlist(watchlistId: string): Promise<void> {
+    // Items will cascade delete due to FK constraint
+    await db.delete(watchlists).where(eq(watchlists.id, watchlistId));
+  }
+
+  async ensureDefaultWatchlist(userId: string): Promise<string> {
+    // Check if user has a default watchlist
+    const [existing] = await db.select({ id: watchlists.id }).from(watchlists)
+      .where(and(eq(watchlists.userId, userId), eq(watchlists.isDefault, true))).limit(1);
+
+    if (existing) return existing.id;
+
+    // Create default "Favorites" watchlist
+    const [created] = await db.insert(watchlists).values({
+      userId,
+      name: 'Favorites',
+      isDefault: true,
+    }).returning({ id: watchlists.id });
+
+    return created.id;
+  }
+
+  async getWatchlistItems(watchlistId: string): Promise<string[]> {
+    const results = await db.select({ playerId: watchList.playerId }).from(watchList)
+      .where(eq(watchList.watchlistId, watchlistId));
+    return results.map(r => r.playerId);
+  }
+
+  async getPlayerWatchlists(userId: string, playerId: string): Promise<string[]> {
+    const results = await db.select({ watchlistId: watchList.watchlistId }).from(watchList)
+      .where(and(eq(watchList.userId, userId), eq(watchList.playerId, playerId)));
+    return results.map(r => r.watchlistId).filter((id): id is string => id !== null);
   }
 }
 

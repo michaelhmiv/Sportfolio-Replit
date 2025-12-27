@@ -1,11 +1,11 @@
 import { db } from "./db";
-import { users, botProfiles, mining, miningSplits } from "@shared/schema";
+import { users, botProfiles, vesting, vestingSplits } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 interface BotConfig {
   username: string;
   botName: string;
-  botRole: "market_maker" | "trader" | "contest" | "miner" | "casual";
+  botRole: "market_maker" | "trader" | "contest" | "vester" | "casual";
   balance: string;
   aggressiveness: string;
   spreadPercent: string;
@@ -13,8 +13,8 @@ interface BotConfig {
   minOrderSize: number;
   maxDailyOrders: number;
   maxDailyVolume: number;
-  miningClaimThreshold: string;
-  maxPlayersToMine: number;
+  vestingClaimThreshold: string;
+  maxPlayersToVest: number;
   maxContestEntriesPerDay: number;
   contestEntryBudget: number;
   minActionCooldownMs: number;
@@ -35,8 +35,8 @@ const BOT_CONFIGS: BotConfig[] = [
     minOrderSize: 10,
     maxDailyOrders: 999999,
     maxDailyVolume: 999999,
-    miningClaimThreshold: "0.90",
-    maxPlayersToMine: 8,
+    vestingClaimThreshold: "0.90",
+    maxPlayersToVest: 8,
     maxContestEntriesPerDay: 1,
     contestEntryBudget: 300,
     minActionCooldownMs: 30000,
@@ -55,8 +55,8 @@ const BOT_CONFIGS: BotConfig[] = [
     minOrderSize: 20,
     maxDailyOrders: 999999,
     maxDailyVolume: 999999,
-    miningClaimThreshold: "0.85",
-    maxPlayersToMine: 6,
+    vestingClaimThreshold: "0.85",
+    maxPlayersToVest: 6,
     maxContestEntriesPerDay: 1,
     contestEntryBudget: 400,
     minActionCooldownMs: 60000,
@@ -75,8 +75,8 @@ const BOT_CONFIGS: BotConfig[] = [
     minOrderSize: 5,
     maxDailyOrders: 999999,
     maxDailyVolume: 999999,
-    miningClaimThreshold: "0.80",
-    maxPlayersToMine: 4,
+    vestingClaimThreshold: "0.80",
+    maxPlayersToVest: 4,
     maxContestEntriesPerDay: 2,
     contestEntryBudget: 350,
     minActionCooldownMs: 120000,
@@ -95,8 +95,8 @@ const BOT_CONFIGS: BotConfig[] = [
     minOrderSize: 10,
     maxDailyOrders: 999999,
     maxDailyVolume: 999999,
-    miningClaimThreshold: "0.95",
-    maxPlayersToMine: 3,
+    vestingClaimThreshold: "0.95",
+    maxPlayersToVest: 3,
     maxContestEntriesPerDay: 3,
     contestEntryBudget: 600,
     minActionCooldownMs: 20000,
@@ -115,8 +115,8 @@ const BOT_CONFIGS: BotConfig[] = [
     minOrderSize: 5,
     maxDailyOrders: 999999,
     maxDailyVolume: 999999,
-    miningClaimThreshold: "0.75",
-    maxPlayersToMine: 10,
+    vestingClaimThreshold: "0.75",
+    maxPlayersToVest: 10,
     maxContestEntriesPerDay: 5,
     contestEntryBudget: 800,
     minActionCooldownMs: 60000,
@@ -135,8 +135,8 @@ const BOT_CONFIGS: BotConfig[] = [
     minOrderSize: 2,
     maxDailyOrders: 999999,
     maxDailyVolume: 999999,
-    miningClaimThreshold: "0.70",
-    maxPlayersToMine: 3,
+    vestingClaimThreshold: "0.70",
+    maxPlayersToVest: 3,
     maxContestEntriesPerDay: 1,
     contestEntryBudget: 200,
     minActionCooldownMs: 300000,
@@ -155,8 +155,8 @@ const BOT_CONFIGS: BotConfig[] = [
     minOrderSize: 5,
     maxDailyOrders: 999999,
     maxDailyVolume: 999999,
-    miningClaimThreshold: "0.85",
-    maxPlayersToMine: 5,
+    vestingClaimThreshold: "0.85",
+    maxPlayersToVest: 5,
     maxContestEntriesPerDay: 1,
     contestEntryBudget: 250,
     minActionCooldownMs: 180000,
@@ -175,8 +175,8 @@ const BOT_CONFIGS: BotConfig[] = [
     minOrderSize: 50,
     maxDailyOrders: 999999,
     maxDailyVolume: 999999,
-    miningClaimThreshold: "0.95",
-    maxPlayersToMine: 3,
+    vestingClaimThreshold: "0.95",
+    maxPlayersToVest: 3,
     maxContestEntriesPerDay: 1,
     contestEntryBudget: 1000,
     minActionCooldownMs: 600000,
@@ -195,8 +195,8 @@ const BOT_CONFIGS: BotConfig[] = [
     minOrderSize: 1,
     maxDailyOrders: 999999,
     maxDailyVolume: 999999,
-    miningClaimThreshold: "0.60",
-    maxPlayersToMine: 2,
+    vestingClaimThreshold: "0.60",
+    maxPlayersToVest: 2,
     maxContestEntriesPerDay: 2,
     contestEntryBudget: 150,
     minActionCooldownMs: 120000,
@@ -207,7 +207,7 @@ const BOT_CONFIGS: BotConfig[] = [
   {
     username: "DiversifyDan",
     botName: "Diversify Dan",
-    botRole: "miner",
+    botRole: "vester",
     balance: "22000.00",
     aggressiveness: "0.45",
     spreadPercent: "2.00",
@@ -215,8 +215,8 @@ const BOT_CONFIGS: BotConfig[] = [
     minOrderSize: 5,
     maxDailyOrders: 999999,
     maxDailyVolume: 999999,
-    miningClaimThreshold: "0.80",
-    maxPlayersToMine: 10,
+    vestingClaimThreshold: "0.80",
+    maxPlayersToVest: 10,
     maxContestEntriesPerDay: 2,
     contestEntryBudget: 400,
     minActionCooldownMs: 90000,
@@ -251,7 +251,7 @@ export async function seedBots(): Promise<{ created: number; skipped: number }> 
         username: config.username,
         balance: config.balance,
         isBot: true,
-        isPremium: true, // Bots get premium for split mining
+        isPremium: true, // Bots get premium for split vesting
         hasSeenOnboarding: true,
       })
       .returning();
@@ -267,8 +267,8 @@ export async function seedBots(): Promise<{ created: number; skipped: number }> 
       minOrderSize: config.minOrderSize,
       maxDailyOrders: config.maxDailyOrders,
       maxDailyVolume: config.maxDailyVolume,
-      miningClaimThreshold: config.miningClaimThreshold,
-      maxPlayersToMine: config.maxPlayersToMine,
+      vestingClaimThreshold: config.vestingClaimThreshold,
+      maxPlayersToVest: config.maxPlayersToVest,
       maxContestEntriesPerDay: config.maxContestEntriesPerDay,
       contestEntryBudget: config.contestEntryBudget,
       minActionCooldownMs: config.minActionCooldownMs,
@@ -277,8 +277,8 @@ export async function seedBots(): Promise<{ created: number; skipped: number }> 
       activeHoursEnd: config.activeHoursEnd,
     });
 
-    // Initialize mining record for bot
-    await db.insert(mining).values({
+    // Initialize vesting record for bot
+    await db.insert(vesting).values({
       userId: newUser.id,
       sharesAccumulated: 0,
       residualMs: 0,

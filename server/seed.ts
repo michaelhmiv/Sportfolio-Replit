@@ -1,5 +1,5 @@
 import { db } from "./db";
-import { users, players, mining, contests, holdings, dailyGames } from "@shared/schema";
+import { users, players, vesting, contests, holdings, dailyGames } from "@shared/schema";
 import { sql, and, gte, lte, asc } from "drizzle-orm";
 
 async function seed() {
@@ -20,7 +20,7 @@ async function seed() {
 
   console.log("Created user:", user.username);
 
-  // Seed players first (before mining references them)
+  // Seed players first (before vesting references them)
   const mockPlayers = [
     { id: "lebron-james", firstName: "LeBron", lastName: "James", currentTeam: { abbreviation: "LAL" }, primaryPosition: "F", jerseyNumber: "23" },
     { id: "stephen-curry", firstName: "Stephen", lastName: "Curry", currentTeam: { abbreviation: "GSW" }, primaryPosition: "G", jerseyNumber: "30" },
@@ -38,7 +38,7 @@ async function seed() {
         position: player.primaryPosition || "G",
         jerseyNumber: player.jerseyNumber || "",
         isActive: true,
-        isEligibleForMining: true,
+        isEligibleForVesting: true,
         currentPrice: (10 + Math.random() * 20).toFixed(2),
         volume24h: Math.floor(Math.random() * 10000),
         priceChange24h: ((Math.random() - 0.5) * 10).toFixed(2),
@@ -55,20 +55,20 @@ async function seed() {
 
   console.log(`Seeded ${mockPlayers.length} players`);
 
-  // Create mining record (after players exist)
+  // Create vesting record (after players exist)
   await db
-    .insert(mining)
+    .insert(vesting)
     .values({
       userId: user.id,
       sharesAccumulated: 1200,
       playerId: "lebron-james",
     })
     .onConflictDoUpdate({
-      target: mining.userId,
+      target: vesting.userId,
       set: { sharesAccumulated: 1200, playerId: "lebron-james" },
     });
 
-  console.log("Created mining record");
+  console.log("Created vesting record");
 
   // Give user some shares
   const someShares = [
@@ -98,22 +98,22 @@ async function seed() {
   const now = new Date();
   const etOffset = -5; // ET is UTC-5 (EST) or UTC-4 (EDT), using -5 for simplicity
   const nowET = new Date(now.getTime() + (etOffset * 60 * 60 * 1000));
-  
+
   // Get start and end of day in ET, then convert back to UTC for database
   const startOfDayET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 0, 0, 0);
   const endOfDayET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 23, 59, 59);
-  
+
   // Convert ET boundaries to UTC for database query
   const startOfDayUTC = new Date(startOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
   const endOfDayUTC = new Date(endOfDayET.getTime() - (etOffset * 60 * 60 * 1000));
-  
+
   // Create a pure date for gameDate field (midnight ET in local timezone representation)
   const todayDate = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 0, 0, 0);
 
   // Create some mock games at different times today (in ET timezone)
   const game1StartET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 17, 0, 0); // 5:00 PM ET
   const game2StartET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 18, 30, 0); // 6:30 PM ET
-  
+
   const mockGames = [
     {
       gameId: "game-1-today",
@@ -142,7 +142,7 @@ async function seed() {
   }
 
   console.log("Created mock games for today (ET timezone)");
-  
+
   // Fetch games for today (using ET boundaries) to find the earliest start time
   const todayGames = await db
     .select()
@@ -152,13 +152,13 @@ async function seed() {
       lte(dailyGames.startTime, endOfDayUTC)
     ))
     .orderBy(asc(dailyGames.startTime));
-  
+
   // Set contest start time to earliest game time, or default to 7pm ET if no games
   const defaultStartET = new Date(nowET.getFullYear(), nowET.getMonth(), nowET.getDate(), 19, 0, 0);
   const defaultStartTime = new Date(defaultStartET.getTime() - (etOffset * 60 * 60 * 1000));
-  
-  const contestStartTime = todayGames.length > 0 
-    ? todayGames[0].startTime 
+
+  const contestStartTime = todayGames.length > 0
+    ? todayGames[0].startTime
     : defaultStartTime;
 
   await db

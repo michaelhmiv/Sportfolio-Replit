@@ -15,6 +15,7 @@ import type { Player, Holding, DailyGame } from "@shared/schema";
 import { format } from "date-fns";
 import { PlayerName } from "@/components/player-name";
 import { AnimatedButton } from "@/components/ui/animations";
+import { Confetti } from "@/components/ui/confetti";
 
 interface ContestEntryData {
   contest: {
@@ -44,6 +45,7 @@ export default function ContestEntry() {
   const [lineup, setLineup] = useState<Map<string, LineupEntry>>(new Map());
   const [showOnlyPlayingTeams, setShowOnlyPlayingTeams] = useState(false);
   const [isGamesOpen, setIsGamesOpen] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
   const isEditMode = !!entryId;
 
   const { data, isLoading } = useQuery<ContestEntryData>({
@@ -59,12 +61,12 @@ export default function ContestEntry() {
 
   // Get contest data to access gameDate
   const contestData = isEditMode ? existingEntry?.contest : data?.contest;
-  
+
   // Extract just the date portion (YYYY-MM-DD) from gameDate
-  const formattedGameDate = contestData?.gameDate 
+  const formattedGameDate = contestData?.gameDate
     ? format(new Date(contestData.gameDate), "yyyy-MM-dd")
     : undefined;
-  
+
   // Fetch games for the contest date
   const { data: gamesData } = useQuery<DailyGame[]>({
     queryKey: ["/api/games/date", formattedGameDate],
@@ -108,7 +110,12 @@ export default function ContestEntry() {
         invalidateContestQueries(),
       ]);
       toast({ title: isEditMode ? "Contest entry updated!" : "Contest entry submitted!" });
-      navigate("/contests");
+
+      // Trigger celebration and delay navigation
+      setShowConfetti(true);
+      setTimeout(() => {
+        navigate("/contests");
+      }, 2000);
     },
     onError: (error: Error) => {
       toast({ title: isEditMode ? "Update failed" : "Entry failed", description: error.message, variant: "destructive" });
@@ -167,22 +174,22 @@ export default function ContestEntry() {
   }
 
   const eligiblePlayers = isEditMode ? (existingEntry?.eligiblePlayers || []) : (data?.eligiblePlayers || []);
-  
+
   // Extract teams playing on contest date
   const teamsPlaying = gamesData ? Array.from(new Set([
     ...gamesData.map(g => g.homeTeam),
     ...gamesData.map(g => g.awayTeam)
   ])) : [];
-  
+
   // Apply filters
   const filteredPlayers = eligiblePlayers.filter((holding: any) => {
     // Search filter
     const matchesSearch = holding.player.firstName.toLowerCase().includes(search.toLowerCase()) ||
       holding.player.lastName.toLowerCase().includes(search.toLowerCase());
-    
+
     // Teams playing filter
     const matchesTeamsFilter = !showOnlyPlayingTeams || teamsPlaying.includes(holding.player.team);
-    
+
     return matchesSearch && matchesTeamsFilter;
   });
 
@@ -226,8 +233,8 @@ export default function ContestEntry() {
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                     {gamesData.map((game) => (
-                      <div 
-                        key={game.id} 
+                      <div
+                        key={game.id}
                         className="p-3 border rounded-md bg-card/50"
                         data-testid={`game-card-${game.id}`}
                       >
@@ -295,9 +302,9 @@ export default function ContestEntry() {
                       </div>
                       <div>
                         <div className="font-medium">
-                          <PlayerName 
-                            playerId={holding.player.id} 
-                            firstName={holding.player.firstName} 
+                          <PlayerName
+                            playerId={holding.player.id}
+                            firstName={holding.player.firstName}
                             lastName={holding.player.lastName}
                           />
                         </div>
@@ -346,9 +353,9 @@ export default function ContestEntry() {
                       <div className="flex items-start justify-between mb-3">
                         <div>
                           <div className="font-medium">
-                            <PlayerName 
-                              playerId={entry.playerId} 
-                              firstName={entry.playerName.split(' ')[0]} 
+                            <PlayerName
+                              playerId={entry.playerId}
+                              firstName={entry.playerName.split(' ')[0]}
                               lastName={entry.playerName.split(' ').slice(1).join(' ')}
                             />
                           </div>
@@ -365,7 +372,7 @@ export default function ContestEntry() {
                           <Minus className="w-4 h-4" />
                         </Button>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <div className="flex items-center gap-3">
                           <div className="flex-1">
