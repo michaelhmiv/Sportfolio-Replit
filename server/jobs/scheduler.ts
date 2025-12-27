@@ -113,19 +113,19 @@ export class JobScheduler {
     const contestJobs: JobConfig[] = [
       {
         name: "update_contest_statuses",
-        schedule: "*/5 * * * *", // Every 5 minutes - transition contests from open to live
+        schedule: "1-59/5 * * * *", // Every 5 minutes (offset 1m) - transition contests from open to live
         enabled: true,
         handler: updateContestStatuses,
       },
       {
         name: "settle_contests",
-        schedule: "*/5 * * * *", // Every 5 minutes - check for contests to settle
+        schedule: "2-59/5 * * * *", // Every 5 minutes (offset 2m) - check for contests to settle
         enabled: true,
         handler: settleContests,
       },
       {
         name: "bot_engine",
-        schedule: "*/10 * * * *", // Every 10 minutes - run market maker bots
+        schedule: "3-59/10 * * * *", // Every 10 minutes (offset 3m) - run market maker bots
         enabled: true,
         handler: async () => {
           const result = await runBotEngineTick();
@@ -138,7 +138,7 @@ export class JobScheduler {
       },
       {
         name: "vesting_accrual",
-        schedule: "*/5 * * * *", // Every 5 minutes - accrue vesting shares for all users
+        schedule: "4-59/5 * * * *", // Every 5 minutes (offset 4m) - accrue vesting shares for all users
         enabled: true,
         handler: accrueVestingForAllUsers,
       },
@@ -160,25 +160,25 @@ export class JobScheduler {
     const apiJobs: JobConfig[] = [
       {
         name: "roster_sync",
-        schedule: "0 5 * * *", // Daily at 5:00 AM ET
+        schedule: "30 5 * * *", // Daily at 5:30 AM ET
         enabled: true,
         handler: syncRoster,
       },
       {
         name: "sync_player_game_logs",
-        schedule: "0 6 * * *", // Daily at 6:00 AM ET - after games finalize
+        schedule: "30 6 * * *", // Daily at 6:30 AM ET - after games finalize
         enabled: true,
         handler: () => syncPlayerGameLogs({ mode: 'daily' }),
       },
       {
         name: "schedule_sync",
-        schedule: "0 * * * *", // Every hour for live score updates
+        schedule: "5 * * * *", // Every hour at minute 5 for live score updates
         enabled: true,
         handler: syncSchedule,
       },
       {
         name: "stats_sync",
-        schedule: "0 * * * *", // Every hour
+        schedule: "10 * * * *", // Every hour at minute 10
         enabled: true,
         handler: syncStats,
       },
@@ -190,13 +190,13 @@ export class JobScheduler {
       },
       {
         name: "create_contests",
-        schedule: "0 0 * * *", // Daily at midnight - create contests for upcoming games
+        schedule: "20 0 * * *", // Daily at 00:20 - create contests for upcoming games
         enabled: true,
         handler: createContests,
       },
       {
         name: "daily_snapshot",
-        schedule: "0 1 * * *", // Daily at 1:00 AM ET - after contests are created
+        schedule: "30 1 * * *", // Daily at 1:30 AM ET - after contests are created
         enabled: true,
         handler: dailySnapshot,
       },
@@ -208,7 +208,7 @@ export class JobScheduler {
       },
       {
         name: "nfl_roster_sync",
-        schedule: "0 4 * * *", // Daily at 4:00 AM ET
+        schedule: "30 4 * * *", // Daily at 4:30 AM ET
         enabled: true,
         handler: async () => {
           const result = await syncNFLRoster();
@@ -221,7 +221,7 @@ export class JobScheduler {
       },
       {
         name: "nfl_schedule_sync",
-        schedule: "0 6 * * *", // Daily at 6:00 AM ET (after roster sync)
+        schedule: "45 6 * * *", // Daily at 6:45 AM ET (after roster sync)
         enabled: true,
         handler: async () => {
           const result = await syncNFLSchedule();
@@ -234,7 +234,7 @@ export class JobScheduler {
       },
       {
         name: "nfl_stats_sync",
-        schedule: "0 * * * *", // Every hour
+        schedule: "15 * * * *", // Every hour at minute 15
         enabled: true,
         handler: async () => {
           const result = await syncNFLStats();
