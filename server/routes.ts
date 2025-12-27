@@ -33,6 +33,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // DEBUG: Diagnostic endpoint for player query issues
+  app.get("/api/debug/players", async (req, res) => {
+    try {
+      const sport = (req.query.sport as string) || "ALL";
+
+      // Test 1: Simple count from players table
+      const allPlayers = await storage.getPlayersBySport(sport);
+
+      // Test 2: Paginated query (used by main list)
+      const paginated = await storage.getPlayersPaginated({ sport, limit: 5 });
+
+      res.json({
+        sport,
+        simpleQueryCount: allPlayers.length,
+        paginatedQueryCount: paginated.total,
+        paginatedSample: paginated.players.slice(0, 2).map(p => ({ id: p.id, name: `${p.firstName} ${p.lastName}`, sport: p.sport }))
+      });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message, stack: error.stack });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // Initialize WebSocket server
