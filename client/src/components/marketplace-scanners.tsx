@@ -276,9 +276,9 @@ function ScannerCarousel({ scanData, topRisers, topMc, mode }: { scanData: Scann
 function DesktopScannerGrid({ scanData }: { scanData: ScannerResponse }) {
     return (
         <>
-            {/* 💎 Undervalued Gems */}
+            {/* 📊 Relative Price/FPS */}
             <ScannerCard
-                title="Undervalued Gems"
+                title="Relative Price/FPS"
                 icon={<TicketPercent className="w-4 h-4 text-emerald-500" />}
                 colorConfig={{ border: "border-emerald-500/20", bg: "bg-emerald-500/5", hover: "hover:border-emerald-500/40", badge: "" }}
             >
@@ -290,40 +290,6 @@ function DesktopScannerGrid({ scanData }: { scanData: ScannerResponse }) {
                         metricLabel="Index"
                         metricValue={item.metrics.valueIndex.toFixed(0)}
                         metricColor="text-emerald-500"
-                    />
-                ))}
-            </ScannerCard>
-
-            <ScannerCard
-                title="Sentiment Leaders"
-                icon={<Activity className="w-4 h-4 text-blue-500" />}
-                colorConfig={{ border: "border-blue-500/20", bg: "bg-blue-500/5", hover: "hover:border-blue-500/40", badge: "" }}
-            >
-                {scanData.sentiment.slice(0, 5).map((item, i) => (
-                    <ScannerRow
-                        key={item.player.id}
-                        rank={i + 1}
-                        player={item.player}
-                        metricLabel="Buy %"
-                        metricValue={`${item.metrics.sentiment.buyPressure.toFixed(0)}%`}
-                        metricColor="text-blue-500"
-                    />
-                ))}
-            </ScannerCard>
-
-            <ScannerCard
-                title="Premium Price"
-                icon={<TrendingUp className="w-4 h-4 text-orange-500" />}
-                colorConfig={{ border: "border-orange-500/20", bg: "bg-orange-500/5", hover: "hover:border-orange-500/40", badge: "" }}
-            >
-                {scanData.premium.slice(0, 5).map((item, i) => (
-                    <ScannerRow
-                        key={item.player.id}
-                        rank={i + 1}
-                        player={item.player}
-                        metricLabel="Index"
-                        metricValue={item.metrics.valueIndex.toFixed(0)}
-                        metricColor="text-orange-500"
                     />
                 ))}
             </ScannerCard>
