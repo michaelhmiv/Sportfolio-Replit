@@ -29,14 +29,14 @@ const STORAGE_KEY = "sportfolio_selected_sport";
  */
 export function SportProvider({ children }: { children: ReactNode }) {
     const [sport, setSportState] = useState<Sport>(() => {
-        // Initialize from localStorage, default to NBA
+        // Initialize from localStorage, default to ALL for new visitors
         if (typeof window !== "undefined") {
             const stored = localStorage.getItem(STORAGE_KEY);
-            if (stored === "NBA" || stored === "NFL") {
+            if (stored === "NBA" || stored === "NFL" || stored === "ALL") {
                 return stored;
             }
         }
-        return "NBA";
+        return "ALL";
     });
 
     // Persist to localStorage whenever sport changes

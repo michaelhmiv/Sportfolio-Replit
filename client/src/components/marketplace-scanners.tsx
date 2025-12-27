@@ -274,6 +274,18 @@ function ScannerCarousel({ scanData, topRisers, topMc, mode }: { scanData: Scann
 
 // --- Desktop Grid Component (Legacy implementation) ---
 function DesktopScannerGrid({ scanData }: { scanData: ScannerResponse }) {
+    // Transform data for Top Gainers (sorted by 24h price change)
+    const topRisers = scanData.momentum
+        .filter((item) => parseFloat(item.player.priceChange24h) > 0)
+        .sort((a, b) => parseFloat(b.player.priceChange24h) - parseFloat(a.player.priceChange24h))
+        .slice(0, 6);
+
+    // Transform data for Market Cap Leaders
+    const topMc = [...scanData.undervalued, ...scanData.momentum]
+        .filter((item, index, self) => self.findIndex(t => t.player.id === item.player.id) === index)
+        .sort((a, b) => parseFloat(b.player.marketCap?.toString() || "0") - parseFloat(a.player.marketCap?.toString() || "0"))
+        .slice(0, 6);
+
     return (
         <>
             {/* 📊 Relative Price/FPS */}
@@ -290,6 +302,42 @@ function DesktopScannerGrid({ scanData }: { scanData: ScannerResponse }) {
                         metricLabel="Index"
                         metricValue={item.metrics.valueIndex.toFixed(0)}
                         metricColor="text-emerald-500"
+                    />
+                ))}
+            </ScannerCard>
+
+            {/* 📈 Top Gainers (24h) */}
+            <ScannerCard
+                title="Top Gainers (24h)"
+                icon={<TrendingUp className="w-4 h-4 text-green-500" />}
+                colorConfig={{ border: "border-green-500/20", bg: "bg-green-500/5", hover: "hover:border-green-500/40", badge: "" }}
+            >
+                {topRisers.slice(0, 5).map((item, i) => (
+                    <ScannerRow
+                        key={item.player.id}
+                        rank={i + 1}
+                        player={item.player}
+                        metricLabel="24h"
+                        metricValue={`+${parseFloat(item.player.priceChange24h).toFixed(1)}%`}
+                        metricColor="text-green-500"
+                    />
+                ))}
+            </ScannerCard>
+
+            {/* 🏆 Market Cap Leaders */}
+            <ScannerCard
+                title="Market Cap Leaders"
+                icon={<BarChart3 className="w-4 h-4 text-blue-500" />}
+                colorConfig={{ border: "border-blue-500/20", bg: "bg-blue-500/5", hover: "hover:border-blue-500/40", badge: "" }}
+            >
+                {topMc.slice(0, 5).map((item, i) => (
+                    <ScannerRow
+                        key={item.player.id}
+                        rank={i + 1}
+                        player={item.player}
+                        metricLabel="Mkt Cap"
+                        metricValue={`$${(parseFloat(item.player.marketCap?.toString() || "0") / 1000000).toFixed(1)}M`}
+                        metricColor="text-blue-500"
                     />
                 ))}
             </ScannerCard>
