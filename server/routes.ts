@@ -3005,9 +3005,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Filter by sport if provided
-      if (sport && typeof sport === 'string' && sport !== 'all') {
-        filteredContests = filteredContests.filter(contest => contest.sport === sport);
+      // Filter by sport if provided (case-insensitive check for "ALL")
+      if (sport && typeof sport === 'string' && sport.toUpperCase() !== 'ALL') {
+        filteredContests = filteredContests.filter(contest =>
+          contest.sport.toUpperCase() === sport.toUpperCase()
+        );
       }
 
       // If user is authenticated, include their entries

@@ -2366,8 +2366,8 @@ export class DatabaseStorage implements IStorage {
       sql`${dailyGames.startTime} < ${endDate}`
     ];
 
-    if (sport && sport !== "ALL") {
-      conditions.push(eq(dailyGames.sport, sport));
+    if (sport && sport.toUpperCase() !== "ALL") {
+      conditions.push(sql`UPPER(${dailyGames.sport}) = ${sport.toUpperCase()}`);
     }
 
     return await db
@@ -2404,9 +2404,9 @@ export class DatabaseStorage implements IStorage {
       sql`${dailyGames.startTime} < ${endDate}`
     ];
 
-    // Only filter by sport if not "ALL"
-    if (sport !== "ALL") {
-      conditions.push(eq(dailyGames.sport, sport));
+    // Only filter by sport if not "ALL" (case-insensitive)
+    if (sport.toUpperCase() !== "ALL") {
+      conditions.push(sql`UPPER(${dailyGames.sport}) = ${sport.toUpperCase()}`);
     }
 
     return await db
