@@ -1665,6 +1665,11 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
+    // Add sport filter - ensure it matches
+    if (sport && sport.toUpperCase() !== "ALL") {
+      ordersConditions.push(sql`UPPER(${players.sport}) = ${sport.toUpperCase()}`);
+    }
+
     // Fetch recent orders (placed and cancelled) with player and user info
     const recentOrders = await db
       .select({
