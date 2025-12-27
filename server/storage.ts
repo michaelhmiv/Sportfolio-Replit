@@ -757,7 +757,7 @@ export class DatabaseStorage implements IStorage {
 
     // Sport filter - case-insensitive
     if (filters?.sport && filters.sport.toUpperCase() !== "ALL") {
-      conditions.push(sql`${players.sport} = ${filters.sport.toUpperCase()}`);
+      conditions.push(sql`UPPER(${players.sport}) = ${filters.sport.toUpperCase()}`);
     }
     if (filters?.team && filters.team !== "all") {
       conditions.push(eq(players.team, filters.team));
@@ -1020,7 +1020,7 @@ export class DatabaseStorage implements IStorage {
     if (sport.toUpperCase() === 'ALL') {
       return await db.select().from(players);
     }
-    return await db.select().from(players).where(sql`${players.sport} = ${sport.toUpperCase()}`);
+    return await db.select().from(players).where(sql`UPPER(${players.sport}) = ${sport.toUpperCase()}`);
   }
 
   async updatePlayer(playerId: string, updates: Partial<InsertPlayer>): Promise<void> {
@@ -1639,7 +1639,7 @@ export class DatabaseStorage implements IStorage {
     }
     // Add sport filter
     if (sport && sport.toUpperCase() !== "ALL") {
-      conditions.push(sql`${players.sport} = ${sport.toUpperCase()}`);
+      conditions.push(sql`UPPER(${players.sport}) = ${sport.toUpperCase()}`);
     }
 
     if (conditions.length > 0) {
@@ -3890,7 +3890,7 @@ export class DatabaseStorage implements IStorage {
       : and(
         isNotNull(players.lastTradePrice),
         gt(players.lastTradePrice, "0"),
-        sql`${players.sport} = ${normalizedSport}`
+        sql`UPPER(${players.sport}) = ${normalizedSport}`
       );
 
     const activePlayers = await db
