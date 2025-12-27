@@ -720,20 +720,15 @@ export default function Marketplace() {
                               data-testid={`row-player-${player.id}`}
                             >
                               {/* Mobile layout: stacked info */}
-                              <td className="px-2 py-2 sm:hidden" colSpan={6}>
-                                <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 relative group-hover:bg-primary/20 transition-colors cursor-pointer" onClick={(e) => toggleWatchList(player.id, e)}>
-                                      <div className="absolute inset-0 flex items-center justify-center transition-opacity">
-                                        {watchList?.includes(player.id) ? (
-                                          <Star className="w-4 h-4 fill-yellow-500 text-yellow-500" />
-                                        ) : (
-                                          <>
-                                            <span className="group-hover:hidden font-bold text-xs">{player.firstName[0]}{player.lastName[0]}</span>
-                                            <Star className="hidden group-hover:block w-4 h-4 text-muted-foreground/50 hover:text-yellow-500" />
-                                          </>
-                                        )}
-                                      </div>
+                              <td className="pl-0 pr-1 py-1 sm:hidden" colSpan={6}>
+                                <div className="flex items-center justify-between gap-1">
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                    <div className="flex-shrink-0 cursor-pointer -ml-1" onClick={(e) => toggleWatchList(player.id, e)}>
+                                      {watchList?.includes(player.id) ? (
+                                        <Star className="w-5 h-5 fill-yellow-500 text-yellow-500" />
+                                      ) : (
+                                        <Star className="w-5 h-5 text-muted-foreground/30" />
+                                      )}
                                     </div>
                                     <div className="min-w-0 flex-1">
                                       <div className="font-medium text-sm">

@@ -1,6 +1,19 @@
-import { Pool } from 'pg';
+
+import { Client } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
+
+// Manual .env loading
+const envPath = path.resolve(process.cwd(), '.env');
+if (fs.existsSync(envPath)) {
+    const envContent = fs.readFileSync(envPath, 'utf8');
+    envContent.split('\n').forEach(line => {
+        const [key, ...valueParts] = line.split('=');
+        if (key && valueParts.length > 0) {
+            process.env[key.trim()] = valueParts.join('=').trim().replace(/^"(.*)"$/, '$1');
+        }
+    });
+}
 
 const DATABASE_URL = process.env.DATABASE_URL;
 
@@ -9,23 +22,37 @@ if (!DATABASE_URL) {
     process.exit(1);
 }
 
-const pool = new Pool({ connectionString: DATABASE_URL });
+const client = new Client({ connectionString: DATABASE_URL });
 
-const sqlPath = path.join(import.meta.dirname, 'enable-rls.sql');
-const sql = fs.readFileSync(sqlPath, 'utf8');
+(async () => {
+    try {
+        await client.connect();
 
-console.log('Running RLS enable script...');
+        // Use process.cwd() to verify path, pointing to scripts directory
+        const sqlPath = path.resolve(process.cwd(), 'scripts', 'fix-rls.sql');
+        console.log('SQL Path:', sqlPath);
 
-pool.query(sql)
-    .then((result) => {
+        if (!fs.existsSync(sqlPath)) {
+            throw new Error(`File not found: ${sqlPath}`);
+        }
+
+        const sql = fs.readFileSync(sqlPath, 'utf8');
+        console.log('Read SQL file, length:', sql.length);
+
+        console.log('Running RLS enable script...');
+        const result = await client.query(sql);
+
         console.log('RLS enabled successfully!');
-        if (result.rows) {
+        // Result might be an array if multiple statements
+        if (Array.isArray(result)) {
+            const lastResult = result[result.length - 1];
+            if (lastResult.rows) console.log(lastResult.rows);
+        } else if (result.rows) {
             console.log(result.rows);
         }
-        pool.end();
-    })
-    .catch((error) => {
-        console.error('Error:', error.message);
-        pool.end();
-        process.exit(1);
-    });
+    } catch (error) {
+        console.error('FULL ERROR:', error);
+    } finally {
+        await client.end();
+    }
+})();

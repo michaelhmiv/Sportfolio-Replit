@@ -2,12 +2,14 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createClient, User as SupabaseUser } from '@supabase/supabase-js';
 import { storage } from "./storage";
 
+// Fallback to SUPABASE_KEY if specific keys are missing
+// This handles cases where only the generic SUPABASE_KEY (usually anon) is provided
 const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
 
 if (!supabaseUrl || !supabaseServiceRoleKey) {
-  console.warn('[SUPABASE_AUTH] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
+  console.warn('[SUPABASE_AUTH] Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY/SUPABASE_KEY');
 }
 
 const supabaseAdmin = createClient(
@@ -24,12 +26,12 @@ const supabaseAdmin = createClient(
 async function verifySupabaseToken(token: string): Promise<SupabaseUser | null> {
   try {
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-    
+
     if (error) {
       console.log('[SUPABASE_AUTH] Token verification failed:', error.message);
       return null;
     }
-    
+
     return user;
   } catch (error: any) {
     console.error('[SUPABASE_AUTH] Error verifying token:', error.message);
@@ -43,21 +45,21 @@ async function upsertSupabaseUser(supabaseUser: SupabaseUser): Promise<void> {
     const nameParts = fullName.split(' ');
     const firstName = supabaseUser.user_metadata?.first_name || nameParts[0] || null;
     const lastName = supabaseUser.user_metadata?.last_name || nameParts.slice(1).join(' ') || null;
-    
+
     // Check for existing user by ID or email to preserve their username
     const existingUserById = await storage.getUser(supabaseUser.id);
     const existingUserByEmail = supabaseUser.email ? await storage.getUserByEmail(supabaseUser.email) : null;
     const existingUser = existingUserById || existingUserByEmail;
-    
+
     // Log migration detection for debugging
     console.log(`[SUPABASE_AUTH] Auth check for ${supabaseUser.email}:`);
     console.log(`  - Supabase ID: ${supabaseUser.id}`);
     console.log(`  - Existing by ID: ${existingUserById?.id || 'none'} (admin: ${existingUserById?.isAdmin})`);
     console.log(`  - Existing by email: ${existingUserByEmail?.id || 'none'} (admin: ${existingUserByEmail?.isAdmin})`);
-    
+
     // Only generate a new username for truly new users - preserve existing usernames
     const username = existingUser?.username || supabaseUser.email?.split('@')[0] || `user_${supabaseUser.id.substring(0, 8)}`;
-    
+
     const upsertedUser = await storage.upsertUser({
       id: supabaseUser.id,
       email: supabaseUser.email || null,
@@ -78,12 +80,12 @@ function extractToken(req: Request): string | null {
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.substring(7);
   }
-  
+
   const cookieToken = (req as any).cookies?.['sb-access-token'];
   if (cookieToken) {
     return cookieToken;
   }
-  
+
   return null;
 }
 
@@ -94,7 +96,7 @@ export async function isAuthenticated(
 ): Promise<void> {
   const isDev = process.env.NODE_ENV === 'development';
   const bypassAuth = process.env.DEV_BYPASS_AUTH !== 'false';
-  
+
   if (isDev && bypassAuth) {
     if (!(req as any).user) {
       const mockUserId = 'dev-user-12345678';
@@ -106,7 +108,7 @@ export async function isAuthenticated(
           last_name: 'User',
         },
       };
-      
+
       try {
         const existingUser = await storage.getUser(mockUserId);
         if (!existingUser) {
@@ -127,7 +129,7 @@ export async function isAuthenticated(
   }
 
   const token = extractToken(req);
-  
+
   if (!token) {
     console.log('[SUPABASE_AUTH] No token provided');
     res.status(401).json({ message: "Unauthorized - No token provided" });
@@ -135,7 +137,7 @@ export async function isAuthenticated(
   }
 
   const supabaseUser = await verifySupabaseToken(token);
-  
+
   if (!supabaseUser) {
     console.log('[SUPABASE_AUTH] Invalid or expired token');
     res.status(401).json({ message: "Unauthorized - Invalid token" });
@@ -146,7 +148,7 @@ export async function isAuthenticated(
 
   const fullName = supabaseUser.user_metadata?.full_name || '';
   const nameParts = fullName.split(' ');
-  
+
   (req as any).user = {
     claims: {
       sub: supabaseUser.id,
@@ -166,7 +168,7 @@ export async function optionalAuth(
 ): Promise<void> {
   const isDev = process.env.NODE_ENV === 'development';
   const bypassAuth = process.env.DEV_BYPASS_AUTH !== 'false';
-  
+
   if (isDev && bypassAuth && !(req as any).user) {
     const mockUserId = 'dev-user-12345678';
     (req as any).user = {
@@ -177,7 +179,7 @@ export async function optionalAuth(
         last_name: 'User',
       },
     };
-    
+
     try {
       const existingUser = await storage.getUser(mockUserId);
       if (!existingUser) {
@@ -196,17 +198,17 @@ export async function optionalAuth(
   }
 
   const token = extractToken(req);
-  
+
   if (token) {
     const supabaseUser = await verifySupabaseToken(token);
-    
+
     if (supabaseUser) {
       try {
         await upsertSupabaseUser(supabaseUser);
-        
+
         const fullName = supabaseUser.user_metadata?.full_name || '';
         const nameParts = fullName.split(' ');
-        
+
         (req as any).user = {
           claims: {
             sub: supabaseUser.id,
@@ -226,7 +228,7 @@ export async function optionalAuth(
 
 export async function setupAuth(app: Express): Promise<void> {
   console.log('[SUPABASE_AUTH] Setting up Supabase authentication');
-  
+
   app.set("trust proxy", 1);
 
   app.get("/api/auth/config", (_req: Request, res: Response) => {
@@ -234,7 +236,7 @@ export async function setupAuth(app: Express): Promise<void> {
       res.status(500).json({ error: "Supabase not configured" });
       return;
     }
-    
+
     res.json({
       url: supabaseUrl,
       anonKey: supabaseAnonKey,

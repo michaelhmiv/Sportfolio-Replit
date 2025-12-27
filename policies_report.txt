@@ -1,0 +1,84 @@
+
+--- TABLE STATUS ---
+Table Name                    RLS Enabled    Policies
+------------------------------------------------------------
+balance_locks                 true           0
+blog_posts                    true           2
+    - Allow public read on blog_posts (SELECT)
+    - Public read access (SELECT)
+bot_actions_log               true           0
+bot_profiles                  true           0
+contest_entries               true           2
+    - Users can create own entries (INSERT)
+    - Users can view own entries (SELECT)
+contest_lineups               true           1
+    - Users can view own lineups (SELECT)
+contests                      true           2
+    - Allow public read on contests (SELECT)
+    - Public read access (SELECT)
+daily_games                   true           2
+    - Allow public read on daily_games (SELECT)
+    - Public read access (SELECT)
+holdings                      true           1
+    - Users can view own holdings (SELECT)
+holdings_locks                true           0
+job_execution_logs            true           0
+market_snapshots              true           2
+    - Allow public read on market_snapshots (SELECT)
+    - Public read access (SELECT)
+orders                        true           4
+    - Allow public read on orders (SELECT)
+    - Users can cancel own orders (UPDATE)
+    - Users can create own orders (INSERT)
+    - Users can view own orders (SELECT)
+player_game_stats             true           2
+    - Allow public read on player_game_stats (SELECT)
+    - Public read access (SELECT)
+players                       true           2
+    - Allow public read on players (SELECT)
+    - Public read access (SELECT)
+portfolio_snapshots           true           1
+    - Users can view own snapshots (SELECT)
+premium_checkout_sessions     true           1
+    - Users can view own checkout sessions (SELECT)
+premium_orders                true           1
+    - Users can view own premium orders (SELECT)
+premium_trades                true           1
+    - Users can view own premium trades (SELECT)
+price_history                 true           2
+    - Allow public read on price_history (SELECT)
+    - Public read access (SELECT)
+sessions                      true           0
+sessions                      true           0
+trades                        true           2
+    - Allow public read on trades (SELECT)
+    - Users can view own trades (SELECT)
+tweet_history                 true           0
+tweet_settings                true           0
+users                         true           3
+    - Public read access (SELECT)
+    - Users can update own profile (UPDATE)
+    - Users can view own data (SELECT)
+users                         true           3
+    - Public read access (SELECT)
+    - Users can update own profile (UPDATE)
+    - Users can view own data (SELECT)
+vesting                       true           1
+    - Users can view own vesting (SELECT)
+vesting_claims                true           1
+    - Users can view own vesting claims (SELECT)
+vesting_presets               true           2
+    - Users can manage own vesting presets (ALL)
+    - Users can view own vesting presets (SELECT)
+vesting_splits                true           1
+    - Users can view own vesting splits (SELECT)
+watch_list                    true           2
+    - Users can manage own watchlist items (ALL)
+    - Users can view own watchlist items (SELECT)
+watchlists                    true           2
+    - Users can manage own watchlists (ALL)
+    - Users can view own watchlists (SELECT)
+whop_payments                 true           1
+    - Users can view own whop payments (SELECT)
+
+Done.

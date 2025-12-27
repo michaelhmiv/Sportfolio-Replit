@@ -1,0 +1,56 @@
+node.exe : C:\Users\m
+icha\OneDrive\Documen
+ts\Antigravity\Sportf
+olio-Replit\scripts\r
+un-rls.ts:25
+At line:1 char:1
++ & "C:\Program Files
+\nodejs/node.exe" 
+"C:\Program 
+Files\nodejs/node_mo 
+...
++ ~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~
+    + CategoryInfo   
+           : NotSpe  
+  cified: (C:\User   
+ s\micha\...s\run    
+-rls.ts:25:Strin    
+g) [], RemoteExc    
+eption
+    + FullyQualified 
+   ErrorId : Native  
+  CommandError
+ 
+const { Client } = 
+require('pg');
+                   ^
+
+ReferenceError: 
+require is not 
+defined in ES module 
+scope, you can use 
+import instead
+    at <anonymous> (C
+:\Users\micha\OneDriv
+e\Documents\Antigravi
+ty\Sportfolio-Replit\
+scripts\run-rls.ts:25
+:20)
+    at ModuleJob.run 
+(node:internal/module
+s/esm/module_job:377:
+25)
+    at async onImport
+.tracePromise.__proto
+__ (node:internal/mod
+ules/esm/loader:671:2
+6)
+    at async asyncRun
+EntryPointWithESMLoad
+er (node:internal/mod
+ules/run_main:101:5)
+
+Node.js v24.11.1

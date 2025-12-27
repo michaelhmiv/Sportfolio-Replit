@@ -23,7 +23,7 @@ import { backfillMarketSnapshots } from "./market-snapshot";
 import { runBotEngineTick } from "../bot/bot-engine";
 import { syncNFLSchedule } from "./sync-nfl-schedule";
 import { syncNFLStats } from "./sync-nfl-stats";
-import { createNFLContests } from "./create-nfl-contests";
+// NFL contest creation is now handled by unified create_contests job
 import { syncNFLRoster } from "./sync-nfl-roster";
 import type { ProgressCallback } from "../lib/admin-stream";
 
@@ -245,19 +245,7 @@ export class JobScheduler {
           };
         },
       },
-      {
-        name: "nfl_create_contests",
-        schedule: "0 1 * * *", // Daily at 1:00 AM ET
-        enabled: true,
-        handler: async () => {
-          const result = await createNFLContests();
-          return {
-            requestCount: 0,
-            recordsProcessed: result.contestsCreated,
-            errorCount: result.errors,
-          };
-        },
-      },
+      // NFL contest creation is now handled by the unified 'create_contests' job
     ];
 
     for (const jobConfig of apiJobs) {

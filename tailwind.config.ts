@@ -5,6 +5,7 @@ export default {
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+
       borderRadius: {
         lg: ".375rem", /* 6px */
         md: ".25rem", /* 4px */
@@ -14,7 +15,7 @@ export default {
         // Trading-specific colors
         positive: "rgb(34 197 94)", // Green for gains
         negative: "rgb(239 68 68)", // Red for losses
-        
+
         // Flat / base colors (regular buttons)
         background: "hsl(var(--background) / <alpha-value>)",
         foreground: "hsl(var(--foreground) / <alpha-value>)",

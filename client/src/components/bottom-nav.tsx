@@ -54,11 +54,9 @@ export function BottomNav() {
   const [previousLocation, setPreviousLocation] = useState(location);
   const [justActivated, setJustActivated] = useState<string | null>(null);
 
-  // Sport Context & Long Press State
+  // Sport Context & Filter
   const { sport, setSport } = useSport();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const longPressTimer = useRef<NodeJS.Timeout | null>(null);
-  const isLongPress = useRef(false);
 
   // Haptic feedback helper
   const triggerHaptic = () => {
@@ -67,32 +65,12 @@ export function BottomNav() {
     }
   };
 
-  const handleTouchStart = () => {
-    isLongPress.current = false;
-    longPressTimer.current = setTimeout(() => {
-      isLongPress.current = true;
-      triggerHaptic();
+  const handleClick = (e: React.MouseEvent, url: string) => {
+    // If clicking Dashboard while already on Dashboard, open filter
+    if (url === "/" && location === "/") {
+      e.preventDefault();
       setIsDrawerOpen(true);
-    }, 500); // 500ms threshold
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent | React.MouseEvent) => {
-    if (longPressTimer.current) {
-      clearTimeout(longPressTimer.current);
-      longPressTimer.current = null;
-    }
-
-    if (isLongPress.current) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  };
-
-  const handleClick = (e: React.MouseEvent) => {
-    if (isLongPress.current) {
-      e.preventDefault();
-      e.stopPropagation();
-      isLongPress.current = false; // Reset for next time
+      triggerHaptic();
     }
   };
 
@@ -166,15 +144,11 @@ export function BottomNav() {
               <div
                 key={item.title}
                 className="flex items-center justify-center"
-                onTouchStart={handleTouchStart}
-                onTouchEnd={handleTouchEnd}
-                onMouseDown={handleTouchStart}
-                onMouseUp={handleTouchEnd}
-                onClick={handleClick}
               >
                 <Link
                   href={item.url}
                   className="flex items-center justify-center w-full h-full"
+                  onClick={(e) => handleClick(e, item.url)}
                 >
                   <motion.div
                     className={cn(

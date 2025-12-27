@@ -48,7 +48,7 @@
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
-  --radius: 0.125rem;
+  --radius: 0.5rem;
   --tracking-tight: -0.01em;
   --shadow-2xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
   --shadow-xs: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
@@ -97,7 +97,7 @@
   --elevate-1: rgba(255, 255, 255, .04);
   --elevate-2: rgba(255, 255, 255, .09);
   /* Glassmorphism: Darker page background (#121212) */
-  --background: 0 0% 7%;
+  --background: 240 10% 3.9%;
   --foreground: 0 0% 96%;
   --border: 0 0% 18%;
   /* Glassmorphism: Rich dark grey cards (#1E1E1E) */
@@ -141,8 +141,6 @@
   --shadow-lg: 0px 2px 0px 0px hsl(0 0% 0% / 0.00), 0px 4px 6px -1px hsl(0 0% 0% / 0.00);
   --shadow-xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.00), 0px 8px 10px -1px hsl(0 0% 0% / 0.00);
   --shadow-2xl: 0px 2px 0px 0px hsl(0 0% 0% / 0.00);
-  /* Glassmorphism border radius */
-  --radius: 1rem;
 
   /* Fallback for older browsers */
   --sidebar-primary-border: hsl(var(--sidebar-primary));
@@ -348,6 +346,8 @@
     border-radius: 1.25rem;
   }
 }
+
+
 
 /* 2. FINTECH TYPOGRAPHY */
 @layer base {
@@ -754,6 +754,14 @@
   transition: left 0.5s ease;
   pointer-events: none;
   z-index: 2;
+}
+
+/* Disable holographic shimmer on table rows for mobile - the pseudo-element
+   interferes with table layout, creating an anonymous cell that pushes content right */
+@media (max-width: 639px) {
+  tr.holographic::before {
+    content: none;
+  }
 }
 
 .holographic:hover::before {
