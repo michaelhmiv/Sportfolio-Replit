@@ -955,9 +955,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Add cash to user balance ($1)
+  // Add cash to user balance ($1) - DEVELOPMENT ONLY
+  // This endpoint is disabled in production to prevent abuse
   app.post("/api/user/add-cash", isAuthenticated, async (req, res) => {
     try {
+      // SECURITY: Disable in production
+      if (process.env.NODE_ENV === 'production') {
+        return res.status(403).json({ error: "This feature is disabled in production" });
+      }
+
       const userId = getUserId(req);
       const user = await storage.getUser(userId);
       if (!user) {
@@ -2183,6 +2189,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Cancel order
   app.post("/api/orders/:orderId/cancel", isAuthenticated, async (req, res) => {
     try {
+      const userId = getUserId(req);
+
+      // SECURITY: Verify order belongs to authenticated user
+      const order = await storage.getOrder(req.params.orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      if (order.userId !== userId) {
+        console.warn(`[SECURITY] User ${userId} attempted to cancel order ${req.params.orderId} owned by ${order.userId}`);
+        return res.status(403).json({ error: "Forbidden - cannot cancel another user's order" });
+      }
+
       await storage.cancelOrder(req.params.orderId);
       broadcast({ type: "marketActivity" });
       res.json({ success: true });
