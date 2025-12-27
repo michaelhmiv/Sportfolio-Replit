@@ -719,7 +719,6 @@ export const insertContestSchema = createInsertSchema(contests).omit({
 export const insertContestEntrySchema = createInsertSchema(contestEntries).omit({
   id: true,
   createdAt: true,
-  totalSharesEntered: true,
   totalScore: true,
   rank: true,
   payout: true,

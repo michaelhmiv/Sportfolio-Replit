@@ -755,9 +755,9 @@ export class DatabaseStorage implements IStorage {
   private buildPlayerQueryConditions(filters?: { search?: string; team?: string; position?: string; sport?: string }) {
     const conditions = [];
 
-    // Sport filter - default to NBA if not specified (backward compatibility)
-    if (filters?.sport && filters.sport !== "ALL" && filters.sport !== "all") {
-      conditions.push(eq(players.sport, filters.sport));
+    // Sport filter - case-insensitive
+    if (filters?.sport && filters.sport.toUpperCase() !== "ALL") {
+      conditions.push(sql`${players.sport} = ${filters.sport.toUpperCase()}`);
     }
     if (filters?.team && filters.team !== "all") {
       conditions.push(eq(players.team, filters.team));
@@ -1017,15 +1017,10 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getPlayersBySport(sport: string): Promise<Player[]> {
-    if (sport === "ALL") {
-      return await db
-        .select()
-        .from(players);
+    if (sport.toUpperCase() === 'ALL') {
+      return await db.select().from(players);
     }
-    return await db
-      .select()
-      .from(players)
-      .where(eq(players.sport, sport));
+    return await db.select().from(players).where(sql`${players.sport} = ${sport.toUpperCase()}`);
   }
 
   async updatePlayer(playerId: string, updates: Partial<InsertPlayer>): Promise<void> {
@@ -1592,8 +1587,8 @@ export class DatabaseStorage implements IStorage {
       .limit(limit);
   }
 
-  async getMarketActivity(filters?: { playerId?: string; userId?: string; playerSearch?: string; limit?: number }): Promise<any[]> {
-    const { playerId, userId, playerSearch, limit = 50 } = filters || {};
+  async getMarketActivity(filters?: { playerId?: string; userId?: string; playerSearch?: string; limit?: number; sport?: string }): Promise<any[]> {
+    const { playerId, userId, playerSearch, limit = 50, sport } = filters || {};
 
     // Create aliases for buyer and seller users
     const buyer = alias(users, "buyer");
@@ -1611,6 +1606,7 @@ export class DatabaseStorage implements IStorage {
         playerFirstName: players.firstName,
         playerLastName: players.lastName,
         playerTeam: players.team,
+        playerSport: players.sport,
         userId: sql<string>`NULL`,
         username: sql<string>`NULL`,
         buyerId: trades.buyerId,
@@ -1628,22 +1624,26 @@ export class DatabaseStorage implements IStorage {
       .innerJoin(players, eq(trades.playerId, players.id))
       .innerJoin(buyer, eq(trades.buyerId, buyer.id))
       .innerJoin(seller, eq(trades.sellerId, seller.id))
-      .$dynamic();
+      .$dynamic(); // Enable dynamic where clause
 
-    // Build and apply where conditions for trades (after joins)
-    const tradeConditions = [];
-    if (playerId) tradeConditions.push(eq(trades.playerId, playerId));
-    if (userId) tradeConditions.push(
+    const conditions = [];
+    if (playerId) conditions.push(eq(trades.playerId, playerId));
+    if (userId) conditions.push(
       or(eq(trades.buyerId, userId), eq(trades.sellerId, userId))
     );
     if (playerSearch) {
       const searchPattern = `%${playerSearch}%`;
-      tradeConditions.push(
+      conditions.push(
         sql`(${players.firstName} ILIKE ${searchPattern} OR ${players.lastName} ILIKE ${searchPattern})`
       );
     }
-    if (tradeConditions.length > 0) {
-      tradesQuery = tradesQuery.where(and(...tradeConditions));
+    // Add sport filter
+    if (sport && sport.toUpperCase() !== "ALL") {
+      conditions.push(sql`${players.sport} = ${sport.toUpperCase()}`);
+    }
+
+    if (conditions.length > 0) {
+      tradesQuery = tradesQuery.where(and(...conditions));
     }
 
     const recentTrades = await tradesQuery
@@ -3884,12 +3884,13 @@ export class DatabaseStorage implements IStorage {
   async getFinancialMarketScanners(sport: string = "ALL") {
     // 1. Bulk Fetch Player Stats for P/E Calculation
     // If sport is specific, filter by it. If "ALL", fetch all.
-    const whereClause = sport === "ALL"
+    const normalizedSport = sport.toUpperCase();
+    const whereClause = normalizedSport === "ALL"
       ? and(isNotNull(players.lastTradePrice), gt(players.lastTradePrice, "0"))
       : and(
         isNotNull(players.lastTradePrice),
         gt(players.lastTradePrice, "0"),
-        eq(players.sport, sport)
+        sql`${players.sport} = ${normalizedSport}`
       );
 
     const activePlayers = await db

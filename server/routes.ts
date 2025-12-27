@@ -1130,10 +1130,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // If isWatchlist=true, we need authentication
       let watchlistUserId: string | undefined = undefined;
       if (isWatchlist === 'true') {
-        const userId = (req.user as any)?.claims?.sub; // Use raw claims check here since middleware might be optionalAuth
+        // Support both Passport session user (req.user.id) and raw Auth0 profile (req.user.claims.sub)
+        const user = req.user as any;
+        const userId = user?.id || user?.claims?.sub;
+
         if (!userId) {
-          // If asking for watchlist but not logged in, return empty or error?
-          // Let's return empty to be safe
+          // If asking for watchlist but not logged in, return empty
           return res.json({ players: [], total: 0 });
         }
         watchlistUserId = userId;
@@ -1271,7 +1273,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Market activity feed
   app.get("/api/market/activity", async (req, res) => {
     try {
-      const { playerId, userId, playerSearch, limit } = req.query;
+      const { playerId, userId, playerSearch, limit, sport } = req.query;
 
       const parsedLimit = limit ? parseInt(limit as string) : 50;
       const safeLimit = isNaN(parsedLimit) ? 50 : Math.max(1, Math.min(parsedLimit, 200));
@@ -1281,6 +1283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: userId as string,
         playerSearch: playerSearch as string,
         limit: safeLimit,
+        sport: sport as string,
       });
 
       // Enrich with player metrics (priceChange24h)
