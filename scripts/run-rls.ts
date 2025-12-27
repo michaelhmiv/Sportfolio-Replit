@@ -29,7 +29,7 @@ const client = new Client({ connectionString: DATABASE_URL });
         await client.connect();
 
         // Use process.cwd() to verify path, pointing to scripts directory
-        const sqlPath = path.resolve(process.cwd(), 'scripts', 'fix-rls.sql');
+        const sqlPath = path.resolve(process.cwd(), 'scripts', 'disable-rls.sql');
         console.log('SQL Path:', sqlPath);
 
         if (!fs.existsSync(sqlPath)) {
