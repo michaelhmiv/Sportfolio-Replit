@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useWebSocket } from "@/lib/websocket";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, authenticatedFetch } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -161,7 +161,7 @@ export default function Marketplace() {
         return watchList || [];
       }
       // Fetch specific watchlist items
-      const res = await fetch(`/api/watchlists/${filterWatchlistId}/items`);
+      const res = await authenticatedFetch(`/api/watchlists/${filterWatchlistId}/items`);
       if (!res.ok) return [];
       return res.json();
     },
@@ -185,7 +185,7 @@ export default function Marketplace() {
     const method = isWatching ? "DELETE" : "POST";
 
     try {
-      const res = await fetch(`/api/watchlist/${playerId}`, {
+      const res = await authenticatedFetch(`/api/watchlist/${playerId}`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: method === 'POST' ? JSON.stringify({}) : undefined
