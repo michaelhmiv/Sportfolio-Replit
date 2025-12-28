@@ -3145,19 +3145,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const userHoldings = await storage.getUserHoldings(user.id);
-      const eligiblePlayers = await Promise.all(
+      const eligiblePlayers = (await Promise.all(
         userHoldings
           .filter(h => h.assetType === "player")
           .map(async (holding) => {
+            const player = await storage.getPlayer(holding.assetId);
+            // Skip players not matching contest sport
+            if (!player || player.sport.toUpperCase() !== contest.sport.toUpperCase()) {
+              return null;
+            }
             const availableShares = await storage.getAvailableShares(user.id, "player", holding.assetId);
             return {
               ...holding,
               availableShares, // Available shares (unlocked)
-              player: await storage.getPlayer(holding.assetId),
+              player,
               isEligible: true, // Simplified - would check game schedule
             };
           })
-      );
+      )).filter(Boolean);
 
       res.json({
         contest: {
@@ -3214,6 +3219,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const playerIds = lineup.map((item: any) => item.playerId);
       const players = await storage.getPlayersByIds(playerIds);
       const playerMap = new Map(players.map(p => [p.id, p]));
+
+      // VALIDATE: All players must match contest sport
+      for (const item of lineup) {
+        const player = playerMap.get(item.playerId);
+        if (!player) {
+          return res.status(400).json({ error: `Player ${item.playerId} not found` });
+        }
+        if (player.sport.toUpperCase() !== contest.sport.toUpperCase()) {
+          return res.status(400).json({
+            error: `Player ${player.firstName} ${player.lastName} is a ${player.sport} player and cannot be entered in a ${contest.sport} contest`
+          });
+        }
+      }
+
 
       for (const item of lineup) {
         const availableShares = await storage.getAvailableShares(user.id, "player", item.playerId);
@@ -3316,11 +3335,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...result.lineup.map((l: any) => l.playerId)
       ]);
 
-      const eligiblePlayers = await Promise.all(
+      const eligiblePlayers = (await Promise.all(
         Array.from(allPlayerIds).map(async (playerId) => {
           const holding = holdingsMap.get(playerId);
           const lineupItem = result.lineup.find((l: any) => l.playerId === playerId);
           const player = await storage.getPlayer(playerId);
+
+          // Skip players not matching contest sport
+          if (!player || player.sport.toUpperCase() !== contest.sport.toUpperCase()) {
+            return null;
+          }
 
           // Total available = current holding + shares in lineup
           const currentQuantity = holding?.quantity || 0;
@@ -3337,7 +3361,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             isEligible: true,
           };
         })
-      );
+      )).filter(Boolean);
 
       res.json({
         contest: {
@@ -3413,6 +3437,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const allPlayerIds = Array.from(newLineupMap.keys());
       const playersForUpdate = await storage.getPlayersByIds(allPlayerIds);
       const playerMapForUpdate = new Map(playersForUpdate.map(p => [p.id, p]));
+
+      // VALIDATE: All players must match contest sport
+      for (const [playerId] of Array.from(newLineupMap.entries())) {
+        const player = playerMapForUpdate.get(playerId);
+        if (!player) {
+          return res.status(400).json({ error: `Player ${playerId} not found` });
+        }
+        if (player.sport.toUpperCase() !== contest.sport.toUpperCase()) {
+          return res.status(400).json({
+            error: `Player ${player.firstName} ${player.lastName} is a ${player.sport} player and cannot be entered in a ${contest.sport} contest`
+          });
+        }
+      }
+
 
       // Validate that user has sufficient shares for the new lineup
       for (const [playerId, newShares] of Array.from(newLineupMap.entries())) {

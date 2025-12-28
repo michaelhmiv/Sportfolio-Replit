@@ -553,7 +553,7 @@ export default function Marketplace() {
                       <thead className="border-b bg-muted/50 hidden sm:table-header-group">
                         <tr>
                           <th className="w-8 px-2 py-1.5"></th>
-                          <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
+                          <th className="text-left py-1.5 pl-12 pr-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Player</th>
                           <th className="text-left px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground hidden md:table-cell">Team</th>
                           <th className="text-right px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                             <button

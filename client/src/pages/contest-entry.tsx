@@ -67,11 +67,16 @@ export default function ContestEntry() {
     ? format(new Date(contestData.gameDate), "yyyy-MM-dd")
     : undefined;
 
-  // Fetch games for the contest date
+  // Fetch games for the contest date (filtered by sport)
   const { data: gamesData } = useQuery<DailyGame[]>({
-    queryKey: ["/api/games/date", formattedGameDate],
-    enabled: !!formattedGameDate,
-    select: (games) => games || [],
+    queryKey: ["/api/games/date", formattedGameDate, contestData?.sport],
+    queryFn: async () => {
+      const sport = contestData?.sport || "NBA";
+      const res = await fetch(`/api/games/date/${formattedGameDate}?sport=${sport}`);
+      if (!res.ok) throw new Error("Failed to fetch games");
+      return res.json();
+    },
+    enabled: !!formattedGameDate && !!contestData?.sport,
   });
 
   // Pre-populate lineup in edit mode using API-provided eligiblePlayers
