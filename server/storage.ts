@@ -964,8 +964,13 @@ export class DatabaseStorage implements IStorage {
     }
 
     // Run count and data fetch in parallel
+    // Only apply where clause to count if there are conditions
+    const countQuery = baseConditions.length > 0
+      ? db.select({ count: sql<number>`COUNT(*)::int` }).from(players).where(and(...baseConditions))
+      : db.select({ count: sql<number>`COUNT(*)::int` }).from(players);
+
     const [countResult, playersDataRaw] = await Promise.all([
-      db.select({ count: sql<number>`COUNT(*)::int` }).from(players).where(and(...baseConditions)),
+      countQuery,
       dataQuery.orderBy(orderByClause).limit(limit).offset(offset)
     ]);
 
