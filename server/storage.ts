@@ -132,6 +132,7 @@ export interface IStorage {
   getUsers(): Promise<User[]>;
   getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
+  getAllUsersForRanking(): Promise<Array<{ userId: string; balance: string; portfolioValue: number }>>;
   createUser(user: InsertUser): Promise<User>;
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserBalance(userId: string, amount: string): Promise<void>;
@@ -400,6 +401,23 @@ export class DatabaseStorage implements IStorage {
     // Use case-insensitive email matching for consistency with OAuth providers
     const [user] = await db.select().from(users).where(sql`LOWER(${users.email}) = LOWER(${email})`);
     return user || undefined;
+  }
+
+  async getAllUsersForRanking(): Promise<Array<{ userId: string; balance: string; portfolioValue: number }>> {
+    // Optimized single query to get all users and their net worth
+    // Joins holdings and players to calculate market value in one pass
+    const results = await db
+      .select({
+        userId: users.id,
+        balance: users.balance,
+        portfolioValue: sql<number>`COALESCE(SUM(${holdings.quantity} * COALESCE(${players.lastTradePrice}, ${players.currentPrice}, '0')::numeric), 0)`,
+      })
+      .from(users)
+      .leftJoin(holdings, eq(users.id, holdings.userId))
+      .leftJoin(players, and(eq(holdings.assetId, players.id), eq(holdings.assetType, 'player')))
+      .groupBy(users.id);
+
+    return results;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -817,11 +835,11 @@ export class DatabaseStorage implements IStorage {
       watchlistUserId
     } = filters || {};
 
-    const conditions = this.buildPlayerQueryConditions({ search, team, position, sport });
+    const baseConditions = this.buildPlayerQueryConditions({ search, team, position, sport });
 
     // Watchlist filter
     if (watchlistUserId) {
-      conditions.push(
+      baseConditions.push(
         sql`EXISTS (
           SELECT 1 FROM ${watchList}
           WHERE ${watchList.playerId} = ${players.id}
@@ -832,13 +850,12 @@ export class DatabaseStorage implements IStorage {
 
     // Add teams playing on date filter
     if (teamsPlayingOnDate && teamsPlayingOnDate.length > 0) {
-      conditions.push(inArray(players.team, teamsPlayingOnDate));
+      baseConditions.push(inArray(players.team, teamsPlayingOnDate));
     }
 
     // Add order book filters using EXISTS subqueries
-    // Include both 'open' and 'partial' statuses (partially filled orders are still active)
     if (hasBuyOrders) {
-      conditions.push(
+      baseConditions.push(
         sql`EXISTS (
           SELECT 1 FROM ${orders} 
           WHERE ${orders.playerId} = ${players.id} 
@@ -849,7 +866,7 @@ export class DatabaseStorage implements IStorage {
     }
 
     if (hasSellOrders) {
-      conditions.push(
+      baseConditions.push(
         sql`EXISTS (
           SELECT 1 FROM ${orders} 
           WHERE ${orders.playerId} = ${players.id} 
@@ -859,29 +876,69 @@ export class DatabaseStorage implements IStorage {
       );
     }
 
-    // CRITICAL: When sorting by sentiment, filter to only include players with
-    // significant 24h order volume (> 10), matching the scanner card logic.
-    // This prevents low-activity players (who default to 100% or 50%) from
-    // dominating the results.
-    if (sortBy === 'sentiment') {
-      conditions.push(
-        sql`(
-          SELECT COALESCE(SUM(${orders.quantity}), 0)
-          FROM ${orders}
-          WHERE ${orders.playerId} = ${players.id}
-          AND ${orders.createdAt} >= NOW() - INTERVAL '24 hours'
-        ) > 10`
-      );
+    // OPTIMIZATION: When we need metrics for sorting (sentiment, undervalued, etc.), 
+    // we use LEFT JOINs to subqueries instead of correlated subqueries in the ORDER BY.
+    // This allows Postgres to calculate the aggregations in a single pass.
+
+    // Subquery for Order Metrics (Bid/Ask/Sentiment)
+    // Only fetch if sortBy requires it to keep the base query light
+    const needsOrders = ['bid', 'ask', 'sentiment'].includes(sortBy);
+    const orderMetrics = db
+      .select({
+        playerId: orders.playerId,
+        bestBid: sql<number>`MAX(CASE WHEN ${orders.side} = 'buy' AND ${orders.status} IN ('open', 'partial') THEN ${orders.limitPrice} END)`,
+        bestAsk: sql<number>`MIN(CASE WHEN ${orders.side} = 'sell' AND ${orders.status} IN ('open', 'partial') THEN ${orders.limitPrice} END)`,
+        sentimentPercent: sql<number>`(SUM(CASE WHEN ${orders.side} = 'buy' AND ${orders.createdAt} >= NOW() - INTERVAL '24 hours' THEN ${orders.quantity} ELSE 0 END)::numeric / NULLIF(SUM(CASE WHEN ${orders.createdAt} >= NOW() - INTERVAL '24 hours' THEN ${orders.quantity} ELSE 0 END), 0)::numeric) * 100`,
+        totalVol24h: sql<number>`SUM(CASE WHEN ${orders.createdAt} >= NOW() - INTERVAL '24 hours' THEN ${orders.quantity} ELSE 0 END)`,
+      })
+      .from(orders)
+      .groupBy(orders.playerId)
+      .as('order_metrics');
+
+    // Subquery for Fantasy Stats (Undervalued)
+    const fantasyMetrics = db
+      .select({
+        playerId: playerGameStats.playerId,
+        avgFantasy: sql<number>`AVG(${playerGameStats.fantasyPoints}::numeric)`,
+      })
+      .from(playerGameStats)
+      .groupBy(playerGameStats.playerId)
+      .as('fantasy_metrics');
+
+    // Build the main data query
+    let dataQuery = db
+      .select({
+        player: players,
+        // Optional aliased columns for sorting
+        bestBid: sql`order_metrics.best_bid`,
+        bestAsk: sql`order_metrics.best_ask`,
+        sentiment: sql`order_metrics.sentiment_percent`,
+        avgFantasy: sql`fantasy_metrics.avg_fantasy`,
+      })
+      .from(players);
+
+    if (needsOrders) {
+      dataQuery = dataQuery.leftJoin(orderMetrics, eq(players.id, orderMetrics.playerId)) as any;
     }
 
-    // Determine sort column based on sortBy parameter
-    // For price/bid/ask sorts, always use NULLS LAST so real market data appears before empty values
+    // Only join fantasyMetrics when needed for undervalued sorting
+    if (sortBy === 'undervalued') {
+      dataQuery = dataQuery.leftJoin(fantasyMetrics, eq(players.id, fantasyMetrics.playerId)) as any;
+    }
+
+    if (baseConditions.length > 0) {
+      dataQuery = dataQuery.where(and(...baseConditions)) as any;
+    }
+
+    // Additional condition for sentiment sorting (quality filter)
+    if (sortBy === 'sentiment') {
+      dataQuery = dataQuery.where(sql`order_metrics.total_vol_24h > 10`) as any;
+    }
+
+    // Set up ORDER BY
     let orderByClause;
     if (sortBy === 'price') {
-      // Sort by lastTradePrice with NULL handling (real prices first, then NULLs)
-      orderByClause = sortOrder === 'asc'
-        ? sql`${players.lastTradePrice} ASC NULLS LAST`
-        : sql`${players.lastTradePrice} DESC NULLS LAST`;
+      orderByClause = sortOrder === 'asc' ? sql`${players.lastTradePrice} ASC NULLS LAST` : sql`${players.lastTradePrice} DESC NULLS LAST`;
     } else if (sortBy === 'marketCap') {
       orderByClause = sortOrder === 'asc' ? asc(players.marketCap) : desc(players.marketCap);
     } else if (sortBy === 'volume') {
@@ -889,70 +946,32 @@ export class DatabaseStorage implements IStorage {
     } else if (sortBy === 'change') {
       orderByClause = sortOrder === 'asc' ? asc(players.priceChange24h) : desc(players.priceChange24h);
     } else if (sortBy === 'bid') {
-      // Sort by best bid price (real bids first, then NULLs)
-      const bestBidSubquery = sql`(
-        SELECT MAX(${orders.limitPrice}) 
-        FROM ${orders} 
-        WHERE ${orders.playerId} = ${players.id} 
-        AND ${orders.side} = 'buy' 
-        AND ${orders.status} IN ('open', 'partial')
-      )`;
-      orderByClause = sortOrder === 'asc'
-        ? sql`${bestBidSubquery} ASC NULLS LAST`
-        : sql`${bestBidSubquery} DESC NULLS LAST`;
+      orderByClause = sortOrder === 'asc' ? sql`order_metrics.best_bid ASC NULLS LAST` : sql`order_metrics.best_bid DESC NULLS LAST`;
     } else if (sortBy === 'ask') {
-      // Sort by best ask price (real asks first, then NULLs)
-      const bestAskSubquery = sql`(
-        SELECT MIN(${orders.limitPrice}) 
-        FROM ${orders} 
-        WHERE ${orders.playerId} = ${players.id} 
-        AND ${orders.side} = 'sell' 
-        AND ${orders.status} IN ('open', 'partial')
-      )`;
-      orderByClause = sortOrder === 'asc'
-        ? sql`${bestAskSubquery} ASC NULLS LAST`
-        : sql`${bestAskSubquery} DESC NULLS LAST`;
+      orderByClause = sortOrder === 'asc' ? sql`order_metrics.best_ask ASC NULLS LAST` : sql`order_metrics.best_ask DESC NULLS LAST`;
     } else if (sortBy === 'sentiment') {
-      // Use Postgres-native interval for 24h window to avoid JS Date serialization issues
-      // Also add a minimum volume filter to match scanner quality (total volume > 5)
-      const sentimentSubquery = sql`(
-        SELECT (SUM(CASE WHEN ${orders.side} = 'buy' THEN ${orders.quantity} ELSE 0 END)::numeric / NULLIF(SUM(${orders.quantity}), 0)::numeric) * 100
-        FROM ${orders}
-        WHERE ${orders.playerId} = ${players.id}
-        AND ${orders.createdAt} >= NOW() - INTERVAL '24 hours'
-      )`;
-
-      // Secondary sort by volume to break ties (especially for 50/50 players)
       orderByClause = sortOrder === 'asc'
-        ? sql`${sentimentSubquery} ASC NULLS LAST, ${players.volume24h} ASC`
-        : sql`${sentimentSubquery} DESC NULLS LAST, ${players.volume24h} DESC`;
+        ? sql`order_metrics.sentiment_percent ASC NULLS LAST, ${players.volume24h} ASC`
+        : sql`order_metrics.sentiment_percent DESC NULLS LAST, ${players.volume24h} DESC`;
     } else if (sortBy === 'undervalued') {
       const LEAGUE_AVG_PE = 0.43;
-      // Correlated subquery for avg points
-      const undervaluedSubquery = sql`(
-        ( ( ${players.lastTradePrice}::numeric / NULLIF((SELECT AVG(${playerGameStats.fantasyPoints}::numeric) FROM ${playerGameStats} WHERE ${playerGameStats.playerId} = ${players.id}), 0) ) / ${LEAGUE_AVG_PE} ) * 100
-      )`;
+      const peScore = sql`( ( ${players.lastTradePrice}::numeric / NULLIF(fantasy_metrics.avg_fantasy, 0) ) / ${LEAGUE_AVG_PE} ) * 100`;
       orderByClause = sortOrder === 'asc'
-        ? sql`CASE WHEN ${undervaluedSubquery} > 0 THEN ${undervaluedSubquery} ELSE 999 END ASC`
-        : sql`${undervaluedSubquery} DESC NULLS LAST`;
+        ? sql`CASE WHEN ${peScore} > 0 THEN ${peScore} ELSE 999 END ASC`
+        : sql`${peScore} DESC NULLS LAST`;
     } else {
-      // Default to volume desc
       orderByClause = desc(players.volume24h);
     }
 
-    // Run count and data fetch in parallel for performance
-    const [countResult, playersData] = await Promise.all([
-      // Count query
-      conditions.length > 0
-        ? db.select({ count: sql<number>`COUNT(*)::int` }).from(players).where(and(...conditions))
-        : db.select({ count: sql<number>`COUNT(*)::int` }).from(players),
-      // Data query with pagination and sorting
-      conditions.length > 0
-        ? db.select().from(players).where(and(...conditions)).orderBy(orderByClause).limit(limit).offset(offset)
-        : db.select().from(players).orderBy(orderByClause).limit(limit).offset(offset),
+    // Run count and data fetch in parallel
+    const [countResult, playersDataRaw] = await Promise.all([
+      db.select({ count: sql<number>`COUNT(*)::int` }).from(players).where(and(...baseConditions)),
+      dataQuery.orderBy(orderByClause).limit(limit).offset(offset)
     ]);
 
     const total = countResult[0].count;
+    // Unwrap the player object from the join result
+    const playersData = (playersDataRaw as any[]).map(row => row.player);
 
     return { players: playersData, total };
   }
@@ -1590,15 +1609,16 @@ export class DatabaseStorage implements IStorage {
   async getMarketActivity(filters?: { playerId?: string; userId?: string; playerSearch?: string; limit?: number; sport?: string }): Promise<any[]> {
     const { playerId, userId, playerSearch, limit = 50, sport } = filters || {};
 
-    // Create aliases for buyer and seller users
     const buyer = alias(users, "buyer");
     const seller = alias(users, "seller");
 
-    // Fetch recent trades with player and user info
-    // Use a larger limit to ensure we get enough rows after merging
-    const fetchLimit = limit * 2;
+    // Unified Market Activity Query using UNION ALL
+    // This allows the database to handle sorting and limiting across both trades and orders in one pass.
+    const searchPattern = playerSearch ? `%${playerSearch}%` : null;
+    const normalizedSport = sport?.toUpperCase() !== "ALL" ? sport?.toUpperCase() : null;
 
-    let tradesQuery = db
+    // --- Trades Subquery ---
+    const tradesBase = db
       .select({
         activityType: sql<string>`'trade'`,
         id: trades.id,
@@ -1608,7 +1628,8 @@ export class DatabaseStorage implements IStorage {
         playerTeam: players.team,
         playerSport: players.sport,
         userId: sql<string>`NULL`,
-        username: sql<string>`NULL`,
+        userUsername: sql<string>`NULL`,
+        userAvatar: sql<string>`NULL`,
         buyerId: trades.buyerId,
         buyerUsername: buyer.username,
         sellerId: trades.sellerId,
@@ -1623,55 +1644,18 @@ export class DatabaseStorage implements IStorage {
       .from(trades)
       .innerJoin(players, eq(trades.playerId, players.id))
       .innerJoin(buyer, eq(trades.buyerId, buyer.id))
-      .innerJoin(seller, eq(trades.sellerId, seller.id))
-      .$dynamic(); // Enable dynamic where clause
+      .innerJoin(seller, eq(trades.sellerId, seller.id));
 
-    const conditions = [];
-    if (playerId) conditions.push(eq(trades.playerId, playerId));
-    if (userId) conditions.push(
-      or(eq(trades.buyerId, userId), eq(trades.sellerId, userId))
-    );
-    if (playerSearch) {
-      const searchPattern = `%${playerSearch}%`;
-      conditions.push(
-        sql`(${players.firstName} ILIKE ${searchPattern} OR ${players.lastName} ILIKE ${searchPattern})`
-      );
-    }
-    // Add sport filter
-    if (sport && sport.toUpperCase() !== "ALL") {
-      conditions.push(sql`UPPER(${players.sport}) = ${sport.toUpperCase()}`);
-    }
+    const tradesConditions = [];
+    if (playerId) tradesConditions.push(eq(trades.playerId, playerId));
+    if (userId) tradesConditions.push(or(eq(trades.buyerId, userId), eq(trades.sellerId, userId)));
+    if (searchPattern) tradesConditions.push(sql`(${players.firstName} ILIKE ${searchPattern} OR ${players.lastName} ILIKE ${searchPattern})`);
+    if (normalizedSport) tradesConditions.push(sql`UPPER(${players.sport}) = ${normalizedSport}`);
 
-    if (conditions.length > 0) {
-      tradesQuery = tradesQuery.where(and(...conditions));
-    }
+    const finalTradesQuery = tradesConditions.length > 0 ? tradesBase.where(and(...tradesConditions)) : tradesBase;
 
-    const recentTrades = await tradesQuery
-      .orderBy(desc(trades.executedAt))
-      .limit(fetchLimit);
-
-    // Build where conditions for orders
-    const ordersConditions = [];
-    if (playerId) ordersConditions.push(eq(orders.playerId, playerId));
-    if (userId) ordersConditions.push(eq(orders.userId, userId));
-    // Exclude filled orders (optional, but good for "activity" feed unless we want history)
-    // ordersConditions.push(ne(orders.status, 'filled')); // Keep filled for history?
-
-    // Search filter for orders
-    if (playerSearch) {
-      const searchPattern = `%${playerSearch}%`;
-      ordersConditions.push(
-        sql`(${players.firstName} ILIKE ${searchPattern} OR ${players.lastName} ILIKE ${searchPattern})`
-      );
-    }
-
-    // Add sport filter - ensure it matches
-    if (sport && sport.toUpperCase() !== "ALL") {
-      ordersConditions.push(sql`UPPER(${players.sport}) = ${sport.toUpperCase()}`);
-    }
-
-    // Fetch recent orders (placed and cancelled) with player and user info
-    const recentOrders = await db
+    // --- Orders Subquery ---
+    const ordersBase = db
       .select({
         activityType: sql<string>`CASE WHEN ${orders.status} = 'cancelled' THEN 'order_cancelled' ELSE 'order_placed' END`,
         id: orders.id,
@@ -1683,24 +1667,37 @@ export class DatabaseStorage implements IStorage {
         userId: orders.userId,
         userUsername: users.username,
         userAvatar: users.profileImageUrl,
-        price: orders.limitPrice,
+        buyerId: sql<string>`NULL`,
+        buyerUsername: sql<string>`NULL`,
+        sellerId: sql<string>`NULL`,
+        sellerUsername: sql<string>`NULL`,
+        side: orders.side,
+        orderType: orders.orderType,
         quantity: orders.quantity,
+        price: sql<string>`NULL`,
+        limitPrice: orders.limitPrice,
         timestamp: orders.createdAt,
       })
       .from(orders)
       .innerJoin(players, eq(orders.playerId, players.id))
-      .innerJoin(users, eq(orders.userId, users.id))
-      .$dynamic()
-      .where(and(...ordersConditions))
-      .orderBy(desc(orders.createdAt))
-      .limit(fetchLimit);
+      .innerJoin(users, eq(orders.userId, users.id));
 
-    // Combine, sort by timestamp, and apply the final limit
-    const combined = [...recentTrades, ...recentOrders]
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      .slice(0, limit); // Apply final limit after sorting
+    const orderConditions = [];
+    if (playerId) orderConditions.push(eq(orders.playerId, playerId));
+    if (userId) orderConditions.push(eq(orders.userId, userId));
+    if (searchPattern) orderConditions.push(sql`(${players.firstName} ILIKE ${searchPattern} OR ${players.lastName} ILIKE ${searchPattern})`);
+    if (normalizedSport) orderConditions.push(sql`UPPER(${players.sport}) = ${normalizedSport}`);
 
-    return combined;
+    const finalOrdersQuery = orderConditions.length > 0 ? ordersBase.where(and(...orderConditions)) : ordersBase;
+
+    // Combine using UNION ALL and apply global order + limit
+    const combinedQuery = db
+      .select()
+      .from(sql`(${finalTradesQuery.as('t')} UNION ALL ${finalOrdersQuery.as('o')}) as activity`)
+      .orderBy(sql`timestamp DESC`)
+      .limit(limit);
+
+    return await combinedQuery;
   }
 
   // Price history methods

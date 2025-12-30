@@ -30,13 +30,13 @@ interface UserProfile {
   };
   stats: {
     netWorth: string;
-    totalSharesMined: number;
+    totalSharesVested: number;
     totalMarketOrders: number;
     totalTradesExecuted: number;
     holdingsCount: number;
   };
   rankings: {
-    sharesMined: number;
+    sharesVested: number;
     marketOrders: number;
     netWorth: number;
   };
@@ -276,7 +276,7 @@ export default function UserProfile() {
             </Card>
           </Link>
 
-          <Link href="/leaderboards#sharesMined">
+          <Link href="/leaderboards#sharesVested">
             <Card className="hover-elevate cursor-pointer" data-testid="card-shares-mined">
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-2">
@@ -284,10 +284,10 @@ export default function UserProfile() {
                   <span className="text-xs sm:text-sm text-muted-foreground">Shares Vested</span>
                 </div>
                 <div className="text-lg sm:text-2xl font-bold" data-testid="text-shares-mined">
-                  {stats.totalSharesMined.toLocaleString()}
+                  {stats.totalSharesVested?.toLocaleString() ?? "0"}
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  Rank #{rankings.sharesMined} → View Full Board
+                  Rank #{rankings.sharesVested ?? "?"} → View Full Board
                 </div>
               </CardContent>
             </Card>

@@ -4049,25 +4049,36 @@ ${posts.map(post => `  <url>
 
       // Get user holdings with market values
       const userHoldings = await storage.getUserHoldings(user.id);
-      const enrichedHoldings = await Promise.all(
-        userHoldings.map(async (holding) => {
-          if (holding.assetType === "player") {
-            const player = await storage.getPlayer(holding.assetId);
-            if (player) {
-              const marketValue = player.lastTradePrice
-                ? (parseFloat(player.lastTradePrice) * holding.quantity).toFixed(2)
-                : null;
-              return {
-                ...holding,
-                player,
-                lastTradePrice: player.lastTradePrice,
-                marketValue,
-              };
-            }
+
+      // Batch fetch all players for holdings (avoids N+1 queries)
+      const playerIds = userHoldings
+        .filter(h => h.assetType === "player")
+        .map(h => h.assetId);
+      const playersMap = new Map<string, any>();
+      if (playerIds.length > 0) {
+        const playersList = await storage.getPlayersByIds(playerIds);
+        for (const player of playersList) {
+          playersMap.set(player.id, player);
+        }
+      }
+
+      const enrichedHoldings = userHoldings.map((holding) => {
+        if (holding.assetType === "player") {
+          const player = playersMap.get(holding.assetId);
+          if (player) {
+            const marketValue = player.lastTradePrice
+              ? (parseFloat(player.lastTradePrice) * holding.quantity).toFixed(2)
+              : null;
+            return {
+              ...holding,
+              player,
+              lastTradePrice: player.lastTradePrice,
+              marketValue,
+            };
           }
-          return holding;
-        })
-      );
+        }
+        return holding;
+      });
 
       // Calculate net worth (balance + total market value of holdings)
       const holdingsValue = enrichedHoldings.reduce((sum: number, h: any) => {
@@ -4078,41 +4089,26 @@ ${posts.map(post => `  <url>
       // Get leaderboard rankings
       const allUsers = await storage.getUsers();
 
-      // Calculate rankings
+      // Calculate simple rankings (fields directly on user row)
       const sharesVestedRank = allUsers
-        .sort((a: User, b: User) => b.totalSharesVested - a.totalSharesVested)
-        .findIndex((u: User) => u.id === user.id) + 1;
+        .sort((a, b) => b.totalSharesVested - a.totalSharesVested)
+        .findIndex((u) => u.id === user.id) + 1;
 
       const marketOrdersRank = allUsers
-        .sort((a: User, b: User) => b.totalMarketOrders - a.totalMarketOrders)
-        .findIndex((u: User) => u.id === user.id) + 1;
+        .sort((a, b) => b.totalMarketOrders - a.totalMarketOrders)
+        .findIndex((u) => u.id === user.id) + 1;
 
-      // Calculate net worth for all users (with proper price fetching)
-      const usersWithNetWorth = await Promise.all(
-        allUsers.map(async (u: User) => {
-          const holdings = await storage.getUserHoldings(u.id);
-          const holdingsVal = await Promise.all(
-            holdings.map(async (h: Holding) => {
-              if (h.assetType === "player") {
-                const p = await storage.getPlayer(h.assetId);
-                if (p?.lastTradePrice) {
-                  return parseFloat(p.lastTradePrice) * h.quantity;
-                }
-              }
-              return 0;
-            })
-          );
-          const totalHoldingsVal = holdingsVal.reduce((sum: number, v: number) => sum + v, 0);
-          return {
-            userId: u.id,
-            netWorth: parseFloat(u.balance) + totalHoldingsVal,
-          };
-        })
-      );
+      // Calculate net worth ranking (requires holdings + prices)
+      // Optimized: Single SQL query handles the aggregation
+      const usersWithNetWorthRaw = await storage.getAllUsersForRanking();
+      const usersWithNetWorth = usersWithNetWorthRaw.map(u => ({
+        userId: u.userId,
+        netWorth: parseFloat(u.balance) + u.portfolioValue
+      }));
 
       const netWorthRank = usersWithNetWorth
-        .sort((a: { userId: string; netWorth: number }, b: { userId: string; netWorth: number }) => b.netWorth - a.netWorth)
-        .findIndex((u: { userId: string; netWorth: number }) => u.userId === user.id) + 1;
+        .sort((a, b) => b.netWorth - a.netWorth)
+        .findIndex((u) => u.userId === user.id) + 1;
 
       res.json({
         user: {
