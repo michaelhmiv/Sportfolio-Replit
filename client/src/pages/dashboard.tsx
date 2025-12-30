@@ -642,13 +642,13 @@ export default function Dashboard() {
             </ScrollReveal>
           )}
 
+          {/* Market Scanners Carousel */}
+          <ScrollReveal delay={0.15}>
+            <DashboardScanners />
+          </ScrollReveal>
+
           {/* Widgets Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3">
-            {/* Market Scanners Carousel */}
-            <ScrollReveal delay={0.15}>
-              <DashboardScanners />
-            </ScrollReveal>
-
             {/* Contest Summary */}
             <ScrollReveal delay={0.35}>
               <Card className="lg:col-span-1">

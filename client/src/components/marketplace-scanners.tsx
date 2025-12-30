@@ -68,7 +68,7 @@ function useScannerData() {
         scanData,
         topRisers,
         topMc,
-        isLoading: scanLoading || (!scanData && (risersLoading || mcLoading))
+        isLoading: scanLoading || risersLoading || mcLoading
     };
 }
 
@@ -99,21 +99,122 @@ export function MarketplaceScanners() {
     );
 }
 
-// --- Dashboard Component (Always Carousel, Expanded Rows) ---
+// --- Dashboard Component (Grid on Desktop, Carousel on Mobile) ---
 export function DashboardScanners() {
     const { scanData, topRisers, topMc, isLoading } = useScannerData();
 
     if (isLoading) return <ScannerSkeleton />;
     if (!scanData) return null;
 
+    const descriptions: Record<string, string> = {
+        undervalued: "Players priced significantly below their calculated fair value based on recent performance.",
+        risers: "Players with the highest percentage price increase over the last 24 hours.",
+        marketcap: "Top players ranked by total market capitalization (Price × Total Shares)."
+    };
+
+    const sections = [
+        {
+            title: "Relative Price/FPS",
+            icon: <TicketPercent className="w-4 h-4 text-emerald-500" />,
+            color: { border: "border-emerald-500/20", bg: "bg-emerald-500/10", text: "text-emerald-500" },
+            items: scanData.undervalued,
+            type: "undervalued"
+        },
+        {
+            title: "Top Gainers (24h)",
+            icon: <TrendingUp className="w-4 h-4 text-green-500" />,
+            color: { border: "border-green-500/20", bg: "bg-green-500/10", text: "text-green-500" },
+            items: topRisers,
+            type: "risers"
+        },
+        {
+            title: "Market Cap Leaders",
+            icon: <BarChart3 className="w-4 h-4 text-blue-500" />,
+            color: { border: "border-blue-500/20", bg: "bg-blue-500/10", text: "text-blue-500" },
+            items: topMc,
+            type: "marketcap"
+        }
+    ];
+
     return (
-        <div className="mb-2">
-            <ScannerCarousel
-                scanData={scanData}
-                topRisers={topRisers}
-                topMc={topMc}
-                mode="expanded"
-            />
+        <div className="mb-6">
+            {/* Mobile/Tablet: Carousel */}
+            <div className="lg:hidden -mx-4 px-4">
+                <ScannerCarousel
+                    scanData={scanData}
+                    topRisers={topRisers}
+                    topMc={topMc}
+                    mode="expanded"
+                />
+            </div>
+
+            {/* Desktop: 3-column Grid */}
+            <div className="hidden lg:grid grid-cols-3 gap-6">
+                {sections.map((section, idx) => (
+                    <div key={idx} className={`border rounded-xl overflow-hidden bg-card h-full flex flex-col ${section.color.border} glass`}>
+                        <div className={`p-3 border-b flex items-center justify-between ${section.color.bg}`}>
+                            <div className="flex items-center gap-2 font-bold text-sm">
+                                {section.icon}
+                                {section.title}
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-4 w-4 rounded-full p-0 hover:bg-transparent">
+                                            <HelpCircle className="w-3 h-3 text-muted-foreground/50 hover:text-muted-foreground transition-colors cursor-pointer" />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent side="top" className="w-64 p-2">
+                                        <p className="text-xs">{descriptions[section.type]}</p>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        </div>
+
+                        <div className="p-2 flex-1 space-y-1">
+                            {section.items?.slice(0, 5).map((item: any, i: number) => {
+                                const player = item.player || item;
+                                let value = "";
+                                let label = "";
+
+                                if (section.type === "undervalued") {
+                                    value = item.metrics?.valueIndex?.toFixed(0);
+                                    label = "Index";
+                                } else if (section.type === "risers") {
+                                    value = `+$${item.priceChange24h?.toFixed(2)}`;
+                                    label = "Change";
+                                } else if (section.type === "marketcap") {
+                                    const cap = item.marketCap || 0;
+                                    value = `$${cap < 1000000 ? (cap / 1000).toFixed(0) + 'k' : (cap / 1000000).toFixed(1) + 'M'}`;
+                                    label = "Cap";
+                                }
+
+                                return (
+                                    <ScannerRowExpanded
+                                        key={player.id}
+                                        rank={i + 1}
+                                        player={player}
+                                        label={label}
+                                        value={value}
+                                        color={section.color.text}
+                                        type={section.type}
+                                    />
+                                );
+                            })}
+                        </div>
+
+                        <div className="p-2 border-t bg-muted/20 text-center">
+                            <Link href="/marketplace">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="w-full h-6 text-[10px] uppercase text-muted-foreground"
+                                >
+                                    View Full List <ArrowRight className="w-3 h-3 ml-1" />
+                                </Button>
+                            </Link>
+                        </div>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
@@ -369,7 +470,7 @@ function ScannerRowExpanded({ rank, player, label, value, color, type }: any) {
                 <div className="flex items-center gap-6 text-right">
                     {/* Price */}
                     <div className="flex flex-col items-end w-16">
-                        <span className="text-sm font-mono font-bold">${parseFloat(player.currentPrice || "0").toFixed(2)}</span>
+                        <span className="text-sm font-mono font-bold">${parseFloat(player.currentPrice || player.price || "0").toFixed(2)}</span>
                         <span className="text-[10px] text-muted-foreground uppercase opacity-50">Price</span>
                     </div>
 
@@ -382,7 +483,7 @@ function ScannerRowExpanded({ rank, player, label, value, color, type }: any) {
                     <ArrowRight className="w-4 h-4 text-muted-foreground/50 opacity-0 group-hover/row:opacity-100 -ml-2" />
                 </div>
             </div>
-        </Link>
+        </Link >
     )
 }
 

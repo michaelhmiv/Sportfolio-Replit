@@ -1096,7 +1096,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: p.lastName,
           team: p.team,
           position: p.position,
-          price: p.currentPrice ? parseFloat(p.currentPrice) : (p.lastTradePrice ? parseFloat(p.lastTradePrice) : null),
+          currentPrice: p.currentPrice ? parseFloat(p.currentPrice) : (p.lastTradePrice ? parseFloat(p.lastTradePrice) : null),
           priceChange24h: parseFloat(p.priceChange24h),
         }));
 
@@ -1124,7 +1124,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lastName: p.lastName,
           team: p.team,
           position: p.position,
-          price: p.currentPrice ? parseFloat(p.currentPrice) : (p.lastTradePrice ? parseFloat(p.lastTradePrice) : null),
+          currentPrice: p.currentPrice ? parseFloat(p.currentPrice) : (p.lastTradePrice ? parseFloat(p.lastTradePrice) : null),
           marketCap: parseFloat(p.marketCap),
           totalShares: p.totalShares,
         }));
