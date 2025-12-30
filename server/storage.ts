@@ -905,25 +905,50 @@ export class DatabaseStorage implements IStorage {
       .groupBy(playerGameStats.playerId)
       .as('fantasy_metrics');
 
-    // Build the main data query
-    let dataQuery = db
-      .select({
-        player: players,
-        // Optional aliased columns for sorting
-        bestBid: sql`order_metrics.best_bid`,
-        bestAsk: sql`order_metrics.best_ask`,
-        sentiment: sql`order_metrics.sentiment_percent`,
-        avgFantasy: sql`fantasy_metrics.avg_fantasy`,
-      })
-      .from(players);
+    // Build the main data query dynamically based on what columns/joins are needed
+    // This prevents SQL errors from referencing non-existent joined tables
+    let dataQuery: any;
 
-    if (needsOrders) {
-      dataQuery = dataQuery.leftJoin(orderMetrics, eq(players.id, orderMetrics.playerId)) as any;
-    }
-
-    // Only join fantasyMetrics when needed for undervalued sorting
-    if (sortBy === 'undervalued') {
-      dataQuery = dataQuery.leftJoin(fantasyMetrics, eq(players.id, fantasyMetrics.playerId)) as any;
+    if (needsOrders && sortBy === 'undervalued') {
+      // Need both order metrics and fantasy metrics
+      dataQuery = db
+        .select({
+          player: players,
+          bestBid: sql`order_metrics.best_bid`,
+          bestAsk: sql`order_metrics.best_ask`,
+          sentiment: sql`order_metrics.sentiment_percent`,
+          avgFantasy: sql`fantasy_metrics.avg_fantasy`,
+        })
+        .from(players)
+        .leftJoin(orderMetrics, eq(players.id, orderMetrics.playerId))
+        .leftJoin(fantasyMetrics, eq(players.id, fantasyMetrics.playerId));
+    } else if (needsOrders) {
+      // Need only order metrics
+      dataQuery = db
+        .select({
+          player: players,
+          bestBid: sql`order_metrics.best_bid`,
+          bestAsk: sql`order_metrics.best_ask`,
+          sentiment: sql`order_metrics.sentiment_percent`,
+        })
+        .from(players)
+        .leftJoin(orderMetrics, eq(players.id, orderMetrics.playerId));
+    } else if (sortBy === 'undervalued') {
+      // Need only fantasy metrics
+      dataQuery = db
+        .select({
+          player: players,
+          avgFantasy: sql`fantasy_metrics.avg_fantasy`,
+        })
+        .from(players)
+        .leftJoin(fantasyMetrics, eq(players.id, fantasyMetrics.playerId));
+    } else {
+      // No extra joins needed - just select players
+      dataQuery = db
+        .select({
+          player: players,
+        })
+        .from(players);
     }
 
     if (baseConditions.length > 0) {
