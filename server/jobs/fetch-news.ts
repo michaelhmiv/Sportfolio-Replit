@@ -72,8 +72,10 @@ function buildPrompt(recentHeadlines: string[]): string {
 ${headlinesContext}INSTRUCTIONS:
 1. Search for the most significant NBA and NFL news from TODAY
 2. Report up to 3 stories maximum (only truly newsworthy items)
-3. For stories we've already covered, only report if there's a MAJOR UPDATE with new information
-4. Prioritize: player injuries, trades, major performances, surprising results
+3. CRITICAL: Do NOT report on any player who appears in the stories above, even with a different angle or update
+4. CRITICAL: Always use full player names (e.g., "LeBron James" instead of "LeBron") to ensure proper auto-linking
+5. Skip any story about players/teams we've already covered
+6. Prioritize: player injuries, trades, major performances, surprising results
 
 OUTPUT FORMAT (use this EXACT structure for each story):
 ---STORY---
@@ -83,10 +85,7 @@ BRIEFING: [1-2 sentence summary for sports traders, focus on impact]
 SPORT: NBA
 ---END---
 
-For updates to existing stories, use TYPE: UPDATE
-
-IMPORTANT: If there is no significant new news to report, you MUST respond with exactly this text and nothing else:
-NO_NEWS`;
+IMPORTANT: If there is no significant NEW news about DIFFERENT players, respond with exactly: NO_NEWS`;
 }
 
 /**
