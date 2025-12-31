@@ -158,9 +158,14 @@ export async function fetchNews(progressCallback?: ProgressCallback): Promise<Ne
         progressCallback?.({ message: 'Loading recent news for context...', type: 'info' });
         const recentHeadlines = await getRecentHeadlines();
         console.log(`[News] Loaded ${recentHeadlines.length} recent headlines for context`);
+        if (recentHeadlines.length > 0) {
+            console.log('[News] Headlines being sent as context:');
+            recentHeadlines.forEach((h, i) => console.log(`  ${i + 1}. ${h}`));
+        }
 
         // Build context-aware prompt
         const prompt = buildPrompt(recentHeadlines);
+        console.log(`[News] Full prompt length: ${prompt.length} characters`);
 
         progressCallback?.({ message: 'Fetching breaking news from Perplexity...', type: 'info' });
         console.log('[News] Fetching breaking news with context...');
