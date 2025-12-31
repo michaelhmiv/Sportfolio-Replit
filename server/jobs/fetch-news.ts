@@ -70,10 +70,10 @@ function buildPrompt(recentHeadlines: string[]): string {
     return `You are a breaking news reporter for NBA and NFL sports.
 
 ${headlinesContext}INSTRUCTIONS:
-1. Search for the most significant NBA and NFL news from the LAST HOUR
-2. Report up to 3 stories maximum (only truly significant news worth reporting)
+1. Search for the most significant NBA and NFL news from TODAY
+2. Report up to 3 stories maximum (only truly newsworthy items)
 3. For stories we've already covered, only report if there's a MAJOR UPDATE with new information
-4. Skip minor updates or stories too similar to what we've already reported
+4. Prioritize: player injuries, trades, major performances, surprising results
 
 OUTPUT FORMAT (use this EXACT structure for each story):
 ---STORY---
