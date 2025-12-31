@@ -39,6 +39,7 @@ import About from "@/pages/about";
 import Contact from "@/pages/contact";
 import HowItWorks from "@/pages/how-it-works";
 import Analytics from "@/pages/analytics";
+import News from "@/pages/news";
 import Premium from "@/pages/premium";
 import PremiumTrade from "@/pages/premium-trade";
 import Watchlists from "@/pages/watchlists";
@@ -52,6 +53,7 @@ import { VestingWidget } from "@/components/vesting-widget";
 import { RedemptionModal } from "@/components/redemption-modal";
 import { VestingProvider, useVesting } from "@/lib/vesting-context";
 import { SportProvider } from "@/lib/sport-context";
+import { NewsNotificationProvider } from "@/lib/news-notification-context";
 
 function OnboardingCheck() {
   const { user, isAuthenticated } = useAuth();
@@ -223,6 +225,7 @@ function Router() {
           <Route path="/contact" component={Contact} />
           <Route path="/how-it-works" component={HowItWorks} />
           <Route path="/analytics" component={Analytics} />
+          <Route path="/news" component={News} />
 
           {/* Protected routes - require authentication, redirect to dashboard if not logged in */}
           <Route path="/player/:id">
@@ -265,11 +268,14 @@ function Router() {
 
 function Header({ onVestShares }: { onVestShares: () => void }) {
   const { user, isAuthenticated, logout } = useAuth();
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
   const { subscribe } = useWebSocket();
   const { data: dashboardData } = useQuery<{ user: { balance: string; portfolioValue: string } }>({
     queryKey: ['/api/dashboard'],
   });
+
+  // Detect if we're on a user profile page
+  const isProfilePage = location.startsWith('/user/');
 
   // WebSocket listener for real-time balance updates in header
   useEffect(() => {
@@ -336,18 +342,20 @@ function Header({ onVestShares }: { onVestShares: () => void }) {
                 <User className="h-4 w-4" />
               </Link>
             </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              onClick={async () => {
-                await logout();
-                navigate("/");
-              }}
-              data-testid="button-logout"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+            {isProfilePage && (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={async () => {
+                  await logout();
+                  navigate("/");
+                }}
+                data-testid="button-logout"
+                title="Logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
+            )}
           </>
         ) : (
           <Button
@@ -369,7 +377,7 @@ function Header({ onVestShares }: { onVestShares: () => void }) {
         >
           <SiDiscord className="w-5 h-5" />
         </Button>
-        <HelpDialog />
+        {isProfilePage && <HelpDialog />}
       </div>
     </header>
   );
@@ -421,7 +429,9 @@ function App() {
             <TooltipProvider>
               <VestingProvider>
                 <SportProvider>
-                  <AppContent />
+                  <NewsNotificationProvider>
+                    <AppContent />
+                  </NewsNotificationProvider>
                 </SportProvider>
                 <Toaster />
               </VestingProvider>

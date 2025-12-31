@@ -1,8 +1,9 @@
-import { Home, TrendingUp, Trophy, Briefcase, BarChart3, Globe } from "lucide-react";
+import { Home, TrendingUp, Trophy, Briefcase, Newspaper } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { useNotifications } from "@/lib/notification-context";
+import { useNewsNotifications } from "@/lib/news-notification-context";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -40,15 +41,16 @@ const navItems = [
     icon: Briefcase,
   },
   {
-    title: "Analytics",
-    url: "/analytics",
-    icon: BarChart3,
+    title: "News",
+    url: "/news",
+    icon: Newspaper,
   },
 ];
 
 export function BottomNav() {
   const [location] = useLocation();
   const { unreadCount } = useNotifications();
+  const { unreadNewsCount } = useNewsNotifications();
   const { user } = useAuth();
   const isPremium = user?.isPremium || false;
   const [previousLocation, setPreviousLocation] = useState(location);
@@ -157,7 +159,7 @@ export function BottomNav() {
                         ? "text-primary"
                         : "text-muted-foreground"
                     )}
-                    data-testid={`button-nav-${item.title.toLowerCase()}`}
+                    data-testid={`button - nav - ${item.title.toLowerCase()} `}
                     animate={wasJustActivated ? {
                       scale: [1, 1.15, 0.95, 1.05, 1],
                       y: [0, -6, 0, -2, 0],
@@ -211,6 +213,23 @@ export function BottomNav() {
                           data-testid="badge-notification-count-mobile"
                         >
                           {unreadCount}
+                        </Badge>
+                      </motion.div>
+                    )}
+
+                    {item.title === "News" && unreadNewsCount > 0 && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 25 }}
+                        className="absolute top-1 right-2 z-[51]"
+                      >
+                        <Badge
+                          variant="default"
+                          className="min-w-5 h-5 flex items-center justify-center px-1.5 text-xs bg-blue-600"
+                          data-testid="badge-news-count-mobile"
+                        >
+                          {unreadNewsCount}
                         </Badge>
                       </motion.div>
                     )}

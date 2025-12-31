@@ -36,6 +36,9 @@ export const users = pgTable("users", {
   totalTradesExecuted: integer("total_trades_executed").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+  // News Hub fields
+  lastNewsViewedAt: timestamp("last_news_viewed_at"), // Track when user last viewed news
+  newsNotificationsEnabled: boolean("news_notifications_enabled").notNull().default(true), // Opt-out of news notifications
 });
 
 // Players table - players from all sports (NBA, NFL, etc.)
@@ -572,6 +575,21 @@ export const watchList = pgTable("watch_list", {
   watchlistIdx: index("watch_watchlist_idx").on(table.watchlistId),
 }));
 
+// News feed table - AI-generated sports news for the News Hub
+export const newsFeed = pgTable("news_feed", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  headline: text("headline").notNull(),
+  briefing: text("briefing").notNull(),
+  sourceUrl: text("source_url"),
+  contentHash: varchar("content_hash", { length: 64 }).notNull(), // SHA-256 hash for deduplication
+  sport: text("sport").notNull(), // NBA, NFL
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  createdAtIdx: index("news_feed_created_at_idx").on(table.createdAt),
+  contentHashIdx: index("news_feed_content_hash_idx").on(table.contentHash),
+  sportIdx: index("news_feed_sport_idx").on(table.sport),
+}));
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   holdings: many(holdings),
@@ -927,3 +945,6 @@ export const insertTweetHistorySchema = createInsertSchema(tweetHistory).omit({
 
 export type TweetHistory = typeof tweetHistory.$inferSelect;
 export type InsertTweetHistory = z.infer<typeof insertTweetHistorySchema>;
+
+// News feed types
+export type NewsFeed = typeof newsFeed.$inferSelect;

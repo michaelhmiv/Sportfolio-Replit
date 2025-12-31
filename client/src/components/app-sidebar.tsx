@@ -1,4 +1,4 @@
-import { Home, TrendingUp, Trophy, User, Settings, BarChart3, Crown } from "lucide-react";
+import { Home, TrendingUp, Trophy, User, Settings, BarChart3, Crown, Newspaper } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -14,6 +14,7 @@ import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { useNotifications } from "@/lib/notification-context";
+import { useNewsNotifications } from "@/lib/news-notification-context";
 
 const menuItems = [
   {
@@ -46,6 +47,11 @@ const menuItems = [
     url: "/premium",
     icon: Crown,
   },
+  {
+    title: "News",
+    url: "/news",
+    icon: Newspaper,
+  },
 ];
 
 export function AppSidebar() {
@@ -53,6 +59,7 @@ export function AppSidebar() {
   const { isAuthenticated, user } = useAuth();
   const { toast } = useToast();
   const { unreadCount } = useNotifications();
+  const { unreadNewsCount } = useNewsNotifications();
   const isPremium = user?.isPremium || false;
 
   const handleNavigation = (item: typeof menuItems[0], e: React.MouseEvent) => {
@@ -61,7 +68,7 @@ export function AppSidebar() {
       e.preventDefault();
       toast({
         title: "Authentication Required",
-        description: item.url === "/premium" 
+        description: item.url === "/premium"
           ? "Please create an account or log in to access Premium features."
           : "Please create an account or log in to view your portfolio.",
         variant: "destructive",
@@ -81,8 +88,8 @@ export function AppSidebar() {
               {menuItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild isActive={location === item.url}>
-                    <Link 
-                      href={item.url} 
+                    <Link
+                      href={item.url}
                       data-testid={`link-${item.title.toLowerCase()}`}
                       onClick={(e) => handleNavigation(item, e)}
                       className={item.title === "Premium" ? "text-yellow-500 hover:text-yellow-400" : ""}
@@ -90,12 +97,21 @@ export function AppSidebar() {
                       <item.icon className={item.title === "Premium" ? "w-5 h-5 text-yellow-500" : "w-5 h-5"} />
                       <span>{item.title}</span>
                       {item.title === "Portfolio" && unreadCount > 0 && (
-                        <Badge 
-                          variant="default" 
+                        <Badge
+                          variant="default"
                           className="ml-auto min-w-5 h-5 flex items-center justify-center px-1.5 text-xs"
                           data-testid="badge-notification-count"
                         >
                           {unreadCount}
+                        </Badge>
+                      )}
+                      {item.title === "News" && unreadNewsCount > 0 && (
+                        <Badge
+                          variant="default"
+                          className="ml-auto min-w-5 h-5 flex items-center justify-center px-1.5 text-xs bg-blue-600"
+                          data-testid="badge-news-count"
+                        >
+                          {unreadNewsCount}
                         </Badge>
                       )}
                     </Link>

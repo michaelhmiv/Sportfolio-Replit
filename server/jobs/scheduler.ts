@@ -25,6 +25,8 @@ import { syncNFLSchedule } from "./sync-nfl-schedule";
 import { syncNFLStats } from "./sync-nfl-stats";
 // NFL contest creation is now handled by unified create_contests job
 import { syncNFLRoster } from "./sync-nfl-roster";
+import { fetchNews } from "./fetch-news";
+import { compileAllDigests } from "./compile-digest";
 import type { ProgressCallback } from "../lib/admin-stream";
 
 export interface JobResult {
@@ -141,6 +143,32 @@ export class JobScheduler {
         schedule: "4-59/5 * * * *", // Every 5 minutes (offset 4m) - accrue vesting shares for all users
         enabled: true,
         handler: accrueVestingForAllUsers,
+      },
+      {
+        name: "news_fetch",
+        schedule: "0 * * * *", // Every hour at :00 - fetch breaking news via Perplexity
+        enabled: true,
+        handler: async () => {
+          const result = await fetchNews();
+          return {
+            requestCount: 1,
+            recordsProcessed: result.storiesProcessed,
+            errorCount: result.success ? 0 : 1,
+          };
+        },
+      },
+      {
+        name: "compile_digest",
+        schedule: "0 6 * * *", // Daily at 6:00 AM ET - compile personalized digests
+        enabled: true,
+        handler: async () => {
+          const result = await compileAllDigests();
+          return {
+            requestCount: 0,
+            recordsProcessed: result.usersProcessed,
+            errorCount: result.errors,
+          };
+        },
       },
     ];
 
@@ -323,6 +351,25 @@ export class JobScheduler {
         return {
           requestCount: 0,
           recordsProcessed: result.botsProcessed,
+          errorCount: result.errors,
+        };
+      },
+      news_fetch: async (callback) => {
+        const result = await fetchNews(callback);
+        return {
+          requestCount: 1,
+          recordsProcessed: result.storiesProcessed,
+          errorCount: result.success ? 0 : 1,
+          // Additional fields for frontend feedback
+          stories: result.stories || [],
+          error: result.error || null,
+        };
+      },
+      compile_digest: async (callback) => {
+        const result = await compileAllDigests(callback);
+        return {
+          requestCount: 0,
+          recordsProcessed: result.usersProcessed,
           errorCount: result.errors,
         };
       },

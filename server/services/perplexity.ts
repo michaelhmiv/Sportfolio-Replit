@@ -106,7 +106,7 @@ class PerplexityService {
       }
 
       const data = await response.json();
-      
+
       if (!data.choices || data.choices.length === 0) {
         return {
           success: false,
@@ -182,7 +182,7 @@ class PerplexityService {
       }
 
       const data = await response.json();
-      
+
       if (!data.choices || data.choices.length === 0) {
         return {
           success: false,
@@ -207,6 +207,83 @@ class PerplexityService {
   }
 
   /**
+   * Fetch breaking sports news (for News Hub)
+   */
+  async fetchBreakingNews(prompt: string): Promise<PerplexityResponse> {
+    const apiKey = this.getApiKey();
+    if (!apiKey) {
+      return {
+        success: false,
+        error: "Perplexity service not configured. Please add PERPLEXITY_API_KEY.",
+      };
+    }
+
+    try {
+      console.log("[Perplexity] Fetching breaking sports news...");
+
+      const response = await fetch(this.baseUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "sonar-pro",
+          messages: [
+            {
+              role: "system",
+              content: "You are a breaking news sports reporter for NBA and NFL. Provide factual, concise news updates about player injuries, trades, signings, and major performances. Format your response as: [Headline] - [Brief 1-2 sentence summary]."
+            },
+            {
+              role: "user",
+              content: prompt
+            }
+          ],
+          max_tokens: 400,
+          temperature: 0.1, // Low temperature for factual news
+          search_recency_filter: "hour", // Focus on very recent news
+          return_images: false,
+          return_related_questions: false,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("[Perplexity] Breaking news API error:", response.status, errorData);
+        return {
+          success: false,
+          error: `API error: ${response.status} - ${errorData}`,
+        };
+      }
+
+      const data = await response.json();
+
+      if (!data.choices || data.choices.length === 0) {
+        return {
+          success: false,
+          error: "No response from Perplexity",
+        };
+      }
+
+      const content = data.choices[0]?.message?.content || "";
+      const citations = data.citations || [];
+      console.log("[Perplexity] Fetched breaking news successfully");
+
+      return {
+        success: true,
+        content: content.trim(),
+        citations,
+      };
+    } catch (error: any) {
+      console.error("[Perplexity] Breaking news request failed:", error.message);
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  }
+
+  /**
    * Test the API connection
    */
   async testConnection(): Promise<{ valid: boolean; error?: string }> {
@@ -222,7 +299,7 @@ class PerplexityService {
         ["LeBron James"],
         "In one sentence, what was LeBron James' most recent game performance?"
       );
-      
+
       return {
         valid: result.success,
         error: result.error,

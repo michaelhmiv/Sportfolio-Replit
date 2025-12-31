@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, TrendingDown, DollarSign, Crown, Clock, ShoppingCart, Trophy, ArrowUpRight, ArrowDownRight, ArrowUpDown, ChevronUp, ChevronDown, Plus } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Crown, Clock, ShoppingCart, Trophy, ArrowUpRight, ArrowDownRight, ArrowUpDown, ChevronUp, ChevronDown, Plus, BarChart3 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
 import { formatDistanceToNow } from "date-fns";
@@ -469,36 +469,44 @@ export default function Portfolio() {
         </Card>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-3 sm:space-y-3">
-          <TabsList>
-            <TabsTrigger value="holdings" data-testid="tab-holdings">Holdings</TabsTrigger>
-            <TabsTrigger value="orders" data-testid="tab-open-orders">Open Orders</TabsTrigger>
-            <TabsTrigger
-              value="activity"
-              data-testid="tab-activity"
-              className={unreadCount > 0 ? "relative ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}
-            >
-              <span className="flex items-center gap-1.5">
-                Activity
-                <AnimatePresence>
-                  {unreadCount > 0 && (
-                    <motion.span
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      exit={{ scale: 0 }}
-                    >
-                      <Badge
-                        variant="default"
-                        className="min-w-5 h-5 flex items-center justify-center px-1.5 text-xs font-bold"
-                        data-testid="badge-activity-count"
+          <div className="flex items-center justify-between gap-2">
+            <TabsList>
+              <TabsTrigger value="holdings" data-testid="tab-holdings">Holdings</TabsTrigger>
+              <TabsTrigger value="orders" data-testid="tab-open-orders">Open Orders</TabsTrigger>
+              <TabsTrigger
+                value="activity"
+                data-testid="tab-activity"
+                className={unreadCount > 0 ? "relative ring-2 ring-primary ring-offset-2 ring-offset-background" : ""}
+              >
+                <span className="flex items-center gap-1.5">
+                  Activity
+                  <AnimatePresence>
+                    {unreadCount > 0 && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        exit={{ scale: 0 }}
                       >
-                        {unreadCount}
-                      </Badge>
-                    </motion.span>
-                  )}
-                </AnimatePresence>
-              </span>
-            </TabsTrigger>
-          </TabsList>
+                        <Badge
+                          variant="default"
+                          className="min-w-5 h-5 flex items-center justify-center px-1.5 text-xs font-bold"
+                          data-testid="badge-activity-count"
+                        >
+                          {unreadCount}
+                        </Badge>
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                </span>
+              </TabsTrigger>
+            </TabsList>
+            <Link href="/analytics">
+              <Button variant="outline" size="sm" className="gap-2 bg-primary/5 border-primary/30 hover:bg-primary/10" data-testid="button-analytics-portfolio">
+                <BarChart3 className="w-4 h-4" />
+                <span className="hidden sm:inline">Analytics</span>
+              </Button>
+            </Link>
+          </div>
 
           {/* Holdings */}
           <TabsContent value="holdings">

@@ -6,7 +6,7 @@ import { storage } from "./storage";
 import { db } from "./db";
 import { fetchActivePlayers, calculateFantasyPoints } from "./mysportsfeeds";
 import type { InsertPlayer, Player, User, Holding } from "@shared/schema";
-import { contestLineups, contestEntries, contests, holdings, marketSnapshots, premiumCheckoutSessions, tweetSettings, tweetHistory } from "@shared/schema";
+import { contestLineups, contestEntries, contests, holdings, marketSnapshots, premiumCheckoutSessions, tweetSettings, tweetHistory, users } from "@shared/schema";
 import { sql, eq, desc, and, gte, lte } from "drizzle-orm";
 import { jobScheduler } from "./jobs/scheduler";
 import { addClient, removeClient, broadcast } from "./websocket";
@@ -5579,6 +5579,145 @@ ${posts.map(post => `  <url>
   });
 
   // ========== END TWEET MANAGEMENT ==========
+
+  // ========== NEWS HUB ENDPOINTS ==========
+
+  // Get general news feed (last 7 days)
+  app.get("/api/news", optionalAuth, async (req, res) => {
+    try {
+      const { newsFeed } = await import("@shared/schema");
+
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const news = await db
+        .select()
+        .from(newsFeed)
+        .where(gte(newsFeed.createdAt, sevenDaysAgo))
+        .orderBy(desc(newsFeed.createdAt))
+        .limit(50);
+
+      res.json({ news });
+    } catch (error: any) {
+      console.error("[news] Error fetching news:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get lightweight player name lookup (for auto-hyperlinking player names)
+  app.get("/api/players/lookup", async (req, res) => {
+    try {
+      const allPlayers = await storage.getPlayers();
+
+      // Return only active players with minimal data needed for name matching
+      const players = allPlayers
+        .filter((p: Player) => p.isActive)
+        .map((p: Player) => ({
+          id: p.id,
+          firstName: p.firstName,
+          lastName: p.lastName,
+          fullName: `${p.firstName} ${p.lastName}`,
+          priceChange24h: p.priceChange24h || null,
+        }));
+
+      res.json({ players });
+    } catch (error: any) {
+      console.error("[players/lookup] Error:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get personalized daily digest for authenticated user
+  app.get("/api/news/digest", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { compileUserDigest } = await import("./jobs/compile-digest");
+
+      const digest = await compileUserDigest(userId);
+
+      res.json({ digest });
+    } catch (error: any) {
+      console.error("[news/digest] Error:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Mark news as read (updates last_news_viewed_at timestamp)
+  app.post("/api/news/mark-read", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+
+      await db
+        .update(users)
+        .set({ lastNewsViewedAt: new Date() })
+        .where(eq(users.id, userId));
+
+      res.json({ success: true });
+    } catch (error: any) {
+      console.error("[news/mark-read] Error:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Get unread news count for notification badge
+  app.get("/api/news/unread-count", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { newsFeed } = await import("@shared/schema");
+
+      // Get user's last viewed timestamp
+      const user = await storage.getUser(userId);
+      const lastViewed = user?.lastNewsViewedAt || new Date(0);
+
+      // Count news items created after last viewed
+      const result = await db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(newsFeed)
+        .where(gte(newsFeed.createdAt, lastViewed));
+
+      const count = result[0]?.count || 0;
+
+      res.json({ count });
+    } catch (error: any) {
+      console.error("[news/unread-count] Error:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // Admin endpoint: Trigger a specific job manually (e.g., news_fetch)
+  app.post("/api/admin/jobs/:jobName/trigger", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const user = await storage.getUser(userId);
+
+      if (!user?.isAdmin) {
+        return res.status(403).json({ error: "Admin access required" });
+      }
+
+      const { jobName } = req.params;
+
+      // Only allow specific jobs to be triggered from this endpoint
+      const allowedJobs = ['news_fetch', 'compile_digest'];
+      if (!allowedJobs.includes(jobName)) {
+        return res.status(400).json({ error: `Job '${jobName}' not allowed via this endpoint` });
+      }
+
+      console.log(`[Admin] User ${userId} triggering job: ${jobName}`);
+
+      const result = await jobScheduler.triggerJob(jobName);
+
+      res.json({
+        success: true,
+        jobName,
+        ...result,
+      });
+    } catch (error: any) {
+      console.error("[admin/jobs/trigger] Error:", error.message);
+      res.status(500).json({ error: error.message });
+    }
+  });
+
+  // ========== END NEWS HUB ==========
 
   // Analytics API - market insights and player analysis
   app.get("/api/analytics", async (req, res) => {
