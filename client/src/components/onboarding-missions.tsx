@@ -52,7 +52,7 @@ export function OnboardingMissions() {
             title: "Make a Move",
             description: "Buy your first shares on the exchange.",
             icon: <ShoppingCart className="w-4 h-4" />,
-            completed: (trades?.length || 0) > 0,
+            completed: (trades?.filter((t: any) => t.activityType === 'trade')?.length || 0) > 0,
             link: "/marketplace"
         },
         {

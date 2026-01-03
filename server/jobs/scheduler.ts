@@ -127,7 +127,8 @@ export class JobScheduler {
       },
       {
         name: "bot_engine",
-        schedule: "3-59/10 * * * *", // Every 10 minutes (offset 3m) - run market maker bots
+        // Run every minute on dev for active testing, every 10 minutes on production
+        schedule: process.env.NODE_ENV === 'production' ? "3-59/10 * * * *" : "* * * * *",
         enabled: true,
         handler: async () => {
           const result = await runBotEngineTick();

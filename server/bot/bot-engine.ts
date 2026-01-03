@@ -231,6 +231,7 @@ async function executeBotStrategies(
   const { executeVestingStrategy } = await import("./vesting-strategy");
   const { executeContestStrategy } = await import("./contest-strategy");
   const { executeTakerStrategy } = await import("./taker-strategy");
+  const { executeMarketSeederStrategy } = await import("./market-seeder-strategy");
 
   const strategiesExecuted: string[] = [];
 
@@ -242,6 +243,20 @@ async function executeBotStrategies(
       strategiesExecuted.push("vesting");
     } catch (e: any) {
       console.warn(`[BotEngine] ${profile.botName} vesting failed: ${e.message}`);
+    }
+
+    // 1.5. SEEDING - Bots with "cold" or "seeder" in name bootstrap cold markets
+    // This runs before regular trading to establish prices on untraded players
+    const isColdMarketBot = profile.botName.toLowerCase().includes('cold') ||
+      profile.botName.toLowerCase().includes('seeder') ||
+      profile.botRole === 'market_maker'; // All market makers can seed
+    if (isColdMarketBot && profile.ordersToday < profile.maxDailyOrders) {
+      try {
+        await withTimeout(executeMarketSeederStrategy(profile), STRATEGY_TIMEOUT_MS, 'seeding');
+        strategiesExecuted.push("seeding");
+      } catch (e: any) {
+        console.warn(`[BotEngine] ${profile.botName} seeding failed: ${e.message}`);
+      }
     }
 
     // 2. TRADING - All bots can place orders in the marketplace

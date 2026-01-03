@@ -137,6 +137,7 @@ export interface IStorage {
   upsertUser(user: UpsertUser): Promise<User>;
   updateUserBalance(userId: string, amount: string): Promise<void>;
   updateUsername(userId: string, username: string): Promise<User | undefined>;
+  updateProfileImage(userId: string, imageUrl: string): Promise<User | undefined>;
   incrementTotalSharesVested(userId: string, amount: number): Promise<void>;
   markOnboardingComplete(userId: string): Promise<void>;
   updateUserPremiumStatus(userId: string, isPremium: boolean, premiumExpiresAt: Date | null): Promise<void>;
@@ -746,6 +747,15 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(users)
       .set({ username, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+
+    return await this.getUser(userId);
+  }
+
+  async updateProfileImage(userId: string, imageUrl: string): Promise<User | undefined> {
+    await db
+      .update(users)
+      .set({ profileImageUrl: imageUrl, updatedAt: new Date() })
       .where(eq(users.id, userId));
 
     return await this.getUser(userId);

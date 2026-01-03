@@ -391,3 +391,66 @@ export async function getVestingCandidates(limit: number = 10): Promise<PlayerVa
     limit,
   });
 }
+
+/**
+ * Get players with NULL lastTradePrice for cold market seeding
+ * These players have never been traded and need initial price establishment
+ * Returns players sorted by fairValue (prioritizes high-value players first)
+ */
+export async function getColdMarketCandidates(limit: number = 50): Promise<{
+  playerId: string;
+  playerName: string;
+  currentPrice: number;
+  fairValue: number;
+  tier: number;
+}[]> {
+  // Get active players with NULL lastTradePrice (never traded)
+  const coldPlayers = await db
+    .select({
+      id: players.id,
+      firstName: players.firstName,
+      lastName: players.lastName,
+      currentPrice: players.currentPrice,
+    })
+    .from(players)
+    .where(
+      and(
+        eq(players.isActive, true),
+        sql`${players.lastTradePrice} IS NULL`
+      )
+    )
+    .limit(limit * 2); // Fetch more to allow filtering
+
+  if (coldPlayers.length === 0) {
+    return [];
+  }
+
+  // Calculate fair values for these players
+  const candidates = await Promise.all(
+    coldPlayers.map(async (player) => {
+      const stats = await calculatePlayerFairValue(player.id);
+
+      // Determine tier based on fair value (simplified without z-score calculation)
+      let tier = 3; // Default average
+      if (stats.fairValue > 30) tier = 1;
+      else if (stats.fairValue > 20) tier = 2;
+      else if (stats.fairValue > 10) tier = 3;
+      else if (stats.fairValue > 5) tier = 4;
+      else tier = 5;
+
+      return {
+        playerId: player.id,
+        playerName: `${player.firstName} ${player.lastName}`,
+        currentPrice: parseFloat(player.currentPrice),
+        fairValue: stats.fairValue,
+        tier,
+      };
+    })
+  );
+
+  // Sort by fair value (high to low) to prioritize valuable players
+  candidates.sort((a, b) => b.fairValue - a.fairValue);
+
+  return candidates.slice(0, limit);
+}
+

@@ -1042,6 +1042,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update profile image
+  app.post("/api/user/update-profile-image", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      const { profileImageUrl } = req.body;
+
+      // Validate URL
+      if (!profileImageUrl || typeof profileImageUrl !== 'string') {
+        return res.status(400).json({ error: "Profile image URL is required" });
+      }
+
+      // Basic URL validation
+      try {
+        new URL(profileImageUrl);
+      } catch {
+        return res.status(400).json({ error: "Invalid URL format" });
+      }
+
+      const updatedUser = await storage.updateProfileImage(userId, profileImageUrl);
+      if (updatedUser) {
+        res.json({ profileImageUrl: updatedUser.profileImageUrl });
+      } else {
+        res.status(500).json({ error: "Failed to update profile image" });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  });
+
   // Mark onboarding as complete
   app.post("/api/user/onboarding/complete", isAuthenticated, async (req, res) => {
     try {

@@ -1,5 +1,5 @@
 import { useParams } from "wouter";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useWebSocket } from "@/lib/websocket";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Trophy, TrendingUp, Activity, Award, DollarSign, Clock, Edit2, Settings, Moon, Sun } from "lucide-react";
+import { Trophy, TrendingUp, Activity, Award, DollarSign, Clock, Edit2, Settings, Moon, Sun, Camera, Upload, Loader2 } from "lucide-react";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import type { Player } from "@shared/schema";
 import { PlayerName } from "@/components/player-name";
 import { EmptyState } from "@/components/ui/empty-state";
+import { getSupabase } from "@/lib/supabase";
 
 interface UserProfile {
   user: {
@@ -56,9 +57,13 @@ export default function UserProfile() {
   const { user: currentUser } = useAuth();
   const { toast } = useToast();
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isAvatarDialogOpen, setIsAvatarDialogOpen] = useState(false);
   const [newUsername, setNewUsername] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
   const { subscribe } = useWebSocket();
   const [theme, setTheme] = useState<"light" | "dark">("dark");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("theme") as "light" | "dark" | null;
@@ -137,6 +142,89 @@ export default function UserProfile() {
     }
   };
 
+  const updateProfileImageMutation = useMutation({
+    mutationFn: async (profileImageUrl: string) => {
+      const res = await apiRequest("POST", `/api/user/update-profile-image`, { profileImageUrl });
+      return await res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/user/${userId}/profile`] });
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      setIsAvatarDialogOpen(false);
+      toast({
+        title: "Profile picture updated",
+        description: "Your profile picture has been successfully changed.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile picture",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file size (max 20MB)
+    if (file.size > 20 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Please select an image under 20MB.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate file type
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Please select a JPEG, PNG, WebP, or GIF image.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const supabase = await getSupabase();
+      const ext = file.name.split('.').pop() || 'jpg';
+      const fileName = `${currentUser?.id}/${Date.now()}.${ext}`;
+
+      const { data, error } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: true,
+        });
+
+      if (error) throw error;
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      // Update database
+      await updateProfileImageMutation.mutateAsync(publicUrl);
+    } catch (error: any) {
+      toast({
+        title: "Upload failed",
+        description: error.message || "Failed to upload image. Make sure the 'avatars' bucket exists in Supabase.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      if (cameraInputRef.current) cameraInputRef.current.value = '';
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background p-3 sm:p-4 flex items-center justify-center">
@@ -170,10 +258,87 @@ export default function UserProfile() {
         <Card data-testid="card-profile-header">
           <CardContent className="p-4 sm:p-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-              <Avatar className="h-20 w-20 sm:h-24 sm:w-24" data-testid="avatar-user">
-                <AvatarImage src={user.profileImageUrl} alt={displayName} />
-                <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
-              </Avatar>
+              {/* Avatar with optional change overlay */}
+              {isOwnProfile ? (
+                <Dialog open={isAvatarDialogOpen} onOpenChange={setIsAvatarDialogOpen}>
+                  <DialogTrigger asChild>
+                    <button className="relative group cursor-pointer">
+                      <Avatar className="h-20 w-20 sm:h-24 sm:w-24" data-testid="avatar-user">
+                        <AvatarImage src={user.profileImageUrl} alt={displayName} />
+                        <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
+                      </Avatar>
+                      {/* Camera overlay on hover */}
+                      <div className="absolute inset-0 rounded-full bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Camera className="w-6 h-6 text-white" />
+                      </div>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                      <DialogTitle>Change Profile Picture</DialogTitle>
+                      <DialogDescription>
+                        Upload a new photo or take one with your camera.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-3 py-4">
+                      {/* Hidden file inputs */}
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        onChange={handleFileUpload}
+                      />
+                      <input
+                        ref={cameraInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        capture="user"
+                        className="hidden"
+                        onChange={handleFileUpload}
+                      />
+
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2 h-12"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                      >
+                        {isUploading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Upload className="w-4 h-4" />
+                        )}
+                        Upload Photo
+                      </Button>
+
+                      <Button
+                        variant="outline"
+                        className="w-full gap-2 h-12"
+                        onClick={() => cameraInputRef.current?.click()}
+                        disabled={isUploading}
+                      >
+                        {isUploading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Camera className="w-4 h-4" />
+                        )}
+                        Take Photo
+                      </Button>
+                    </div>
+                    <DialogFooter>
+                      <Button variant="ghost" onClick={() => setIsAvatarDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              ) : (
+                <Avatar className="h-20 w-20 sm:h-24 sm:w-24" data-testid="avatar-user">
+                  <AvatarImage src={user.profileImageUrl} alt={displayName} />
+                  <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
+                </Avatar>
+              )}
 
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
