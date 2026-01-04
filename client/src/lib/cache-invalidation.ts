@@ -141,6 +141,7 @@ export async function invalidatePortfolioQueries(): Promise<void> {
     queryClient.invalidateQueries({ queryKey: ["/api/player"] }),
     queryClient.invalidateQueries({ queryKey: ["/api/contests"] }),
     queryClient.invalidateQueries({ queryKey: ["/api/contest"] }),
+    queryClient.invalidateQueries({ queryKey: ["/api/trades/history"] }),
   ]);
 }
 

@@ -67,7 +67,7 @@ import {
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, asc, sql, inArray, or, gte, lte, isNotNull, count, gt } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import { alias, unionAll } from "drizzle-orm/pg-core";
 import { randomUUID } from "crypto";
 
 // Season helper: Get current competitive season patterns (regular + playoffs, exclude preseason)
@@ -1651,6 +1651,8 @@ export class DatabaseStorage implements IStorage {
 
     const buyer = alias(users, "buyer");
     const seller = alias(users, "seller");
+    const ordersUser = alias(users, "orders_user");
+
 
     // Unified Market Activity Query using UNION ALL
     // This allows the database to handle sorting and limiting across both trades and orders in one pass.
@@ -1660,26 +1662,26 @@ export class DatabaseStorage implements IStorage {
     // --- Trades Subquery ---
     const tradesBase = db
       .select({
-        activityType: sql<string>`'trade'`,
+        activityType: sql<string>`'trade'`.as('activityType'),
         id: trades.id,
         playerId: trades.playerId,
         playerFirstName: players.firstName,
         playerLastName: players.lastName,
         playerTeam: players.team,
         playerSport: players.sport,
-        userId: sql<string>`NULL`,
-        userUsername: sql<string>`NULL`,
-        userAvatar: sql<string>`NULL`,
+        userId: sql<string>`NULL`.as('userId'),
+        userUsername: sql<string>`NULL`.as('userUsername'),
+        userAvatar: sql<string | null>`NULL`.as('userAvatar'),
         buyerId: trades.buyerId,
-        buyerUsername: buyer.username,
+        buyerUsername: sql<string>`${buyer.username}`.as('buyerUsername'),
         sellerId: trades.sellerId,
-        sellerUsername: seller.username,
-        side: sql<string>`NULL`,
-        orderType: sql<string>`NULL`,
+        sellerUsername: sql<string>`${seller.username}`.as('sellerUsername'),
+        side: sql<string>`NULL`.as('side'),
+        orderType: sql<string>`NULL`.as('orderType'),
         quantity: trades.quantity,
         price: trades.price,
-        limitPrice: sql<string>`NULL`,
-        timestamp: trades.executedAt,
+        limitPrice: sql<string>`NULL`.as('limitPrice'),
+        timestamp: sql<Date>`${trades.executedAt}`.as('timestamp'),
       })
       .from(trades)
       .innerJoin(players, eq(trades.playerId, players.id))
@@ -1697,7 +1699,7 @@ export class DatabaseStorage implements IStorage {
     // --- Orders Subquery ---
     const ordersBase = db
       .select({
-        activityType: sql<string>`CASE WHEN ${orders.status} = 'cancelled' THEN 'order_cancelled' ELSE 'order_placed' END`,
+        activityType: sql<string>`CASE WHEN ${orders.status} = 'cancelled' THEN 'order_cancelled' ELSE 'order_placed' END`.as('activityType'),
         id: orders.id,
         playerId: orders.playerId,
         playerFirstName: players.firstName,
@@ -1705,22 +1707,22 @@ export class DatabaseStorage implements IStorage {
         playerTeam: players.team,
         playerSport: players.sport,
         userId: orders.userId,
-        userUsername: users.username,
-        userAvatar: users.profileImageUrl,
-        buyerId: sql<string>`NULL`,
-        buyerUsername: sql<string>`NULL`,
-        sellerId: sql<string>`NULL`,
-        sellerUsername: sql<string>`NULL`,
+        userUsername: sql<string>`${ordersUser.username}`.as('userUsername'),
+        userAvatar: ordersUser.profileImageUrl,
+        buyerId: sql<string>`NULL`.as('buyerId'),
+        buyerUsername: sql<string>`NULL`.as('buyerUsername'),
+        sellerId: sql<string>`NULL`.as('sellerId'),
+        sellerUsername: sql<string>`NULL`.as('sellerUsername'),
         side: orders.side,
         orderType: orders.orderType,
         quantity: orders.quantity,
-        price: sql<string>`NULL`,
+        price: sql<string>`NULL`.as('price'),
         limitPrice: orders.limitPrice,
-        timestamp: orders.createdAt,
+        timestamp: sql<Date>`${orders.createdAt}`.as('timestamp'),
       })
       .from(orders)
       .innerJoin(players, eq(orders.playerId, players.id))
-      .innerJoin(users, eq(orders.userId, users.id));
+      .innerJoin(ordersUser, eq(orders.userId, ordersUser.id));
 
     const orderConditions = [];
     if (playerId) orderConditions.push(eq(orders.playerId, playerId));
@@ -1733,11 +1735,13 @@ export class DatabaseStorage implements IStorage {
     // Combine using UNION ALL and apply global order + limit
     const combinedQuery = db
       .select()
-      .from(sql`(${finalTradesQuery.as('t')} UNION ALL ${finalOrdersQuery.as('o')}) as activity`)
+      .from(unionAll(finalTradesQuery, finalOrdersQuery).as('activity'))
       .orderBy(sql`timestamp DESC`)
       .limit(limit);
 
     return await combinedQuery;
+
+
   }
 
   // Price history methods
