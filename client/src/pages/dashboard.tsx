@@ -360,9 +360,7 @@ export default function Dashboard() {
 
           {/* Balance Header - Only show for authenticated users */}
           {isAuthenticated && data?.user && (
-            <div className="p-4 sm:p-8 rounded-2xl bg-card/60 backdrop-blur-xl border border-white/5 shadow-2xl relative overflow-hidden group">
-              {/* Background Glow */}
-              <div className="absolute top-0 left-1/4 w-1/2 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
+            <div className="p-4 sm:p-6 rounded-lg bg-card border shadow-sm relative overflow-hidden group">
               {/* Labels row */}
               <div className="flex justify-between gap-4 mb-4">
                 <div className="text-xs text-muted-foreground uppercase tracking-wider font-sans">Cash Balance</div>
@@ -383,7 +381,7 @@ export default function Dashboard() {
                   {data?.user?.cashRank && data?.user.cashRank > 0 && (
                     <button
                       onClick={() => setLocation("/leaderboards#cashBalance")}
-                      className="inline-flex items-center gap-1 border border-border px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer flex-shrink-0"
+                      className="inline-flex items-center gap-1 border border-border px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs hover:bg-secondary transition-colors cursor-pointer flex-shrink-0"
                       data-testid="badge-cash-rank"
                       aria-label={`Cash balance rank #${data?.user.cashRank}, click to view leaderboard`}
                     >
@@ -413,7 +411,7 @@ export default function Dashboard() {
                   {data?.user?.portfolioRank && data?.user.portfolioRank > 0 && (
                     <button
                       onClick={() => setLocation("/leaderboards#portfolioValue")}
-                      className="inline-flex items-center gap-1 border border-border px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs hover-elevate active-elevate-2 transition-colors cursor-pointer flex-shrink-0"
+                      className="inline-flex items-center gap-1 border border-border px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full text-xs hover:bg-secondary transition-colors cursor-pointer flex-shrink-0"
                       data-testid="badge-portfolio-rank"
                       aria-label={`Portfolio value rank #${data?.user.portfolioRank}, click to view leaderboard`}
                     >
@@ -540,7 +538,7 @@ export default function Dashboard() {
                               >
                                 {/* Front Face */}
                                 <div
-                                  className="absolute inset-0 p-2 rounded-md bg-muted hover-elevate active-elevate-2"
+                                  className="absolute inset-0 p-2 rounded-md bg-muted hover:bg-secondary"
                                   style={{
                                     backfaceVisibility: 'hidden',
                                     WebkitBackfaceVisibility: 'hidden',

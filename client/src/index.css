@@ -26,22 +26,23 @@
   --popover: 0 0% 93%;
   --popover-foreground: 0 0% 9%;
   --popover-border: 0 0% 86%;
-  --primary: 142 100% 50%;
-  /* Neon Emerald */
-  --primary-foreground: 0 0% 0%;
-  /* Black contrast for neon */
-  --secondary: 220 10% 15%;
+  --primary: 142 76% 36%;
+  /* Solid Emerald */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 15% 15%;
   --secondary-foreground: 0 0% 100%;
-  --muted: 220 10% 20%;
-  --muted-foreground: 220 10% 65%;
-  --accent: 142 100% 50%;
-  --accent-foreground: 0 0% 0%;
+  --muted: 220 10% 90%;
+  --muted-foreground: 220 10% 45%;
+  --accent: 142 76% 36%;
+  --accent-foreground: 0 0% 100%;
   --destructive: 0 84% 42%;
   --destructive-foreground: 0 0% 98%;
-  --input: 0 0% 70%;
+  --input: 220 10% 85%;
   --ring: 142 76% 36%;
-  --chart-1: 142 76% 36%;
-  --chart-2: 160 84% 39%;
+  --chart-1: 158 100% 32%;
+  /* TradingView Teal */
+  --chart-2: 0 100% 58%;
+  /* TradingView Red */
   --chart-3: 173 80% 40%;
   --chart-4: 197 37% 24%;
   --chart-5: 271 81% 56%;
@@ -96,40 +97,42 @@
   --opaque-button-border-intensity: 9;
   --elevate-1: rgba(255, 255, 255, .04);
   --elevate-2: rgba(255, 255, 255, .09);
-  /* Glassmorphism: Darker page background (#121212) */
-  --background: 240 10% 3.9%;
-  --foreground: 0 0% 96%;
-  --border: 0 0% 18%;
-  /* Glassmorphism: Rich dark grey cards (#1E1E1E) */
-  --card: 0 0% 12%;
-  --card-foreground: 0 0% 96%;
-  --card-border: 0 0% 16%;
-  --sidebar: 0 0% 8%;
-  --sidebar-foreground: 0 0% 96%;
-  --sidebar-border: 0 0% 14%;
+  /* Professional Dark Theme: TradingView Navy (#131722) */
+  --background: 222 27% 10%;
+  --foreground: 215 20% 90%;
+  --border: 225 10% 18%;
+  /* Solid Surfaces (#1e222d) */
+  --card: 224 20% 15%;
+  --card-foreground: 215 20% 90%;
+  --card-border: 225 10% 22%;
+  --sidebar: 222 27% 8%;
+  --sidebar-foreground: 215 20% 90%;
+  --sidebar-border: 225 10% 14%;
   --sidebar-primary: 142 76% 36%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 0 0% 14%;
-  --sidebar-accent-foreground: 0 0% 96%;
+  --sidebar-accent: 225 10% 14%;
+  --sidebar-accent-foreground: 215 20% 90%;
   --sidebar-ring: 142 76% 36%;
-  --popover: 0 0% 10%;
-  --popover-foreground: 0 0% 96%;
-  --popover-border: 0 0% 18%;
-  --primary: 142 100% 45%;
-  /* Vibrant Neon */
-  --primary-foreground: 0 0% 0%;
+  --popover: 224 20% 14%;
+  --popover-foreground: 215 20% 90%;
+  --popover-border: 225 10% 18%;
+  --primary: 142 76% 36%;
+  /* Solid Emerald */
+  --primary-foreground: 0 0% 100%;
   --secondary: 220 15% 15%;
   --secondary-foreground: 0 0% 100%;
   --muted: 220 15% 20%;
-  --muted-foreground: 220 10% 70%;
-  --accent: 142 100% 45%;
-  --accent-foreground: 0 0% 0%;
+  --muted-foreground: 220 10% 65%;
+  --accent: 142 76% 36%;
+  --accent-foreground: 0 0% 100%;
   --destructive: 0 84% 42%;
   --destructive-foreground: 0 0% 98%;
-  --input: 0 0% 22%;
+  --input: 225 10% 25%;
   --ring: 142 76% 36%;
-  --chart-1: 142 76% 36%;
-  --chart-2: 160 84% 39%;
+  --chart-1: 158 100% 32%;
+  /* TradingView Teal */
+  --chart-2: 0 100% 58%;
+  /* TradingView Red */
   --chart-3: 173 80% 40%;
   --chart-4: 197 37% 70%;
   --chart-5: 271 81% 66%;
@@ -192,16 +195,10 @@
   section,
   article,
   div[class*="bg-"],
+  div[class*="text-"],
   [data-sidebar],
-  .card,
-  .bg-background,
-  .bg-card,
-  .bg-sidebar,
-  .bg-popover,
-  .bg-muted,
-  .bg-secondary,
-  .bg-primary,
-  .bg-accent {
+  [data-slot="card"],
+  .card {
     transition:
       background-color 0.3s ease-in-out,
       border-color 0.25s ease-in-out,
@@ -328,108 +325,33 @@
 /* 1. GLASSMORPHISM CARD STYLING */
 @layer components {
 
-  /* Dashboard cards with glassmorphism effect */
-  .dark .dashboard-card {
-    background-color: hsla(220, 15%, 10%, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 1.25rem;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  /* Clean, solid primary buttons */
+  .btn-primary-solid {
+    @apply bg-primary text-primary-foreground font-semibold;
+    border-radius: 2px;
+    transition: filter 0.2s ease;
   }
 
-  /* Override Card component for dark mode glassmorphism */
-  .dark [data-slot="card"],
-  .dark .bg-card {
-    background-color: hsla(220, 15%, 12%, 0.6);
-    backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 1.25rem;
-  }
-}
-
-
-
-/* 2. FINTECH TYPOGRAPHY */
-@layer base {
-  /* Import Inter for UI text (sans-serif) */
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
-
-  /* UI text uses Inter (clean sans-serif) */
-  .font-sans {
-    font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  .btn-primary-solid:hover {
+    filter: brightness(1.1);
   }
 
-  /* Financial numbers use monospace (JetBrains Mono) */
-  .font-mono {
-    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  .btn-primary-solid:active {
+    filter: brightness(0.9);
   }
 
-  /* Large balance display - Dashboard only */
-  .fintech-balance {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 1.25rem;
-    font-weight: 700;
-    line-height: 1.1;
-    letter-spacing: -0.02em;
-  }
-
-  @media (min-width: 640px) {
-    .fintech-balance {
-      font-size: 2rem;
-    }
-  }
-
-  @media (min-width: 768px) {
-    .fintech-balance {
-      font-size: 2.25rem;
-    }
-  }
-
-  @media (min-width: 1024px) {
-    .fintech-balance {
-      font-size: 2.5rem;
-    }
-  }
-}
-
-/* 3. GAMIFIED BUTTONS & ACCENTS */
-@layer components {
-
-  /* Primary gradient button - Pill shaped with glow */
-  .btn-primary-gradient {
-    background: linear-gradient(135deg, #00C853 0%, #64DD17 100%);
-    color: white;
-    border: none;
-    border-radius: 9999px;
-    font-weight: 600;
-    box-shadow: 0 4px 14px rgba(0, 200, 83, 0.4);
-    transition: all 0.2s ease;
-  }
-
-  .btn-primary-gradient:hover {
-    box-shadow: 0 6px 20px rgba(0, 200, 83, 0.5);
-    transform: translateY(-1px);
-  }
-
-  .btn-primary-gradient:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 10px rgba(0, 200, 83, 0.3);
-  }
-
-  /* Apply gradient to default variant primary buttons in dark mode */
+  /* Override primary buttons to be solid and sharp */
   .dark button[data-variant="default"],
   .dark .bg-primary:not(.text-primary):not([class*="text-primary"]) {
-    background: linear-gradient(135deg, #00FF87 0%, #60EFFF 100%);
-    color: black;
-    border: none;
-    border-radius: 9999px;
-    box-shadow: 0 0 20px rgba(0, 255, 135, 0.4);
-    font-weight: 700;
+    background-color: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    @apply rounded-sm border-none shadow-none font-bold;
   }
 
   .dark button[data-variant="default"]:hover,
   .dark .bg-primary:not(.text-primary):not([class*="text-primary"]):hover {
-    box-shadow: 0 6px 18px rgba(0, 200, 83, 0.45);
+    filter: brightness(1.1);
+    box-shadow: none;
   }
 }
 
@@ -449,18 +371,22 @@
 
 /* 5. CSS AVATARS - Colored circles with initials */
 @layer components {
+
+  /* CSS Avatars with solid professional colors */
   .css-avatar {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 2.5rem;
     height: 2.5rem;
-    border-radius: 50%;
+    border-radius: 2px;
     font-weight: 600;
     font-size: 0.875rem;
     text-transform: uppercase;
     color: white;
     flex-shrink: 0;
+    background-color: var(--card);
+    border: 1px solid var(--card-border);
   }
 
   .css-avatar-sm {
@@ -473,156 +399,6 @@
     width: 3rem;
     height: 3rem;
     font-size: 1rem;
-  }
-
-  /* Avatar color palette based on first letter */
-  .css-avatar[data-letter^="A"],
-  .css-avatar[data-letter^="a"] {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  }
-
-  .css-avatar[data-letter^="B"],
-  .css-avatar[data-letter^="b"] {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  }
-
-  .css-avatar[data-letter^="C"],
-  .css-avatar[data-letter^="c"] {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  }
-
-  .css-avatar[data-letter^="D"],
-  .css-avatar[data-letter^="d"] {
-    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-  }
-
-  .css-avatar[data-letter^="E"],
-  .css-avatar[data-letter^="e"] {
-    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-  }
-
-  .css-avatar[data-letter^="F"],
-  .css-avatar[data-letter^="f"] {
-    background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
-  }
-
-  .css-avatar[data-letter^="G"],
-  .css-avatar[data-letter^="g"] {
-    background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="H"],
-  .css-avatar[data-letter^="h"] {
-    background: linear-gradient(135deg, #5ee7df 0%, #b490ca 100%);
-  }
-
-  .css-avatar[data-letter^="I"],
-  .css-avatar[data-letter^="i"] {
-    background: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="J"],
-  .css-avatar[data-letter^="j"] {
-    background: linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%);
-  }
-
-  .css-avatar[data-letter^="K"],
-  .css-avatar[data-letter^="k"] {
-    background: linear-gradient(135deg, #fddb92 0%, #d1fdff 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="L"],
-  .css-avatar[data-letter^="l"] {
-    background: linear-gradient(135deg, #96fbc4 0%, #f9f586 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="M"],
-  .css-avatar[data-letter^="m"] {
-    background: linear-gradient(135deg, #cd9cf2 0%, #f6f3ff 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="N"],
-  .css-avatar[data-letter^="n"] {
-    background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="O"],
-  .css-avatar[data-letter^="o"] {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="P"],
-  .css-avatar[data-letter^="p"] {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  }
-
-  .css-avatar[data-letter^="Q"],
-  .css-avatar[data-letter^="q"] {
-    background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="R"],
-  .css-avatar[data-letter^="r"] {
-    background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="S"],
-  .css-avatar[data-letter^="s"] {
-    background: linear-gradient(135deg, #a1c4fd 0%, #c2e9fb 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="T"],
-  .css-avatar[data-letter^="t"] {
-    background: linear-gradient(135deg, #d4fc79 0%, #96e6a1 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="U"],
-  .css-avatar[data-letter^="u"] {
-    background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="V"],
-  .css-avatar[data-letter^="v"] {
-    background: linear-gradient(135deg, #cfd9df 0%, #e2ebf0 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="W"],
-  .css-avatar[data-letter^="w"] {
-    background: linear-gradient(135deg, #a6c0fe 0%, #f68084 100%);
-  }
-
-  .css-avatar[data-letter^="X"],
-  .css-avatar[data-letter^="x"] {
-    background: linear-gradient(135deg, #fccb90 0%, #d57eeb 100%);
-  }
-
-  .css-avatar[data-letter^="Y"],
-  .css-avatar[data-letter^="y"] {
-    background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%);
-    color: #333;
-  }
-
-  .css-avatar[data-letter^="Z"],
-  .css-avatar[data-letter^="z"] {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-  }
-
-  /* Default for numbers */
-  .css-avatar:not([data-letter]) {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   }
 }
 
@@ -654,40 +430,12 @@
   }
 }
 
-/* 7. VESTING GLOW ANIMATION */
-@keyframes vesting-glow {
-
-  0%,
-  100% {
-    box-shadow: 0 0 4px rgba(34, 197, 94, 0.4), 0 0 8px rgba(34, 197, 94, 0.2);
-  }
-
-  50% {
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.6), 0 0 16px rgba(34, 197, 94, 0.3);
-  }
+/* 7. VESTING & INDICATORS - Clean Standard */
+.vesting-indicator {
+  @apply border-2 border-primary/50;
+  box-shadow: 0 0 4px rgba(0, 153, 129, 0.2);
 }
 
-.vesting-glow {
-  animation: vesting-glow 2s ease-in-out infinite;
-}
-
-.vesting-glow-premium {
-  animation: vesting-glow-premium 2s ease-in-out infinite;
-}
-
-@keyframes vesting-glow-premium {
-
-  0%,
-  100% {
-    box-shadow: 0 0 4px rgba(234, 179, 8, 0.4), 0 0 8px rgba(234, 179, 8, 0.2);
-  }
-
-  50% {
-    box-shadow: 0 0 8px rgba(234, 179, 8, 0.6), 0 0 16px rgba(234, 179, 8, 0.3);
-  }
-}
-
-/* 8. FIRST-TIME USER BLINKING INDICATOR */
 .first-time-indicator {
   position: relative;
 }
@@ -697,102 +445,17 @@
   position: absolute;
   top: -2px;
   right: -2px;
-  width: 8px;
-  height: 8px;
-  background-color: rgb(34, 197, 94);
+  width: 6px;
+  height: 6px;
+  background-color: var(--positive);
   border-radius: 50%;
-  animation: first-time-blink 1.5s ease-in-out infinite;
 }
 
-@keyframes first-time-blink {
-
-  0%,
-  100% {
-    opacity: 1;
-    box-shadow: 0 0 4px rgba(34, 197, 94, 0.8);
-  }
-
-  50% {
-    opacity: 0.3;
-    box-shadow: 0 0 8px rgba(34, 197, 94, 0.4);
-  }
+/* 8. HOVER STATES */
+.tradingview-hover {
+  transition: background-color 0.1s ease;
 }
 
-/* 9. HOLOGRAPHIC PLAYER CARDS */
-.holographic {
-  position: relative;
-  overflow: hidden;
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-  will-change: transform;
-  backface-visibility: hidden;
-}
-
-.holographic:hover {
-  transform: translateY(-2px) scale(1.005);
-  box-shadow:
-    0 10px 20px -5px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(255, 255, 255, 0.1);
-  z-index: 10;
-}
-
-.holographic::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -150%;
-  width: 150%;
-  height: 100%;
-  background: linear-gradient(115deg,
-      transparent 0%,
-      rgba(255, 255, 255, 0.0) 30%,
-      rgba(255, 255, 255, 0.1) 45%,
-      rgba(255, 255, 255, 0.2) 50%,
-      rgba(255, 255, 255, 0.1) 55%,
-      rgba(255, 255, 255, 0.0) 70%,
-      transparent 100%);
-  transform: skewX(-25deg);
-  transition: left 0.5s ease;
-  pointer-events: none;
-  z-index: 2;
-}
-
-/* Disable holographic shimmer on table rows for mobile - the pseudo-element
-   interferes with table layout, creating an anonymous cell that pushes content right */
-@media (max-width: 639px) {
-  tr.holographic::before {
-    content: none;
-  }
-}
-
-.holographic:hover::before {
-  left: 150%;
-  transition: left 0.7s ease;
-}
-
-.holographic::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(125deg,
-      rgba(255, 0, 0, 0) 0%,
-      rgba(255, 0, 0, 0) 35%,
-      rgba(255, 255, 255, 0.05) 35%,
-      rgba(255, 255, 255, 0.05) 36%,
-      rgba(255, 0, 0, 0) 36%,
-      rgba(255, 0, 0, 0) 100%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.holographic:hover::after {
-  opacity: 1;
-}
-
-/* Premium Gold Holographic */
-.holographic-premium:hover {
-  box-shadow:
-    0 10px 40px -10px rgba(234, 179, 8, 0.3),
-    0 0 0 1px rgba(234, 179, 8, 0.4);
+.tradingview-hover:hover {
+  background-color: var(--secondary);
 }

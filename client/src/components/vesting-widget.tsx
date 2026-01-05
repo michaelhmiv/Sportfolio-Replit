@@ -46,7 +46,7 @@ export function VestingWidget({ onVestShares, className, compact = false }: Vest
     }
 
     const vesting = data.vesting;
-    
+
     const calculateProjection = () => {
       if (!vesting.lastAccruedAt) {
         setProjectedShares(vesting.sharesAccumulated || 0);
@@ -97,15 +97,15 @@ export function VestingWidget({ onVestShares, className, compact = false }: Vest
         data-testid="button-vesting-widget-mobile"
       >
         <div className="relative w-20 h-5">
-          <Progress 
-            value={progress} 
+          <Progress
+            value={progress}
             className={cn(
               "h-5 w-full",
               isAtCap && "bg-yellow-500/20"
             )}
           />
-          <span 
-            className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold text-white mix-blend-difference"
+          <span
+            className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold text-white"
             data-testid="text-vesting-shares-mobile"
           >
             {projectedShares.toLocaleString()} / {capLimit.toLocaleString()}
@@ -128,16 +128,16 @@ export function VestingWidget({ onVestShares, className, compact = false }: Vest
         >
           <span className="text-xs font-medium text-muted-foreground">Vesting</span>
           <div className="relative w-full h-5">
-            <Progress 
-              value={progress} 
+            <Progress
+              value={progress}
               className={cn(
                 "h-5 w-full",
                 isAtCap && "bg-yellow-500/20"
               )}
               data-testid="progress-vesting-widget"
             />
-            <span 
-              className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold text-white mix-blend-difference"
+            <span
+              className="absolute inset-0 flex items-center justify-center text-[10px] font-mono font-bold text-white"
               data-testid="text-vesting-shares"
             >
               {projectedShares.toLocaleString()} / {capLimit.toLocaleString()}
@@ -156,8 +156,8 @@ export function VestingWidget({ onVestShares, className, compact = false }: Vest
               {projectedShares.toLocaleString()} / {capLimit.toLocaleString()}
             </span>
           </div>
-          <Progress 
-            value={progress} 
+          <Progress
+            value={progress}
             className={cn(
               "h-2",
               isAtCap && "bg-yellow-500/20"
@@ -167,7 +167,7 @@ export function VestingWidget({ onVestShares, className, compact = false }: Vest
             <span>Rate: {sharesPerHour} shares/hr</span>
             {isAtCap && <span className="text-yellow-500 font-medium">Cap reached!</span>}
           </div>
-          <Button 
+          <Button
             onClick={() => {
               if (onVestShares) onVestShares();
               else openRedemptionModal();

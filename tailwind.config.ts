@@ -7,14 +7,14 @@ export default {
     extend: {
 
       borderRadius: {
-        lg: ".375rem", /* 6px */
-        md: ".25rem", /* 4px */
-        sm: ".125rem", /* 2px */
+        lg: "0.25rem", /* 4px */
+        md: "0.125rem", /* 2px */
+        sm: "0rem", /* 0px */
       },
       colors: {
-        // Trading-specific colors
-        positive: "rgb(34 197 94)", // Green for gains
-        negative: "rgb(239 68 68)", // Red for losses
+        // Trading-specific colors (TradingView Palette)
+        positive: "#089981", // Teal-Green for gains
+        negative: "#f23645", // Bright Red for losses
 
         // Flat / base colors (regular buttons)
         background: "hsl(var(--background) / <alpha-value>)",
