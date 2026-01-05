@@ -11,6 +11,7 @@ import { syncRoster } from "./sync-roster";
 import { syncSchedule } from "./sync-schedule";
 import { syncStats } from "./sync-stats";
 import { syncStatsLive } from "./sync-stats-live";
+import { syncAllLiveStats } from "./sync-all-live-stats";
 import { syncPlayerGameLogs } from "./sync-player-game-logs";
 import { settleContests } from "./settle-contests";
 import { createContests } from "./create-contests";
@@ -23,7 +24,6 @@ import { backfillMarketSnapshots } from "./market-snapshot";
 import { runBotEngineTick } from "../bot/bot-engine";
 import { syncNFLSchedule } from "./sync-nfl-schedule";
 import { syncNFLStats } from "./sync-nfl-stats";
-// NFL contest creation is now handled by unified create_contests job
 import { syncNFLRoster } from "./sync-nfl-roster";
 import { fetchNews } from "./fetch-news";
 import { compileAllDigests } from "./compile-digest";
@@ -213,9 +213,13 @@ export class JobScheduler {
       },
       {
         name: "stats_sync_live",
-        schedule: "*/5 * * * *", // Every 5 minutes for live games
+        schedule: "*/5 * * * *", // Every 5 minutes for live games (all sports)
         enabled: true,
-        handler: syncStatsLive,
+        handler: async () => {
+          // Unified live stats sync for all sports (NBA + NFL)
+          const result = await syncAllLiveStats();
+          return result;
+        },
       },
       {
         name: "create_contests",
@@ -261,20 +265,7 @@ export class JobScheduler {
           };
         },
       },
-      {
-        name: "nfl_stats_sync",
-        schedule: "15 * * * *", // Every hour at minute 15
-        enabled: true,
-        handler: async () => {
-          const result = await syncNFLStats();
-          return {
-            requestCount: 0,
-            recordsProcessed: result.statsProcessed,
-            errorCount: result.errors.length,
-          };
-        },
-      },
-      // NFL contest creation is now handled by the unified 'create_contests' job
+      // NFL stats sync is now handled by unified 'stats_sync_live' job above
     ];
 
     for (const jobConfig of apiJobs) {

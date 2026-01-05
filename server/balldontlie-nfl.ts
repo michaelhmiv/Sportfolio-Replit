@@ -13,6 +13,7 @@
  */
 
 import axios, { AxiosInstance } from "axios";
+import { balldontlieRateLimiter } from "./jobs/rate-limiter";
 
 const API_BASE = "https://api.balldontlie.io/nfl/v1";
 
@@ -158,7 +159,9 @@ export async function fetchActivePlayers(): Promise<NFLPlayer[]> {
         if (cursor) params.cursor = cursor;
 
         try {
-            const response = await apiClient.get<PaginatedResponse<NFLPlayer>>("/players/active", { params });
+            const response = await balldontlieRateLimiter.executeWithRetry(
+                () => apiClient.get<PaginatedResponse<NFLPlayer>>("/players/active", { params })
+            );
             const players = response.data.data || [];
             allPlayers.push(...players);
             cursor = response.data.meta?.next_cursor || null;
@@ -201,7 +204,9 @@ export async function fetchGames(options: {
         if (cursor) params.cursor = cursor;
 
         try {
-            const response = await apiClient.get<PaginatedResponse<NFLGame>>("/games", { params });
+            const response = await balldontlieRateLimiter.executeWithRetry(
+                () => apiClient.get<PaginatedResponse<NFLGame>>("/games", { params })
+            );
             const games = response.data.data || [];
             allGames.push(...games);
             cursor = response.data.meta?.next_cursor || null;
@@ -249,7 +254,9 @@ export async function fetchGameStats(gameIds: number[]): Promise<NFLGameStats[]>
             if (cursor) params.cursor = cursor;
 
             try {
-                const response = await apiClient.get<PaginatedResponse<NFLGameStats>>("/stats", { params });
+                const response = await balldontlieRateLimiter.executeWithRetry(
+                    () => apiClient.get<PaginatedResponse<NFLGameStats>>("/stats", { params })
+                );
                 const stats = response.data.data || [];
                 allStats.push(...stats);
                 cursor = response.data.meta?.next_cursor || null;
@@ -285,7 +292,9 @@ export async function fetchPlayerStats(playerId: number, options?: {
         if (cursor) params.cursor = cursor;
 
         try {
-            const response = await apiClient.get<PaginatedResponse<NFLGameStats>>("/stats", { params });
+            const response = await balldontlieRateLimiter.executeWithRetry(
+                () => apiClient.get<PaginatedResponse<NFLGameStats>>("/stats", { params })
+            );
             const stats = response.data.data || [];
             allStats.push(...stats);
             cursor = response.data.meta?.next_cursor || null;
@@ -316,7 +325,9 @@ export async function fetchSeasonStats(options?: {
         if (cursor) params.cursor = cursor;
 
         try {
-            const response = await apiClient.get<PaginatedResponse<NFLSeasonStats>>("/season_stats", { params });
+            const response = await balldontlieRateLimiter.executeWithRetry(
+                () => apiClient.get<PaginatedResponse<NFLSeasonStats>>("/season_stats", { params })
+            );
             const stats = response.data.data || [];
             allStats.push(...stats);
             cursor = response.data.meta?.next_cursor || null;
@@ -347,7 +358,9 @@ export async function fetchInjuries(options?: {
         if (cursor) params.cursor = cursor;
 
         try {
-            const response = await apiClient.get<PaginatedResponse<NFLInjury>>("/player_injuries", { params });
+            const response = await balldontlieRateLimiter.executeWithRetry(
+                () => apiClient.get<PaginatedResponse<NFLInjury>>("/player_injuries", { params })
+            );
             const injuries = response.data.data || [];
             allInjuries.push(...injuries);
             cursor = response.data.meta?.next_cursor || null;

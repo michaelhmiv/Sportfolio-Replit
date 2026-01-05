@@ -761,8 +761,9 @@ function getPlainTextSportsUrl(game: DailyGame): string {
     // Apply mapping and lowercase for URL
     const awayTeam = (teamCodeMapping[game.awayTeam] || game.awayTeam).toLowerCase();
     const homeTeam = (teamCodeMapping[game.homeTeam] || game.homeTeam).toLowerCase();
+    const sport = game.sport ? game.sport.toLowerCase() : 'nba';
 
-    return `https://plaintextsports.com/nba/${formattedDate}/${awayTeam}-${homeTeam}`;
+    return `https://plaintextsports.com/${sport}/${formattedDate}/${awayTeam}-${homeTeam}`;
   } catch (error) {
     console.error('[Game Card] Error building Plain Text Sports URL:', error);
     return '#';

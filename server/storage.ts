@@ -265,6 +265,7 @@ export interface IStorage {
   createDailyGame(game: InsertDailyGame): Promise<DailyGame>;
   updateDailyGame(id: string, updates: Partial<InsertDailyGame>): Promise<void>;
   updateDailyGameStatus(gameId: string, status: string): Promise<void>;
+  updateDailyGameScore(gameId: string, homeScore: number, awayScore: number, status: string): Promise<void>;
   getGamesByTeam(teamAbbreviation: string, startDate: Date, endDate: Date): Promise<DailyGame[]>;
 
   // Job execution log methods
@@ -2422,6 +2423,18 @@ export class DatabaseStorage implements IStorage {
     await db
       .update(dailyGames)
       .set({ status, lastFetchedAt: new Date() })
+      .where(eq(dailyGames.gameId, gameId));
+  }
+
+  async updateDailyGameScore(gameId: string, homeScore: number, awayScore: number, status: string): Promise<void> {
+    await db
+      .update(dailyGames)
+      .set({
+        homeScore,
+        awayScore,
+        status,
+        lastUpdated: new Date()
+      })
       .where(eq(dailyGames.gameId, gameId));
   }
 

@@ -52,7 +52,7 @@ export class MySportsFeedsRateLimiter {
       const { resolve } = this.queue.shift()!;
       resolve();
       this.processing = false;
-      
+
       // Process next item in queue
       if (this.queue.length > 0) {
         this.processQueue();
@@ -71,7 +71,7 @@ export class MySportsFeedsRateLimiter {
     const now = Date.now();
     const timePassed = now - this.bucket.lastRefill;
     const tokensToAdd = timePassed * this.bucket.refillRate;
-    
+
     this.bucket.tokens = Math.min(
       this.bucket.maxTokens,
       this.bucket.tokens + tokensToAdd
@@ -93,20 +93,20 @@ export class MySportsFeedsRateLimiter {
       try {
         // Wait for rate limit token
         await this.acquire();
-        
+
         // Execute the function
         const result = await fn();
         return result;
       } catch (error: any) {
         lastError = error;
-        
+
         // Check if we should retry
-        const shouldRetry = 
+        const shouldRetry =
           error.response?.status === 429 || // Too Many Requests
           error.response?.status >= 500 || // Server errors
           error.code === 'ECONNRESET' || // Connection issues
           error.code === 'ETIMEDOUT';
-        
+
         if (!shouldRetry || attempt === maxAttempts) {
           throw error;
         }
@@ -142,3 +142,20 @@ export class MySportsFeedsRateLimiter {
 
 // Global rate limiter instance
 export const mysportsfeedsRateLimiter = new MySportsFeedsRateLimiter();
+
+/**
+ * Ball Don't Lie Rate Limiter
+ * 
+ * Uses the same token bucket algorithm for the Ball Don't Lie NFL API.
+ * Conservative defaults: 60 requests per minute (1 per second average)
+ * Adjust based on your actual API tier limits.
+ */
+export class BallDontLieRateLimiter extends MySportsFeedsRateLimiter {
+  constructor() {
+    // 60 requests per minute = 1 request per second average
+    super(60, 60 * 1000);
+  }
+}
+
+// Global Ball Don't Lie rate limiter instance
+export const balldontlieRateLimiter = new BallDontLieRateLimiter();

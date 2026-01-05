@@ -53,12 +53,12 @@ async function getBotHoldings(userId: string): Promise<Map<string, number>> {
       eq(holdings.userId, userId),
       eq(holdings.assetType, "player")
     ));
-  
+
   const holdingsMap = new Map<string, number>();
   for (const holding of allHoldings) {
     holdingsMap.set(holding.assetId, holding.quantity);
   }
-  
+
   return holdingsMap;
 }
 
@@ -67,7 +67,7 @@ async function getBotHoldings(userId: string): Promise<Map<string, number>> {
  */
 async function findContestsToEnter(): Promise<typeof contests.$inferSelect[]> {
   const openContests = await storage.getContests("open");
-  
+
   // Filter to contests with low entry counts (more incentive for bots to join)
   return openContests.filter(c => c.entryCount < 10);
 }
@@ -91,31 +91,31 @@ function buildLineup(
 ): LineupPlayer[] {
   const lineup: LineupPlayer[] = [];
   const teamCounts = new Map<string, number>();
-  
+
   let sharesUsed = 0;
-  
+
   // Sort candidates by tier (prefer better players), then by fair value
   const sortedCandidates = [...candidates].sort((a, b) => {
     if (a.tier !== b.tier) return a.tier - b.tier;
     return b.fairValue - a.fairValue;
   });
-  
+
   // FLEX-FIRST approach: Just add any players the bot holds, up to 7
   for (const candidate of sortedCandidates) {
     const heldShares = holdingsMap.get(candidate.playerId) || 0;
     if (heldShares <= 0) continue;
-    
+
     // Check team constraint (relaxed)
     const teamCount = teamCounts.get(candidate.team) || 0;
     if (teamCount >= MAX_PLAYERS_PER_TEAM) continue;
-    
+
     // Calculate shares to enter (60% max of holdings, within budget)
     const maxFromHoldings = Math.floor(heldShares * MAX_HOLDINGS_PERCENT_PER_PLAYER);
     const remainingBudget = budget - sharesUsed;
     const sharesToEnter = Math.min(maxFromHoldings, remainingBudget, 200); // Cap at 200 per player
-    
+
     if (sharesToEnter <= 0) continue;
-    
+
     // Add to lineup with original position or FLEX
     const position = candidate.position.toUpperCase();
     lineup.push({
@@ -125,17 +125,17 @@ function buildLineup(
       team: candidate.team,
       sharesEntered: sharesToEnter,
     });
-    
+
     teamCounts.set(candidate.team, teamCount + 1);
     sharesUsed += sharesToEnter;
-    
+
     // Cap at 7 players max
     if (lineup.length >= 7) break;
-    
+
     // Stop if we hit budget
     if (sharesUsed >= budget) break;
   }
-  
+
   return lineup;
 }
 
@@ -150,13 +150,13 @@ async function enterContest(
   try {
     // Calculate total shares
     const totalShares = lineup.reduce((sum, p) => sum + p.sharesEntered, 0);
-    
+
     // Validate minimum shares to prevent zero-participation entries
     if (totalShares < MIN_TOTAL_SHARES) {
       console.log(`[ContestBot] Entry rejected: totalShares=${totalShares} < min=${MIN_TOTAL_SHARES}`);
       return false;
     }
-    
+
     // Create contest entry
     const [entry] = await db
       .insert(contestEntries)
@@ -166,7 +166,7 @@ async function enterContest(
         totalSharesEntered: totalShares,
       })
       .returning();
-    
+
     // Add lineup players
     for (const player of lineup) {
       await db.insert(contestLineups).values({
@@ -175,7 +175,7 @@ async function enterContest(
         sharesEntered: player.sharesEntered,
       });
     }
-    
+
     // Update contest entry count, total shares, AND prize pool
     // Prize pool = total shares entered (1 share = $1)
     // BUGFIX: Previously bots weren't updating totalPrizePool, so their shares
@@ -185,10 +185,10 @@ async function enterContest(
       .set({
         entryCount: sql`entry_count + 1`,
         totalSharesEntered: sql`total_shares_entered + ${totalShares}`,
-        totalPrizePool: sql`(total_shares_entered + ${totalShares})::text`,
+        totalPrizePool: sql`(total_shares_entered + ${totalShares})`,
       })
       .where(eq(contests.id, contestId));
-    
+
     return true;
   } catch (error: any) {
     console.error(`[ContestBot] Failed to enter contest:`, error.message);
@@ -210,61 +210,61 @@ export async function executeContestStrategy(
     aggressiveness: parseFloat(profile.aggressiveness),
     profileId: profile.id,
   };
-  
+
   // Check daily limit
   if (config.entriesToday >= config.maxEntriesPerDay) {
     console.log(`[ContestBot] ${profile.botName} hit daily contest entry limit`);
     return;
   }
-  
+
   // Random chance based on aggressiveness
   if (Math.random() > config.aggressiveness) {
     console.log(`[ContestBot] ${profile.botName} skipping contest (random)`);
     return;
   }
-  
+
   // Find contests to enter
   const contestsToEnter = await findContestsToEnter();
-  
+
   if (contestsToEnter.length === 0) {
     console.log(`[ContestBot] ${profile.botName} no suitable contests found`);
     return;
   }
-  
+
   // Get bot's holdings
   const holdingsMap = await getBotHoldings(config.userId);
-  
+
   if (holdingsMap.size === 0) {
     console.log(`[ContestBot] ${profile.botName} has no holdings for contests`);
     return;
   }
-  
+
   // Get player valuations for lineup building
   const candidates = await getPlayersForTrading({
     tier: [1, 2, 3],
     minGamesPlayed: 2,
     limit: 50,
   });
-  
+
   // Try to enter one contest
   for (const contest of contestsToEnter) {
     // Skip if already entered
     if (await hasEnteredContest(config.userId, contest.id)) {
       continue;
     }
-    
+
     // Build lineup
     const lineup = buildLineup(candidates, holdingsMap, config.entryBudget);
-    
+
     // Need at least MIN_LINEUP_SIZE players for a valid lineup (relaxed to 1 for bot liquidity)
     if (lineup.length < MIN_LINEUP_SIZE) {
       console.log(`[ContestBot] ${profile.botName} couldn't build valid lineup (need at least ${MIN_LINEUP_SIZE} players)`);
       continue;
     }
-    
+
     // Enter the contest
     const success = await enterContest(config.userId, contest.id, lineup);
-    
+
     await logBotAction(config.userId, {
       actionType: "contest_entry",
       actionDetails: {
@@ -277,7 +277,7 @@ export async function executeContestStrategy(
       triggerReason: `Contest ${contest.name} has low entries (${contest.entryCount})`,
       success,
     });
-    
+
     if (success) {
       await updateContestEntries(config.profileId);
       console.log(`[ContestBot] ${profile.botName} entered contest ${contest.name}`);
