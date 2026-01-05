@@ -35,6 +35,11 @@ npm run build
 - **Production:** Uses `DATABASE_URL` (Supabase cloud)
 - See [DATABASE.md](../../DATABASE.md) and [/local-dev-database workflow](./local-dev-database.md)
 
+> [!IMPORTANT]
+> **ALWAYS TARGET DEV FIRST**
+> You must always verify changes against the **Development** database first using `process.env.NODE_ENV = 'development'` in scripts.
+> Never apply schema changes or data fixes directly to Production without first validating them in Development.
+
 ## 3. Error Handling
 
 - Always add meaningful console.log statements for debugging

@@ -135,11 +135,34 @@ export async function syncNFLSchedule(): Promise<SyncResult> {
                 const gameId = `nfl_${apiGame.id}`;
 
                 // Determine game status
+                // Determine game status
                 let status = "scheduled";
-                if (apiGame.status === "Final" || apiGame.status === "final") {
+                const rawStatus = apiGame.status?.toLowerCase() || "";
+
+                // Check for time pattern (e.g. "12/27 - 8:00 PM EST")
+                const isTimePattern = rawStatus.match(/\d{1,2}\/\d{1,2}\s*-\s*\d{1,2}:\d{2}\s*(am|pm)/i) ||
+                    rawStatus.match(/\d{1,2}:\d{2}\s*(am|pm)/i);
+
+                if (rawStatus === "final") {
                     status = "completed";
-                } else if (apiGame.status === "In Progress" || apiGame.status === "in_progress") {
+                } else if (
+                    rawStatus === "in progress" ||
+                    rawStatus === "in_progress" ||
+                    rawStatus === "live" ||
+                    rawStatus === "halftime" ||
+                    rawStatus.includes("half") ||
+                    rawStatus.includes("qtr") ||
+                    rawStatus.includes("ot") ||
+                    rawStatus.includes("overtime") ||
+                    (!isTimePattern && !["postponed", "canceled", "cancelled", "scheduled"].includes(rawStatus))
+                ) {
+                    // Assume anything else not matching a time pattern is live/in-progress
                     status = "inprogress";
+                }
+
+                // DEBUG: Log status determination for first 5 games
+                if (result.gamesProcessed <= 5) {
+                    console.log(`[NFL Schedule Sync] DEBUG: Game ${gameId} (${apiGame.visitor_team?.abbreviation}@${apiGame.home_team?.abbreviation}): rawStatus="${apiGame.status}" -> mapped to "${status}", homeScore=${apiGame.home_team_score}, awayScore=${apiGame.visitor_team_score}`);
                 }
 
                 // Parse game date and time
@@ -174,8 +197,9 @@ export async function syncNFLSchedule(): Promise<SyncResult> {
                     venue: apiGame.venue || null,
                     status,
                     startTime,
-                    homeScore: status !== "scheduled" ? apiGame.home_team_score : null,
-                    awayScore: status !== "scheduled" ? apiGame.visitor_team_score : null,
+                    // ALWAYS include scores when API provides them (fixes null score display issue)
+                    homeScore: apiGame.home_team_score ?? null,
+                    awayScore: apiGame.visitor_team_score ?? null,
                 };
 
                 // Check if game exists

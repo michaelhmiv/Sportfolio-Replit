@@ -359,7 +359,7 @@ export async function getMarketMakingCandidates(
   const allCandidates = await getPlayersForTrading({
     tier: targetTiers || [1, 2, 3, 4, 5], // Include ALL tiers for full market coverage
     minGamesPlayed: 1, // Lower threshold to include newer players
-    limit: Math.max(limit * 2, 200), // Fetch more to allow for prioritization
+    // limit: removed to allow selecting from ALL players
   });
 
   // Get players that have no orders (need liquidity bootstrapping)
