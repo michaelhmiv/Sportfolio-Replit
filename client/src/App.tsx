@@ -295,8 +295,8 @@ function Header({ onVestShares }: { onVestShares: () => void }) {
 
   return (
     <header className={cn(
-      "flex items-center justify-between h-16 px-4 border-b bg-card sticky top-0 z-10",
-      isPremium && "shadow-[0_4px_20px_rgba(234,179,8,0.3)] border-b-yellow-500/50"
+      "flex items-center justify-between h-16 px-4 border-b bg-sidebar sticky top-0 z-10",
+      isPremium && "border-b-yellow-500/30"
     )}>
       <div className="flex items-center gap-4">
         <div className="hidden sm:block">

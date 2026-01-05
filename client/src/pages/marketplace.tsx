@@ -553,14 +553,14 @@ export default function Marketplace() {
                       {/* Mobile View - Card List */}
                       <div className="sm:hidden space-y-2">
                         {/* Premium Share Card */}
-                        <div className="bg-gradient-to-r from-yellow-500/5 to-amber-500/5 border border-yellow-500/20 rounded-lg p-3 hover-elevate">
+                        <div className="bg-sidebar border border-yellow-500/30 rounded-lg p-3">
                           <div className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2 min-w-0 flex-1">
                               <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center flex-shrink-0">
                                 <Crown className="w-4 h-4 text-yellow-500" />
                               </div>
                               <div className="min-w-0 flex-1">
-                                <div className="font-medium text-sm text-yellow-500">Premium Share</div>
+                                <div className="font-bold text-sm text-yellow-500">Premium Share</div>
                                 <div className="flex items-center gap-1.5 text-xs flex-wrap">
                                   <span className="text-muted-foreground">30 Days Access</span>
                                 </div>
@@ -594,7 +594,7 @@ export default function Marketplace() {
                         {/* Player Cards */}
                         {players.map((player, index) => (
                           <div key={`mobile-${player.id}`} className="space-y-2">
-                            <div className="bg-card border rounded-lg p-3 hover-elevate holographic">
+                            <div className="bg-card border rounded-lg p-3">
                               <div className="flex items-center justify-between gap-1">
                                 <div className="flex items-center gap-1.5 min-w-0 flex-1">
                                   <div className="flex-shrink-0 cursor-pointer -ml-1" onClick={(e) => toggleWatchList(player.id, e)}>
@@ -717,7 +717,7 @@ export default function Marketplace() {
                           </thead>
                           <tbody>
                             {/* Premium Share Row */}
-                            <tr className="border-b hover-elevate bg-gradient-to-r from-yellow-500/5 to-amber-500/5">
+                            <tr className="border-b bg-sidebar hover:bg-sidebar/80">
                               <td className="w-16 px-1 py-1.5 text-center"></td>
                               <td className="px-2 py-1.5 text-left">
                                 <div className="flex items-center gap-2">

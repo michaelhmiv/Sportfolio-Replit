@@ -41,21 +41,21 @@ function HeroCard() {
         rotateX,
         transformStyle: "preserve-3d",
       }}
-      className="relative h-96 w-72 rounded-2xl bg-gradient-to-br from-primary/30 to-black/50 p-1 shadow-2xl backdrop-blur-sm"
+      className="relative h-96 w-72 rounded-lg bg-card border shadow-xl p-1"
     >
       <div
         style={{
           transform: "translateZ(75px)",
           transformStyle: "preserve-3d",
         }}
-        className="absolute inset-4 grid place-content-center rounded-xl bg-black/40 shadow-inner group overflow-hidden"
+        className="absolute inset-4 grid place-content-center rounded-md bg-muted/20 border shadow-inner group overflow-hidden"
       >
         <div className="absolute top-4 left-4">
           <Badge className="bg-primary text-black font-bold">LEGENDARY</Badge>
         </div>
 
         {/* Mock Player Image/Graphic */}
-        <div className="w-32 h-32 rounded-full bg-gradient-to-tr from-primary to-emerald-400 blur-2xl opacity-50 mb-4 animate-pulse" />
+        <div className="w-32 h-32 rounded-full bg-primary/20 flex items-center justify-center mb-4" />
         <Trophy
           style={{ transform: "translateZ(50px)" }}
           className="w-24 h-24 text-primary absolute"
@@ -67,8 +67,8 @@ function HeroCard() {
         </div>
       </div>
 
-      {/* Decorative border glow */}
-      <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-br from-primary via-transparent to-primary/50 opacity-20 group-hover:opacity-100 transition-opacity" />
+      {/* Decorative border highlight */}
+      <div className="absolute inset-px rounded-md border border-primary/20 pointer-events-none" />
     </motion.div>
   );
 }
@@ -76,62 +76,18 @@ function HeroCard() {
 export default function Landing() {
   return (
     <div className="min-h-screen relative overflow-hidden">
-      {/* Animated Gradient Background */}
-      <div className="absolute inset-0 -z-10">
-        {/* Base gradient */}
-        <div className="absolute inset-0 bg-gradient-to-b from-background via-background to-muted/30" />
+      {/* Solid Technical Background */}
+      <div className="absolute inset-0 -z-10 bg-background" />
 
-        {/* Animated ambient orbs */}
-        <motion.div
-          className="absolute top-0 -left-40 w-80 h-80 bg-primary/5 rounded-full blur-3xl"
-          animate={{
-            x: [0, 100, 0],
-            y: [0, 50, 0],
-            scale: [1, 1.2, 1],
-          }}
-          transition={{
-            duration: 20,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-        <motion.div
-          className="absolute top-1/4 -right-40 w-96 h-96 bg-primary/3 rounded-full blur-3xl"
-          animate={{
-            x: [0, -80, 0],
-            y: [0, 80, 0],
-            scale: [1.2, 1, 1.2],
-          }}
-          transition={{
-            duration: 25,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-        <motion.div
-          className="absolute bottom-1/4 left-1/4 w-64 h-64 bg-chart-2/5 rounded-full blur-3xl"
-          animate={{
-            x: [0, 60, 0],
-            y: [0, -40, 0],
-            scale: [1, 1.3, 1],
-          }}
-          transition={{
-            duration: 18,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-
-        {/* Subtle grid overlay */}
-        <div
-          className="absolute inset-0 opacity-[0.02]"
-          style={{
-            backgroundImage: `linear-gradient(hsl(var(--foreground)) 1px, transparent 1px),
-                              linear-gradient(90deg, hsl(var(--foreground)) 1px, transparent 1px)`,
-            backgroundSize: '50px 50px'
-          }}
-        />
-      </div>
+      {/* Subtle grid overlay */}
+      <div
+        className="absolute inset-0 opacity-[0.05] pointer-events-none -z-5"
+        style={{
+          backgroundImage: `linear-gradient(hsl(var(--border)) 1px, transparent 1px),
+                            linear-gradient(90deg, hsl(var(--border)) 1px, transparent 1px)`,
+          backgroundSize: '40px 40px'
+        }}
+      />
 
       {/* Hero Section */}
       <div className="container px-4 pt-8 sm:pt-16 pb-6 sm:pb-10">
@@ -150,9 +106,9 @@ export default function Landing() {
             </motion.div>
             Live NBA Fantasy Trading
           </motion.div>
-          <h1 className="text-5xl sm:text-7xl md:text-8xl font-black italic tracking-tighter mb-4 leading-[0.9] text-white">
-            FREE MARKET<br />
-            <span className="text-primary drop-shadow-[0_0_20px_rgba(0,255,135,0.4)]">FANTASY</span>
+          <h1 className="text-5xl sm:text-7xl md:text-8xl font-black italic tracking-tighter mb-4 leading-[0.9] text-foreground uppercase">
+            Free Market<br />
+            <span className="text-primary">Fantasy</span>
           </h1>
           <div className="flex flex-col lg:flex-row gap-8 items-center mt-12">
             <div className="flex-1 space-y-6">
@@ -160,7 +116,7 @@ export default function Landing() {
                 Your portfolio lasts a player's entire career. Trade shares, vest value, and own the game.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
-                <Button asChild size="lg" className="w-full sm:w-auto text-lg h-14 px-10 rounded-full">
+                <Button asChild size="lg" className="w-full sm:w-auto text-lg h-14 px-10 rounded-md">
                   <Link href="/login" data-testid="button-hero-login" className="flex items-center justify-center gap-2">
                     Get Started
                     <ArrowRight className="w-5 h-5" />
@@ -246,9 +202,7 @@ export default function Landing() {
       {/* CTA Section */}
       <div className="container px-4 py-6 sm:py-6 pb-12 sm:pb-20">
         <div className="mx-auto max-w-3xl">
-          <Card className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground border-0 overflow-hidden relative">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-primary-foreground/5 rounded-full -translate-y-16 translate-x-16"></div>
-            <div className="absolute bottom-0 left-0 w-24 h-24 bg-primary-foreground/5 rounded-full translate-y-12 -translate-x-12"></div>
+          <Card className="bg-primary text-primary-foreground border-0 overflow-hidden relative rounded-lg">
             <CardHeader className="relative pb-3 sm:pb-4">
               <CardTitle className="text-lg sm:text-2xl text-center">Start Building Your Portfolio</CardTitle>
               <CardDescription className="text-center text-primary-foreground/90 text-xs sm:text-base pt-1 sm:pt-2">
@@ -256,7 +210,7 @@ export default function Landing() {
               </CardDescription>
             </CardHeader>
             <CardContent className="flex justify-center pb-4 sm:pb-6 relative">
-              <Button variant="secondary" size="lg" asChild className="shadow-lg">
+              <Button variant="secondary" size="lg" asChild className="shadow-lg rounded-md">
                 <Link href="/login" data-testid="button-cta-login" className="flex items-center gap-2">
                   <DollarSign className="w-4 h-4" />
                   Get Started Free

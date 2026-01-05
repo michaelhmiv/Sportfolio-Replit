@@ -135,8 +135,8 @@ export function BottomNav() {
       </Drawer>
 
       <nav className={cn(
-        "fixed bottom-0 left-0 right-0 z-50 bg-card border-t sm:hidden select-none",
-        isPremium && "shadow-[0_-4px_20px_rgba(234,179,8,0.3)] border-t-yellow-500/50"
+        "fixed bottom-0 left-0 right-0 z-50 bg-sidebar border-t sm:hidden select-none",
+        isPremium && "border-t-yellow-500/30"
       )}>
         <div className="grid grid-cols-5 h-16 max-w-md mx-auto">
           {navItems.map((item) => {

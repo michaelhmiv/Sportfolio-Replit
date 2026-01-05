@@ -151,7 +151,7 @@ export function DashboardScanners() {
             {/* Desktop: 3-column Grid */}
             <div className="hidden lg:grid grid-cols-3 gap-6">
                 {sections.map((section, idx) => (
-                    <div key={idx} className={`border rounded-xl overflow-hidden bg-card h-full flex flex-col ${section.color.border} glass`}>
+                    <div key={idx} className={`border rounded-lg overflow-hidden bg-card h-full flex flex-col ${section.color.border}`}>
                         <div className={`p-3 border-b flex items-center justify-between ${section.color.bg}`}>
                             <div className="flex items-center gap-2 font-bold text-sm">
                                 {section.icon}
@@ -235,7 +235,7 @@ function ScannerCarousel({ scanData, topRisers, topMc, mode }: { scanData: Scann
 
         return (
             <CarouselItem className={`${isExpanded ? "basis-[95%] lg:basis-[48%]" : "basis-[85%]"} pl-4`}>
-                <div className={`border rounded-xl overflow-hidden bg-card h-full flex flex-col ${color.border}`}>
+                <div className={`border rounded-lg overflow-hidden bg-card h-full flex flex-col ${color.border}`}>
                     <div className={`p-3 border-b flex items-center justify-between ${color.bg}`}>
                         <div className="flex items-center gap-2 font-bold text-sm">
                             {icon}
@@ -509,8 +509,7 @@ function ScannerRowCompact({ rank, player, label, value, color }: any) {
 
 function ScannerCard({ title, icon, colorConfig, children }: any) {
     return (
-        <Card className={`transition-all duration-300 ${colorConfig.border} ${colorConfig.hover} overflow-hidden group`}>
-            <div className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-transparent via-transparent to-${colorConfig.bg.split('-')[1]}/10 pointer-events-none`} />
+        <Card className={`transition-all duration-300 ${colorConfig.border} ${colorConfig.hover} overflow-hidden group rounded-lg`}>
             <CardHeader className="p-3 pb-2 border-b border-border/50">
                 <div className="flex items-center justify-between">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">

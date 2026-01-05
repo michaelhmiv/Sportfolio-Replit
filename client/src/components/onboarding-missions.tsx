@@ -80,7 +80,7 @@ export function OnboardingMissions() {
     if (completedCount === missions.length) return null;
 
     return (
-        <Card className="border-primary/20 bg-card/40 backdrop-blur-sm overflow-hidden relative shadow-lg holographic">
+        <Card className="border border-primary/20 bg-card overflow-hidden relative shadow-lg rounded-lg">
             <CardHeader
                 className="py-3 px-4 cursor-pointer select-none"
                 onClick={() => setIsExpanded(!isExpanded)}
@@ -109,7 +109,7 @@ export function OnboardingMissions() {
                     <div className="mt-2">
                         <Progress value={progress} className="h-1 bg-muted/50">
                             <div
-                                className="h-full bg-gradient-to-r from-primary to-emerald-400 transition-all duration-500 ease-out"
+                                className="h-full bg-primary transition-all duration-500 ease-out"
                                 style={{ width: `${progress}%` }}
                             />
                         </Progress>
@@ -133,7 +133,7 @@ export function OnboardingMissions() {
                                 </div>
                                 <Progress value={progress} className="h-1.5 bg-muted/50">
                                     <div
-                                        className="h-full bg-gradient-to-r from-primary to-emerald-400 transition-all duration-500 ease-out"
+                                        className="h-full bg-primary transition-all duration-500 ease-out"
                                         style={{ width: `${progress}%` }}
                                     />
                                 </Progress>
